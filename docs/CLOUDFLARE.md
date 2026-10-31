@@ -77,3 +77,9 @@ compatibilidade das migrações antes de reverter código.
 
 Mantenha backups do PostgreSQL conforme a retenção contratada no Supabase. O
 snapshot local da transferência é uma cópia histórica, não um backup contínuo.
+
+## CI, CD e evolução
+
+O workflow `CD Cloudflare` publica automaticamente a revisão da `main` aprovada
+pelo CI. O experimento de alterações autônomas usa esse mesmo caminho. Consulte
+[CODE_EVOLUTION.md](CODE_EVOLUTION.md) para escopo, credenciais, limites e rollback.

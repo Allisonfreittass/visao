@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
-import { appEnvironment, type Env } from "./application";
+import { type Env } from "./application";
+import { ensureRunning } from "./lifecycle";
 
 export class VisaoBackend extends DurableObject<Env> {
   private starting?: Promise<void>;
@@ -7,10 +8,7 @@ export class VisaoBackend extends DurableObject<Env> {
 
   private async ready(): Promise<void> {
     const container = this.ctx.container!;
-    if (!container.running) {
-      container.start({ image: container.images.base, instance: "lite", enableInternet: true,
-        env: appEnvironment(this.env) });
-    }
+    await ensureRunning(container, this.env);
     await container.setInactivityTimeout(10 * 60 * 1000);
     const port = container.getTcpPort(8000);
     for (let attempt = 0; attempt < 120; attempt++) {

@@ -85,6 +85,7 @@ export interface StudyNotebook {
   scheduler?: { last_tick_at: string; status: string } | null;
   enabled: boolean;
   paused: boolean;
+  code_evolution?: Array<{ id: string; status: string; summary?: string; reason?: string; files?: string[]; commit?: string; run_url?: string }>;
   interval_hours: number;
   next_eligible_at: string | null;
   source: string;

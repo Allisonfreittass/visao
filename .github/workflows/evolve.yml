@@ -1,0 +1,46 @@
+name: VISÃO code evolution
+on:
+  schedule:
+    - cron: '23 14 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: visao-code-evolution
+  cancel-in-progress: false
+jobs:
+  evolve:
+    if: vars.VISAO_CODE_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Request one bounded code proposal
+        id: proposal
+        env:
+          VISION_CODE_AUTONOMY_KEY: ${{ secrets.VISION_CODE_AUTONOMY_KEY }}
+        run: python infrastructure/evolution/runner.py propose
+      - name: Build isolated test environment
+        if: steps.proposal.outputs.changed == 'true'
+        run: docker build -f infrastructure/evolution/Dockerfile -t visao-candidate .
+      - name: Test without network or production credentials
+        if: steps.proposal.outputs.changed == 'true'
+        run: docker run --rm --network none --memory 1g --cpus 2 --pids-limit 256 --cap-drop ALL --security-opt no-new-privileges visao-candidate
+      - name: Commit the tested change and trigger CI
+        if: steps.proposal.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VISION_CODE_AUTONOMY_KEY: ${{ secrets.VISION_CODE_AUTONOMY_KEY }}
+        run: python infrastructure/evolution/runner.py publish
+      - name: Record a rejected attempt
+        if: failure() && steps.proposal.outputs.changed == 'true'
+        env:
+          VISION_CODE_AUTONOMY_KEY: ${{ secrets.VISION_CODE_AUTONOMY_KEY }}
+        run: python infrastructure/evolution/runner.py reject

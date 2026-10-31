@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
+from core.evolution.service import recent_runs
 from core.policies.autonomy import is_paused
 from core.study.service import INTERVAL, enabled, next_opportunity
 from infrastructure.database.audit import record_audit
@@ -53,6 +54,7 @@ def notebook(db: DbSession, user: CurrentUser) -> dict[str, Any]:
     )
     scheduler = db.get(SystemFlag, "cloud_scheduler")
     return {
+        "code_evolution": recent_runs(db),
         "scheduler": scheduler.value if scheduler else None,
         "enabled": enabled(user),
         "paused": is_paused(db),

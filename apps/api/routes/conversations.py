@@ -156,6 +156,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         context_char_budget=settings.llm_context_char_budget,
         tts_approved_voices=settings.tts_approved_voices,
         stt_model=settings.stt_model,
+        code_autonomy_enabled=settings.code_autonomy_enabled,
     )
 
 

@@ -23,6 +23,7 @@
   "exports": { "VisaoBackend": { "type": "durable-object", "storage": "sqlite" } },
   "vars": {
     "VISION_ENVIRONMENT": "production",
+    "VISION_CODE_AUTONOMY_ENABLED": "true",
     "VISION_DATABASE_SCHEMA": "visao",
     "VISION_LOG_LEVEL": "INFO",
     "VISION_CURIOSITY_ENABLED": "true",

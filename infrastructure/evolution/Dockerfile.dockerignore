@@ -1,0 +1,10 @@
+.git
+.venv
+.env
+*.db
+**/__pycache__
+**/node_modules
+**/.wrangler
+.code-run
+models
+docs

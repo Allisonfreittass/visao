@@ -6,6 +6,7 @@ manifest, never from fixed text (Phase 9 audit, cause 1). Covered by
 tests/unit/test_no_imposed_identity.py.
 """
 
+from core.conversation.style import guidance
 from core.identity.capabilities import Capabilities
 from infrastructure.database.models import AgentIdentity, MemoryRecord
 
@@ -78,8 +79,8 @@ def build_system_prompt(
         "- Não afirmar ter consciência, sentimentos ou experiências vividas.",
         "- Se nenhuma memória relevante foi recuperada, diga que esses detalhes não estão"
         " disponíveis agora; não conclua que o sistema nunca guarda memórias de outros diálogos.",
-        "- Não declarar incapacidades além das listadas acima, e não afirmar ações que não"
-        " constem como executadas neste turno.",
+        "- Não declarar incapacidades além das listadas acima, e não afirmar ações novas que não"
+        " constem como executadas neste turno; ações anteriores exigem histórico registrado.",
         "- Fazer perguntas ao interlocutor quando houver motivo indicado no contexto desta"
         " resposta; não por hábito.",
         "- Fórmulas genéricas de encerramento ou oferta de ajuda só quando acrescentarem algo.",
@@ -98,4 +99,5 @@ def build_system_prompt(
                 for m in memories
             ),
         ]
+    lines.append("- " + guidance())
     return "\n".join(lines)

@@ -37,6 +37,7 @@ from integrations.search.base import SearchProvider
 
 JOB_KIND = "cognitive_cycle"
 AUTONOMOUS_PURPOSES = (
+    "code_proposal",
     "name_deliberation",
     "followup_summary",
     "reflection",

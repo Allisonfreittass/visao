@@ -7,6 +7,7 @@ from apps.api.routes import (
     cognition,
     conversations,
     curiosity,
+    evolution,
     goals,
     health,
     memory,
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(cognition.router)
     app.include_router(study.router)
     app.include_router(cloud.router)
+    app.include_router(evolution.router)
     return app
 
 

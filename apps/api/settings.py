@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cloud_tick_key: SecretStr | None = Field(default=None, min_length=32)
 
+    build_sha: str = "local"
+    code_autonomy_enabled: bool = False
+    code_autonomy_key: SecretStr | None = Field(default=None, min_length=32)
+
     # LLM: any OpenAI-compatible endpoint. Prices are mandatory: without them spending can't be
     # measured or capped, so the provider stays disabled.
     llm_provider_name: str | None = None

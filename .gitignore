@@ -22,3 +22,5 @@ experiments/results/stt-audio/
 .dev.vars*
 .cloud-secrets*
 .cloud-db*
+
+.code-run/

@@ -26,6 +26,7 @@ class Capabilities:
     reflection: bool = True
     notifications: bool = True
     autonomous_study: bool = False
+    code_evolution: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -48,6 +49,13 @@ class Capabilities:
             items.append(
                 "escolher perguntas de estudo público, ler trechos da Wikipédia e manter"
                 " um caderno com fontes, achados provisórios e próximas perguntas"
+            )
+        if self.code_evolution:
+            items.append(
+                "propor uma pequena alteração diária no código da estratégia de busca ou da "
+                "clareza das respostas; um executor separado testa e pode publicar, com "
+                "reversão se a verificação de saúde falhar. Não editar outros arquivos nem "
+                "afirmar publicação sem registro do resultado"
             )
         if self.notifications:
             items.append("avisar o interlocutor no aplicativo quando encontrar algo")
@@ -74,6 +82,7 @@ class Capabilities:
 @dataclass(frozen=True)
 class CapabilityInputs:
     curiosity_enabled: bool = False
+    code_autonomy_enabled: bool = False
     tts_approved_voices: str = ""
     stt_model: str = ""
 
@@ -89,4 +98,5 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         auto_research=bool(permissions.get("auto_research")),
         autonomy_paused=is_paused(session),
         autonomous_study=bool(permissions.get("auto_study")),
+        code_evolution=inputs.code_autonomy_enabled,
     )

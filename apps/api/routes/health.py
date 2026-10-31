@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from apps.api.deps import DbSession
+from apps.api.deps import AppSettings, DbSession
 from infrastructure.database.session import ping
 
 router = APIRouter(tags=["health"])
@@ -26,3 +26,8 @@ def ready(db: DbSession) -> JSONResponse:
         logger.warning("database not ready", extra={"event": "ready_check_failed"})
         return JSONResponse(status_code=503, content={"status": "unavailable", "database": "down"})
     return JSONResponse(content={"status": "ok", "database": "up"})
+
+
+@router.get("/release")
+def release(settings: AppSettings) -> dict[str, str]:
+    return {"revision": settings.build_sha}

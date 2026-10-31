@@ -22,6 +22,7 @@ from core.memory import policy
 from core.memory.text import fold, overlap, tokens
 from core.policies.autonomy import is_paused
 from core.research.budget import searches_today
+from core.study.strategy import candidate_queries
 from infrastructure.database.models import (
     KnowledgeGap,
     MemoryRecord,
@@ -344,7 +345,7 @@ def study_once(
             if retry_context
             else set()
         )
-        candidates = [q for q in dict.fromkeys([query, topic]) if fold(q) not in previous_queries]
+        candidates = [q for q in candidate_queries(query, topic) if fold(q) not in previous_queries]
         if not candidates:
             return finish("SKIPPED", "repeated_query")
         for candidate in candidates:

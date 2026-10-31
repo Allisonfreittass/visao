@@ -54,6 +54,11 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
   }
 
   const latest = notebook?.entries[0];
+  const evolutionStatus: Record<string, string> = {
+    planning: "Analisando uma melhoria", proposed: "Proposta aguardando testes", tested: "Testada, aguardando publicação",
+    published: "Publicada", rejected: "Rejeitada nos testes ou na publicação", reverted: "Revertida",
+    no_change: "Sem mudança justificada", failed: "Tentativa interrompida",
+  };
   return (
     <section className="study-panel">
       <div className="study-title">
@@ -77,6 +82,15 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
             Próxima oportunidade a partir de {utcDate(notebook.next_eligible_at).toLocaleString("pt-BR")}, conforme o ciclo e o orçamento disponíveis.
           </p>}
           {!latest && <p className="study-empty">Quando houver uma rodada, você verá aqui a pergunta, as fontes e o que ainda falta descobrir.</p>}
+          {!!notebook.code_evolution?.length && <article className="study-entry">
+            <h3>Evolução do código</h3>
+            <p className="note">Alterações autônomas na estratégia de busca e na clareza das respostas. Os testes e a publicação ficam fora do código que posso modificar. A pausa de autonomia também pausa novas alterações.</p>
+            {notebook.code_evolution.map(run => <div key={run.id}>
+              <h4>{run.summary ?? "Verificação de melhoria"} · {evolutionStatus[run.status] ?? run.status}</h4>
+              {run.reason && <p className="note">{run.reason}</p>}
+              {run.run_url && <a href={run.run_url} target="_blank" rel="noopener noreferrer">Ver execução de {run.id}</a>}
+            </div>)}
+          </article>}
           {notebook.entries.map((entry) => <article className="study-entry" key={entry.id}>
             <div className="study-entry-heading"><span>{STATUS[entry.status] ?? entry.status}</span><time>{utcDate(entry.created_at).toLocaleString("pt-BR")}</time></div>
             <h3>{entry.question || "Buscando uma linha de investigação"}</h3>
