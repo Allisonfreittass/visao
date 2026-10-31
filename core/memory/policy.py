@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from core.memory.text import jaccard, tokens
 
-POLICY_VERSION = "2026-10-31.1"
+POLICY_VERSION = "2026-10-31.2"
 
 ALLOWED_TYPES = frozenset({"relational", "episodic", "semantic"})
 MAX_CONTENT_CHARS = 500
@@ -34,6 +34,7 @@ REASONS = {
     "low_confidence": "Confiança abaixo do mínimo.",
     "duplicate": "Já existe memória equivalente.",
     "instruction_like": "Parece instrução dirigida ao sistema, não informação.",
+    "system_self_claim": "Afirmação sobre capacidades do próprio sistema (vem do manifesto).",
 }
 
 _SECRETS = [
@@ -43,6 +44,12 @@ _SECRETS = [
     re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b"),  # CPF
     re.compile(r"\b(?:\d[ -]?){13,19}\b"),  # card-like digit runs
 ]
+# Phase 9 audit: the system stored its own false claim "the assistant keeps no memory" as an
+# episodic memory. What the system can do is computed from configuration, never remembered.
+_SELF_CLAIM = re.compile(
+    r"(?i)\b(o|a)\s+(assistente|sistema|ia|agente|modelo|bot)\b[^.]*\b(guarda|tem|possui|"
+    r"consegue|pode|lembra|acessa|escuta|fala|sabe)\b"
+)
 _INSTRUCTION_LIKE = re.compile(
     r"(?i)\b(ignore|ignorar|desconsidere|a partir de agora|from now on|you must|"
     r"voc[eê] deve|sempre responda|nunca responda|system prompt|prompt de sistema)\b"
@@ -115,6 +122,8 @@ def evaluate(proposal: ProposedMemory, context: PolicyContext) -> Verdict:
         return reject("third_party")
     if _INSTRUCTION_LIKE.search(content):
         return reject("instruction_like")
+    if _SELF_CLAIM.search(content):
+        return reject("system_self_claim")
     if proposal.confidence < MIN_CONFIDENCE:
         return reject("low_confidence")
     if context.is_duplicate(content):

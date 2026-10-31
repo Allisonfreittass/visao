@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     research_per_conversation: int = Field(default=5, ge=0)
     research_max_results: int = Field(default=3, ge=1, le=10)
 
+    # Autonomous cycle (docs/AUTONOMY.md): one scheduled job per window, plus a daily budget for
+    # everything the agent does on its own. Zero calls = no autonomous model call at all.
+    autonomy_cycle_minutes: int = Field(default=60, ge=5)
+    autonomy_llm_calls_per_day: int = Field(default=20, ge=0)
+    autonomy_tokens_per_day: int = Field(default=60_000, ge=0)
+    autonomy_max_actions_per_cycle: int = Field(default=3, ge=0)
+    autonomy_max_seconds: float = Field(default=120.0, gt=0)
+
     # Budgets in USD (docs/COSTS.md). Enforced in code before every call.
     llm_daily_budget_usd: Decimal = Field(default=Decimal("1.50"), ge=0)
     llm_conversation_budget_usd: Decimal = Field(default=Decimal("0.30"), ge=0)

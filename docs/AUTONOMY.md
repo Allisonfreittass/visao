@@ -1,6 +1,6 @@
 # Autonomia: metas, iniciativas e limites
 
-> Estado: **Fase 5 implementada.** Primeira coisa que o sistema faz sem mensagem do usuário:
+> Estado: **Fase 5 implementada; ciclo autônomo na Fase 9** (seção no fim). Primeira coisa que o sistema faz sem mensagem do usuário:
 > retomar uma pergunta de fato público que ficou sem resposta, **só depois de aprovação**.
 
 ## Princípios
@@ -67,3 +67,32 @@ infraestrutura: rejeitado.
 - A pausa é global, não por usuário (adequado ao uso single-user atual).
 - `PROPOSE_GOAL` não é uma ação direta da curiosidade: a proposta acontece depois, a partir do
   resultado (inconclusivo/adiado).
+
+## Ciclo autônomo (Fase 9)
+
+`core/autonomy/cycle.py`. Disparado por agenda, com um job `cognitive_cycle` idempotente por
+janela de `VISION_AUTONOMY_CYCLE_MINUTES` (padrão 60). Nunca é um laço contínuo. Detectar
+oportunidades só lê o banco; o modelo só é chamado para executar.
+
+| Oportunidade | Ação | Precisa de |
+|---|---|---|
+| lacuna de fato público `DEFERRED`/`INCONCLUSIVE` | propõe meta de retomada | nada (propor é grátis) |
+| meta avaliada | aprova por permissão permanente e pesquisa | `auto_research` ligado pelo dono |
+| conversa sem mensagens há 30 min e sem reflexão | reflexão | orçamento |
+| nome `null`, ≥ 3 conversas, ≥ 1 dia desde o genesis, sem deliberação nos últimos 30 dias | agenda deliberação de nome | orçamento |
+
+Limites, todos aplicados em código:
+
+- **Pausa global:** não roda nada.
+- **Orçamento de autonomia:**
+  - `VISION_AUTONOMY_LLM_CALLS_PER_DAY`, padrão 20;
+  - `VISION_AUTONOMY_TOKENS_PER_DAY`, padrão 60000;
+  - `VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE`, padrão 3;
+  - `VISION_AUTONOMY_MAX_SECONDS`, padrão 120.
+
+  O orçamento conta só os propósitos autônomos (`name_deliberation`, `followup_summary`,
+  `reflection`). Com orçamento zero, nada que chama o modelo roda.
+- **`auto_research`:** desligado por padrão. Só o dono liga, pelo painel de iniciativas ou por
+  `PUT /autonomy/permissions`. Sem ele, a meta espera aprovação em `/approvals`.
+- **Registro:** cada ação vira uma linha em `decisions` com `origin=autonomous`, visível em
+  `GET /decisions`.

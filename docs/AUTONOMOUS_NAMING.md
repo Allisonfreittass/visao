@@ -1,9 +1,8 @@
 # Formação autônoma do nome
 
-> Estado: **registro implementado na Fase 1a** (`core/identity/naming.py`): esquema, eventos
-> append-only, transação e histórico. **O mecanismo de deliberação que decide escolher um nome
-> ainda não existe**: hoje nada chama `record_naming_decision` fora dos testes, então o nome
-> permanece `null`. Não há endpoint para definir nome, e não haverá.
+> Estado: **registro na Fase 1a, deliberação na Fase 9** (`core/identity/name_deliberation.py`).
+> Não há endpoint para *definir* nome, e não haverá: `POST /identity/name/deliberate` só pede ao
+> próprio sistema que delibere, e o resultado pode ser escolher, adiar ou recusar.
 
 ## Regras
 
@@ -53,3 +52,22 @@ identity_name_events(
 - Troca de LLM não apaga `chosen_name` nem `name_history`.
 - Mudança de nome preserva UUID e eventos anteriores.
 - Varredura de prompts: nenhum prompt obriga ou sugere escolher nome.
+
+## Deliberação (Fase 9)
+
+- **Gatilhos:**
+  - alguém pergunta sobre o nome; o detector `asks_about_name` agenda um job na hora;
+  - o ciclo autônomo, com a questão em aberto desde o genesis (ver [AUTONOMY.md](AUTONOMY.md));
+  - o pedido explícito do dono.
+
+  Há um intervalo mínimo de 3 dias entre deliberações.
+- **Entrada:** fatos do sistema (data de criação, número de conversas, memórias, histórico de
+  nome). O prompt oferece escolher, adiar ou recusar, **sem lista de nomes**: as alternativas
+  precisam ser geradas pelo próprio sistema.
+- **Saída:**
+  - um evento em `identity_name_events`, com alternativas consideradas e justificativa breve;
+  - se a decisão for escolher, um aviso ao dono ("Decidi um nome: …").
+- **Consulta:** `GET /identity/name` mostra o nome atual e o histórico.
+- **Primeiro resultado real** (avaliação da Fase 9): `DEFERRED`, por histórico insuficiente,
+  com alternativas próprias. Ver
+  [research/curiosity_evaluation.md](research/curiosity_evaluation.md).

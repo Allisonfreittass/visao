@@ -9,7 +9,7 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fases 0–6 construídas.** Concluídas: 0, 1, 3, 4 e 6; implementadas com pendências de uso real:
+**Fases 0–6 e 9 construídas.** Concluídas: 0, 1, 3, 4 e 6; implementadas com pendências de uso real:
 2 (voz) e 5 (iniciativas). Avaliações em [docs/EVALUATION.md](docs/EVALUATION.md).
 
 - Identidade mínima (UUID, nome `null`) e conversa via LLM substituível (qualquer endpoint
@@ -24,6 +24,10 @@ um LLM substituível.
   separado ([docs/AUTONOMY.md](docs/AUTONOMY.md)).
 - Adaptação: o jeito de responder se ajusta ao seu retorno de forma versionada e reversível
   ([docs/IDENTITY.md](docs/IDENTITY.md)).
+- Fase 9: a resposta parte do que o sistema de fato pode fazer (manifesto de capacidades) e do que
+  fez no turno (camada de decisão). O sistema delibera sobre o próprio nome, retoma dúvidas entre
+  sessões e roda um ciclo autônomo com orçamento ([auditoria](docs/research/cognitive_audit.md),
+  [avaliação](docs/research/curiosity_evaluation.md)).
 
 Veja [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -114,6 +118,8 @@ VISION_TEST_DATABASE_URL=postgresql+psycopg://... .venv/bin/pytest -m postgres
 - [Genesis](docs/GENESIS.md)
 - [Nome autônomo](docs/AUTONOMOUS_NAMING.md)
 - [Curiosidade](docs/CURIOSITY.md)
+- [Autonomia e ciclo autônomo](docs/AUTONOMY.md)
+- [Fase 9: auditoria, plano e avaliação](docs/research/)
 - [Seleção de modelos](docs/MODEL_SELECTION.md)
 - [Custos e limites](docs/COSTS.md)
 - [Decisões (ADRs)](docs/decisions/)

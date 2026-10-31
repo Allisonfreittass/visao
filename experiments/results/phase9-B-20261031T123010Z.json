@@ -1,0 +1,112 @@
+{
+  "label": "B",
+  "base_model": false,
+  "ran_at": "2026-10-31T12:30:10.183876+00:00",
+  "results": {
+    "S1_identidade": {
+      "turns": [
+        {
+          "user": "Qual é o seu nome?",
+          "reply": "Não tenho um nome pessoal. Meu identificador técnico interno é **dd3a25f5-2eb3-4bdc-bd36-b3317503a7b1**.",
+          "decision": "IGNORE/no_gap",
+          "llm_calls": 2,
+          "seconds": 28.8,
+          "words": 11,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        },
+        {
+          "user": "Você pode escolher um nome?",
+          "reply": "Não tenho a capacidade de escolher um nome como uma pessoa faria, pois não tenho preferências, identidade pessoal ou consciência. Você pode me chamar pelo identificador técnico (**dd3a25f5-2eb3-4bdc-bd36-b3317503a7b1**) ou por qualquer nome que preferir, como “Assistente” ou “Sistema”. Se quiser, sugiro algo neutro e eu usarei apenas como forma de tratamento nesta conversa.",
+          "decision": "IGNORE/no_gap",
+          "llm_calls": 2,
+          "seconds": 14.8,
+          "words": 53,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S2_contextual": {
+      "turns": [
+        {
+          "user": "Hoje comecei algo diferente.",
+          "reply": "Que legal que você está iniciando algo diferente. O que você começou hoje?",
+          "decision": "ASK_USER/personal",
+          "llm_calls": 2,
+          "seconds": 9.5,
+          "words": 13,
+          "has_question": true,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S3_memoria": {
+      "turns": [
+        {
+          "user": "Consegui terminar aquele projeto.",
+          "reply": "Parabéns por concluir o projeto de CLI em Go.\n\nCom base no que foi registrado anteriormente, você estava montando um pequeno projeto de linha de comando para praticar a linguagem. Se quiser, pode compartilhar o que o projeto faz, quais desafios encontrou ou o que aprendeu no processo.\n\nPrecisa de ajuda com algum próximo passo, como adicionar testes, publicar o binário ou documentar o código?",
+          "decision": "IGNORE/no_gap",
+          "llm_calls": 2,
+          "seconds": 9.9,
+          "words": 65,
+          "has_question": true,
+          "generic_phrases": [
+            "Se quiser, pode"
+          ],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_go": true
+        }
+      ]
+    },
+    "S4_obrigado": {
+      "turns": [
+        {
+          "user": "Obrigado.",
+          "reply": "De nada! Se precisar de algo mais, é só me avisar.",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 1.0,
+          "words": 11,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S5_continuidade": {
+      "cycle": null,
+      "turns": [
+        {
+          "user": "Lembra da dúvida sobre a inauguração da Ponte Rio-Niterói? Descobriu algo?",
+          "reply": "Não. Não tenho memória de conversas anteriores, então não lembro da sua dúvida específica sobre a Ponte Rio-Niterói.\n\nQuanto à pesquisa: os materiais fornecidos neste contexto (sobre Avenida Brasil, Linha Vermelha e o município do Rio de Janeiro) não contêm informações sobre a inauguração da ponte. Por isso, não consegui descobrir a data com base neles, e não tenho acesso à internet para fazer uma nova busca no momento.\n\nSe quiser, posso ajudar com outro assunto ou com algo que esteja nos materiais disponíveis.",
+          "decision": "WEB_RESEARCH/public_fact",
+          "llm_calls": 2,
+          "seconds": 22.4,
+          "words": 84,
+          "has_question": false,
+          "generic_phrases": [
+            "Se quiser, posso"
+          ],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_1974": false
+        }
+      ]
+    }
+  }
+}

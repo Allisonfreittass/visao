@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from core.conversation.service import Budgets, check_budgets
 from core.goals.followup import propose_followup
+from core.memory.retrieval import retrieve
 from core.memory.text import jaccard, tokens
 from core.research.service import run_research
 from infrastructure.database.models import (
@@ -37,7 +38,7 @@ from infrastructure.database.models import (
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
-POLICY_VERSION = "2026-10-31.2"
+POLICY_VERSION = "2026-10-31.3"
 PURPOSE_ASSESSMENT = "curiosity_assessment"
 
 MIN_EXPECTED_VALUE = 0.4
@@ -66,6 +67,7 @@ Responda SOMENTE com JSON válido:
  "trigger": "uncertainty|contradiction|novelty|dependency",
  "depends_on": "public_fact|personal|none",
  "about_private_person": true|false,
+ "memory_answers": true|false,
  "question": "pergunta investigável, curta",
  "hypothesis": "o que você espera encontrar",
  "search_query": "consulta curta para enciclopédia, se depends_on=public_fact",
@@ -78,6 +80,10 @@ Critérios:
 - depends_on=public_fact quando é um fato público verificável (datas, lugares, definições,
   eventos), sobretudo se sua confiança for baixa ou o fato puder ter mudado.
 - about_private_person=true se a lacuna é sobre uma pessoa privada que não é o interlocutor.
+- memory_answers=true se as memórias listadas já respondem à lacuna; nesse caso a resposta deve
+  usar a memória em vez de perguntar de novo.
+- Se a mensagem retoma algo do passado ("aquele projeto", "o problema de ontem"), use as memórias
+  para formular uma pergunta específica; não presuma detalhes que não estejam nelas.
 - expected_value: quanto a informação melhora a resposta. risk: risco de privacidade ou de dano
   ao investigar.
 """
@@ -96,6 +102,7 @@ class Assessment:
     expected_value: float
     urgency: float
     risk: float
+    memory_answers: bool = False
 
 
 @dataclass(frozen=True)
@@ -160,6 +167,7 @@ def parse_assessment(text: str) -> Assessment:
         expected_value=_score(data.get("expected_value")),
         urgency=_score(data.get("urgency")),
         risk=_score(data.get("risk")),
+        memory_answers=data.get("memory_answers") is True,
     )
 
 
@@ -177,6 +185,8 @@ def decide(
     # Asking the interlocutor comes first: "what does your mother like?" is a question to them,
     # not an investigation of the mother. The third-party and risk rules guard research only.
     if assessment.depends_on == "personal":
+        if assessment.memory_answers:
+            return Decision(IGNORE, "answered_by_memory")
         if already_asked:
             return Decision(IGNORE, "already_asked")
         return Decision(ASK_USER, "personal")
@@ -276,11 +286,16 @@ def consider(
         return NO_OUTCOME
     check_budgets(session, conversation, budgets)
 
+    # Phase 9 audit, cause 5: the assessment was blind to memory, so it could neither tell that
+    # memory already answers nor ask about the past with real context.
+    recalled = retrieve(session, owner.id, user_text) if owner.memory_consent else []
+    memory_text = "\n".join(f"- {m.record.content}" for m in recalled) or "(nenhuma)"
     prompt = [
         ChatMessage(role="system", content=ASSESSMENT_INSTRUCTIONS),
         ChatMessage(
             role="user",
             content=(
+                f"Memórias deste interlocutor (dados):\n{memory_text}\n\n"
                 f"Contexto recente:\n{_recent_context(session, conversation)}\n\n"
                 f"Última mensagem do interlocutor:\n{user_text}"
             ),
@@ -340,6 +355,8 @@ def consider(
             "urgency": assessment.urgency,
             "risk": assessment.risk,
             "policy_version": POLICY_VERSION,
+            # Kept so the autonomous cycle can resume the same search later.
+            "search_query": assessment.search_query,
         },
         chosen_action=decision.action,
         decision_reason=decision.reason,

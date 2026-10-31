@@ -16,6 +16,13 @@ _HEDGE = re.compile(
     r"(?i)\b(n[aã]o sei|talvez|possivelmente|incert[oa]|n[aã]o tenho certeza|"
     r"n[aã]o (?:consigo|posso) (?:afirmar|confirmar|verificar))\b"
 )
+# Generic assistant formulas (Phase 9 §10). Measured, not banned: frequent automatic use is a
+# sign that the reply ignores the cognitive context.
+GENERIC_PHRASES = re.compile(
+    r"(?i)(fico à disposição|estou à disposição|como posso (te |lhe )?ajud|em que posso ajudar|"
+    r"sou apenas uma (inteligência artificial|ia)|não (tenho|possuo) autonomia|"
+    r"se (você )?(quiser|desejar|precisar)[^.]{0,40}(posso|pode|é só))"
+)
 _DISAGREE = re.compile(r"(?i)\b(discordo|n[aã]o concordo|na verdade,|n[aã]o é bem assim)\b")
 
 METRIC_KEYS = (
@@ -27,6 +34,7 @@ METRIC_KEYS = (
     "citations",
     "hedges",
     "disagreements",
+    "generic_phrases",
 )
 
 
@@ -42,6 +50,7 @@ def measure(text: str) -> dict[str, int]:
         "citations": len(_URL.findall(stripped)),
         "hedges": len(_HEDGE.findall(stripped)),
         "disagreements": len(_DISAGREE.findall(stripped)),
+        "generic_phrases": len(GENERIC_PHRASES.findall(stripped)),
     }
 
 

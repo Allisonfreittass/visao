@@ -143,7 +143,10 @@ def test_irrelevant_turn_does_not_search(client, db, world) -> None:
     assert body["curiosity"]["action"] == "IGNORE"
     assert body["sources"] == []
     assert world["search"].queries == []
-    assert "Contexto desta resposta" not in world["llm"].prompts[-1][0].content
+    system = world["llm"].prompts[-1][0].content
+    assert "Pesquisa feita" not in system and "Faça esta pergunta" not in system
+    # Phase 9: every turn states what was executed, so the reply cannot claim more.
+    assert "Ações executadas neste turno além de responder: nenhuma" in system
 
 
 def test_inconclusive_research_stays_inconclusive(client, db, world) -> None:

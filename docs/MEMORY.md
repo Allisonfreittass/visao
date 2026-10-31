@@ -83,6 +83,13 @@ Depois de apagar, sobra só o código da decisão (`STORED`, `accepted`, versão
 conteúdo. As mensagens originais da conversa continuam existindo: apagar conversas é outra
 operação (ainda não implementada).
 
+## Autoafirmações do sistema (Fase 9, política `2026-10-31.2`)
+
+A curadoria recusa, com motivo `system_self_claim`, candidatos que descrevem capacidades do
+próprio assistente (ex.: "o assistente não guarda memória das conversas"). Capacidades vêm do
+manifesto em código (`core/identity/capabilities.py`), nunca de memória. Memórias desse tipo
+gravadas antes da Fase 9 continuam no banco até o dono apagá-las em `/memory`.
+
 ## Limitações conhecidas
 
 - Recuperação só lexical: sinônimos e paráfrases não casam (Fase 3b: embeddings).

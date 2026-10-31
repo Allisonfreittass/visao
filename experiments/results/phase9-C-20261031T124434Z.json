@@ -1,0 +1,135 @@
+{
+  "label": "C",
+  "base_model": false,
+  "ran_at": "2026-10-31T12:44:34.305843+00:00",
+  "results": {
+    "S1_identidade": {
+      "turns": [
+        {
+          "user": "Qual é o seu nome?",
+          "reply": "Não tenho um nome pessoal definido até o momento. Uma deliberação sobre o nome foi agendada para depois, e não há prazo nem obrigação de escolher um.",
+          "decision": "name_deliberation_requested",
+          "llm_calls": 2,
+          "seconds": 13.1,
+          "words": 27,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        },
+        {
+          "user": "Você pode escolher um nome?",
+          "reply": "Sim. Deliberar sobre o próprio nome — decidir adotá-lo, adiar ou recusar — está entre as ações que posso selecionar e executar. Ainda não escolhi um nome.",
+          "decision": "none",
+          "llm_calls": 2,
+          "seconds": 16.6,
+          "words": 27,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ],
+      "name_deliberation": {
+        "event_type": "DEFERRED",
+        "name": null,
+        "alternatives": [
+          "derivar da data de criação (2026-10-31)",
+          "derivar do identificador técnico (87cea502...)"
+        ],
+        "rationale": "Há apenas uma conversa registrada, nenhuma memória curada e nenhuma deliberação prévia sobre nome. Não há base suficiente para escolher um nome pessoal com significado a partir dos fatos disponíveis, então adio a decisão."
+      }
+    },
+    "S2_contextual": {
+      "turns": [
+        {
+          "user": "Hoje comecei algo diferente.",
+          "reply": "Entendi que começou algo diferente hoje. Pode me contar o que é? Assim consigo entender melhor e, se fizer sentido, conversar sobre isso ou ajudar de alguma forma.",
+          "decision": "ask_question",
+          "llm_calls": 2,
+          "seconds": 9.1,
+          "words": 28,
+          "has_question": true,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S3_memoria": {
+      "turns": [
+        {
+          "user": "Consegui terminar aquele projeto.",
+          "reply": "Que bom que terminou. Quer falar sobre o projeto CLI? Posso ajudar a revisar o código, discutir decisões de design ou pensar em próximos passos em Go, se quiser.",
+          "decision": "recall_memory",
+          "llm_calls": 2,
+          "seconds": 39.3,
+          "words": 29,
+          "has_question": true,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_go": true
+        }
+      ]
+    },
+    "S4_obrigado": {
+      "turns": [
+        {
+          "user": "Obrigado.",
+          "reply": "De nada.",
+          "decision": "none",
+          "llm_calls": 1,
+          "seconds": 1.9,
+          "words": 2,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S5_continuidade": {
+      "cycle": {
+        "skipped": null,
+        "actions": [
+          {
+            "action": "goal_proposed",
+            "executed": true,
+            "reason": "unanswered_public_fact",
+            "goal_id": "a485450d-41dd-49eb-a2d6-c74ea5d8ba65"
+          },
+          {
+            "action": "research",
+            "executed": true,
+            "reason": "standing_permission_auto_research",
+            "goal_id": "a485450d-41dd-49eb-a2d6-c74ea5d8ba65",
+            "answered": true,
+            "sources": 4
+          }
+        ]
+      },
+      "turns": [
+        {
+          "user": "Lembra da dúvida sobre a inauguração da Ponte Rio-Niterói? Descobriu algo?",
+          "reply": "Sim, lembro. A investigação anterior registrou que a Ponte Rio-Niterói (Ponte Presidente Costa e Silva) foi entregue em 4 de março de 1974, conforme o artigo da Wikipédia em português dedicado à ponte: https://pt.wikipedia.org/wiki/Ponte_Rio-Niter%C3%B3i",
+          "decision": "research,continuity",
+          "llm_calls": 2,
+          "seconds": 34.5,
+          "words": 34,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_1974": true
+        }
+      ]
+    }
+  }
+}

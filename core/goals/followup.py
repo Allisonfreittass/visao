@@ -102,7 +102,38 @@ def run_followup(
     research_budget_left: bool,
     max_output_tokens: int,
 ) -> FollowupResult:
-    goal = session.get(Goal, uuid.UUID(job.payload["goal_id"]))
+    return run_goal(
+        session,
+        uuid.UUID(job.payload["goal_id"]),
+        provider=provider,
+        search=search,
+        research_budget_left=research_budget_left,
+        max_output_tokens=max_output_tokens,
+    )
+
+
+def approve_by_standing_permission(session: Session, goal: Goal) -> None:
+    """The owner granted `auto_research` once; this records that it, not a click, approved."""
+    lifecycle.transition(
+        session,
+        goal,
+        lifecycle.APPROVED,
+        actor="policy",
+        reason="permissão permanente do interlocutor: auto_research",
+    )
+    session.flush()
+
+
+def run_goal(
+    session: Session,
+    goal_id: uuid.UUID,
+    *,
+    provider: LLMProvider,
+    search: SearchProvider,
+    research_budget_left: bool,
+    max_output_tokens: int,
+) -> FollowupResult:
+    goal = session.get(Goal, goal_id)
     if goal is None or goal.status not in (lifecycle.APPROVED, lifecycle.ACTIVE):
         # Cancelled, rejected or paused after the job was queued: nothing to do.
         return FollowupResult("done", {"skipped": goal.status if goal else "missing"})

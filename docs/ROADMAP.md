@@ -12,6 +12,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | **concluída** (6/6 casos reais após correção; Wikipédia pt) |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | **implementada** (evento real ponta a ponta; aviso útil verificado com lacuna semeada) |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | **concluída** (−69% palavras após retorno, revertido volta à linha de base) |
+| 9. Auditoria cognitiva e curiosidade autônoma | auditoria experimental, manifesto de capacidades, camada de decisão, deliberação de nome, continuidade, ciclo autônomo com orçamento | sem negar autonomia operacional nem transferir o nome; age sem mensagem dentro de permissões; comparação A/B/C | **implementada** ([curiosity_evaluation.md](research/curiosity_evaluation.md)); nome ainda adiado, uso real contínuo pendente |
 | 7. Pesquisa avançada | fine-tuning, TTS próprio, continual learning | só após baselines e datasets | não iniciada |
 
 ## Fase 0: o que está feito e o que falta
@@ -77,7 +78,7 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-As fases de construção (0–6) estão feitas. A Fase 7 (fine-tuning, TTS treinado, aprendizado
+As fases de construção (0–6) e a auditoria da Fase 9 estão feitas. A Fase 7 (fine-tuning, TTS treinado, aprendizado
 contínuo) só começa com baselines e datasets de uso real (master prompt §20).
 
 Próximo passo recomendado: **implantação** no Lightsail + Cloudflare (HTTPS), que destrava:

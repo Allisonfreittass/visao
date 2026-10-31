@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -18,9 +18,9 @@ from core.conversation.service import (
     Budgets,
     EmptyReplyError,
     conversation_history,
-    reply,
 )
-from core.curiosity.engine import NO_OUTCOME, CuriosityLimits, consider
+from core.curiosity.engine import CuriosityLimits
+from core.decision.pipeline import TurnConfig, run_turn
 from core.identity.genesis import get_identity
 from core.memory.curator import (
     CurationOutputError,
@@ -55,6 +55,8 @@ class MessageOut(BaseModel):
 
 class MessageIn(BaseModel):
     content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    # "voice" when the turn came from a voice session: the reply is spoken, so kept short.
+    modality: Literal["text", "voice"] = "text"
 
 
 class UsageOut(BaseModel):
@@ -134,6 +136,23 @@ def create_conversation(
             _reflect_previous, factory, user.id, conversation.id, provider, settings
         )
     return ConversationOut(id=conversation.id, created_at=conversation.created_at)
+
+
+def turn_config(settings: Settings) -> TurnConfig:
+    return TurnConfig(
+        budgets=_budgets(settings),
+        curiosity_enabled=settings.curiosity_enabled,
+        curiosity_limits=CuriosityLimits(
+            research_per_day=settings.research_per_day,
+            research_per_conversation=settings.research_per_conversation,
+            max_results=settings.research_max_results,
+        ),
+        assessment_max_tokens=settings.llm_curation_max_output_tokens,
+        reply_max_tokens=settings.llm_max_output_tokens,
+        context_char_budget=settings.llm_context_char_budget,
+        tts_approved_voices=settings.tts_approved_voices,
+        stt_model=settings.stt_model,
+    )
 
 
 def _budgets(settings: Settings) -> Budgets:
@@ -312,38 +331,18 @@ def send_message(
         raise HTTPException(status.HTTP_409_CONFLICT, "Identidade da conversa indisponível")
 
     try:
-        outcome = NO_OUTCOME
-        if settings.curiosity_enabled:
-            outcome = consider(
-                db,
-                conversation=conversation,
-                owner=user,
-                user_text=body.content,
-                provider=provider,
-                search=search,
-                budgets=_budgets(settings),
-                limits=CuriosityLimits(
-                    research_per_day=settings.research_per_day,
-                    research_per_conversation=settings.research_per_conversation,
-                    max_results=settings.research_max_results,
-                ),
-                max_output_tokens=settings.llm_curation_max_output_tokens,
-            )
-        result = reply(
+        turn = run_turn(
             db,
             conversation=conversation,
             identity=identity,
             owner=user,
-            user_text=body.content,
+            text=body.content,
             provider=provider,
-            budgets=_budgets(settings),
-            max_output_tokens=settings.llm_max_output_tokens,
-            context_char_budget=settings.llm_context_char_budget,
-            extra_system=outcome.system_context,
+            search=search,
+            config=turn_config(settings),
+            modality=body.modality,
         )
-        if outcome.gap is not None:
-            outcome.gap.trigger_message_id = result.user_message.id
-            db.commit()
+        result, outcome = turn.result, turn.curiosity
     except BudgetExceededError as exc:
         scope = "diário" if exc.scope == "daily" else "desta conversa"
         raise HTTPException(

@@ -18,7 +18,7 @@ from sqlalchemy import (
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import false
+from sqlalchemy.sql import false, text
 
 from infrastructure.database.base import Base, utcnow
 
@@ -37,6 +37,10 @@ class User(Base):
     quiet_end: Mapped[str] = mapped_column(String(5), default="08:00", server_default="08:00")
     timezone: Mapped[str] = mapped_column(
         String(64), default="America/Sao_Paulo", server_default="America/Sao_Paulo"
+    )
+    # Standing permissions for autonomous actions, e.g. {"auto_research": true}. Absent = off.
+    autonomy_permissions: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, server_default=text("'{}'")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -544,3 +548,26 @@ class Lesson(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Decision(Base):
+    """What the system decided and actually executed, per turn or per autonomous cycle (§15).
+    The reply is told exactly these executed actions, so it cannot claim others."""
+
+    __tablename__ = "decisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    origin: Mapped[str] = mapped_column(String(16))  # turn | autonomous
+    actions: Mapped[list[dict[str, Any]]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )

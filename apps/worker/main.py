@@ -9,10 +9,12 @@ import signal
 import socket
 import time
 import uuid
+from datetime import UTC, datetime
 
 from apps.api.settings import get_settings
 from apps.worker.handlers import build_handlers
 from apps.worker.runner import run_once
+from core.autonomy.cycle import schedule
 from infrastructure.database.session import get_sessionmaker
 from infrastructure.observability.logging import configure_logging
 
@@ -37,6 +39,9 @@ def main() -> int:
     signal.signal(signal.SIGINT, stop)
     logger.info("worker started", extra={"event": "worker_started"})
     while not stopping:
+        # Schedule-driven trigger: at most one cycle job per window (idempotent).
+        with factory() as session:
+            schedule(session, datetime.now(UTC), settings.autonomy_cycle_minutes)
         outcome = run_once(factory, handlers, worker_id)
         if outcome in ("idle", "paused"):
             time.sleep(IDLE_SLEEP_SECONDS)

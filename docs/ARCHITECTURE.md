@@ -83,3 +83,33 @@ funcionalidade** e não devem ser apresentados como tal.
 AWS Lightsail existente (~US$ 12/mês) + Cloudflare. **Nenhum recurso foi inspecionado ainda**:
 CPU, RAM, disco, containers e serviços em execução precisam ser auditados antes de qualquer
 instalação. Nenhum deploy sem aprovação explícita. Ver [COSTS.md](COSTS.md).
+
+## Fase 9: camada de decisão e ciclo autônomo
+
+A decisão fica separada da expressão. O LLM redige a resposta, mas **o que o sistema fez** no turno
+é decidido e registrado em código (`decisions`), e só esses fatos entram no prompt.
+
+```text
+mensagem (texto ou voz)
+   |
+run_turn  (core/decision/pipeline.py)
+   |-- manifesto de capacidades      core/identity/capabilities.py   (o que existe de fato)
+   |-- curiosidade (lê memórias)     core/curiosity/engine.py        ask / search / ignore
+   |-- continuidade                  core/autonomy/continuity.py     lacunas de outras conversas
+   |-- pergunta sobre nome?          core/identity/name_deliberation.py -> job name_deliberation
+   |-- TurnPlan: ações executadas -> "fatos do turno" no prompt
+   |-- reply (LLM = expressão)       core/conversation/service.py
+   |-- curadoria de memória
+   '-- Decision(origin=turn)         tabela decisions
+
+worker (a cada VISION_AUTONOMY_CYCLE_MINUTES, 1 job idempotente por janela)
+   '-- run_cycle (core/autonomy/cycle.py), respeitando pausa e orçamento de autonomia
+         1. lacunas de fato público adiadas -> propõe meta -> pesquisa se auto_research
+         2. conversas paradas há 30 min -> reflexão
+         3. nome em aberto (>= 3 conversas, >= 1 dia, a cada 30 dias) -> deliberação
+         cada ação -> Decision(origin=autonomous)
+```
+
+Inspeção: `GET /decisions`, `GET /cognition/metrics`, `GET /identity/name`,
+`GET|PUT /autonomy/permissions`. Ver [AUTONOMY.md](AUTONOMY.md) e
+[research/curiosity_evaluation.md](research/curiosity_evaluation.md).

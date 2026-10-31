@@ -1,6 +1,7 @@
 # Curiosidade como mecanismo
 
-> Estado: **Fase 4 implementada** (`core/curiosity/engine.py`, política `2026-10-31.2`).
+> Estado: **Fase 4 implementada** (`core/curiosity/engine.py`, política `2026-10-31.3`: a
+> avaliação recebe as memórias do interlocutor e não pergunta o que a memória já responde).
 > Desligada por padrão (`VISION_CURIOSITY_ENABLED`). `PROPOSE_GOAL` depende de metas (Fase 5)
 > e ainda não é oferecida. Avaliação real: `docs/research-log/2026-10-31-fase-4-curiosidade.md`.
 
@@ -84,3 +85,13 @@ outra chamada ao LLM por turno pesquisado.
 - Caso irrelevante não aciona pesquisa.
 - Resultado inconclusivo é reportado como inconclusivo.
 - Orçamento esgotado degrada para `DEFER`, sem erro e sem loop.
+
+## Mudanças da Fase 9
+
+- **Memórias na avaliação:** a avaliação recebe as memórias do interlocutor e devolve
+  `memory_answers`. Uma lacuna pessoal que a memória já responde vira `IGNORE`, com motivo
+  `answered_by_memory`.
+- **Consulta guardada:** a consulta de busca proposta fica em `gap.scores.search_query`, para o
+  ciclo autônomo reaproveitar.
+- **Continuidade:** lacunas de outras conversas relacionadas à mensagem entram no contexto, com
+  status, fontes e meta (`core/autonomy/continuity.py`).

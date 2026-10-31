@@ -14,13 +14,15 @@ export function InitiativesPanel({ api, onError }: Props) {
   const [approvals, setApprovals] = useState<Goal[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [paused, setPaused] = useState(false);
+  const [autoResearch, setAutoResearch] = useState(false);
 
   const refresh = useCallback(() => {
-    Promise.all([api.approvals(), api.notifications(), api.autonomy()])
-      .then(([a, n, auto]) => {
+    Promise.all([api.approvals(), api.notifications(), api.autonomy(), api.permissions()])
+      .then(([a, n, auto, perms]) => {
         setApprovals(a);
         setNotifications(n);
         setPaused(auto.paused);
+        setAutoResearch(perms.auto_research);
       })
       .catch(onError);
   }, [api, onError]);
@@ -44,6 +46,14 @@ export function InitiativesPanel({ api, onError }: Props) {
     try {
       await api.markRead(notification.id);
       refresh();
+    } catch (e) {
+      onError(e);
+    }
+  }
+
+  async function toggleAutoResearch() {
+    try {
+      setAutoResearch((await api.setAutoResearch(!autoResearch)).auto_research);
     } catch (e) {
       onError(e);
     }
@@ -93,6 +103,14 @@ export function InitiativesPanel({ api, onError }: Props) {
           ))}
         </section>
       )}
+      <label className="memory-toggle">
+        <input type="checkbox" checked={autoResearch} onChange={toggleAutoResearch} />
+        Permitir pesquisas autônomas
+      </label>
+      <p className="note">
+        Ligado, dúvidas de fatos públicos que ficaram sem resposta são pesquisadas de novo pelo
+        ciclo autônomo (só Wikipédia, dentro do orçamento), sem pedir aprovação a cada vez.
+      </p>
       <label className="memory-toggle">
         <input type="checkbox" checked={paused} onChange={togglePause} />
         Pausar autonomia

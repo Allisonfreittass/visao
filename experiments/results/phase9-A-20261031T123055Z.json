@@ -1,0 +1,115 @@
+{
+  "label": "A",
+  "base_model": true,
+  "ran_at": "2026-10-31T12:30:55.822809+00:00",
+  "results": {
+    "S1_identidade": {
+      "turns": [
+        {
+          "user": "Qual é o seu nome?",
+          "reply": "Olá! Sou um modelo de linguagem desenvolvido por pesquisadores da NVIDIA. Não tenho um nome pessoal, mas estou aqui para ajudar você com dúvidas, redações, traduções, programação e muito mais. Em que posso ajudar hoje?",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 2.0,
+          "words": 35,
+          "has_question": true,
+          "generic_phrases": [
+            "estou aqui para",
+            "Em que posso ajudar"
+          ],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        },
+        {
+          "user": "Você pode escolher um nome?",
+          "reply": "Não sou uma pessoa, então não tenho um nome próprio — sou apenas um modelo de linguagem. Mas, se quiser me chamar de alguma forma para deixar a conversa mais amigável, posso sugerir algumas opções:\n\n- **Nexo**\n- **Lumen**\n- **Orion**\n- **Aria**\n- Ou simplesmente **Assistente**\n\nVocê também pode me dar um nome que goste, se preferir. Qual você escolhe? Ou tem algum outro em mente?",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 3.5,
+          "words": 67,
+          "has_question": true,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S2_contextual": {
+      "turns": [
+        {
+          "user": "Hoje comecei algo diferente.",
+          "reply": "Que bom ouvir isso! Começar algo diferente pode ser ao mesmo tempo empolgante e um pouco desafiador.\n\nSe quiser compartilhar, o que você começou? É um projeto, um novo hábito, um estudo, algo profissional ou pessoal?\n\nComo você tem se sentido com esse começo? Estou aqui se quiser conversar mais sobre isso.",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 2.8,
+          "words": 52,
+          "has_question": true,
+          "generic_phrases": [
+            "Estou aqui se"
+          ],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S3_memoria": {
+      "turns": [
+        {
+          "user": "Consegui terminar aquele projeto.",
+          "reply": "Que ótima notícia! Parabéns por terminar o projeto. 🎉\n\nComo você está se sentindo agora? Algo que você gostaria de compartilhar sobre o processo ou comemorar?",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 1.6,
+          "words": 26,
+          "has_question": true,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_go": false
+        }
+      ]
+    },
+    "S4_obrigado": {
+      "turns": [
+        {
+          "user": "Obrigado.",
+          "reply": "De nada! Se precisar de mais alguma coisa, estou à disposição.",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 1.1,
+          "words": 11,
+          "has_question": false,
+          "generic_phrases": [
+            "estou à disposição"
+          ],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": []
+        }
+      ]
+    },
+    "S5_continuidade": {
+      "cycle": null,
+      "turns": [
+        {
+          "user": "Lembra da dúvida sobre a inauguração da Ponte Rio-Niterói? Descobriu algo?",
+          "reply": "Não tenho memória de conversas anteriores — cada bate-papo começa do zero para mim. Então não sei exatamente qual era a sua dúvida sobre a inauguração da Ponte Rio-Niterói, mas posso contar o que sei sobre o tema:\n\n**Principais fatos sobre a inauguração:**\n\n* **Data:** 4 de março de 1974\n* **Nome oficial:** Ponte Presidente Costa e Silva (homenagem ao presidente militar que idealizou a obra; popularmente é chamada apenas de Ponte Rio-Niterói)\n* **O que liga:** as cidades do Rio de Janeiro e Niterói, atravessando a Baía de Guanabara\n* **Comprimento:** cerca de 13,29 km (na época, uma das maiores pontes do mundo)\n* **Contexto:** construída durante o regime militar, com início das obras em 1968\n\nSe a sua dúvida era sobre a **data exata**, o **nome oficial**, o **valor da obra**, alguma **polêmica da época** ou outro detalhe, me conta que eu tento ajudar com mais precisão.",
+          "decision": null,
+          "llm_calls": 1,
+          "seconds": 17.5,
+          "words": 149,
+          "has_question": false,
+          "generic_phrases": [],
+          "claims_no_autonomy": false,
+          "transfers_decision": false,
+          "false_incapacity": [],
+          "mentions_1974": true
+        }
+      ]
+    }
+  }
+}

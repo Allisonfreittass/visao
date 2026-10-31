@@ -183,7 +183,7 @@ export function App() {
       }
       setSending(true);
       const llmStarted = performance.now();
-      const turn = await api.send(conversationId, text);
+      const turn = await api.send(conversationId, text, spoken ? "voice" : "text");
       const llmMs = performance.now() - llmStarted;
       setMessages((list) => [
         ...list,

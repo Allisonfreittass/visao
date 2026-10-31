@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.behavior import state as behavior_state
+from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import build_system_prompt
 from core.memory.retrieval import ScoredMemory, retrieve
 from infrastructure.database.models import (
@@ -105,6 +106,9 @@ def reply(
     max_output_tokens: int,
     context_char_budget: int,
     extra_system: str | None = None,
+    capabilities: Capabilities | None = None,
+    modality: str = "text",
+    name_history_summary: str | None = None,
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
@@ -124,6 +128,9 @@ def reply(
         identity,
         memory_enabled=owner.memory_consent,
         memories=[item.record for item in recalled],
+        capabilities=capabilities,
+        name_history_summary=name_history_summary,
+        modality=modality,
     )
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)

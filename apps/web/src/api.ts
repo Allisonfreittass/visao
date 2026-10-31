@@ -117,10 +117,14 @@ export class Api {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`);
   }
 
-  send(conversationId: string, content: string): Promise<Turn> {
+  send(
+    conversationId: string,
+    content: string,
+    modality: "text" | "voice" = "text",
+  ): Promise<Turn> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, modality }),
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -164,6 +168,18 @@ export class Api {
   markRead(notificationId: string): Promise<void> {
     return this.request(`/notifications/${encodeURIComponent(notificationId)}/read`, {
       method: "POST",
+    });
+  }
+
+  permissions(): Promise<{ auto_research: boolean }> {
+    return this.request("/autonomy/permissions");
+  }
+
+  setAutoResearch(enabled: boolean): Promise<{ auto_research: boolean }> {
+    return this.request("/autonomy/permissions", {
+      method: "PUT",
+      body: JSON.stringify({ auto_research: enabled }),
+      headers: { "Content-Type": "application/json" },
     });
   }
 

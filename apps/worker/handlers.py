@@ -1,13 +1,17 @@
 """Job kind -> handler wiring for the worker process."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from apps.api.llm import build_llm_provider
 from apps.api.settings import Settings
 from apps.worker.runner import Handler, HandlerResult
+from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.goals.followup import research_count_today, run_followup
+from core.identity import name_deliberation
+from core.identity.genesis import get_identity
 from infrastructure.database.models import Goal, ScheduledJob
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
@@ -43,9 +47,65 @@ def research_followup_handler(
     return handle
 
 
-def build_handlers(settings: Settings) -> dict[str, Handler]:
-    return {
-        "research_followup": research_followup_handler(
-            settings, build_llm_provider(settings), WikipediaSearch()
+def autonomy_budget(settings: Settings) -> AutonomyBudget:
+    return AutonomyBudget(
+        llm_calls_per_day=settings.autonomy_llm_calls_per_day,
+        tokens_per_day=settings.autonomy_tokens_per_day,
+        max_actions_per_cycle=settings.autonomy_max_actions_per_cycle,
+        max_seconds=settings.autonomy_max_seconds,
+        research_per_day=settings.research_per_day,
+        max_output_tokens=settings.llm_curation_max_output_tokens,
+    )
+
+
+def cycle_handler(
+    settings: Settings, provider: LLMProvider | None, search: SearchProvider
+) -> Handler:
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        report = run_cycle(
+            session, provider=provider, search=search, budget=autonomy_budget(settings)
         )
+        return HandlerResult(
+            "done",
+            {
+                "skipped": report.skipped,
+                "actions": report.actions,
+                "llm_calls_today": report.llm_calls_today,
+            },
+        )
+
+    return handle
+
+
+def name_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        identity = get_identity(session)
+        if provider is None or identity is None:
+            raise RuntimeError("LLM or identity missing")
+        calls, tokens = usage_today(session, datetime.now(UTC))
+        if (
+            calls >= settings.autonomy_llm_calls_per_day
+            or tokens >= settings.autonomy_tokens_per_day
+        ):
+            tomorrow = (datetime.now(UTC) + timedelta(days=1)).replace(hour=9, minute=0)
+            return HandlerResult("defer", defer_until=tomorrow, reason="autonomy_budget")
+        result = name_deliberation.run_job(
+            session,
+            job.payload,
+            provider=provider,
+            identity=identity,
+            max_output_tokens=settings.llm_curation_max_output_tokens,
+        )
+        return HandlerResult("done", result)
+
+    return handle
+
+
+def build_handlers(settings: Settings) -> dict[str, Handler]:
+    provider = build_llm_provider(settings)
+    search = WikipediaSearch()
+    return {
+        "research_followup": research_followup_handler(settings, provider, search),
+        "cognitive_cycle": cycle_handler(settings, provider, search),
+        "name_deliberation": name_handler(settings, provider),
     }
