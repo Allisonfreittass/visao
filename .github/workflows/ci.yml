@@ -47,3 +47,20 @@ jobs:
           docker compose up -d --build --wait
           curl --fail --retry 10 --retry-delay 2 --retry-all-errors http://127.0.0.1:8000/ready
           docker compose down -v
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

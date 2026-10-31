@@ -9,10 +9,12 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 3a: memória curada.** Identidade mínima (UUID, nome `null`), conversa por texto via LLM
-substituível (qualquer endpoint compatível com OpenAI) com orçamento e custo registrados, e
-memória curada entre conversas, opt-in por usuário ([docs/MEMORY.md](docs/MEMORY.md)). Ainda não
-há curiosidade nem voz. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+**Fase 2a: interface web.** Fases 0, 1 e 3 concluídas. Identidade mínima (UUID, nome `null`),
+conversa por texto via LLM substituível (qualquer endpoint compatível com OpenAI) com orçamento e
+custo registrados, memória curada entre conversas, opt-in por usuário
+([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados
+([docs/VOICE.md](docs/VOICE.md)). Ainda não há voz nem curiosidade. Veja
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
 elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
@@ -51,6 +53,18 @@ VISION_DATABASE_URL=sqlite:///./dev.db .venv/bin/uvicorn apps.api.main:app --rel
 ```
 
 SQLite serve só para desenvolvimento e testes unitários; o banco de referência é PostgreSQL.
+
+### Interface web (desenvolvimento)
+
+Requer Node.js 22+. Com a API rodando em `127.0.0.1:8000`:
+
+```bash
+npm --prefix apps/web install
+npm --prefix apps/web run dev
+```
+
+Abra http://localhost:5173. A demonstração dos estados da bolha fica em
+http://localhost:5173/?orb=demo.
 
 ### Testes
 

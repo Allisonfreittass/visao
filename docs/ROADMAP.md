@@ -7,7 +7,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
-| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
+| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **2a concluída** (interface + bolha); 2b (TTS) e 2c (escuta) pendentes |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
@@ -77,14 +77,12 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-Fase 3 concluída (ver diário 2026-10-31-fase-3c-baseline.md). Candidatos, em ordem sugerida:
+**Fase 2b: TTS próprio.** Instalar e medir Kokoro e Piper em pt-BR (tempo até o primeiro áudio,
+fator de tempo real, RAM, qualidade subjetiva), escolher por ADR, criar `integrations/tts` e
+ligar ao estado `SPEAKING` da bolha. Plano completo em [VOICE.md](VOICE.md).
 
-1. **Fase 2 (voz + interface com a bolha laranja)**: próxima fase do master prompt e obrigatória
-   na v0.1.
-2. Melhorias de memória que o benchmark apontou: revisão de memória substituída (março → abril),
-   separar fatos de terceiros do resto (fato perdido no s1), regra lexical extra para saúde.
-3. Fase 3b (embeddings): a NVIDIA oferece modelos de embedding (`nemotron-3.5-embed-*`); vale só
-   se um conjunto com paráfrases mostrar perda na busca lexical.
+Pendências de memória que o benchmark apontou (revisão de fato substituído, terceiros, saúde)
+continuam registradas e podem entrar entre fases.
 
 ## Visual da interface (entra no início da Fase 2)
 
