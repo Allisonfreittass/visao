@@ -6,7 +6,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | Fase | Escopo | Critério de aceite | Estado |
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
-| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **1a concluída** (CI, commit 8bc36bd); **1b implementada, sem validação com LLM real** |
+| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | não iniciada |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
@@ -46,7 +46,7 @@ Adiado para fases seguintes:
 Fora da 1a (vai para a 1b): "não afirma lembrar do criador", "conversas sem nome funcionam" e
 "troca de LLM não apaga histórico", que só fazem sentido com conversa e `LLMProvider`.
 
-## Fase 1b: conversa (implementada; validação com LLM real pendente)
+## Fase 1b: conversa (concluída)
 
 - `LLMProvider` + `OpenAICompatibleProvider` (retries, timeout, erros tipados), Qwen como família
   escolhida (ADR-0002). Preço obrigatório; sem ele a conversa fica desligada.
@@ -59,10 +59,13 @@ Fora da 1a (vai para a 1b): "não afirma lembrar do criador", "conversas sem nom
 - Testes com provedor falso cobrindo: conversa sem nome, isolamento entre conversas e usuários,
   troca de LLM sem perda de histórico, falha do provedor sem resposta inventada, orçamentos.
 
-Pendente para fechar a Fase 1:
-- Configurar provedor real no `.env` e rodar `python -m experiments.eval_genesis_conversation`
-  ("não afirma lembrar do criador", "responde que não tem nome", sem experiências ou sentimentos
-  inventados), com revisão humana das respostas.
+Avaliação com LLM real (`experiments/eval_genesis_conversation.py`): 4 de 4 critérios atendidos
+com `nvidia/nemotron-3.5-super-vl:free` via OpenRouter, revisados manualmente
+(ver diário 2026-10-31-fase-1b-conversa.md).
+
+Pendências que não bloqueiam a Fase 2/3:
+- Rodar a mesma avaliação com Qwen (família escolhida no ADR-0002) e repetir para medir
+  variação.
 - Lacunas conhecidas do `LLMProvider`: streaming, tools, saída estruturada, cancelamento.
 
 ## Próximo incremento proposto

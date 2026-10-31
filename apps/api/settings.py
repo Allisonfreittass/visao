@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
@@ -9,7 +10,12 @@ DEFAULT_SECRET_KEY = "dev-insecure-change-me"  # noqa: S105 (rejected in product
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VISION_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="VISION_",
+        # Tests point this at an empty file so a developer's real .env never leaks in.
+        env_file=os.environ.get("VISION_ENV_FILE", ".env"),
+        extra="ignore",
+    )
 
     environment: Literal["development", "test", "production"] = "development"
     database_url: str = "sqlite:///./dev.db"

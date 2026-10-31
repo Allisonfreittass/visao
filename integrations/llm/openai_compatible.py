@@ -11,6 +11,7 @@ from integrations.llm.base import ChatMessage, LLMError, LLMResponse, Pricing
 logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
+_MAX_RETRY_DELAY_SECONDS = 30.0
 
 
 class OpenAICompatibleProvider:
@@ -70,6 +71,7 @@ class OpenAICompatibleProvider:
     def _post_with_retries(self, payload: dict) -> httpx.Response:
         for attempt in range(self._max_retries + 1):
             last_attempt = attempt == self._max_retries
+            response: httpx.Response | None = None
             try:
                 response = self._client.post("/chat/completions", json=payload)
             except httpx.TimeoutException as exc:
@@ -86,7 +88,24 @@ class OpenAICompatibleProvider:
                         f"http_{response.status_code}",
                         f"provider returned {response.status_code}: {response.text[:300]}",
                     )
-            delay = 0.5 * 2**attempt
-            logger.warning("llm call failed, retrying", extra={"event": "llm_retry"})
+            delay = _retry_delay(response, attempt)
+            logger.warning(
+                f"llm call failed, retrying in {delay:.1f}s", extra={"event": "llm_retry"}
+            )
             time.sleep(delay)
         raise AssertionError("unreachable")
+
+
+def _retry_delay(response: httpx.Response | None, attempt: int) -> float:
+    """Honors Retry-After (seconds) when the provider sends it; otherwise exponential backoff.
+    Rate limits get a longer base delay than transient server errors."""
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                return min(max(float(retry_after), 0.0), _MAX_RETRY_DELAY_SECONDS)
+            except ValueError:
+                pass
+        if response.status_code == 429:
+            return min(5.0 * 2**attempt, _MAX_RETRY_DELAY_SECONDS)
+    return min(0.5 * 2**attempt, _MAX_RETRY_DELAY_SECONDS)

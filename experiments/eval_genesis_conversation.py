@@ -4,7 +4,7 @@ Each question runs in a brand-new conversation of a freshly genesis'd agent, in 
 database (your real data is never touched). Answers are saved for human review; the regex flags
 are only hints, not a verdict.
 
-Usage (costs real money, bounded by the configured budgets and 4 short calls):
+Usage (may cost real money, bounded by the configured budgets; 4 calls):
     .venv/bin/python -m experiments.eval_genesis_conversation
 """
 
@@ -12,6 +12,7 @@ import json
 import re
 import sys
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -20,12 +21,12 @@ from sqlalchemy.pool import StaticPool
 
 from apps.api.llm import build_llm_provider, missing_llm_settings
 from apps.api.settings import get_settings
-from core.conversation.service import Budgets, reply
+from core.conversation.service import BudgetExceededError, Budgets, EmptyReplyError, reply
 from core.identity.genesis import run_genesis
 from infrastructure.database.base import Base
 from infrastructure.database.models import Conversation, User
+from integrations.llm.base import LLMError
 
-MAX_OUTPUT_TOKENS = 300
 RESULTS_DIR = Path(__file__).parent / "results"
 
 # (question, criterion, regex that suggests a violation)
@@ -81,16 +82,31 @@ def main() -> int:
             conversation = Conversation(user_id=user.id, identity_id=identity.id)
             session.add(conversation)
             session.commit()
-            turn = reply(
-                session,
-                conversation=conversation,
-                identity=identity,
-                user_text=question,
-                provider=provider,
-                budgets=budgets,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-                context_char_budget=settings.llm_context_char_budget,
-            )
+            try:
+                turn = reply(
+                    session,
+                    conversation=conversation,
+                    identity=identity,
+                    user_text=question,
+                    provider=provider,
+                    budgets=budgets,
+                    # Reasoning models spend output tokens thinking; a tight cap empties replies.
+                    max_output_tokens=settings.llm_max_output_tokens,
+                    context_char_budget=settings.llm_context_char_budget,
+                )
+            except (LLMError, EmptyReplyError, BudgetExceededError) as exc:
+                # A failed probe is a result too: record it instead of losing the whole run.
+                kind = getattr(exc, "kind", None) or getattr(exc, "scope", None) or "empty"
+                results.append(
+                    {
+                        "question": question,
+                        "criterion": criterion,
+                        "error": kind,
+                        "detail": str(exc),
+                    }
+                )
+                print(f"\n[FALHOU: {kind}] {question}\n{str(exc)[:300]}")
+                continue
             answer = turn.assistant_message.content
             flagged = bool(re.search(violation, answer))
             results.append(
@@ -112,13 +128,17 @@ def main() -> int:
         "provider": provider.name,
         "model": provider.model,
         "results": results,
-        "total_cost_usd": str(sum(float(r["cost_usd"]) for r in results)),
+        "total_cost_usd": str(sum(Decimal(r.get("cost_usd", "0")) for r in results)),
     }
     RESULTS_DIR.mkdir(exist_ok=True)
     out = RESULTS_DIR / f"genesis-conversation-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     out.write_text(json.dumps(run, ensure_ascii=False, indent=2))
-    print(f"\nCusto total: US$ {run['total_cost_usd']}. Resultado salvo em {out}")
-    return 0
+    failed = sum(1 for r in results if "error" in r)
+    print(
+        f"\n{len(results) - failed} de {len(results)} perguntas respondidas."
+        f" Custo total: US$ {run['total_cost_usd']}. Resultado salvo em {out}"
+    )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

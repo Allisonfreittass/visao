@@ -153,3 +153,36 @@ def test_blank_env_values_mean_unconfigured() -> None:
     assert settings.llm_api_key is None
     assert settings.llm_price_input_per_mtok is None
     assert build_llm_provider(settings) is None
+
+
+def test_rate_limit_honors_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr(openai_compatible.time, "sleep", sleeps.append)
+    responses = iter(
+        [
+            httpx.Response(429, headers={"Retry-After": "7"}),
+            httpx.Response(429),
+            httpx.Response(200, json=OK_BODY),
+        ]
+    )
+
+    _provider(lambda request: next(responses)).complete(
+        [ChatMessage("user", "oi")], max_output_tokens=5
+    )
+
+    # Retry-After wins; without it, rate limits back off longer than server errors.
+    assert sleeps == [7.0, 10.0]
+
+
+def test_retry_after_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr(openai_compatible.time, "sleep", sleeps.append)
+    responses = iter(
+        [httpx.Response(503, headers={"Retry-After": "3600"}), httpx.Response(200, json=OK_BODY)]
+    )
+
+    _provider(lambda request: next(responses)).complete(
+        [ChatMessage("user", "oi")], max_output_tokens=5
+    )
+
+    assert sleeps == [30.0]

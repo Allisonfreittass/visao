@@ -1,5 +1,6 @@
 import os
 
+os.environ["VISION_ENV_FILE"] = os.devnull
 os.environ.setdefault("VISION_ENVIRONMENT", "test")
 os.environ.setdefault("VISION_SECRET_KEY", "test-secret-key-with-at-least-32-chars!!")
 os.environ.setdefault("VISION_DATABASE_URL", "sqlite://")
