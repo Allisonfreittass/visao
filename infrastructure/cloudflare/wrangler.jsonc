@@ -19,7 +19,10 @@
     "scheduling_policy": "durable_object",
     "images": { "base": { "dockerfile": "../../Dockerfile" } }
   }],
-  "durable_objects": { "bindings": [{ "name": "BACKEND", "class_name": "VisaoBackend" }] },
+  "durable_objects": {
+    "bindings": [{ "name": "BACKEND", "class_name": "VisaoBackend" }],
+    "code_update_strategy": { "mode": "deferred", "max_delay": 30 }
+  },
   "exports": { "VisaoBackend": { "type": "durable-object", "storage": "sqlite" } },
   "vars": {
     "VISION_ENVIRONMENT": "production",

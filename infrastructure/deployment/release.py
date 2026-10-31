@@ -86,12 +86,26 @@ def main():
     previous_version = previous["versions"][0]["version_id"]
     previous_revision = request_json("/api/release")["revision"]
     try:
-        wrangler("deploy", "--var", f"VISION_BUILD_SHA:{sha}")
+        wrangler(
+            "deploy",
+            "--var",
+            f"VISION_BUILD_SHA:{sha}",
+            "--durable-objects-code-update-mode",
+            "deferred 30s",
+        )
         if not wait_healthy(sha):
             raise RuntimeError("The new API revision did not pass health verification")
     except Exception:
         print("Publicação falhou; revertendo para a versão anterior.")
-        wrangler("rollback", previous_version, "--yes", "--message", "Automatic health rollback")
+        wrangler(
+            "rollback",
+            previous_version,
+            "--yes",
+            "--message",
+            "Automatic health rollback",
+            "--durable-objects-code-update-mode",
+            "immediate",
+        )
         restored = wait_healthy(previous_revision)
         if run_id:
             report(run_id, "reverted", sha)

@@ -39,7 +39,13 @@ def test_success_verifies_the_deployed_sha(monkeypatch):
     health = Mock(return_value=True)
     monkeypatch.setattr(release, "wait_healthy", health)
     release.main()
-    assert ("deploy", "--var", "VISION_BUILD_SHA:" + "a" * 40) in calls
+    assert (
+        "deploy",
+        "--var",
+        "VISION_BUILD_SHA:" + "a" * 40,
+        "--durable-objects-code-update-mode",
+        "deferred 30s",
+    ) in calls
     health.assert_called_once_with("a" * 40)
     assert not any(c[0] == "rollback" for c in calls)
 
