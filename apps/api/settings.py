@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     # ~60 s of 16 kHz mono 16-bit WAV; longer turns are refused.
     stt_max_bytes: int = Field(default=2_000_000, ge=10_000)
 
+    # Curiosity and research (docs/CURIOSITY.md). Off by default: one extra LLM call per
+    # non-trivial turn, plus searches within the limits below.
+    curiosity_enabled: bool = False
+    research_per_day: int = Field(default=20, ge=0)
+    research_per_conversation: int = Field(default=5, ge=0)
+    research_max_results: int = Field(default=3, ge=1, le=10)
+
     # Budgets in USD (docs/COSTS.md). Enforced in code before every call.
     llm_daily_budget_usd: Decimal = Field(default=Decimal("1.50"), ge=0)
     llm_conversation_budget_usd: Decimal = Field(default=Decimal("0.30"), ge=0)

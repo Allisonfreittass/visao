@@ -9,7 +9,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **implementada** (interface, fala, escuta, barge-in; latência mediana ~4,1 s); aceite pendente de teste com microfone real e iPhone |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
-| 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
+| 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | **concluída** (6/6 casos reais após correção; Wikipédia pt) |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
 | 7. Pesquisa avançada | fine-tuning, TTS próprio, continual learning | só após baselines e datasets | não iniciada |
@@ -77,15 +77,12 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fechar a Fase 2:** conversa de vários turnos por voz com microfone real no desktop (você) e no
-iPhone (exige HTTPS: túnel local ou implantação atrás da Cloudflare). Ajustar o VAD se houver
-falsos disparos ou cortes.
+**Fase 5: metas e iniciativas.** Scheduler persistente, ciclo de metas
+(`PROPOSED → EVALUATED → APPROVED → ACTIVE → COMPLETED`), `PROPOSE_GOAL` da curiosidade,
+aprovações e notificações com horário silencioso.
 
-Otimizações de latência anotadas: quebrar a primeira frase na vírgula para antecipar o primeiro
-som; modelo de LLM sem raciocínio para turnos de voz.
-
-Depois, pela ordem do master prompt: **Fase 4 (curiosidade e pesquisa)**. Pendências de memória
-(revisão de fato substituído, terceiros, saúde) e TTS mais natural seguem registradas.
+Pendentes de fases anteriores: teste da conversa por voz com microfone real e no iPhone (Fase 2);
+revisão de memórias substituídas (Fase 3); trechos além da introdução e segunda fonte (Fase 4).
 
 ## Visual da interface (entra no início da Fase 2)
 

@@ -1,0 +1,119 @@
+{
+  "ran_at": "2026-10-31T11:52:41.657089+00:00",
+  "llm": "openrouter+nvidia",
+  "rows": [
+    {
+      "category": "fato_publico",
+      "message": "Quem é o atual presidente do Chile?",
+      "action": "WEB_RESEARCH",
+      "reason": "public_fact",
+      "status": "RESEARCHED",
+      "question": "Quem é o atual presidente do Chile?",
+      "search_query": null,
+      "sources": [
+        {
+          "title": "Lista de presidentes do Chile",
+          "url": "https://pt.wikipedia.org/wiki/Lista_de_presidentes_do_Chile"
+        },
+        {
+          "title": "Augusto Pinochet",
+          "url": "https://pt.wikipedia.org/wiki/Augusto_Pinochet"
+        },
+        {
+          "title": "Gabriel Boric",
+          "url": "https://pt.wikipedia.org/wiki/Gabriel_Boric"
+        }
+      ],
+      "answer": "Com base nos resultados fornecidos, a fonte sobre Gabriel Boric indica que ele foi presidente do Chile entre 2022 e 2026, tendo sido eleito nas presidenciais de 2021 ([3] https://pt.wikipedia.org/wiki/Gabriel_Boric).\n\nNo entanto, os trechos disponibilizados não trazem informações sobre quem assumiu a presidência após 2026 nem sobre quem ocupa o cargo atualmente. Por isso, não é possível afirmar com certeza quem é o atual presidente do Chile com base apenas nesses dados.",
+      "action_ok": true,
+      "cites_a_source": true
+    },
+    {
+      "category": "fato_publico",
+      "message": "Quantos habitantes tem Uberlândia segundo o último censo?",
+      "action": "WEB_RESEARCH",
+      "reason": "public_fact",
+      "status": "RESEARCHED",
+      "question": "Qual é a população de Uberlândia segundo o Censo Demográfico de 2022 do IBGE?",
+      "search_query": null,
+      "sources": [
+        {
+          "title": "Lista de municípios do Brasil por população (2022)",
+          "url": "https://pt.wikipedia.org/wiki/Lista_de_munic%C3%ADpios_do_Brasil_por_popula%C3%A7%C3%A3o_(2022)"
+        },
+        {
+          "title": "Lista de municípios de Minas Gerais por população",
+          "url": "https://pt.wikipedia.org/wiki/Lista_de_munic%C3%ADpios_de_Minas_Gerais_por_popula%C3%A7%C3%A3o"
+        },
+        {
+          "title": "Uberlândia",
+          "url": "https://pt.wikipedia.org/wiki/Uberl%C3%A2ndia"
+        }
+      ],
+      "answer": "Segundo os materiais fornecidos, não foi possível identificar o número exato de habitantes de Uberlândia no Censo Demográfico de 2022.\n\nO que consta nos trechos:\n\n- A [Lista de municípios do Brasil por população (2022)](https://pt.wikipedia.org/wiki/Lista_de_munic%C3%ADpios_do_Brasil_por_popula%C3%A7%C3%A3o_(2022)) considera a população residente em 1º de agosto de 2022 segundo o censo demográfico de 2022 do IBGE, mas o trecho disponível não traz o valor específico de Uberlândia.\n- O artigo sobre [Uberlândia](https://pt.wikipedia.org/wiki/Uberl%C3%A2ndia) cita uma estimativa populacional de 2026 do IBGE (768.339 habitantes), que não é dado do censo de 2022.\n\nPortanto, o que permanece incerto é justamente o número oficial do Censo de 2022 para o município. Para obter esse valor com segurança, recomendo consultar diretamente o IBGE ou a lista completa referenciada acima.",
+      "action_ok": true,
+      "cites_a_source": true
+    },
+    {
+      "category": "fato_publico",
+      "message": "Em que ano Alan Turing nasceu?",
+      "action": "IGNORE",
+      "reason": "no_gap",
+      "status": "IGNORED",
+      "question": "Em que ano Alan Turing nasceu?",
+      "search_query": null,
+      "sources": [],
+      "answer": "Alan Turing nasceu em 1912, mais especificamente em 23 de junho de 1912, em Londres, Inglaterra.",
+      "action_ok": true,
+      "cites_a_source": false
+    },
+    {
+      "category": "pessoal",
+      "message": "Me ajuda a escolher um presente para a minha mãe?",
+      "action": "IGNORE",
+      "reason": "private_third_party",
+      "status": "IGNORED",
+      "question": "Quais são os interesses da sua mãe e qual o orçamento para o presente?",
+      "search_query": null,
+      "sources": [],
+      "answer": "Claro, posso ajudar você a pensar em opções. Para sugerir algo mais adequado, seria útil saber:\n\n- A idade dela (ou faixa etária)\n- Quais são os gostos e hobbies dela\n- Qual é o orçamento que você tem em mente\n- A ocasião (aniversário, Dia das Mães, Natal, só para surpreender)\n- Se ela prefere presentes materiais, experiências ou algo mais simbólico\n- Se há alguma restrição (alergias, dificuldades de mobilidade, etc.)\n\nEnquanto você não tem essas definições, aqui estão algumas ideias gerais:\n\n1. **Experiências**: almoço ou jantar em um restaurante que ela goste, ingresso para teatro/show, oficina de culinária ou arte, um dia de spa.\n2. **Cuidados pessoais**: kit de skincare, perfume, vela aromática, robe, chinelo confortável, assinatura de streaming.\n3. **Livros e hobbies**: um livro de um autor que ela goste, materiais de artesanato, itens para jardinagem, quebra-cabeça.\n4. **Tecnologia e praticidade**: fone de ouvido, carregador portátil,",
+      "action_ok": false,
+      "cites_a_source": false
+    },
+    {
+      "category": "irrelevante",
+      "message": "Hoje acordei com uma preguiça enorme, haha",
+      "action": "IGNORE",
+      "reason": "no_gap",
+      "status": "IGNORED",
+      "question": "(sem lacuna)",
+      "search_query": null,
+      "sources": [],
+      "answer": "Que isso! Às vezes o corpo pede um pouco mais de descanso mesmo.\n\nSe quiser conversar sobre alguma coisa ou precisar de ajuda com algum assunto, é só me dizer. Estou por aqui.",
+      "action_ok": true,
+      "cites_a_source": false
+    },
+    {
+      "category": "inconclusivo",
+      "message": "Qual foi o placar do jogo de ontem do Grêmio Recreativo Vila Esperança do bairro?",
+      "action": "WEB_RESEARCH",
+      "reason": "public_fact",
+      "status": "RESEARCHED",
+      "question": "Qual cidade/bairro e campeonato do Grêmio Recreativo Vila Esperança, e qual foi o placar de sua partida de ontem?",
+      "search_query": null,
+      "sources": [
+        {
+          "title": "Associação Portuguesa de Desportos",
+          "url": "https://pt.wikipedia.org/wiki/Associa%C3%A7%C3%A3o_Portuguesa_de_Desportos"
+        },
+        {
+          "title": "Lista de futebolistas que morreram em campo",
+          "url": "https://pt.wikipedia.org/wiki/Lista_de_futebolistas_que_morreram_em_campo"
+        }
+      ],
+      "answer": "Não tenho informações sobre o Grêmio Recreativo Vila Esperança, nem sobre o bairro ou município onde atua, nem sobre o campeonato que disputa, e não consigo saber o placar de qualquer partida de ontem.\n\nOs trechos fornecidos no contexto tratam da Associação Portuguesa de Desportos e de uma lista de futebolistas que morreram em campo; eles não contêm dados sobre o clube mencionado por você.\n\nAlém disso, não tenho acesso à internet nem a ferramentas de consulta de resultados esportivos, então não posso verificar placares em tempo real.\n\nPara obter essa informação, recomendo consultar:\n- O site ou redes sociais oficiais do clube, se existir;\n- O site da federação ou liga municipal/estadual de futebol da região;\n- Aplicativos ou sites de placar ao vivo (Flashscore, SofaScore, etc.), filtrando pela competição correta.\n\nSe você puder informar o estado/cidade e o campeonato, posso tentar ajudar com o que estiver ao meu alcance, mas sem acesso externo não terei como confirmar resultados de jogos recentes.",
+      "action_ok": true,
+      "cites_a_source": false
+    }
+  ]
+}

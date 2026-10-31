@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from apps.api.routes import auth, conversations, health, memory, system, voice
+from apps.api.routes import auth, conversations, curiosity, health, memory, system, voice
 from apps.api.settings import get_settings
 from infrastructure.observability.logging import configure_logging
 
@@ -15,6 +15,7 @@ def create_app() -> FastAPI:
     app.include_router(conversations.router)
     app.include_router(memory.router)
     app.include_router(voice.router)
+    app.include_router(curiosity.router)
     return app
 
 

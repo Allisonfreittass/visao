@@ -1,0 +1,19 @@
+{
+  "ran_at": "2026-10-31T11:53:56.721349+00:00",
+  "llm": "openrouter+nvidia",
+  "rows": [
+    {
+      "category": "pessoal",
+      "message": "Me ajuda a escolher um presente para a minha mãe?",
+      "action": "ASK_USER",
+      "reason": "personal",
+      "status": "ASKED",
+      "question": "Quais são os interesses e hobbies da sua mãe e qual é o orçamento disponível?",
+      "search_query": null,
+      "sources": [],
+      "answer": "Claro, posso ajudar a pensar em opções de presente para a sua mãe.\n\nPara que as sugestões sejam mais úteis e adequadas, preciso de duas informações que só você tem:\n\n- Quais são os interesses e hobbies da sua mãe?\n- Qual é o orçamento disponível para o presente?\n\nCom isso, consigo propor ideias mais alinhadas ao gosto dela e ao que você pode gastar. Se quiser, pode me contar também se ela tende a gostar mais de itens práticos, experiências, algo personalizado ou presentes caseiros, por exemplo.",
+      "action_ok": true,
+      "cites_a_source": false
+    }
+  ]
+}

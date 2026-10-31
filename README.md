@@ -9,12 +9,14 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 2: voz.** Fases 0, 1 e 3 concluídas; a Fase 2 (interface, fala e escuta) está implementada.
+**Fase 4: curiosidade e pesquisa.** Fases 0, 1, 3 e 4 concluídas; a Fase 2 (voz) está implementada.
 Identidade mínima (UUID, nome `null`), conversa por texto via LLM substituível (qualquer endpoint
 compatível com OpenAI) com orçamento e custo registrados, memória curada entre conversas, opt-in
 por usuário ([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados, que já
 fala as respostas com uma voz escolhida pelo próprio agente ([docs/VOICE.md](docs/VOICE.md)).
-A conversa por voz já funciona no navegador; falta o teste com microfone real e no iPhone. Ainda não há curiosidade. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+A conversa por voz já funciona no navegador; falta o teste com microfone real e no iPhone. Com `VISION_CURIOSITY_ENABLED=true`, detecta
+lacunas, pergunta o que é pessoal e pesquisa fatos públicos na Wikipédia citando as fontes
+([docs/CURIOSITY.md](docs/CURIOSITY.md)). Veja [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
 elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.

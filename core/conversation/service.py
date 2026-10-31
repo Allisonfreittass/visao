@@ -102,6 +102,7 @@ def reply(
     budgets: Budgets,
     max_output_tokens: int,
     context_char_budget: int,
+    extra_system: str | None = None,
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
@@ -122,6 +123,9 @@ def reply(
         memory_enabled=owner.memory_consent,
         memories=[item.record for item in recalled],
     )
+    if extra_system:
+        # Per-turn context from the curiosity pipeline (a question to ask, or sources).
+        system_prompt += f"\n\nContexto desta resposta:\n{extra_system}"
     prompt = [ChatMessage(role="system", content=system_prompt)]
     prompt += build_context(conversation_history(session, conversation), context_char_budget)
 

@@ -42,6 +42,18 @@ export function ChatView({ messages, sending, error, onSend }: ChatViewProps) {
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.role}`}>
             {m.content}
+            {m.sources && m.sources.length > 0 && (
+              <ol className="sources" aria-label="Fontes pesquisadas">
+                {m.sources.map((s) => (
+                  <li key={s.url}>
+                    <a href={s.url} target="_blank" rel="noopener noreferrer">
+                      {s.title}
+                    </a>{" "}
+                    <span>· {s.source}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
         ))}
         {sending && <div className="bubble assistant pending">…</div>}

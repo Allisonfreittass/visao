@@ -280,3 +280,75 @@ class MemoryRetrieval(Base):
     )
     score: Mapped[float] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class KnowledgeGap(Base):
+    """An information gap the CuriosityEngine detected, how it was scored and what was done."""
+
+    __tablename__ = "knowledge_gaps"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    trigger_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    trigger_kind: Mapped[str] = mapped_column(String(32))
+    depends_on: Mapped[str] = mapped_column(String(32))
+    question: Mapped[str] = mapped_column(Text)
+    hypothesis: Mapped[str] = mapped_column(Text)
+    scores: Mapped[dict[str, Any]] = mapped_column(JSON)
+    chosen_action: Mapped[str] = mapped_column(String(32))
+    decision_reason: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    resolution_summary: Mapped[str] = mapped_column(Text, default="")
+    model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ResearchSession(Base):
+    __tablename__ = "research_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    gap_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("knowledge_gaps.id", ondelete="CASCADE"), index=True
+    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    query: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16))
+    error_kind: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    result_count: Mapped[int] = mapped_column(Integer, default=0)
+    elapsed_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class ResearchSource(Base):
+    """A result as retrieved: URL, title, excerpt and when it was fetched (provenance)."""
+
+    __tablename__ = "research_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("research_sessions.id", ondelete="CASCADE"), index=True
+    )
+    rank: Mapped[int] = mapped_column(Integer)
+    url: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text)
+    snippet: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(100))
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -1,6 +1,8 @@
 # Curiosidade como mecanismo
 
-> Estado: **especificação**. Implementação prevista na Fase 4.
+> Estado: **Fase 4 implementada** (`core/curiosity/engine.py`, política `2026-10-31.2`).
+> Desligada por padrão (`VISION_CURIOSITY_ENABLED`). `PROPOSE_GOAL` depende de metas (Fase 5)
+> e ainda não é oferecida. Avaliação real: `docs/research-log/2026-10-31-fase-4-curiosidade.md`.
 
 Curiosidade aqui é um **procedimento de decisão sobre valor da informação**, não um traço de
 personalidade. Nenhum prompt diz "seja curioso".
@@ -50,6 +52,30 @@ knowledge_gaps(
   resolution_summary, created_at, resolved_at
 )
 ```
+
+## Implementação
+
+- **Pré-filtro determinístico:** cumprimentos, agradecimentos e mensagens com menos de 2 palavras
+  não são avaliados (custo zero).
+- **Avaliação:** uma chamada ao LLM por turno não trivial devolve JSON com `gap`, `trigger`,
+  `depends_on` (`public_fact`/`personal`/`none`), `about_private_person`, `question`,
+  `hypothesis`, `search_query` e escores 0–1 de incerteza, valor, urgência e risco. Falha ou
+  JSON ilegível: a conversa segue sem curiosidade.
+- **Política (em código, sem modelo), na ordem:** sem lacuna → `IGNORE no_gap`; valor < 0,4 →
+  `IGNORE low_value`; pessoal → `ASK_USER` (ou `IGNORE already_asked` se pergunta parecida já foi
+  feita na conversa); sobre pessoa privada → `IGNORE private_third_party`; risco ≥ 0,7 →
+  `IGNORE risk`; fato público → `WEB_RESEARCH`, ou `DEFER research_budget` sem orçamento.
+- **Efeito na resposta:** `ASK_USER` acrescenta a pergunta ao contexto da resposta (uma vez,
+  de forma natural); `WEB_RESEARCH` acrescenta as fontes como dados, com instrução de citar URLs,
+  não afirmar além dos trechos e declarar incerteza.
+- **Estados:** `ASKED`, `RESEARCHED` (houve fontes, o que **não** significa resolvido),
+  `INCONCLUSIVE` (sem fontes ou erro), `DEFERRED`, `IGNORED`.
+- **Limites:** 20 pesquisas/dia por usuário, 5 por conversa, 3 resultados por pesquisa
+  (`VISION_RESEARCH_*`); orçamentos de LLM em US$ valem também para a avaliação.
+- **Auditoria:** `GET /knowledge-gaps` e `GET /research`, só do próprio usuário.
+
+Lacuna conhecida: o passo 7 (avaliar se a lacuna foi de fato resolvida) não é feito; exigiria
+outra chamada ao LLM por turno pesquisado.
 
 ## Critérios de aceite
 

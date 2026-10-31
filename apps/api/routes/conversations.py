@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.llm import get_llm_provider, missing_llm_settings
+from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from core.conversation.service import (
     BudgetExceededError,
@@ -19,6 +20,7 @@ from core.conversation.service import (
     conversation_history,
     reply,
 )
+from core.curiosity.engine import NO_OUTCOME, CuriosityLimits, consider
 from core.identity.genesis import get_identity
 from core.memory.curator import (
     CurationOutputError,
@@ -27,6 +29,7 @@ from core.memory.curator import (
 )
 from infrastructure.database.models import Conversation, Message, User
 from integrations.llm.base import LLMError, LLMProvider
+from integrations.search.base import SearchProvider
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 logger = logging.getLogger(__name__)
@@ -68,10 +71,25 @@ class CurationOut(BaseModel):
     rejected: int
 
 
+class SourceOut(BaseModel):
+    title: str
+    url: str
+    source: str
+
+
+class CuriosityOut(BaseModel):
+    action: str
+    reason: str
+    status: str
+    question: str
+
+
 class TurnOut(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
     usage: UsageOut
+    curiosity: CuriosityOut | None = None
+    sources: list[SourceOut] = []
 
 
 def _message_out(message: Message) -> MessageOut:
@@ -211,6 +229,7 @@ def send_message(
     user: CurrentUser,
     settings: AppSettings,
     provider: OptionalProvider,
+    search: Annotated[SearchProvider, Depends(get_search_provider)],
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
@@ -223,6 +242,23 @@ def send_message(
         raise HTTPException(status.HTTP_409_CONFLICT, "Identidade da conversa indisponível")
 
     try:
+        outcome = NO_OUTCOME
+        if settings.curiosity_enabled:
+            outcome = consider(
+                db,
+                conversation=conversation,
+                owner=user,
+                user_text=body.content,
+                provider=provider,
+                search=search,
+                budgets=_budgets(settings),
+                limits=CuriosityLimits(
+                    research_per_day=settings.research_per_day,
+                    research_per_conversation=settings.research_per_conversation,
+                    max_results=settings.research_max_results,
+                ),
+                max_output_tokens=settings.llm_curation_max_output_tokens,
+            )
         result = reply(
             db,
             conversation=conversation,
@@ -233,7 +269,11 @@ def send_message(
             budgets=_budgets(settings),
             max_output_tokens=settings.llm_max_output_tokens,
             context_char_budget=settings.llm_context_char_budget,
+            extra_system=outcome.system_context,
         )
+        if outcome.gap is not None:
+            outcome.gap.trigger_message_id = result.user_message.id
+            db.commit()
     except BudgetExceededError as exc:
         scope = "diário" if exc.scope == "daily" else "desta conversa"
         raise HTTPException(
@@ -249,7 +289,17 @@ def send_message(
         ) from exc
 
     usage = result.usage
+    gap = outcome.gap
     return TurnOut(
+        curiosity=CuriosityOut(
+            action=gap.chosen_action,
+            reason=gap.decision_reason,
+            status=gap.status,
+            question=gap.question,
+        )
+        if gap is not None
+        else None,
+        sources=[SourceOut(title=s.title, url=s.url, source=s.source) for s in outcome.sources],
         user_message=_message_out(result.user_message),
         assistant_message=_message_out(result.assistant_message),
         usage=UsageOut(

@@ -184,7 +184,11 @@ export function App() {
       const llmStarted = performance.now();
       const turn = await api.send(conversationId, text);
       const llmMs = performance.now() - llmStarted;
-      setMessages((list) => [...list, turn.user_message, turn.assistant_message]);
+      setMessages((list) => [
+        ...list,
+        turn.user_message,
+        { ...turn.assistant_message, sources: turn.sources },
+      ]);
       if (spoken) {
         setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
       }

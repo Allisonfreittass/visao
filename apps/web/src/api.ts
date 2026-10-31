@@ -2,11 +2,19 @@
 
 export type Role = "user" | "assistant";
 
+export interface Source {
+  title: string;
+  url: string;
+  source: string;
+}
+
 export interface Message {
   id: string;
   role: Role;
   content: string;
   created_at: string;
+  /** Sources the reply was given (only known for replies received in this session). */
+  sources?: Source[];
 }
 
 export interface Conversation {
@@ -18,6 +26,7 @@ export interface Turn {
   user_message: Message;
   assistant_message: Message;
   usage: { provider: string; model: string; latency_ms: number | null; cost_usd: string };
+  sources: Source[];
 }
 
 export interface SystemStatus {
