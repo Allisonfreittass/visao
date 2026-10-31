@@ -8,7 +8,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
-| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | não iniciada |
+| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **3a implementada**; 3b (semântica) e 3c (baseline) pendentes |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
@@ -68,8 +68,19 @@ Pendências que não bloqueiam a Fase 2/3:
   variação.
 - Lacunas conhecidas do `LLMProvider`: streaming, tools, saída estruturada, cancelamento.
 
+## Fase 3a: memória curada (implementada)
+
+Ver [MEMORY.md](MEMORY.md) e [ADR-0003](decisions/0003-memoria-curada-com-politica-deterministica.md).
+Consentimento opt-in, curadoria por lote com política determinística, decisões append-only,
+recuperação lexical por usuário, exportação e exclusão. Avaliação real com um cenário: memória
+guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente numa conversa nova.
+
 ## Próximo incremento proposto
 
-Depois da avaliação com o LLM real: **Fase 2 (voz)** ou **Fase 3 (curadoria de memória)**.
-A ordem do master prompt põe voz antes; memória é o que mais avança a hipótese científica.
-Decisão a tomar quando a Fase 1 fechar.
+**Fase 3c: comparação com baseline** (critério de aceite da Fase 3). Conjunto fixo de cenários
+fictícios multi-conversa, variantes A (sem memória), B (memória passiva: guarda tudo) e C
+(curada), métricas de recall/precisão de memória relevante, vazamento entre usuários (meta zero),
+dados proibidos guardados e custo. Fica antes da 3b para medir se a busca lexical é mesmo o
+gargalo antes de adicionar embeddings.
+
+Depois: Fase 3b (embeddings) se a 3c mostrar perda por paráfrase; ou Fase 2 (voz).

@@ -1,5 +1,6 @@
 """Test doubles. Never used outside tests and never presented as a real capability."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -14,6 +15,8 @@ class FakeLLMProvider:
         default_factory=lambda: Pricing(input_per_mtok=Decimal("1"), output_per_mtok=Decimal("2"))
     )
     reply_text: str = "resposta de teste"
+    # Optional: computes the reply from the prompt (e.g. curation JSON vs chat text).
+    responder: Callable[[list[ChatMessage]], str] | None = None
     fail_with: str | None = None
     prompts: list[list[ChatMessage]] = field(default_factory=list)
 
@@ -22,7 +25,7 @@ class FakeLLMProvider:
         if self.fail_with:
             raise LLMError(self.fail_with, "falha simulada")
         return LLMResponse(
-            text=self.reply_text,
+            text=self.responder(messages) if self.responder else self.reply_text,
             provider=self.name,
             model=self.model,
             input_tokens=1000,

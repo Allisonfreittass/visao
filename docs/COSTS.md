@@ -23,6 +23,7 @@ Créditos AWS **não** pagam APIs de terceiros (LLM, STT, TTS, busca).
 | Por pesquisa web (lacuna) | 5 buscas, 10 páginas | marca lacuna como `INCONCLUSIVE` ou `DEFERRED` |
 | Iniciativas proativas | 3/dia, fora do horário silencioso | adia |
 | Reflexão | 1 ciclo por conversa encerrada | não reflete |
+| Curadoria de memória | 1 chamada por conversa encerrada, só com consentimento | mensagens ficam pendentes |
 
 Além disso: configurar **limite de gasto no painel de cada provedor** (defesa independente do
 código).

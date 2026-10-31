@@ -87,6 +87,7 @@ def main() -> int:
                     session,
                     conversation=conversation,
                     identity=identity,
+                    owner=user,
                     user_text=question,
                     provider=provider,
                     budgets=budgets,

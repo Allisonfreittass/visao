@@ -1,14 +1,17 @@
+import logging
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.deps import AppSettings, CurrentUser, DbSession
+from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.llm import get_llm_provider, missing_llm_settings
+from apps.api.settings import Settings
 from core.conversation.service import (
     BudgetExceededError,
     Budgets,
@@ -17,10 +20,18 @@ from core.conversation.service import (
     reply,
 )
 from core.identity.genesis import get_identity
-from infrastructure.database.models import Conversation, Message
+from core.memory.curator import (
+    CurationOutputError,
+    curate_conversation,
+    latest_uncurated_conversation,
+)
+from infrastructure.database.models import Conversation, Message, User
 from integrations.llm.base import LLMError, LLMProvider
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+logger = logging.getLogger(__name__)
+
+OptionalProvider = Annotated[LLMProvider | None, Depends(get_llm_provider)]
 
 MAX_MESSAGE_CHARS = 8000
 
@@ -50,6 +61,13 @@ class UsageOut(BaseModel):
     latency_ms: int | None
 
 
+class CurationOut(BaseModel):
+    skipped_reason: str | None
+    stored: int
+    discarded: int
+    rejected: int
+
+
 class TurnOut(BaseModel):
     user_message: MessageOut
     assistant_message: MessageOut
@@ -71,14 +89,102 @@ def _own_conversation(db: DbSession, user: CurrentUser, conversation_id: uuid.UU
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_conversation(db: DbSession, user: CurrentUser) -> ConversationOut:
+def create_conversation(
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    factory: SessionFactory,
+    provider: OptionalProvider,
+    background: BackgroundTasks,
+) -> ConversationOut:
     identity = get_identity(db)
     if identity is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado")
     conversation = Conversation(user_id=user.id, identity_id=identity.id)
     db.add(conversation)
     db.commit()
+    # Starting a new conversation is the event that closes the previous one for curation.
+    if user.memory_consent and provider is not None:
+        background.add_task(_curate_previous, factory, user.id, conversation.id, provider, settings)
     return ConversationOut(id=conversation.id, created_at=conversation.created_at)
+
+
+def _budgets(settings: Settings) -> Budgets:
+    return Budgets(
+        daily_usd=settings.llm_daily_budget_usd,
+        conversation_usd=settings.llm_conversation_budget_usd,
+    )
+
+
+def _curate_previous(
+    factory: sessionmaker[Session],
+    user_id: uuid.UUID,
+    new_conversation_id: uuid.UUID,
+    provider: LLMProvider,
+    settings: Settings,
+) -> None:
+    """Background task: failures are logged, never surfaced, and leave messages pending."""
+    try:
+        with factory() as session:
+            owner = session.get(User, user_id)
+            new = session.get(Conversation, new_conversation_id)
+            if owner is None or not owner.memory_consent:
+                return
+            previous = latest_uncurated_conversation(session, owner, exclude=new)
+            if previous is None:
+                return
+            curate_conversation(
+                session,
+                conversation=previous,
+                owner=owner,
+                provider=provider,
+                budgets=_budgets(settings),
+                max_output_tokens=settings.llm_curation_max_output_tokens,
+            )
+    except Exception:
+        logger.exception("background memory curation failed", extra={"event": "curation_failed"})
+
+
+@router.post("/{conversation_id}/curate")
+def curate(
+    conversation_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    provider: OptionalProvider,
+) -> CurationOut:
+    conversation = _own_conversation(db, user, conversation_id)
+    if provider is None:
+        missing = ", ".join(missing_llm_settings(settings))
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, f"LLM não configurado. Faltam: {missing}"
+        )
+    try:
+        result = curate_conversation(
+            db,
+            conversation=conversation,
+            owner=user,
+            provider=provider,
+            budgets=_budgets(settings),
+            max_output_tokens=settings.llm_curation_max_output_tokens,
+        )
+    except BudgetExceededError as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Orçamento de LLM esgotado") from exc
+    except LLMError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"Falha no provedor de LLM ({exc.kind})"
+        ) from exc
+    except CurationOutputError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "O modelo devolveu uma curadoria ilegível; nada foi guardado",
+        ) from exc
+    return CurationOut(
+        skipped_reason=result.skipped_reason,
+        stored=result.stored,
+        discarded=result.discarded,
+        rejected=result.rejected,
+    )
 
 
 @router.get("")
@@ -104,7 +210,7 @@ def send_message(
     db: DbSession,
     user: CurrentUser,
     settings: AppSettings,
-    provider: Annotated[LLMProvider | None, Depends(get_llm_provider)],
+    provider: OptionalProvider,
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
@@ -121,12 +227,10 @@ def send_message(
             db,
             conversation=conversation,
             identity=identity,
+            owner=user,
             user_text=body.content,
             provider=provider,
-            budgets=Budgets(
-                daily_usd=settings.llm_daily_budget_usd,
-                conversation_usd=settings.llm_conversation_budget_usd,
-            ),
+            budgets=_budgets(settings),
             max_output_tokens=settings.llm_max_output_tokens,
             context_char_budget=settings.llm_context_char_budget,
         )

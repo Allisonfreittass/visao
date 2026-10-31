@@ -1,7 +1,7 @@
 """Text conversation turn: history within one conversation, budget check, LLM call, usage log.
 
-Context comes only from the current conversation. Nothing from other conversations or users is
-ever sent to the model; cross-conversation recall arrives with curated memory (Phase 3).
+Raw history comes only from the current conversation. The only cross-conversation context is
+curated memory of the same owner, and only when that owner opted in.
 """
 
 from dataclasses import dataclass
@@ -12,7 +12,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.identity.system_prompt import build_system_prompt
-from infrastructure.database.models import AgentIdentity, Conversation, Message, ModelUsage
+from core.memory.retrieval import ScoredMemory, retrieve
+from infrastructure.database.models import (
+    AgentIdentity,
+    Conversation,
+    MemoryRetrieval,
+    Message,
+    ModelUsage,
+    User,
+)
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 
 PURPOSE_CHAT = "chat_reply"
@@ -39,6 +47,7 @@ class TurnResult:
     user_message: Message
     assistant_message: Message
     usage: ModelUsage
+    recalled: list[ScoredMemory]
 
 
 def _spent(session: Session, *conditions: object) -> Decimal:
@@ -87,6 +96,7 @@ def reply(
     *,
     conversation: Conversation,
     identity: AgentIdentity,
+    owner: User,
     user_text: str,
     provider: LLMProvider,
     budgets: Budgets,
@@ -97,9 +107,22 @@ def reply(
 
     user_message = Message(conversation_id=conversation.id, role="user", content=user_text)
     session.add(user_message)
+    session.flush()
+
+    # Memory is recalled only for owners who opted in, and only from their own records.
+    recalled = retrieve(session, owner.id, user_text) if owner.memory_consent else []
+    for item in recalled:
+        session.add(
+            MemoryRetrieval(message_id=user_message.id, record_id=item.record.id, score=item.score)
+        )
     session.commit()
 
-    prompt = [ChatMessage(role="system", content=build_system_prompt(identity))]
+    system_prompt = build_system_prompt(
+        identity,
+        memory_enabled=owner.memory_consent,
+        memories=[item.record for item in recalled],
+    )
+    prompt = [ChatMessage(role="system", content=system_prompt)]
     prompt += build_context(conversation_history(session, conversation), context_char_budget)
 
     try:
@@ -131,7 +154,7 @@ def reply(
     session.flush()
     assistant_message.model_usage_id = usage.id
     session.commit()
-    return TurnResult(user_message, assistant_message, usage)
+    return TurnResult(user_message, assistant_message, usage, recalled)
 
 
 def _record_failure(

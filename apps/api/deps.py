@@ -1,13 +1,28 @@
+from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.security import decode_access_token
 from apps.api.settings import Settings, get_settings
 from infrastructure.database.models import User
-from infrastructure.database.session import get_db
+from infrastructure.database.session import get_sessionmaker
+
+
+def get_session_factory() -> sessionmaker[Session]:
+    """Single override point for the database, also used by background tasks."""
+    return get_sessionmaker()
+
+
+SessionFactory = Annotated[sessionmaker[Session], Depends(get_session_factory)]
+
+
+def get_db(factory: SessionFactory) -> Iterator[Session]:
+    with factory() as session:
+        yield session
+
 
 DbSession = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]

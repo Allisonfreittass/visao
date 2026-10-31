@@ -7,6 +7,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import false
 
 from infrastructure.database.base import Base, utcnow
 
@@ -28,6 +30,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Explicit opt-in. Without it nothing from this user's conversations is curated or recalled.
+    memory_consent: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -112,6 +116,8 @@ class Conversation(Base):
     identity_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("agent_identities.id", ondelete="RESTRICT"), index=True
     )
+    # Messages created up to this instant have already gone through memory curation.
+    last_curated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -156,3 +162,98 @@ class ModelUsage(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class MemoryCandidate(Base):
+    """Something the model proposed to store or discard. Content is scrubbed on deletion."""
+
+    __tablename__ = "memory_candidates"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
+    )
+    memory_type: Mapped[str] = mapped_column(String(32))
+    content: Mapped[str] = mapped_column(Text)
+    evidence_message_ids: Mapped[list[str]] = mapped_column(JSON)
+    proposed_decision: Mapped[str] = mapped_column(String(16))
+    scores: Mapped[dict[str, Any]] = mapped_column(JSON)
+    flags: Mapped[dict[str, Any]] = mapped_column(JSON)
+    rationale: Mapped[str] = mapped_column(Text)
+    scrubbed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MemoryDecision(Base):
+    """Append-only verdict on a candidate. Holds only codes, never memory content."""
+
+    __tablename__ = "memory_decisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("memory_candidates.id", ondelete="RESTRICT"), index=True
+    )
+    decision: Mapped[str] = mapped_column(String(32))
+    reason_code: Mapped[str] = mapped_column(String(50))
+    policy_version: Mapped[str] = mapped_column(String(32))
+    # Plain column, no FK: deleting a memory must not require touching this append-only row.
+    record_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MemoryRecord(Base):
+    __tablename__ = "memory_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("memory_candidates.id", ondelete="RESTRICT")
+    )
+    source_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    memory_type: Mapped[str] = mapped_column(String(32))
+    content: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class MemorySource(Base):
+    """Provenance: the messages that support a memory."""
+
+    __tablename__ = "memory_sources"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    record_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("memory_records.id", ondelete="CASCADE"), index=True
+    )
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+
+
+class MemoryRetrieval(Base):
+    """Which memories were put in the prompt for which user message, and their score."""
+
+    __tablename__ = "memory_retrievals"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    record_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("memory_records.id", ondelete="CASCADE"), index=True
+    )
+    score: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
