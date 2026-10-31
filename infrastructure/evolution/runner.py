@@ -27,6 +27,7 @@ def api(path, data=None):
         data=json.dumps(data).encode() if data is not None else None,
         headers={
             "Content-Type": "application/json",
+            "User-Agent": "visao-code-controller/1.0",
             "X-Visao-Code-Key": os.environ["VISION_CODE_AUTONOMY_KEY"],
         },
     )

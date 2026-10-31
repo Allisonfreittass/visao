@@ -25,6 +25,7 @@ from core.decision.turn import TurnPlan
 from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
+from core.memory.text import tokens
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
@@ -145,7 +146,15 @@ def run_turn(
             reason="interlocutor_asked_about_name",
         )
 
-    if config.code_autonomy_enabled:
+    if config.code_autonomy_enabled and tokens(text) & {
+        "codigo",
+        "modificou",
+        "publicou",
+        "alterou",
+        "programacao",
+        "versao",
+        "atualizou",
+    }:
         import json
 
         from core.evolution.service import recent_runs

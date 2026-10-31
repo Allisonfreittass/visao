@@ -65,3 +65,17 @@ def test_stale_ci_cannot_publish_over_new_main(monkeypatch):
     monkeypatch.setattr(release, "current_main", lambda: "b" * 40)
     release.main()
     assert calls == []
+
+
+def test_controller_identifies_itself_to_the_public_api(monkeypatch):
+    from io import BytesIO
+
+    seen = []
+
+    def open_request(request, **kwargs):
+        seen.append(request)
+        return BytesIO(b'{"revision":"test"}')
+
+    monkeypatch.setattr(release.urllib.request, "urlopen", open_request)
+    assert release.request_json("/api/release") == {"revision": "test"}
+    assert seen[0].get_header("User-agent") == "visao-release-controller/1.0"

@@ -33,8 +33,16 @@ def wrangler(*args, capture=False):
     return result.stdout if capture else None
 
 
+def public_request(path):
+    if path not in {"/", "/api/release", "/api/ready"}:
+        raise ValueError("unexpected_health_path")
+    return urllib.request.Request(  # noqa: S310 (fixed public HTTPS service)
+        URL + path, headers={"User-Agent": "visao-release-controller/1.0"}
+    )
+
+
 def request_json(path):
-    with urllib.request.urlopen(URL + path, timeout=30) as response:  # noqa: S310
+    with urllib.request.urlopen(public_request(path), timeout=30) as response:  # noqa: S310
         return json.load(response)
 
 
@@ -56,7 +64,7 @@ def healthy(revision):
             return False
         if request_json("/api/ready") != {"status": "ok", "database": "up"}:
             return False
-        with urllib.request.urlopen(URL + "/", timeout=20) as response:  # noqa: S310
+        with urllib.request.urlopen(public_request("/"), timeout=20) as response:  # noqa: S310
             return response.status == 200 and "VISÃO" in response.read().decode()
     except Exception:
         return False
