@@ -207,3 +207,20 @@ def test_message_validation(client: TestClient, db: Session, fake_llm: FakeLLMPr
     conversation_id = _new_conversation(client, headers)
     assert _say(client, headers, conversation_id, "").status_code == 422
     assert _say(client, headers, conversation_id, "x" * 8001).status_code == 422
+
+
+def test_truncated_reply_is_marked_not_presented_as_complete(
+    client: TestClient, db: Session, fake_llm: FakeLLMProvider
+) -> None:
+    run_genesis(db)
+    headers = _login(client, db, "a@exemplo.com")
+    conversation_id = _new_conversation(client, headers)
+    fake_llm.reply_text = "Inflação é o aumento generalizado e"
+    fake_llm.finish_reason = "length"
+
+    body = _say(client, headers, conversation_id, "O que é inflação?").json()
+
+    assert body["assistant_message"]["content"].endswith(
+        "[resposta interrompida pelo limite de tamanho]"
+    )
+    assert db.scalar(select(ModelUsage.outcome)) == "truncated"

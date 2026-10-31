@@ -11,7 +11,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | **concluída** (6/6 casos reais após correção; Wikipédia pt) |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | **implementada** (evento real ponta a ponta; aviso útil verificado com lacuna semeada) |
-| 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
+| 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | **concluída** (−69% palavras após retorno, revertido volta à linha de base) |
 | 7. Pesquisa avançada | fine-tuning, TTS próprio, continual learning | só após baselines e datasets | não iniciada |
 
 ## Fase 0: o que está feito e o que falta
@@ -77,16 +77,17 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fase 6: reflexão e desenvolvimento comportamental.** Lições revisáveis a partir de resultados
-(esperado × observado), métricas de estilo e comportamento ao longo do tempo, adaptação
-rastreável, versionada e reversível.
+As fases de construção (0–6) estão feitas. A Fase 7 (fine-tuning, TTS treinado, aprendizado
+contínuo) só começa com baselines e datasets de uso real (master prompt §20).
 
-Antes da Fase 6, vale considerar a **implantação** (Lightsail + Cloudflare, com HTTPS): destrava o
-teste da voz no iPhone e os avisos push. Requer acesso à instância e aprovação explícita.
+Próximo passo recomendado: **implantação** no Lightsail + Cloudflare (HTTPS), que destrava:
+teste da voz no iPhone, avisos push, worker 24 h e uso contínuo para as métricas da seção 19 ainda
+sem medição (calibração, consistência entre sessões, custo em 7 dias, comparação D × C). Requer
+acesso à instância, auditoria do que já roda nela e aprovação explícita.
 
-Pendentes: teste da voz com microfone real (Fase 2); revisão de memórias substituídas (Fase 3);
-trechos além da introdução e consulta pelo título exato (Fases 4 e 5); rota para metas criadas pelo
-usuário.
+Pendências: teste de voz com microfone real; caso real completo de iniciativa com aviso; revisão de
+memórias substituídas; trechos além da introdução e consulta pelo título exato na pesquisa; rota
+para metas criadas pelo usuário.
 
 ## Visual da interface (entra no início da Fase 2)
 

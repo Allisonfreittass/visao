@@ -276,6 +276,22 @@ export function App() {
     };
   }, []);
 
+  async function sendFeedback(
+    messageId: string,
+    rating: 1 | -1,
+    tags: string[],
+  ): Promise<string | null> {
+    try {
+      const result = await api.feedback(messageId, rating, tags);
+      return result.state_changed
+        ? `Obrigado. Ajuste de comunicação atualizado (versão ${result.state_version}, revertível).`
+        : "Obrigado.";
+    } catch (e) {
+      handleError(e);
+      return null;
+    }
+  }
+
   async function toggleMemory() {
     try {
       setMemoryEnabled((await api.setMemoryEnabled(!memoryEnabled)).enabled);
@@ -454,7 +470,13 @@ export function App() {
                     ` · total fim da fala → voz ${Math.round(latency.totalMs)} ms`}
                 </p>
               )}
-              <ChatView messages={messages} sending={sending} error={error} onSend={send} />
+              <ChatView
+                messages={messages}
+                sending={sending}
+                error={error}
+                onSend={send}
+                onFeedback={sendFeedback}
+              />
             </>
           )}
         </main>

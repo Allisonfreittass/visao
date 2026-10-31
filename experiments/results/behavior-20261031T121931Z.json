@@ -1,0 +1,77 @@
+{
+  "ran_at": "2026-10-31T12:19:31.716092+00:00",
+  "llm": "openrouter+nvidia",
+  "adapted_version": {
+    "version": 1,
+    "params": {
+      "length": "shorter",
+      "cite_sources": false,
+      "fewer_questions": false
+    },
+    "summary": "3x 'muito longo'",
+    "evidence_feedback_ids": [
+      "527e49df-60f2-4651-bd50-d616525602fd",
+      "89d31ff7-ebbe-40f5-9bba-1ef07cf280f5",
+      "61549f78-2686-422e-9a29-a77d847a4a2a"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "A (linha de base)",
+      "state_version": 0,
+      "mean_words": 132.8,
+      "mean_sentences": 8.2,
+      "mean_list_items": 2.2,
+      "per_question_words": [
+        110,
+        187,
+        228,
+        6
+      ],
+      "replies": [
+        "Uma **API REST** é uma interface de programação de aplicações que segue os princípios do estilo arquitetural **REST** (*Representational State Transfer*) para permitir que sistemas se comuniquem, geralmente por meio da web.\n\nPara entender melhor:\n\n* **API** (*Application Programming Interface*): conjunto de regras que define como dois programas podem trocar informações e solicitar serviços uns aos outros.\n* **REST**: estilo arquitetural definido por Roy Fielding em 2000. Não é um protocolo rígido, mas um conjunto de restrições e boas práticas para criar APIs na web.\n\n### Princípios principais\n\n1. **Recursos**: tudo é tratado como um recurso (por exemplo: um usuário, um produto, um pedido). Cada recurso é identificado por um endereço único, chamado",
+        "A fotossíntese é o processo pelo qual plantas, algas e algumas bactérias transformam a energia da luz solar em energia química, armazenada em moléculas de alimentos como a glicose. Esse processo ocorre principalmente nos **cloroplastos**, organelas das células vegetais ricas no pigmento **clorofila**, que absorve a luz (especialmente nas regiões vermelha e azul do espectro e reflete o verde, por isso as folhas parecem verdes).\n\nA equação simplificada da fotossíntese é:\n\n**6 CO₂ + 6 H₂O + energia luminosa → C₆H₁₂O₆ (glicose) + 6 O₂**\n\nOu seja: dióxido de carbono + água + luz → glicose + oxigênio.\n\nO processo acontece em duas etapas principais:\n\n### 1. Fase luminosa (dependente da luz)\nOcorre nas membranas dos tilacóides, dentro dos cloroplastos.\n- A clorofila captura fótons de luz, e essa energia é usada para quebrar moléculas de água (**fotólise**), liberando oxigênio, íons de hidrogênio e elétrons.\n- Com essa energia, a célula produz duas moléculas transportadoras de energia: **ATP** e **NADPH**.\n- O oxigênio liberado nessa etapa é o mesmo que entra na atmosfera e é usado pela maior parte dos seres vivos na respiração.\n\n### 2. Fase escura ou ciclo de Calvin (independente da luz direta)\nOcorre no estroma do",
+        "O céu parece azul porque a atmosfera da Terra espalha a luz solar de forma desigual, principalmente as cores de comprimento de onda mais curto.\n\nAqui está o que acontece, de forma resumida:\n\n1. **Luz solar é composta por várias cores.** Embora pareça branca, a luz do Sol contém todas as cores do espectro visível (vermelho, laranja, amarelo, verde, azul, índigo, violeta), cada uma com um comprimento de onda diferente.\n\n2. **A atmosfera espalha mais o azul.** Quando essa luz atinge moléculas de nitrogênio e oxigênio no ar, ocorre um fenômeno chamado **dispersão de Rayleigh**. Cores com comprimentos de onda curtos (azul e violeta) são espalhadas em todas as direções com muito mais intensidade do que cores de comprimentos de onda longos (vermelho e laranja).\n\n3. **Por que vemos azul e não violeta?** Embora o violeta seja espalhado ainda mais que o azul, o olho humano é muito mais sensível à luz azul do que à violeta. Além disso, parte da luz violeta é absorvida pela camada de ozônio. Por isso, nossos olhos percebem o céu predominantemente azul.\n\n**Curiosidade:** No amanhecer e no pôr do sol, a luz solar atravessa uma camada muito mais espessa da atmosfera para chegar até nós. Nesse caminho, boa parte do azul já foi espalhada e “perdida” na direção oposta, restando mais vermelho e laranja — por isso o céu fica avermelhado nesses momentos.",
+        "Inflação é o aumento generalizado e"
+      ]
+    },
+    {
+      "phase": "B (adaptado)",
+      "state_version": 1,
+      "mean_words": 53,
+      "mean_sentences": 3,
+      "mean_list_items": 0,
+      "per_question_words": [
+        56,
+        59,
+        46,
+        51
+      ],
+      "replies": [
+        "Uma API REST é uma interface de programação que segue os princípios do estilo arquitetural REST para permitir comunicação entre sistemas via HTTP. Ela usa métodos como GET, POST, PUT e DELETE para manipular recursos, geralmente trocando dados em formato JSON. É stateless, ou seja, cada requisição contém todas as informações necessárias para ser processada independentemente.",
+        "A fotossíntese é o processo pelo qual plantas, algas e algumas bactérias usam luz solar para transformar dióxido de carbono e água em glicose e oxigênio. Ela ocorre nos cloroplastos e se divide em fase dependente da luz e ciclo de Calvin. O oxigênio é liberado na atmosfera e a glicose serve como fonte de energia para o organismo.",
+        "O céu é azul porque a atmosfera espalha mais a luz azul do Sol do que as outras cores, um fenômeno chamado dispersão de Rayleigh. Essa luz espalhada chega aos nossos olhos de todas as direções. À noite, sem a luz solar, o céu fica escuro.",
+        "Inflação é o aumento generalizado e contínuo dos preços de bens e serviços, o que reduz o poder de compra do dinheiro. Ela ocorre principalmente por excesso de demanda, alta nos custos de produção ou expansão da oferta monetária. Expectativas de preços futuros e choques de oferta também podem impulsioná-la."
+      ]
+    },
+    {
+      "phase": "C (revertido)",
+      "state_version": 2,
+      "mean_words": 228.2,
+      "mean_sentences": 13.2,
+      "mean_list_items": 2.8,
+      "per_question_words": [
+        247,
+        147,
+        178,
+        341
+      ],
+      "replies": [
+        "Uma **API REST** é uma interface de programação de aplicações (API) que segue os princípios do estilo arquitetural **REST** (*Representational State Transfer*). Em resumo, é um conjunto de regras que permite que dois sistemas se comuniquem pela internet — ou por uma rede — de forma padronizada, usando o protocolo HTTP.\n\nAbaixo estão os principais conceitos:\n\n### 1. Recursos\nTudo que pode ser acessado é tratado como um **recurso** (por exemplo: um usuário, um produto, um pedido, um artigo). Cada recurso é identificado por um endereço único chamado **URI** (geralmente uma URL).\n\nExemplo:\n```\nhttps://api.exemplo.com/usuarios/42\n```\n\n### 2. Métodos HTTP\nAs ações sobre os recursos são feitas usando verbos HTTP:\n\n| Método | Finalidade típica |\n|--------|-------------------|\n| **GET** | Recuperar dados de um recurso |\n| **POST** | Criar um novo recurso |\n| **PUT** | Atualizar completamente um recurso |\n| **PATCH** | Atualizar parcialmente um recurso |\n| **DELETE** | Remover um recurso |\n\nExemplo de requisição:\n```\nGET /usuarios/42\n```\n\n### 3. Representação dos dados\nO servidor envia os dados ao cliente em um formato estruturado, sendo o mais comum o **JSON**. Outros formatos, como XML, também são possíveis, mas menos usados hoje.\n\nExemplo de resposta:\n```json\n{\n  \"id\": 42,\n  \"nome\": \"Maria Silva\",\n  \"email\": \"maria@exemplo.com\"\n}\n```\n\n### 4. Stateless (sem estado)\nCada requisição do cliente deve conter todas as informações necessárias para o servidor entendê-la e respondê-la. O servidor não guarda o contexto da sessão entre requisições. Isso torna a API mais escalável e simples de manter.\n\n### 5. Códigos de status HTTP\nA API responde com códigos padronizados que indicam o resultado da operação:\n\n- **",
+        "A fotossíntese é o processo pelo qual plantas, algas e algumas bactérias transformam energia da luz em energia química, armazenada em moléculas orgânicas (como a glicose), liberando oxigênio como subproduto. Ocorre principalmente nos **cloroplastos**, organelas que contêm o pigmento verde **clorofila**, responsável por absorver a luz solar.\n\nSua equação simplificada é:\n\n**6 CO₂ + 6 H₂O + luz → C₆H₁₂O₆ + 6 O₂**\n\n(dióxido de carbono + água + energia luminosa → glicose + oxigênio)\n\nO processo acontece em dois estágios principais:\n\n### 1. Reações luminosas (fase clara)\nOcorrem nas membranas dos **tilacóides** (estruturas internas dos cloroplastos). A clorofila absorve a luz e usa essa energia para:\n- separar moléculas de água (fotólise), liberando **oxigênio**;\n- produzir **ATP** e **NADPH**, moléculas que armazenam energia temporariamente.\n\n### 2. Ciclo de Calvin (fase escura ou reações independentes da luz)\nOcorre no **estroma** (o espaço preenchido dos cloroplastos). Usa o dióxido de carbono (CO₂) do ar, junto com o ATP e o",
+        "O céu é azul devido a um fenômeno chamado **dispersão de Rayleigh**.\n\nA luz do Sol parece branca, mas é formada por todas as cores do espectro visível, cada uma com um comprimento de onda diferente. Quando essa luz chega à atmosfera da Terra, ela encontra moléculas de gases (principalmente nitrogênio e oxigênio) e partículas minúsculas.\n\nAs cores de comprimento de onda mais curto — como o azul e o violeta — são espalhadas em todas as direções com mais facilidade do que as cores de comprimento de onda mais longo, como o vermelho e o laranja. Por isso, quando olhamos para cima, vemos essa luz azul vindo de todas as partes do céu.\n\nNão vemos o céu violeta porque o Sol emite menos luz violeta do que azul e nossos olhos são mais sensíveis ao azul.\n\nNo fim do dia, o céu costuma ficar avermelhado porque a luz solar precisa atravessar uma camada muito mais espessa de atmosfera; nessa distância maior, o azul já foi quase totalmente disperso e chega até nossos olhos principalmente a luz vermelha e alaranjada.",
+        "**Inflação** é o aumento generalizado e sustentado dos preços de bens e serviços ao longo do tempo. Quando ela ocorre, a mesma quantidade de dinheiro compra menos produtos do que antes, ou seja, há uma redução do **poder de compra da moeda**.\n\nNo Brasil, a inflação é medida principalmente pelo **IPCA** (Índice Nacional de Preços ao Consumidor Amplo), calculado pelo IBGE, que acompanha a variação de preços de um conjunto de itens consumidos pelas famílias.\n\n---\n\n### Por que a inflação acontece?\n\nNão há uma única causa; geralmente ela resulta de uma combinação de fatores:\n\n1. **Demanda maior que a oferta**  \n   Quando as pessoas e as empresas querem comprar mais bens e serviços do que a economia é capaz de produzir, os preços tendem a subir. Isso pode ocorrer, por exemplo, com aumento do crédito, mais emprego e renda ou estímulos governamentais.\n\n2. **Custos de produção mais altos**  \n   Se matéria-prima, energia, transporte ou salários ficam mais caros, as empresas costumam repassar esse custo ao preço final do produto. Exemplos são a alta do petróleo, de alimentos ou do dólar (que encarece insumos importados).\n\n3. **Expectativas inflacionárias**  \n   Se consumidores e empresas acreditam que os preços vão subir no futuro, eles tendem a antecipar compras ou a reajustar preços e salários agora. Isso pode criar um ciclo autoalimentado.\n\n4. **Quantidade excessiva de dinheiro em circulação**  \n   Quando há muito dinheiro disputando poucos bens e serviços, os preços tendem a subir. Isso pode estar ligado a políticas monetárias muito expansionistas ou a financiamentos deficitários do governo.\n\n5. **Choques de oferta**  \n   Eventos como secas, guerras, pandemias ou problemas logísticos reduzem a disponibilidade de produtos essenciais (como alimentos e combustíveis), elevando seus preços.\n\n6. **Inércia e indexação**  \n   Em países com histórico de inflação alta, contratos, aluguéis e salários podem ficar atrelados a índices de preços, o que torna a inflação mais persistente mesmo após o fim do choque inicial.\n\n---\n\n### Principais efeitos\n\n- **Perda de poder de compra:** especialmente para quem tem renda fixa ou poupança rendendo abaixo da inflação.\n- **Redistribuição de renda:** credores tendem a perder e devedores podem"
+      ]
+    }
+  ]
+}

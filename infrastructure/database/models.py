@@ -147,6 +147,10 @@ class Conversation(Base):
     )
     # Messages created up to this instant have already gone through memory curation.
     last_curated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Reflection runs at most once per finished conversation.
+    last_reflected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -458,4 +462,85 @@ class SystemFlag(Base):
 
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MessageFeedback(Base):
+    """The interlocutor's judgement of one reply: provenance for any adaptation it causes."""
+
+    __tablename__ = "message_feedback"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="CASCADE"), index=True
+    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    rating: Mapped[int] = mapped_column(Integer)  # +1 / -1
+    tags: Mapped[list[str]] = mapped_column(JSON)
+    comment: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class BehaviorObservation(Base):
+    """Metrics computed in code from one assistant reply. Never the model's self-description."""
+
+    __tablename__ = "behavior_observations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="CASCADE"), unique=True
+    )
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    state_version: Mapped[int] = mapped_column(Integer)
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class BehaviorStateVersion(Base):
+    """Append-only versions of the adaptive communication state of one interlocutor relation.
+    Reverting creates a new version; nothing is rewritten."""
+
+    __tablename__ = "behavior_state_versions"
+    __table_args__ = (UniqueConstraint("owner_user_id", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    params: Mapped[dict[str, Any]] = mapped_column(JSON)
+    rules_version: Mapped[str] = mapped_column(String(32))
+    cause: Mapped[str] = mapped_column(String(32))  # baseline | feedback | lesson | revert
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON)
+    summary: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Lesson(Base):
+    """A revisable lesson from reflection. PROVISIONAL until independent evidence repeats."""
+
+    __tablename__ = "lessons"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    scope: Mapped[str] = mapped_column(String(32))
+    observation: Mapped[str] = mapped_column(Text)
+    lesson: Mapped[str] = mapped_column(Text)
+    evidence: Mapped[list[str]] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    confidence: Mapped[float] = mapped_column(Float)
+    model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

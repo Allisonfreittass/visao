@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.behavior import state as behavior_state
 from core.identity.system_prompt import build_system_prompt
 from core.memory.retrieval import ScoredMemory, retrieve
 from infrastructure.database.models import (
@@ -24,6 +25,7 @@ from infrastructure.database.models import (
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 
 PURPOSE_CHAT = "chat_reply"
+TRUNCATION_NOTICE = "[resposta interrompida pelo limite de tamanho]"
 
 
 class BudgetExceededError(Exception):
@@ -123,6 +125,13 @@ def reply(
         memory_enabled=owner.memory_consent,
         memories=[item.record for item in recalled],
     )
+    version, params = behavior_state.current_params(session, owner.id)
+    adjustments = behavior_state.prompt_lines(params)
+    if adjustments:
+        system_prompt += (
+            f"\n\nAjustes de comunicação aprendidos com o retorno deste interlocutor "
+            f"(versão {version}, revertíveis):\n" + "\n".join(f"- {a}" for a in adjustments)
+        )
     if extra_system:
         # Per-turn context from the curiosity pipeline (a question to ask, or sources).
         system_prompt += f"\n\nContexto desta resposta:\n{extra_system}"
@@ -146,17 +155,25 @@ def reply(
         latency_ms=response.latency_ms,
         outcome="success" if response.text.strip() else "empty",
     )
+    truncated = response.finish_reason == "length"
+    if truncated and response.text.strip():
+        # Real case (2026-10-31): a reasoning model spent the output budget thinking and the
+        # reply stopped mid-sentence. Never present a cut reply as complete.
+        usage.outcome = "truncated"
     session.add(usage)
     if not response.text.strip():
         session.commit()
         raise EmptyReplyError("provider returned an empty reply")
 
-    assistant_message = Message(
-        conversation_id=conversation.id, role="assistant", content=response.text
-    )
+    content = response.text
+    if truncated:
+        content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
+    assistant_message = Message(conversation_id=conversation.id, role="assistant", content=content)
     session.add(assistant_message)
     session.flush()
     assistant_message.model_usage_id = usage.id
+    # Observable behavior, measured in code, tagged with the state version in force.
+    behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
     return TurnResult(user_message, assistant_message, usage, recalled)
 

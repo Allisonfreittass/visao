@@ -179,6 +179,18 @@ export class Api {
     });
   }
 
+  feedback(
+    messageId: string,
+    rating: 1 | -1,
+    tags: string[],
+  ): Promise<{ state_version: number; state_changed: boolean }> {
+    return this.request(`/messages/${encodeURIComponent(messageId)}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ rating, tags, comment: "" }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   voiceStatus(): Promise<VoiceStatus> {
     return this.request("/voice/status");
   }

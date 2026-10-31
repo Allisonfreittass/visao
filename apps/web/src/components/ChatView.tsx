@@ -1,15 +1,17 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import type { Message } from "../api";
+import { FeedbackBar } from "./FeedbackBar";
 
 interface ChatViewProps {
   messages: Message[];
   sending: boolean;
   error: string | null;
   onSend: (text: string) => void;
+  onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ messages, sending, error, onSend }: ChatViewProps) {
+export function ChatView({ messages, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +55,9 @@ export function ChatView({ messages, sending, error, onSend }: ChatViewProps) {
                   </li>
                 ))}
               </ol>
+            )}
+            {m.role === "assistant" && (
+              <FeedbackBar onSend={(rating, tags) => onFeedback(m.id, rating, tags)} />
             )}
           </div>
         ))}

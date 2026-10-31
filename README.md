@@ -9,15 +9,23 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 5: metas e iniciativas.** Fases 0, 1, 3 e 4 concluídas; Fases 2 (voz) e 5 implementadas.
-Identidade mínima (UUID, nome `null`), conversa por texto via LLM substituível (qualquer endpoint
-compatível com OpenAI) com orçamento e custo registrados, memória curada entre conversas, opt-in
-por usuário ([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados, que já
-fala as respostas com uma voz escolhida pelo próprio agente ([docs/VOICE.md](docs/VOICE.md)).
-A conversa por voz já funciona no navegador; falta o teste com microfone real e no iPhone. Com `VISION_CURIOSITY_ENABLED=true`, detecta
-lacunas, pergunta o que é pessoal e pesquisa fatos públicos na Wikipédia citando as fontes
-([docs/CURIOSITY.md](docs/CURIOSITY.md)). Perguntas sem resposta podem virar metas de pesquisa
-que só rodam com aprovação, num worker separado ([docs/AUTONOMY.md](docs/AUTONOMY.md)). Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+**Fases 0–6 construídas.** Concluídas: 0, 1, 3, 4 e 6; implementadas com pendências de uso real:
+2 (voz) e 5 (iniciativas). Avaliações em [docs/EVALUATION.md](docs/EVALUATION.md).
+
+- Identidade mínima (UUID, nome `null`) e conversa via LLM substituível (qualquer endpoint
+  compatível com OpenAI), com orçamento e custo registrados.
+- Memória curada entre conversas, opt-in por usuário ([docs/MEMORY.md](docs/MEMORY.md)).
+- Interface web com a bolha de estados e voz: fala com a voz escolhida pelo próprio agente e
+  escuta pelo microfone ([docs/VOICE.md](docs/VOICE.md)). Falta o teste com microfone real e no
+  iPhone.
+- Curiosidade: detecta lacunas, pergunta o que é pessoal e pesquisa fatos públicos na Wikipédia
+  citando fontes ([docs/CURIOSITY.md](docs/CURIOSITY.md)).
+- Iniciativas: perguntas sem resposta podem virar metas que só rodam com aprovação, num worker
+  separado ([docs/AUTONOMY.md](docs/AUTONOMY.md)).
+- Adaptação: o jeito de responder se ajusta ao seu retorno de forma versionada e reversível
+  ([docs/IDENTITY.md](docs/IDENTITY.md)).
+
+Veja [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
 elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.

@@ -355,3 +355,26 @@ button.active {
 .pre {
   white-space: pre-wrap;
 }
+
+.feedback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+
+.feedback button {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.chip {
+  border: 1px solid var(--surface-2);
+  border-radius: 999px;
+}
+
+.feedback-done {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

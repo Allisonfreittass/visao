@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from apps.api.routes import (
     auth,
+    behavior,
     conversations,
     curiosity,
     goals,
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
     app.include_router(voice.router)
     app.include_router(curiosity.router)
     app.include_router(goals.router)
+    app.include_router(behavior.router)
     return app
 
 

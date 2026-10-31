@@ -18,6 +18,7 @@ class FakeLLMProvider:
     # Optional: computes the reply from the prompt (e.g. curation JSON vs chat text).
     responder: Callable[[list[ChatMessage]], str] | None = None
     fail_with: str | None = None
+    finish_reason: str = "stop"
     prompts: list[list[ChatMessage]] = field(default_factory=list)
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
@@ -31,6 +32,6 @@ class FakeLLMProvider:
             input_tokens=1000,
             output_tokens=500,
             latency_ms=5,
-            finish_reason="stop",
+            finish_reason=self.finish_reason,
             cost_usd=self.pricing.cost(1000, 500),
         )

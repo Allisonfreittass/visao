@@ -27,6 +27,8 @@ from core.memory.curator import (
     curate_conversation,
     latest_uncurated_conversation,
 )
+from core.policies.autonomy import is_paused
+from core.reflection.reflect import reflect
 from infrastructure.database.models import Conversation, Message, User
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
@@ -126,6 +128,11 @@ def create_conversation(
     # Starting a new conversation is the event that closes the previous one for curation.
     if user.memory_consent and provider is not None:
         background.add_task(_curate_previous, factory, user.id, conversation.id, provider, settings)
+    # ...and the event that lets the agent reflect on it, if there is evidence to reflect on.
+    if provider is not None:
+        background.add_task(
+            _reflect_previous, factory, user.id, conversation.id, provider, settings
+        )
     return ConversationOut(id=conversation.id, created_at=conversation.created_at)
 
 
@@ -163,6 +170,67 @@ def _curate_previous(
             )
     except Exception:
         logger.exception("background memory curation failed", extra={"event": "curation_failed"})
+
+
+def _reflect_previous(
+    factory: sessionmaker[Session],
+    user_id: uuid.UUID,
+    new_conversation_id: uuid.UUID,
+    provider: LLMProvider,
+    settings: Settings,
+) -> None:
+    """Background task: reflects once on the owner's previous conversation. Respects the
+    autonomy pause (it is spending on the agent's own initiative). Failures are only logged."""
+    try:
+        with factory() as session:
+            if is_paused(session):
+                return
+            owner = session.get(User, user_id)
+            previous = session.scalar(
+                select(Conversation)
+                .where(
+                    Conversation.user_id == user_id,
+                    Conversation.id != new_conversation_id,
+                    Conversation.last_reflected_at.is_(None),
+                )
+                .order_by(Conversation.created_at.desc())
+                .limit(1)
+            )
+            if owner is None or previous is None:
+                return
+            reflect(
+                session,
+                conversation=previous,
+                owner=owner,
+                provider=provider,
+                max_output_tokens=settings.llm_curation_max_output_tokens,
+            )
+    except Exception:
+        logger.exception("background reflection failed", extra={"event": "reflection_failed"})
+
+
+@router.post("/{conversation_id}/reflect")
+def reflect_now(
+    conversation_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    provider: OptionalProvider,
+) -> dict[str, object]:
+    conversation = _own_conversation(db, user, conversation_id)
+    if provider is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM não configurado")
+    try:
+        result = reflect(
+            db,
+            conversation=conversation,
+            owner=user,
+            provider=provider,
+            max_output_tokens=settings.llm_curation_max_output_tokens,
+        )
+    except LLMError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Falha no provedor ({exc.kind})") from exc
+    return result.__dict__
 
 
 @router.post("/{conversation_id}/curate")
