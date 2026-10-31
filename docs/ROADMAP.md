@@ -8,7 +8,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
-| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **3a implementada**; 3b (semântica) e 3c (baseline) pendentes |
+| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **3a implementada**; 3c em andamento (4 de 6 cenários: C > B > A); 3b pendente |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
@@ -84,3 +84,20 @@ dados proibidos guardados e custo. Fica antes da 3b para medir se a busca lexica
 gargalo antes de adicionar embeddings.
 
 Depois: Fase 3b (embeddings) se a 3c mostrar perda por paráfrase; ou Fase 2 (voz).
+
+## Visual da interface (entra no início da Fase 2)
+
+Decidido em 2026-10-31: **bolha de partículas laranja**, minimalista, como representação do
+estado do sistema, não como rosto ou personagem. Cada estado da seção 12 vira um comportamento:
+
+| Estado | Bolha |
+|---|---|
+| `IDLE` | pulsação lenta |
+| `LISTENING` | reage à amplitude do microfone |
+| `THINKING` | partículas em rotação/turbulência |
+| `SPEAKING` | acompanha a amplitude do áudio gerado |
+| `INTERRUPTED` | contração rápida |
+| `DISCONNECTED` | cinza, parada |
+
+Inspiração declarada: assistentes de ficção em geral. Restrição do master prompt: nada de marca,
+nome ou imagem da Marvel (sem "Jarvis", sem HUD copiado); visual próprio.
