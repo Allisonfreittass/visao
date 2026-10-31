@@ -5,7 +5,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 
 | Fase | Escopo | Critério de aceite | Estado |
 |---|---|---|---|
-| 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **em andamento** (ver abaixo) |
+| 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | não iniciada |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | não iniciada |
@@ -25,13 +25,14 @@ Feito:
 - CI (GitHub Actions) com lint e testes contra SQLite e PostgreSQL.
 - Documentação inicial e ADR-0001.
 
-Pendente para fechar a Fase 0:
-- **Executar `docker compose up` de verdade.** A máquina de desenvolvimento atual não tem
-  Docker instalado; o compose foi escrito mas não foi executado.
-- Rodar a suíte contra PostgreSQL (só roda no CI ou com `VISION_TEST_DATABASE_URL`).
-- Repositório remoto e primeira execução do CI.
-- Frontend React + TypeScript (esqueleto): adiado para o início da Fase 1, quando houver tela útil.
-- Worker persistente: adiado para a Fase 1/5, quando houver job real (evitar stub vazio).
+Validação:
+- CI do commit `1c777a9` passou (lint, testes contra SQLite e PostgreSQL, `docker compose up`
+  com `/ready` respondendo), conforme relatado em 2026-10-30.
+
+Adiado para fases seguintes:
+- Frontend React + TypeScript (esqueleto): início da Fase 1, quando houver tela útil.
+- Worker persistente: Fase 1/5, quando houver job real (evitar stub vazio).
+- `docker compose up` na máquina local (Docker ainda não instalado aqui).
 
 ## Próximo incremento proposto
 
