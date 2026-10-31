@@ -10,6 +10,7 @@ import {
 } from "./api";
 import { ChatView } from "./components/ChatView";
 import { InitiativesPanel } from "./components/InitiativesPanel";
+import { NotificationFeed } from "./components/NotificationFeed";
 import { Login } from "./components/Login";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
@@ -85,6 +86,8 @@ export function App() {
   const [current, setCurrent] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [voice, setVoice] = useState<VoiceStatus | null>(null);
@@ -130,15 +133,28 @@ export function App() {
     api.messages(current).then(setMessages).catch(handleError);
   }, [api, current, handleError]);
 
+  function checkMemoryPreparation(conversation: Conversation) {
+    setMemoryWarning(
+      conversation.memory_status === "failed" || conversation.memory_status === "unavailable"
+        ? "A memória anterior não pôde ser preparada. Você pode conversar, mas alguns detalhes podem faltar."
+        : null,
+    );
+  }
+
   async function newConversation() {
+    if (preparing || sending) return;
     setError(null);
+    setPreparing(true);
     try {
       const conversation = await api.createConversation();
+      checkMemoryPreparation(conversation);
       setConversations((list) => [conversation, ...list]);
       setCurrent(conversation.id);
       setMenuOpen(false);
     } catch (e) {
       handleError(e);
+    } finally {
+      setPreparing(false);
     }
   }
 
@@ -174,14 +190,15 @@ export function App() {
     // Audio must be unlocked inside the user gesture, before any await.
     if (willSpeak) speaker.unlock();
     let conversationId = current;
+    setSending(true);
     try {
       if (!conversationId) {
         const conversation = await api.createConversation();
+        checkMemoryPreparation(conversation);
         setConversations((list) => [conversation, ...list]);
         setCurrent(conversation.id);
         conversationId = conversation.id;
       }
-      setSending(true);
       const llmStarted = performance.now();
       const turn = await api.send(conversationId, text, spoken ? "voice" : "text");
       const llmMs = performance.now() - llmStarted;
@@ -354,7 +371,9 @@ export function App() {
       <div className="layout">
         {loggedIn && !demo && (
           <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
-            <button onClick={newConversation}>Nova conversa</button>
+            <button onClick={newConversation} disabled={preparing || sending}>
+              {preparing ? "Preparando memórias…" : "Nova conversa"}
+            </button>
             <ul>
               {conversations.map((c) => (
                 <li key={c.id}>
@@ -470,9 +489,11 @@ export function App() {
                     ` · total fim da fala → voz ${Math.round(latency.totalMs)} ms`}
                 </p>
               )}
+              <NotificationFeed api={api} onError={handleError} />
+              {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
               <ChatView
                 messages={messages}
-                sending={sending}
+                sending={sending || preparing}
                 error={error}
                 onSend={send}
                 onFeedback={sendFeedback}

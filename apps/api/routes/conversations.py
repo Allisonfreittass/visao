@@ -44,6 +44,7 @@ MAX_MESSAGE_CHARS = 8000
 class ConversationOut(BaseModel):
     id: uuid.UUID
     created_at: datetime
+    memory_status: str | None = None
 
 
 class MessageOut(BaseModel):
@@ -127,15 +128,18 @@ def create_conversation(
     conversation = Conversation(user_id=user.id, identity_id=identity.id)
     db.add(conversation)
     db.commit()
-    # Starting a new conversation is the event that closes the previous one for curation.
+    # The first turn must not race curation of the conversation it is asking to remember.
+    memory_status = "disabled" if not user.memory_consent else "unavailable"
     if user.memory_consent and provider is not None:
-        background.add_task(_curate_previous, factory, user.id, conversation.id, provider, settings)
+        memory_status = _curate_previous(factory, user.id, conversation.id, provider, settings)
     # ...and the event that lets the agent reflect on it, if there is evidence to reflect on.
     if provider is not None:
         background.add_task(
             _reflect_previous, factory, user.id, conversation.id, provider, settings
         )
-    return ConversationOut(id=conversation.id, created_at=conversation.created_at)
+    return ConversationOut(
+        id=conversation.id, created_at=conversation.created_at, memory_status=memory_status
+    )
 
 
 def turn_config(settings: Settings) -> TurnConfig:
@@ -168,17 +172,17 @@ def _curate_previous(
     new_conversation_id: uuid.UUID,
     provider: LLMProvider,
     settings: Settings,
-) -> None:
-    """Background task: failures are logged, never surfaced, and leave messages pending."""
+) -> str:
+    """Prepare curated memory before the first turn; failure leaves the source pending."""
     try:
         with factory() as session:
             owner = session.get(User, user_id)
             new = session.get(Conversation, new_conversation_id)
             if owner is None or not owner.memory_consent:
-                return
+                return "disabled"
             previous = latest_uncurated_conversation(session, owner, exclude=new)
             if previous is None:
-                return
+                return "ready"
             curate_conversation(
                 session,
                 conversation=previous,
@@ -187,8 +191,10 @@ def _curate_previous(
                 budgets=_budgets(settings),
                 max_output_tokens=settings.llm_curation_max_output_tokens,
             )
+            return "ready"
     except Exception:
-        logger.exception("background memory curation failed", extra={"event": "curation_failed"})
+        logger.exception("memory curation failed", extra={"event": "curation_failed"})
+        return "failed"
 
 
 def _reflect_previous(

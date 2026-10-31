@@ -264,3 +264,17 @@ def test_opting_out_stops_recall(client: TestClient, db: Session, fake_llm: Fake
 
     assert "Ana" not in fake_llm.prompts[-1][0].content
     assert len(client.get("/memory", headers=headers).json()) == 1  # kept until deleted
+
+
+def test_curation_failure_is_reported_and_source_stays_pending(client, db, fake_llm):
+    run_genesis(db)
+    headers = _login(client, db, "ana@exemplo.com")
+    _consent(client, headers)
+    first = _conversation(client, headers)
+    _say(client, headers, first, "Vamos lembrar deste exercício fictício.")
+    fake_llm.responder = lambda messages: "invalid JSON"
+    response = client.post("/conversations", headers=headers)
+    assert response.status_code == 201
+    assert response.json()["memory_status"] == "failed"
+    db.expire_all()
+    assert db.get(Conversation, uuid.UUID(first)).last_curated_at is None

@@ -62,7 +62,7 @@ infraestrutura: rejeitado.
 
 ## Limitações conhecidas
 
-- Uma única iniciativa implementada; metas criadas pelo usuário (`origin=user`) existem no modelo
+- Pesquisas e convites de retomada estão implementados; metas criadas pelo usuário (`origin=user`) existem no modelo
   mas ainda não há rota para criá-las.
 - A pausa é global, não por usuário (adequado ao uso single-user atual).
 - `PROPOSE_GOAL` não é uma ação direta da curiosidade: a proposta acontece depois, a partir do
@@ -91,8 +91,44 @@ Limites, todos aplicados em código:
   - `VISION_AUTONOMY_MAX_SECONDS`, padrão 120.
 
   O orçamento conta só os propósitos autônomos (`name_deliberation`, `followup_summary`,
-  `reflection`). Com orçamento zero, nada que chama o modelo roda.
+  `reflection`, `conversation_followup`). Com orçamento zero, nada que chama o modelo roda.
 - **`auto_research`:** desligado por padrão. Só o dono liga, pelo painel de iniciativas ou por
   `PUT /autonomy/permissions`. Sem ele, a meta espera aprovação em `/approvals`.
 - **Registro:** cada ação vira uma linha em `decisions` com `origin=autonomous`, visível em
   `GET /decisions`.
+
+
+## Retomada de uma conversa pendente
+
+A avaliação de curiosidade pode registrar `depends_on=conversation` quando há uma questão
+exploratória concreta explicitamente deixada em aberto. Isso não autoriza pesquisa web.
+Após a resposta, um job idempotente agenda o ciclo para pelo menos dez minutos depois,
+sem depender da janela de manutenção (padrão 60 minutos). O worker precisa estar rodando
+com o código atualizado; a API sozinha não executa iniciativas.
+
+Antes de convidar, o ciclo confere se não houve nova mensagem do dono em nenhuma conversa,
+se a resposta já terminou, se o assunto tem menos de sete dias e se não é horário silencioso.
+O modelo reavalia a transcrição recente e pode optar por não enviar, inclusive se a questão
+já foi resolvida ou houve pedido de não interromper. Há uma única tentativa por pendência,
+com captura atômica, contagem no orçamento de autonomia e o limite existente de cinco avisos
+por 24 horas. Novas mensagens durante a geração cancelam o envio. Falha ou JSON ilegível
+não gera convite. A pausa global impede execução e entrega.
+
+O convite aparece na tela principal e pode ser dispensado. É um aviso dentro do app:
+não é push do sistema nem mensagem enviada a outro serviço. Não garante que toda pausa
+produza uma pergunta; precisa haver assunto útil e oportunidade aprovada pela avaliação.
+
+
+### Diagnóstico de uma retomada descartada
+
+A avaliação recebe o tempo decorrido desde a última resposta e a transcrição como um único
+objeto JSON (dados históricos). Uma pausa genérica difere de um pedido explícito para não
+interromper ou de uma condição de retorno definida pelo usuário. Um convite deve propor um
+próximo passo, sem apenas repetir a pergunta registrada.
+
+`knowledge_gaps.scores.followup`, exposto ao dono em `GET /knowledge-gaps`, registra apenas
+códigos e métricas: `outcome`, `model_reason`, `model_send`, `idle_seconds`, `body_chars` e
+`finish_reason`. Não duplica o texto bruto do modelo nem a transcrição. Distingue recusa
+(`model_declined`) de resposta inválida, limite de tamanho, erro de provedor, nova mensagem
+ou pausa durante a geração e limite de avisos. `decisions` também recebe o motivo específico.
+Resultados anteriores a este registro não permitem recuperar retrospectivamente o motivo.

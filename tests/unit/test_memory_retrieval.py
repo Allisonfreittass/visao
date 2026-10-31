@@ -126,3 +126,20 @@ def test_limit_and_char_budget(db: Session) -> None:
 
 def test_unknown_owner_gets_nothing(db: Session) -> None:
     assert retrieve(db, uuid.uuid4(), "qualquer coisa") == []
+
+
+def test_explicit_recall_can_retrieve_recent_curated_episode_without_shared_words(db):
+    owner = _user(db, "a@exemplo.com")
+    _memory(db, owner, "No exercício fictício, Maré tinha livros móveis.", memory_type="episodic")
+    _memory(
+        db,
+        owner,
+        "Uma hipótese antiga.",
+        memory_type="episodic",
+        created_at=datetime.now(UTC) - timedelta(days=8),
+    )
+    result = retrieve(db, owner.id, "Você lembra da conversa anterior?")
+    assert [item.record.content for item in result] == [
+        "No exercício fictício, Maré tinha livros móveis."
+    ]
+    assert retrieve(db, owner.id, "Qual a previsão do tempo?") == []

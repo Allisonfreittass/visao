@@ -38,6 +38,13 @@ def score(record: MemoryRecord, query_tokens: set[str], now: datetime) -> float 
     """None means "not relevant enough to include"."""
     lexical = overlap(query_tokens, tokens(record.content))
     floor = RELATIONAL_FLOOR if record.memory_type == "relational" else 0.0
+    # Explicit recall can name a past exercise without repeating its vocabulary.
+    # Only recent curated episodes qualify; never inject raw transcript as a fallback.
+    recalling = bool(query_tokens & {"lembra", "lembrar", "recorda", "retomar"}) or (
+        "conversa" in query_tokens and "anterior" in query_tokens
+    )
+    if recalling and record.memory_type == "episodic" and _age_days(record.created_at, now) <= 7:
+        floor = 0.15
     if lexical == 0.0 and floor == 0.0:
         return None
     recency = math.exp(-_age_days(record.created_at, now) * math.log(2) / RECENCY_HALF_LIFE_DAYS)

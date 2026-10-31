@@ -24,8 +24,10 @@ from core.curiosity.engine import (
 from core.decision.turn import TurnPlan
 from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
+from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
+from infrastructure.jobs import queue
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
 
@@ -95,7 +97,9 @@ def run_turn(
                 DEFER: "research_deferred",
             }
             plan.add(
-                action.get(gap.chosen_action, "ignore"),
+                "conversation_thread_detected"
+                if gap.depends_on == "conversation" and gap.chosen_action == DEFER
+                else action.get(gap.chosen_action, "ignore"),
                 executed=gap.chosen_action in (ASK_USER, WEB_RESEARCH, DEFER),
                 reason=gap.decision_reason,
                 question=gap.question,
@@ -111,7 +115,11 @@ def run_turn(
         if outcome.system_context:
             blocks.append(outcome.system_context)
 
-    related = continuity.related(session, owner.id, text, exclude_conversation_id=conversation.id)
+    related = (
+        continuity.related(session, owner.id, text, exclude_conversation_id=conversation.id)
+        if owner.memory_consent
+        else []
+    )
     if related:
         plan.add("continuity", executed=True, reason="related_investigations", count=len(related))
         blocks.append(continuity.context_block(related) or "")
@@ -147,6 +155,27 @@ def run_turn(
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id
+        if outcome.gap.depends_on == "conversation" and outcome.gap.status == "DEFERRED":
+            if is_paused(session):
+                outcome.gap.status = "FOLLOWUP_SKIPPED"
+            else:
+                # Event-based trigger: do not wait for the hourly maintenance cycle.
+                queue.enqueue(
+                    session,
+                    kind="cognitive_cycle",
+                    owner_user_id=owner.id,
+                    payload={"gap_id": str(outcome.gap.id)},
+                    idempotency_key=f"conversation-followup:{outcome.gap.id}",
+                    reason="Questão de conversa em aberto após pausa",
+                    run_after=result.assistant_message.created_at + IDLE_BEFORE_FOLLOWUP,
+                    max_attempts=1,
+                )
+                plan.add(
+                    "conversation_followup_scheduled",
+                    executed=True,
+                    reason="open_conversation_thread",
+                    gap_id=str(outcome.gap.id),
+                )
     plan.add(
         "recall_memory",
         executed=bool(result.recalled),

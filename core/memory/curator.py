@@ -43,6 +43,9 @@ Responda SOMENTE com JSON válido, sem texto fora dele, neste formato:
 Tipos:
 - relational: fato ou preferência que o próprio interlocutor declarou sobre si.
 - episodic: algo que aconteceu nesta conversa e pode importar depois (combinado, pendência).
+  Em exercícios fictícios, guarde os nomes e regras combinados e a questão deixada em aberto
+  quando tiverem continuidade futura. Indique explicitamente que se trata de ficção; não
+  transforme detalhes inventados em fatos do mundo nem em características do interlocutor.
 - semantic: fato sobre o mundo estabelecido na conversa.
 
 Regras:

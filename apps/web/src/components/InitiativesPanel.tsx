@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { Api, AppNotification, Goal } from "../api";
+import type { Api, Goal } from "../api";
 
 const POLL_MS = 30_000;
 
@@ -12,15 +12,13 @@ interface Props {
 /** Approvals, notifications and the global autonomy pause. */
 export function InitiativesPanel({ api, onError }: Props) {
   const [approvals, setApprovals] = useState<Goal[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [paused, setPaused] = useState(false);
   const [autoResearch, setAutoResearch] = useState(false);
 
   const refresh = useCallback(() => {
-    Promise.all([api.approvals(), api.notifications(), api.autonomy(), api.permissions()])
-      .then(([a, n, auto, perms]) => {
+    Promise.all([api.approvals(), api.autonomy(), api.permissions()])
+      .then(([a, auto, perms]) => {
         setApprovals(a);
-        setNotifications(n);
         setPaused(auto.paused);
         setAutoResearch(perms.auto_research);
       })
@@ -36,15 +34,6 @@ export function InitiativesPanel({ api, onError }: Props) {
   async function decide(goal: Goal, decision: "approve" | "reject") {
     try {
       await api.decideGoal(goal.id, decision);
-      refresh();
-    } catch (e) {
-      onError(e);
-    }
-  }
-
-  async function read(notification: AppNotification) {
-    try {
-      await api.markRead(notification.id);
       refresh();
     } catch (e) {
       onError(e);
@@ -67,8 +56,6 @@ export function InitiativesPanel({ api, onError }: Props) {
     }
   }
 
-  const unread = notifications.filter((n) => !n.read_at);
-
   return (
     <div className="initiatives">
       {approvals.length > 0 && (
@@ -85,20 +72,6 @@ export function InitiativesPanel({ api, onError }: Props) {
                   Rejeitar
                 </button>
               </div>
-            </div>
-          ))}
-        </section>
-      )}
-      {unread.length > 0 && (
-        <section>
-          <h3>Avisos ({unread.length})</h3>
-          {unread.map((n) => (
-            <div key={n.id} className="card">
-              <strong>{n.title}</strong>
-              <p className="note pre">{n.body}</p>
-              <button className="ghost" onClick={() => read(n)}>
-                Marcar como lido
-              </button>
             </div>
           ))}
         </section>

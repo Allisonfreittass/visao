@@ -40,8 +40,13 @@ MIN_INTERVAL = timedelta(days=3)
 
 NAME_QUESTION = re.compile(
     r"(?i)(\bseu nome\b|\bteu nome\b|como (você|vc|tu) se chama|como te chamo|"
-    r"escolheu (um|o seu|seu) nome|tem (um )?nome\b|qual (é )?o seu nome|"
-    r"\bum nome (para|pra) (você|vc|ti)\b)"
+    r"escolheu (um|o seu|seu) nome\b(?!\s+(?:para|pra|do|da)\b)|"
+    r"tem (um )?nome\b|qual (é )?o seu nome|"
+    r"\bum nome (para|pra) (você|vc|ti)\b|"
+    r"\b(você|voce|vc|tu)\s+(?:(?:ainda|já|ja|não|nao)\s+){0,3}"
+    r"se deu (um|o seu|seu) nome\b|"
+    r"\b(você|voce|vc|tu)\s+(?:(?:ainda|já|ja|não|nao)\s+){0,3}"
+    r"(?:decidiu|escolheu|adotou|definiu)\s+(?:o\s+)?(?:seu|próprio|proprio) nome\b)"
 )
 
 INSTRUCTIONS = """\
@@ -208,12 +213,18 @@ def deliberate(
             model_version=response.model,
         ),
     )
-    if recorded.event_type in ("CHOSEN", "CHANGED") and notify_owner is not None:
+    if notify_owner is not None:
+        title = {
+            "CHOSEN": f"Decidi um nome: {recorded.new_name}",
+            "CHANGED": f"Decidi um nome: {recorded.new_name}",
+            "DEFERRED": "Adiei a escolha de um nome",
+            "DECLINED": "Decidi ficar sem nome por enquanto",
+        }[recorded.event_type]
         notify(
             session,
             owner=notify_owner,
             kind="identity",
-            title=f"Decidi um nome: {recorded.new_name}",
+            title=title,
             body=recorded.rationale_summary,
         )
         session.commit()

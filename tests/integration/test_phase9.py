@@ -426,7 +426,16 @@ def test_system_self_claims_are_not_stored_as_memory() -> None:
 
 
 @pytest.mark.parametrize(
-    "question", ["Qual é o seu nome?", "Como você se chama?", "Você escolheu o seu nome já?"]
+    "question",
+    [
+        "Qual é o seu nome?",
+        "Como você se chama?",
+        "Você escolheu o seu nome já?",
+        "Você ainda não se deu um nome, porque?",
+        "Por que você não se deu um nome?",
+        "Você já decidiu seu nome?",
+        "Vc ainda não definiu o próprio nome?",
+    ],
 )
 def test_name_questions_are_detected(question: str) -> None:
     assert name_deliberation.asks_about_name(question)
@@ -434,3 +443,48 @@ def test_name_questions_are_detected(question: str) -> None:
 
 def test_unrelated_questions_are_not_name_events() -> None:
     assert not name_deliberation.asks_about_name("Qual o nome da capital da Austrália?")
+
+
+@pytest.mark.parametrize(
+    "action,title",
+    [
+        ("defer", "Adiei a escolha de um nome"),
+        ("decline", "Decidi ficar sem nome por enquanto"),
+    ],
+)
+def test_name_deliberation_can_remain_unnamed_and_reports_the_outcome(db, action, title):
+    identity, owner = _world(db)
+    _turn(db, identity, owner, "Você ainda não se deu um nome, porque?", _llm(NO_GAP))
+    job = db.scalar(select(ScheduledJob).where(ScheduledJob.kind == "name_deliberation"))
+    assert job is not None
+    assert job.owner_user_id == owner.id
+    event = name_deliberation.deliberate(
+        db,
+        identity=identity,
+        provider=_llm(
+            name_reply={
+                "action": action,
+                "name": None,
+                "alternatives_considered": [],
+                "rationale": "Não há motivo suficiente para escolher agora.",
+            }
+        ),
+        event="pergunta do interlocutor",
+        notify_owner=owner,
+        max_output_tokens=100,
+    )
+    assert identity.chosen_name is None
+    assert event.event_type in {"DEFERRED", "DECLINED"}
+    assert db.scalar(select(Notification.title)) == title
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Você já escolheu um nome para meu cachorro?",
+        "Ela ainda não se deu um nome.",
+        "Qual o nome da minha oficina?",
+    ],
+)
+def test_other_naming_questions_do_not_trigger_identity_deliberation(question):
+    assert not name_deliberation.asks_about_name(question)

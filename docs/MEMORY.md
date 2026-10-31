@@ -98,3 +98,14 @@ gravadas antes da Fase 9 continuam no banco até o dono apagá-las em `/memory`.
 - Curadoria em segundo plano roda no processo da API (`BackgroundTasks`), não num worker
   persistente; se a API reiniciar no meio, as mensagens apenas continuam pendentes.
 - Apagar conta inteira (usuário + conversas) ainda não existe.
+
+
+## Preparação ao abrir uma nova conversa
+
+A criação aguarda a curadoria da conversa anterior antes de retornar, para que a primeira
+mensagem não dispute com uma tarefa em segundo plano. Falhas deixam o lote pendente e são
+informadas na interface; não implicam perda da transcrição. A reflexão continua separada.
+A curadoria pode propor nomes, regras e pendências de exercícios, sempre identificados como
+ficção e sujeitos à mesma política. Ao pedir explicitamente para lembrar uma conversa, episódios
+curados dos últimos sete dias também podem ser recuperados sem coincidência de vocabulário,
+respeitando os limites de itens e caracteres. Não há fallback para transcrições brutas.

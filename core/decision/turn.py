@@ -18,9 +18,17 @@ _DESCRIBE = {
     "ask_question": "há uma lacuna que só o interlocutor pode responder (pergunta indicada acima)",
     "research": "pesquisa feita agora; fontes listadas acima",
     "research_deferred": "pesquisa adiada por orçamento; nada foi pesquisado agora",
+    "conversation_thread_detected": (
+        "uma pendência de conversa foi registrada para possível retomada; nenhuma pesquisa"
+        " externa foi feita. O envio futuro depende da avaliação do worker"
+    ),
     "goal_proposed": "proposta de meta registrada; só roda com aprovação",
     "continuity": "investigações anteriores relacionadas foram consultadas no registro",
-    "name_deliberation_requested": "uma deliberação sobre o nome foi agendada para depois",
+    "name_deliberation_requested": (
+        "uma deliberação sobre o nome foi agendada para o worker; o resultado ainda não está"
+        " disponível. Há um mecanismo de aviso do resultado, inclusive adiamento ou recusa,"
+        " sujeito aos horários de silêncio, à pausa de autonomia e ao limite de avisos"
+    ),
     "name_deliberation_recent": "o nome já foi deliberado recentemente; não houve nova deliberação",
 }
 

@@ -18,6 +18,7 @@ from core.decision.turn import TurnPlan
 from core.goals import followup, lifecycle
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
+from core.initiatives.followup import consider_followup
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import reflect
 from infrastructure.database.models import (
@@ -34,7 +35,12 @@ from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
 
 JOB_KIND = "cognitive_cycle"
-AUTONOMOUS_PURPOSES = ("name_deliberation", "followup_summary", "reflection")
+AUTONOMOUS_PURPOSES = (
+    "name_deliberation",
+    "followup_summary",
+    "reflection",
+    "conversation_followup",
+)
 REFLECT_AFTER_IDLE = timedelta(minutes=30)
 NAME_QUESTION_AFTER = timedelta(days=1)
 NAME_QUESTION_EVERY = timedelta(days=30)
@@ -191,6 +197,35 @@ def run_cycle(
                 **result.detail,
             )
         )
+
+    # Conversational threads need no web permission. Validate once after an idle interval;
+    # notifications use the existing quiet hours, daily cap and global pause.
+    threads = session.scalars(
+        select(KnowledgeGap)
+        .where(KnowledgeGap.depends_on == "conversation", KnowledgeGap.status == "DEFERRED")
+        .order_by(KnowledgeGap.created_at)
+    ).all()
+    for gap in threads:
+        if not room():
+            break
+        outcome = consider_followup(
+            session,
+            gap=gap,
+            provider=provider,
+            now=now,
+            max_output_tokens=budget.max_output_tokens,
+        )
+        if outcome is not None:
+            report.actions.append(
+                _record(
+                    session,
+                    gap.owner_user_id,
+                    action="conversation_followup",
+                    executed=outcome == "notified",
+                    reason=outcome,
+                    gap_id=str(gap.id),
+                )
+            )
 
     # 2. Finished conversations not reflected on (reflection only calls the model with evidence).
     idle_since = now - REFLECT_AFTER_IDLE

@@ -20,6 +20,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   created_at: string;
+  memory_status?: string | null;
 }
 
 export interface Turn {
