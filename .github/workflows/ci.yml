@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: vision_test
+          POSTGRES_USER: vision
+          POSTGRES_PASSWORD: vision
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vision -d vision_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      VISION_TEST_DATABASE_URL: postgresql+psycopg://vision:vision@localhost:5432/vision_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke test docker compose
+        env:
+          VISION_SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-000
+          POSTGRES_PASSWORD: ci-only-password
+        run: |
+          docker compose up -d --build --wait
+          curl --fail --retry 10 --retry-delay 2 --retry-all-errors http://127.0.0.1:8000/ready
+          docker compose down -v

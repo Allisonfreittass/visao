@@ -1,0 +1,35 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: vision
+      POSTGRES_USER: vision
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Local only. PostgreSQL must never be exposed publicly.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vision -d vision"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    environment:
+      VISION_ENVIRONMENT: ${VISION_ENVIRONMENT:-development}
+      VISION_SECRET_KEY: ${VISION_SECRET_KEY:?defina VISION_SECRET_KEY no .env}
+      VISION_DATABASE_URL: postgresql+psycopg://vision:${POSTGRES_PASSWORD}@db:5432/vision
+      VISION_LOG_LEVEL: ${VISION_LOG_LEVEL:-INFO}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
