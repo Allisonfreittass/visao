@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, pool
 from apps.api.settings import get_settings
 from infrastructure.database import models  # noqa: F401  (registers tables on metadata)
 from infrastructure.database.base import Base
+from infrastructure.database.session import configure_schema
 
 config = context.config
 if config.config_file_name is not None:
@@ -33,6 +34,7 @@ def run_migrations_online() -> None:
         return
 
     engine = create_engine(_database_url(), poolclass=pool.NullPool)
+    configure_schema(engine, get_settings().database_schema)
     with engine.connect() as connection:
         context.configure(
             connection=connection,

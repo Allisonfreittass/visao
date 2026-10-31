@@ -13,7 +13,7 @@ COPY apps ./apps
 COPY core ./core
 COPY integrations ./integrations
 COPY infrastructure ./infrastructure
-RUN pip install .
+RUN pip install -c infrastructure/deployment/constraints.txt .
 
 COPY alembic.ini ./
 COPY migrations ./migrations

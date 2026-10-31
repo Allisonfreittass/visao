@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from apps.api.routes import (
     auth,
     behavior,
+    cloud,
     cognition,
     conversations,
     curiosity,
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(behavior.router)
     app.include_router(cognition.router)
     app.include_router(study.router)
+    app.include_router(cloud.router)
     return app
 
 

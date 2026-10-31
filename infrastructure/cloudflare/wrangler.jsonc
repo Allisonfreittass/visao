@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "visao",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-31",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "limits": { "cpu_ms": 10000 },
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/internal/*"]
+  },
+  "ratelimits": [{ "name": "LOGIN_LIMITER", "namespace_id": "91827461", "simple": { "limit": 8, "period": 60 } }],
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "containers": [{
+    "class_name": "VisaoBackend",
+    "scheduling_policy": "durable_object",
+    "images": { "base": { "dockerfile": "../../Dockerfile" } }
+  }],
+  "durable_objects": { "bindings": [{ "name": "BACKEND", "class_name": "VisaoBackend" }] },
+  "exports": { "VisaoBackend": { "type": "durable-object", "storage": "sqlite" } },
+  "vars": {
+    "VISION_ENVIRONMENT": "production",
+    "VISION_DATABASE_SCHEMA": "visao",
+    "VISION_LOG_LEVEL": "INFO",
+    "VISION_CURIOSITY_ENABLED": "true",
+    "VISION_AUTONOMY_CYCLE_MINUTES": "60",
+    "VISION_AUTONOMY_MAX_SECONDS": "120",
+    "VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE": "3",
+    "VISION_TTS_APPROVED_VOICES": "",
+    "VISION_STT_MODEL": ""
+  }
+}

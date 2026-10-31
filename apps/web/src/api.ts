@@ -82,6 +82,7 @@ export interface StudyEntry {
 }
 
 export interface StudyNotebook {
+  scheduler?: { last_tick_at: string; status: string } | null;
   enabled: boolean;
   paused: boolean;
   interval_hours: number;

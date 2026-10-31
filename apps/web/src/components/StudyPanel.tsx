@@ -71,6 +71,7 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
             Permitir estudo autônomo
           </label>
           <p className="note">Leitura de fontes públicas da Wikipédia, no máximo uma rodada a cada seis horas, dentro do orçamento de pesquisa e de modelo. A pausa de autonomia interrompe o estudo.</p>
+          {notebook.scheduler && <p className="note">Verificação na nuvem: {utcDate(notebook.scheduler.last_tick_at).toLocaleString("pt-BR")}{notebook.scheduler.status === "failed" ? " · A última rodada encontrou uma falha." : ""}</p>}
           {notebook.next_eligible_at && notebook.enabled && <p className="note">
             Próxima oportunidade a partir de {utcDate(notebook.next_eligible_at).toLocaleString("pt-BR")}, conforme o ciclo e o orçamento disponíveis.
           </p>}

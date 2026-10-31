@@ -11,7 +11,7 @@ from apps.api.deps import CurrentUser, DbSession
 from core.policies.autonomy import is_paused
 from core.study.service import INTERVAL, enabled
 from infrastructure.database.audit import record_audit
-from infrastructure.database.models import StudyEntry
+from infrastructure.database.models import StudyEntry, SystemFlag
 from infrastructure.jobs import queue
 
 router = APIRouter(prefix="/study", tags=["study"])
@@ -54,7 +54,9 @@ def notebook(db: DbSession, user: CurrentUser) -> dict[str, Any]:
     last = entries[0].created_at if entries else None
     if last is not None and last.tzinfo is None:
         last = last.replace(tzinfo=UTC)
+    scheduler = db.get(SystemFlag, "cloud_scheduler")
     return {
+        "scheduler": scheduler.value if scheduler else None,
         "enabled": enabled(user),
         "paused": is_paused(db),
         "interval_hours": int(INTERVAL.total_seconds() / 3600),

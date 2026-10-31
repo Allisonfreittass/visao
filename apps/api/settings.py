@@ -19,9 +19,11 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     database_url: str = "sqlite:///./dev.db"
+    database_schema: str | None = Field(default=None, pattern=r"^[a-zA-Z_][a-zA-Z0-9_]{0,62}$")
     secret_key: str = DEFAULT_SECRET_KEY
     access_token_ttl_minutes: int = Field(default=60, ge=1, le=24 * 60)
     log_level: str = "INFO"
+    cloud_tick_key: SecretStr | None = Field(default=None, min_length=32)
 
     # LLM: any OpenAI-compatible endpoint. Prices are mandatory: without them spending can't be
     # measured or capped, so the provider stays disabled.

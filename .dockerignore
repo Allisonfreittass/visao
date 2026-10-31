@@ -9,3 +9,8 @@ docs
 tests
 experiments
 apps/web
+**/node_modules
+**/.wrangler
+infrastructure/cloudflare
+models
+.cloud-*

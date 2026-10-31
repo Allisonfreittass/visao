@@ -16,3 +16,9 @@ models/
 # Generated audio samples
 experiments/results/tts/
 experiments/results/stt-audio/
+
+# Cloud deployment state and local secrets
+.wrangler/
+.dev.vars*
+.cloud-secrets*
+.cloud-db*
