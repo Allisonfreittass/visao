@@ -10,7 +10,12 @@ O disco do Container é temporário e nunca deve guardar o banco.
 O Cron do Cloudflare verifica trabalho a cada 15 minutos, mesmo sem navegador
 aberto. A API agenda o ciclo cognitivo por hora e executa no máximo dois jobs por
 verificação. Usa as permissões, pausa, limites de custo e leases do worker local.
-Estudos continuam sujeitos ao intervalo mínimo de seis horas e às cotas diárias.
+Rodadas novas de estudo continuam sujeitas ao intervalo de seis horas e às cotas
+diárias. Uma pesquisa inconclusiva por falta de fontes ou de resposta nos trechos
+pode ter uma única retomada, uma hora após terminar. A retomada preserva a pergunta,
+fica vinculada à tentativa anterior e deve usar consultas diferentes. Ela usa as
+mesmas cotas de buscas, chamadas, tokens e custo; não ganha orçamento adicional.
+Uma retomada também inconclusiva não dispara outra retomada em uma hora.
 Uma verificação pode terminar sem produzir um estudo novo: cooldown, orçamento,
 pausa ou falta de evidência são resultados possíveis.
 

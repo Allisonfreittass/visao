@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
 from core.policies.autonomy import is_paused
-from core.study.service import INTERVAL, enabled
+from core.study.service import INTERVAL, enabled, next_opportunity
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import StudyEntry, SystemFlag
 from infrastructure.jobs import queue
@@ -51,16 +51,13 @@ def notebook(db: DbSession, user: CurrentUser) -> dict[str, Any]:
             .limit(12)
         )
     )
-    last = entries[0].created_at if entries else None
-    if last is not None and last.tzinfo is None:
-        last = last.replace(tzinfo=UTC)
     scheduler = db.get(SystemFlag, "cloud_scheduler")
     return {
         "scheduler": scheduler.value if scheduler else None,
         "enabled": enabled(user),
         "paused": is_paused(db),
         "interval_hours": int(INTERVAL.total_seconds() / 3600),
-        "next_eligible_at": last + INTERVAL if last else None,
+        "next_eligible_at": next_opportunity(entries[0]) if entries else None,
         "source": "Wikipédia em português",
         "entries": [_out(entry) for entry in entries],
     }

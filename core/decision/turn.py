@@ -51,7 +51,12 @@ class TurnPlan:
                 "Ações executadas neste turno além de responder: nenhuma. Não afirmar ter "
                 "pesquisado, registrado ou agendado algo."
             )
-        return "Ações executadas neste turno (afirmar só estas): " + "; ".join(done) + "."
+        return (
+            "Ações novas executadas neste turno (afirmar só estas): "
+            + "; ".join(done)
+            + ". Relatos de ações anteriores podem usar o histórico registrado, distinguindo "
+            "tentativa de pesquisa, conclusão e ação executada agora."
+        )
 
     def persist(
         self,

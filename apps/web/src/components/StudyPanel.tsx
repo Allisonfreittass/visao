@@ -11,6 +11,7 @@ const REASONS: Record<string, string> = {
   no_useful_question: "Não identifiquei uma pergunta útil nesta rodada.",
   not_public_topic: "O tema não passou pelos critérios de pesquisa pública.",
   no_sources: "A busca não retornou trechos aproveitáveis.",
+  repeated_query: "A retomada não propôs uma busca diferente das anteriores.",
   repeated_question: "A pergunta já estava no caderno; evitei repetir a investigação.",
   invalid_seed_reference: "Não consegui ligar o tema às evidências disponíveis.",
   cycle_budget: "O limite desta rodada foi atingido.",
@@ -70,7 +71,7 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
             <input type="checkbox" checked={notebook.enabled} disabled={saving || unavailable} onChange={() => void toggle()} />
             Permitir estudo autônomo
           </label>
-          <p className="note">Leitura de fontes públicas da Wikipédia, no máximo uma rodada a cada seis horas, dentro do orçamento de pesquisa e de modelo. A pausa de autonomia interrompe o estudo.</p>
+          <p className="note">Leitura de fontes públicas da Wikipédia, com uma rodada nova a cada seis horas. Uma pesquisa sem resposta suficiente pode ter uma única retomada após uma hora, com outra busca. Tudo respeita o orçamento e a pausa de autonomia.</p>
           {notebook.scheduler && <p className="note">Verificação na nuvem: {utcDate(notebook.scheduler.last_tick_at).toLocaleString("pt-BR")}{notebook.scheduler.status === "failed" ? " · A última rodada encontrou uma falha." : ""}</p>}
           {notebook.next_eligible_at && notebook.enabled && <p className="note">
             Próxima oportunidade a partir de {utcDate(notebook.next_eligible_at).toLocaleString("pt-BR")}, conforme o ciclo e o orçamento disponíveis.

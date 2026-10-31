@@ -78,7 +78,7 @@ def world(db, plan=None, review=None):
     def respond(messages):
         return json.dumps(
             (plan if plan is not None else PLAN)
-            if messages[0].content == PLAN_INSTRUCTIONS
+            if messages[0].content.startswith(PLAN_INSTRUCTIONS)
             else (review if review is not None else REVIEW)
         )
 
@@ -223,7 +223,7 @@ def test_round_can_select_previous_question_with_valid_provenance(db):
         "seed_refs": [f"study:{first.id}"],
     }
     llm.responder = lambda messages: json.dumps(
-        new_plan if messages[0].content == PLAN_INSTRUCTIONS else REVIEW
+        new_plan if messages[0].content.startswith(PLAN_INSTRUCTIONS) else REVIEW
     )
     second = run(db, owner, llm, search, now=future)
     assert second.previous_entry_id == first.id and second.status == "READY"
@@ -340,3 +340,127 @@ def test_inconclusive_notebook_is_recalled_as_inconclusive_not_as_a_finding(db):
     assert '"status": "INCONCLUSIVE"' in context
     assert '"findings": []' in context
     assert '"sources": []' in context
+
+
+def inconclusive_round(db, owner, llm, search):
+    original = search.search
+    search.search = lambda query, max_results: []
+    first = run(db, owner, llm, search)
+    first.created_at = first.created_at.replace(hour=12, minute=0, second=0, microsecond=0)
+    first.finished_at = first.created_at + timedelta(seconds=30)
+    db.commit()
+    search.search = original
+    return first, first.finished_at + timedelta(hours=1)
+
+
+def retry_plan(llm, **changes):
+    plan = {**PLAN, "query": "biblioteconomia", "topic": "Ciência da informação", **changes}
+    llm.responder = lambda messages: json.dumps(
+        plan if messages[0].content.startswith(PLAN_INSTRUCTIONS) else REVIEW
+    )
+
+
+def test_inconclusive_retry_waits_an_hour_then_preserves_question_and_provenance(db):
+    owner, llm, search = world(db)
+    first, due = inconclusive_round(db, owner, llm, search)
+    retry_plan(llm, question="Esta pergunta do planejador não deve substituir a original")
+    calls = len(llm.prompts)
+    assert run(db, owner, llm, search, now=due - timedelta(seconds=1)) is None
+    assert len(llm.prompts) == calls
+    second = run(db, owner, llm, search, now=due)
+    assert second.status == "READY"
+    assert second.question == first.question
+    assert second.previous_entry_id == first.id
+    assert f"study:{first.id}" in second.seed_refs
+    payload = json.loads(llm.prompts[-2][1].content)
+    assert payload["retry"]["previous_queries"] == first.evidence["search_queries"]
+    assert payload["retry"]["question"] == first.question
+    assert first.status == "INCONCLUSIVE"  # preserve the unsuccessful attempt
+    assert searches_today(db, owner.id) == 3  # both original lookups plus the retry
+    assert run(db, owner, llm, search, now=due + timedelta(hours=1)) is None
+
+
+def test_second_inconclusive_attempt_cannot_create_an_hourly_retry_loop(db):
+    owner, llm, search = world(db)
+    first, due = inconclusive_round(db, owner, llm, search)
+    retry_plan(llm)
+    search.search = lambda query, max_results: []
+    second = run(db, owner, llm, search, now=due)
+    assert second.status == "INCONCLUSIVE"
+    calls = len(llm.prompts)
+    assert run(db, owner, llm, search, now=due + timedelta(hours=1)) is None
+    assert len(llm.prompts) == calls
+    # A stale worker that saw only the original round still cannot claim another retry.
+    from sqlalchemy import update
+
+    from infrastructure.database.models import StudyEntry
+
+    db.execute(
+        update(StudyEntry)
+        .where(StudyEntry.id == second.id)
+        .values(created_at=first.created_at - timedelta(seconds=1))
+    )
+    db.commit()
+    assert run(db, owner, llm, search, now=due + timedelta(hours=2)) is None
+    assert len(llm.prompts) == calls
+
+
+def test_retry_never_repeats_the_failed_queries(db):
+    owner, llm, search = world(db)
+    first, due = inconclusive_round(db, owner, llm, search)
+    calls = search.calls
+    second = run(db, owner, llm, search, now=due)
+    assert second.status == "SKIPPED" and second.outcome_reason == "repeated_query"
+    assert search.calls == calls
+    assert second.previous_entry_id == first.id
+
+
+@pytest.mark.parametrize("block", ["disabled", "paused", "calls", "tokens", "dollars", "searches"])
+def test_retry_respects_existing_permission_and_budget_limits(db, block):
+    owner, llm, search = world(db)
+    _, due = inconclusive_round(db, owner, llm, search)
+    budget = _budget()
+    if block == "disabled":
+        owner.autonomy_permissions = {}
+        db.commit()
+    elif block == "paused":
+        set_paused(db, True, actor_user_id=owner.id, reason="teste")
+    elif block == "calls":
+        budget = replace(budget, llm_calls_per_day=2)
+    elif block == "tokens":
+        budget = replace(budget, tokens_per_day=0)
+    elif block == "dollars":
+        budget = replace(budget, daily_usd=Decimal("0"))
+    else:
+        budget = replace(budget, research_per_day=2)
+    calls = len(llm.prompts)
+    assert run(db, owner, llm, search, budget, now=due) is None
+    assert len(llm.prompts) == calls
+
+
+def test_notebook_api_and_context_show_retry_time_and_history(client, db):
+    owner, llm, search = world(db)
+    first, due = inconclusive_round(db, owner, llm, search)
+    from apps.api.security import create_access_token
+    from apps.api.settings import get_settings
+
+    headers = {"Authorization": "Bearer " + create_access_token(owner.id, get_settings())}
+    body = client.get("/study", headers=headers).json()
+    assert datetime.fromisoformat(body["next_eligible_at"].replace("Z", "+00:00")) == due
+    context = related_context(db, owner.id, "Aprendeu algo?")
+    state = json.loads(context.split("\n", 1)[1])
+    assert state["entries"][0]["status"] == "INCONCLUSIVE"
+    assert state["entries"][0]["created_at"]
+    assert state["entries"][0]["finished_at"]
+    assert datetime.fromisoformat(state["next_eligible_at"]) == due
+    assert state["enabled"] and not state["paused"]
+
+
+def test_failed_attempt_is_visible_in_history_without_early_retry(db):
+    owner, llm, search = world(db)
+    llm.fail_with = "timeout"
+    first = run(db, owner, llm, search)
+    assert first.status == "FAILED"
+    context = related_context(db, owner.id, "Você pesquisou algo?")
+    assert '"status": "FAILED"' in context
+    assert run(db, owner, llm, search, now=first.created_at + timedelta(hours=1)) is None
