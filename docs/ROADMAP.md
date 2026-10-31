@@ -7,7 +7,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
-| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **2a e 2b concluídas** (interface, bolha, voz própria escolhida pelo agente); 2c (escuta) pendente |
+| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **implementada** (interface, fala, escuta, barge-in; latência mediana ~4,1 s); aceite pendente de teste com microfone real e iPhone |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
@@ -77,11 +77,15 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fase 2c: escuta.** Microfone com consentimento explícito, detecção de fala no navegador, STT
-(medir `faster-whisper` em CPU contra STT por API), barge-in por voz durante `SPEAKING`, e a
-latência ponta a ponta medida, que é o critério de aceite da Fase 2.
+**Fechar a Fase 2:** conversa de vários turnos por voz com microfone real no desktop (você) e no
+iPhone (exige HTTPS: túnel local ou implantação atrás da Cloudflare). Ajustar o VAD se houver
+falsos disparos ou cortes.
 
-Em paralelo, opcional: pesquisar modelos abertos de TTS mais naturais em pt-BR (ADR-0004).
+Otimizações de latência anotadas: quebrar a primeira frase na vírgula para antecipar o primeiro
+som; modelo de LLM sem raciocínio para turnos de voz.
+
+Depois, pela ordem do master prompt: **Fase 4 (curiosidade e pesquisa)**. Pendências de memória
+(revisão de fato substituído, terceiros, saúde) e TTS mais natural seguem registradas.
 
 ## Visual da interface (entra no início da Fase 2)
 

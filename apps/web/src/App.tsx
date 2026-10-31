@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Api,
@@ -14,6 +14,15 @@ import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { Speaker } from "./speech/speaker";
+import { Microphone, type Utterance } from "./voice/microphone";
+
+interface TurnLatency {
+  sttMs: number;
+  llmMs: number;
+  ttsFirstAudioMs: number | null;
+  /** End of the user's speech to the first audio of the reply. */
+  totalMs: number | null;
+}
 
 const HEALTH_INTERVAL_MS = 15_000;
 const DEMO_STATES: OrbState[] = [
@@ -82,6 +91,11 @@ export function App() {
   const [speaking, setSpeaking] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
   const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
+  const [voiceSession, setVoiceSession] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [latency, setLatency] = useState<TurnLatency | null>(null);
+  const micRef = useRef<Microphone | null>(null);
+  const busyRef = useRef(false);
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
   const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
 
@@ -135,20 +149,27 @@ export function App() {
     setTimeout(() => setInterrupted(false), 700);
   }
 
-  function speak(text: string) {
+  function speak(text: string, onFirstAudio?: (ms: number) => void) {
     setSpeaking(true);
     setFirstAudioMs(null);
     speaker
-      .speak(text, (ms) => setFirstAudioMs(Math.round(ms)))
+      .speak(text, (ms) => {
+        setFirstAudioMs(Math.round(ms));
+        onFirstAudio?.(ms);
+      })
       .catch((e) => setError(`Voz indisponível (${e instanceof Error ? e.message : e}); a resposta segue em texto.`))
       .finally(() => setSpeaking(false));
   }
 
-  async function send(text: string) {
+  async function send(
+    text: string,
+    spoken?: { endedAt: number; sttMs: number },
+  ): Promise<void> {
     setError(null);
     // Barge-in by text: a new message cuts whatever is being spoken.
     stopSpeaking();
-    const willSpeak = speakReplies && voice?.enabled === true;
+    // In a voice session replies are always spoken; otherwise it follows the toggle.
+    const willSpeak = (spoken !== undefined || speakReplies) && voice?.enabled === true;
     // Audio must be unlocked inside the user gesture, before any await.
     if (willSpeak) speaker.unlock();
     let conversationId = current;
@@ -160,9 +181,28 @@ export function App() {
         conversationId = conversation.id;
       }
       setSending(true);
+      const llmStarted = performance.now();
       const turn = await api.send(conversationId, text);
+      const llmMs = performance.now() - llmStarted;
       setMessages((list) => [...list, turn.user_message, turn.assistant_message]);
-      if (willSpeak) speak(turn.assistant_message.content);
+      if (spoken) {
+        setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
+      }
+      if (willSpeak) {
+        const ttsStarted = performance.now();
+        speak(turn.assistant_message.content, () => {
+          if (!spoken) return;
+          const now = performance.now();
+          const measured = {
+            sttMs: spoken.sttMs,
+            llmMs,
+            ttsFirstAudioMs: now - ttsStarted,
+            totalMs: now - spoken.endedAt,
+          };
+          setLatency(measured);
+          console.info("visao.turn_latency", JSON.stringify(measured));
+        });
+      }
     } catch (e) {
       handleError(e);
       // The user message may have been stored even if the reply failed: reload the transcript.
@@ -171,6 +211,65 @@ export function App() {
       setSending(false);
     }
   }
+
+  async function onUtterance(utterance: Utterance) {
+    // One turn at a time: speech that arrives while a turn is in flight is dropped.
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setTranscribing(true);
+    try {
+      const transcript = await api.stt(utterance.wav);
+      const sttMs = performance.now() - utterance.endedAt;
+      setTranscribing(false);
+      const text = transcript.text.trim();
+      if (text.length < 2) return; // noise or a cough, not a turn
+      await send(text, { endedAt: utterance.endedAt, sttMs });
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setTranscribing(false);
+      busyRef.current = false;
+    }
+  }
+
+  function endVoiceSession() {
+    micRef.current?.stop();
+    micRef.current = null;
+    setVoiceSession(false);
+  }
+
+  async function startVoiceSession() {
+    setError(null);
+    speaker.unlock(); // inside the click: lets replies play
+    const microphone = new Microphone({
+      agentSpeaking: () => speaker.speaking,
+      // Barge-in by voice: starting to talk cuts the agent off.
+      onSpeechStart: () => stopSpeaking(),
+      onUtterance: (u) => void onUtterance(u),
+    });
+    try {
+      await microphone.start();
+      micRef.current = microphone;
+      setVoiceSession(true);
+    } catch (e) {
+      microphone.stop();
+      setError(
+        `Microfone indisponível (${e instanceof Error ? e.message : e}). A conversa continua por texto.`,
+      );
+    }
+  }
+
+  // No listening in the background: hiding the page ends the voice session.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") endVoiceSession();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      micRef.current?.stop();
+    };
+  }, []);
 
   async function toggleMemory() {
     try {
@@ -189,6 +288,7 @@ export function App() {
   }
 
   function logout() {
+    endVoiceSession();
     stopSpeaking();
     api.setToken(null);
     saveToken(null);
@@ -201,13 +301,15 @@ export function App() {
     ? demoState
     : !online
       ? "DISCONNECTED"
-      : sending
+      : sending || transcribing
         ? "THINKING"
         : interrupted
           ? "INTERRUPTED"
           : speaking
             ? "SPEAKING"
-            : "IDLE";
+            : voiceSession
+              ? "LISTENING"
+              : "IDLE";
   const agentName = status?.identity?.chosen_name ?? null;
 
   return (
@@ -283,7 +385,13 @@ export function App() {
             <Orb
               state={orbState}
               level={demoLevel}
-              getLevel={speaking ? () => speaker.level() : undefined}
+              getLevel={
+                speaking
+                  ? () => speaker.level()
+                  : voiceSession
+                    ? () => micRef.current?.level() ?? 0
+                    : undefined
+              }
             />
             <p className="state-label">{STATE_LABELS[orbState]}</p>
           </div>
@@ -314,10 +422,31 @@ export function App() {
             </p>
           ) : (
             <>
-              {speaking && (
-                <button className="ghost stop" onClick={stopSpeaking}>
-                  Parar de falar
-                </button>
+              <div className="voice-bar">
+                {voice?.listening && voice.enabled && (
+                  <button
+                    className={voiceSession ? "active" : "ghost"}
+                    onClick={voiceSession ? endVoiceSession : () => void startVoiceSession()}
+                    aria-pressed={voiceSession}
+                  >
+                    {voiceSession ? "Encerrar conversa por voz" : "Conversa por voz"}
+                  </button>
+                )}
+                {speaking && (
+                  <button className="ghost stop" onClick={stopSpeaking}>
+                    Parar de falar
+                  </button>
+                )}
+              </div>
+              {latency && (
+                <p className="latency">
+                  Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta{" "}
+                  {Math.round(latency.llmMs)} ms
+                  {latency.ttsFirstAudioMs !== null &&
+                    ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
+                  {latency.totalMs !== null &&
+                    ` · total fim da fala → voz ${Math.round(latency.totalMs)} ms`}
+                </p>
               )}
               <ChatView messages={messages} sending={sending} error={error} onSend={send} />
             </>

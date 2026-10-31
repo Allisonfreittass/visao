@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     tts_models_dir: str = "models/tts"
     tts_approved_voices: str = ""
     tts_max_chars: int = Field(default=600, ge=10)
+    # Speech recognition: faster-whisper size (tiny|base|small); empty = disabled.
+    stt_model: str = ""
+    stt_models_dir: str = "models/stt"
+    # ~60 s of 16 kHz mono 16-bit WAV; longer turns are refused.
+    stt_max_bytes: int = Field(default=2_000_000, ge=10_000)
 
     # Budgets in USD (docs/COSTS.md). Enforced in code before every call.
     llm_daily_budget_usd: Decimal = Field(default=Decimal("1.50"), ge=0)

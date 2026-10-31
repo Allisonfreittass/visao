@@ -122,3 +122,83 @@ def test_long_text_must_be_split_first(client: TestClient, db: Session, loaded) 
 def test_voice_requires_login(client: TestClient) -> None:
     assert client.post("/voice/tts", json={"text": "Oi."}).status_code == 401
     assert client.get("/voice/status").status_code == 401
+
+
+@dataclass
+class FakeSTT:
+    model: str = "faster-whisper-fake"
+    reply: str = "olá, tudo bem?"
+    fail: bool = False
+    received: list[bytes] = field(default_factory=list)
+
+    def transcribe(self, audio: bytes):
+        from integrations.stt.engine import STTError, Transcript
+
+        self.received.append(audio)
+        if self.fail:
+            raise STTError("áudio ilegível")
+        return Transcript(self.reply, "pt", 1.5, 0.2)
+
+
+@pytest.fixture
+def stt(client: TestClient) -> Iterator[FakeSTT]:
+    from apps.api.routes.voice import get_stt_loader
+
+    engine = FakeSTT()
+    client.app.dependency_overrides[get_stt_loader] = lambda: lambda _size, _dir: engine
+    yield engine
+
+
+def _enable_stt(client: TestClient, **extra: object) -> None:
+    client.app.dependency_overrides[get_settings] = lambda: Settings(stt_model="base", **extra)
+
+
+def test_stt_transcribes_audio(client: TestClient, db: Session, stt: FakeSTT) -> None:
+    headers = {**_login(client, db), "Content-Type": "audio/wav"}
+    _enable_stt(client)
+
+    response = client.post("/voice/stt", headers=headers, content=b"RIFF....fake")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["text"] == "olá, tudo bem?"
+    assert body["elapsed_ms"] == 200
+    assert stt.received == [b"RIFF....fake"]
+
+
+def test_stt_disabled_by_default(client: TestClient, db: Session, stt: FakeSTT) -> None:
+    headers = {**_login(client, db), "Content-Type": "audio/wav"}
+    client.app.dependency_overrides[get_settings] = lambda: Settings(stt_model="")
+    assert client.post("/voice/stt", headers=headers, content=b"x").status_code == 503
+    assert stt.received == []
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body", "expected"),
+    [
+        ("application/json", b"{}", 415),
+        ("audio/wav", b"", 422),
+        ("audio/wav", b"x" * 20_001, 413),
+    ],
+)
+def test_stt_rejects_bad_uploads(
+    client: TestClient, db: Session, stt: FakeSTT, content_type: str, body: bytes, expected: int
+) -> None:
+    headers = {**_login(client, db), "Content-Type": content_type}
+    _enable_stt(client, stt_max_bytes=20_000)
+    assert client.post("/voice/stt", headers=headers, content=body).status_code == expected
+    assert stt.received == []
+
+
+def test_stt_failure_is_reported(client: TestClient, db: Session, stt: FakeSTT) -> None:
+    headers = {**_login(client, db), "Content-Type": "audio/webm"}
+    _enable_stt(client)
+    stt.fail = True
+    assert client.post("/voice/stt", headers=headers, content=b"webm").status_code == 502
+
+
+def test_status_reports_listening(client: TestClient, db: Session, loaded) -> None:
+    run_genesis(db)
+    headers = _login(client, db)
+    _enable_stt(client)
+    assert client.get("/voice/status", headers=headers).json()["listening"] is True

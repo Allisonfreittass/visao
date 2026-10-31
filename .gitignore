@@ -15,3 +15,4 @@ node_modules/
 models/
 # Generated audio samples
 experiments/results/tts/
+experiments/results/stt-audio/

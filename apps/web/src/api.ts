@@ -27,6 +27,7 @@ export interface SystemStatus {
 
 export interface VoiceStatus {
   enabled: boolean;
+  listening: boolean;
   current_voice: string | null;
   source: "chosen" | "system_default" | "none";
 }
@@ -107,6 +108,14 @@ export class Api {
       method: "PUT",
       body: JSON.stringify({ enabled }),
       headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  stt(wav: Blob): Promise<{ text: string; model: string; elapsed_ms: number }> {
+    return this.request("/voice/stt", {
+      method: "POST",
+      body: wav,
+      headers: { "Content-Type": "audio/wav" },
     });
   }
 

@@ -2,8 +2,10 @@
 
 > Estado: **Fase 2b concluída**: o sistema fala as respostas com voz própria (Kokoro, voz
 > `kokoro-dora`, escolhida pelo agente entre as aprovadas; ver
-> [ADR-0004](decisions/0004-tts-kokoro-e-voz-escolhida-pelo-agente.md)). **2c** (microfone, STT,
-> barge-in por voz) pendente.
+> [ADR-0004](decisions/0004-tts-kokoro-e-voz-escolhida-pelo-agente.md)). **Fase 2c implementada**
+> (microfone, STT, barge-in por voz; [ADR-0005](decisions/0005-stt-faster-whisper-base-e-escuta-no-navegador.md)).
+> Latência mediana medida: ~4,1 s do fim da fala ao primeiro áudio. Falta o teste humano com
+> microfone real e no iPhone (HTTPS).
 
 ## Restrições do master prompt
 
@@ -28,7 +30,7 @@
 | `IDLE` | pulsação lenta | sim |
 | `THINKING` | rotação rápida + turbulência | sim (aguardando resposta) |
 | `DISCONNECTED` | cinza e parada | sim (`/health` falhou) |
-| `LISTENING` | expande com o nível do microfone | só na demonstração (`?orb=demo`) |
+| `LISTENING` | expande com o nível do microfone | sim (sessão de voz) |
 | `SPEAKING` | expande com o nível do áudio gerado | sim (resposta falada) |
 | `INTERRUPTED` | contração rápida | sim ("Parar de falar" ou nova mensagem) |
 
@@ -61,7 +63,17 @@ Arquitetura: `integrations/tts/` com interface `TTSProvider.synthesize(text) -> 
 streaming por frase`; endpoint `/voice/tts` ou WebSocket de sessão de voz; o frontend toca o
 áudio e alimenta o nível da bolha (`SPEAKING`).
 
-## Plano da 2c: escuta
+## 2c: escuta (feito)
+
+- Medições e decisões: `docs/research-log/2026-10-31-fase-2c-escuta.md` e ADR-0005.
+- Código: `integrations/stt/engine.py`, `POST /voice/stt`, `apps/web/src/voice/`
+  (`vad.ts`, `wav.ts`, `microphone.ts`), sessão de voz em `App.tsx`.
+- Uso: "Conversa por voz" abre o microfone; cada fala vira um turno; falar por cima interrompe;
+  a interface mostra a latência do último turno por etapa.
+- Instalação opcional: `pip install -e ".[stt]"`, `VISION_STT_MODEL=base` (o modelo é baixado em
+  `models/stt/` na primeira carga).
+
+### Plano original da 2c (mantido para referência)
 
 - VAD no navegador (nível de energia + janela de silêncio) para começar e terminar turnos.
 - STT: avaliar `faster-whisper` (MIT) em CPU (`small`/`base`) contra STT por API; medir

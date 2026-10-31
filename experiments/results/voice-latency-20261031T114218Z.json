@@ -1,0 +1,49 @@
+{
+  "ran_at": "2026-10-31T11:42:18.232112+00:00",
+  "stt_model": "base",
+  "voice": "kokoro-dora",
+  "llm": "openrouter+nvidia:nvidia/nemotron-3.5-super-vl:free",
+  "vad_hangover_ms": 800,
+  "medians": {
+    "stt_ms": 375,
+    "llm_ms": 2734,
+    "tts_first_sentence_ms": 511,
+    "server_total_ms": 3311,
+    "perceived_ms": 4111
+  },
+  "turns": [
+    {
+      "question": "Oi, tudo bem? Em uma frase, o que você consegue fazer?",
+      "transcript": "Oi tudo bem em uma frase que você consegue fazer.",
+      "reply": "Oi! Estou funcionando normalmente e posso ajudar você.",
+      "served_by": "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b",
+      "stt_ms": 381,
+      "llm_ms": 2734,
+      "tts_first_sentence_ms": 196,
+      "server_total_ms": 3311,
+      "perceived_ms": 4111
+    },
+    {
+      "question": "Qual é a capital do Japão?",
+      "transcript": "Qual é a capital do Japão?",
+      "reply": "A capital do Japão é Tóquio.",
+      "served_by": "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b",
+      "stt_ms": 343,
+      "llm_ms": 785,
+      "tts_first_sentence_ms": 511,
+      "server_total_ms": 1639,
+      "perceived_ms": 2439
+    },
+    {
+      "question": "Me dá uma dica rápida para dormir melhor.",
+      "transcript": "Me dá uma dica rápida para dormir melhor.",
+      "reply": "Uma dica rápida é manter um horário fixo para dormir e acordar, mesmo nos finais de semana. Isso ajuda a regular o relógio biológico do corpo e facilita o sono.\n\nOutra prática simples: evite telas (celular, computador, TV) pelo menos 30 minutos antes de deitar. A luz azul pode prejudicar a produção de melatonina, o hormônio do sono.\n\nSe você tiver dificuldade frequente para dormir ou acordar cansado mesmo com boas noites de sono, vale a pena conversar com um profissional de saúde.",
+      "served_by": "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b",
+      "stt_ms": 375,
+      "llm_ms": 3500,
+      "tts_first_sentence_ms": 1484,
+      "server_total_ms": 5359,
+      "perceived_ms": 6159
+    }
+  ]
+}

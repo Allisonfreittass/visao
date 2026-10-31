@@ -9,12 +9,12 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 2b: voz própria.** Fases 0, 1 e 3 concluídas; 2a (interface) e 2b (fala) também.
+**Fase 2: voz.** Fases 0, 1 e 3 concluídas; a Fase 2 (interface, fala e escuta) está implementada.
 Identidade mínima (UUID, nome `null`), conversa por texto via LLM substituível (qualquer endpoint
 compatível com OpenAI) com orçamento e custo registrados, memória curada entre conversas, opt-in
 por usuário ([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados, que já
 fala as respostas com uma voz escolhida pelo próprio agente ([docs/VOICE.md](docs/VOICE.md)).
-Ainda não escuta, e não há curiosidade. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+A conversa por voz já funciona no navegador; falta o teste com microfone real e no iPhone. Ainda não há curiosidade. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
 elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
@@ -69,7 +69,7 @@ http://localhost:5173/?orb=demo.
 ### Voz (opcional)
 
 ```bash
-.venv/bin/pip install -e ".[tts]"
+.venv/bin/pip install -e ".[tts,stt]"
 ```
 
 Baixe os modelos para `models/tts/` (links e tamanhos em

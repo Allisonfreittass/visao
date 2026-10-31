@@ -24,6 +24,12 @@ tts = [
     "kokoro-onnx==0.6.1",
     "piper-tts==1.8.0",
 ]
+# Self-hosted speech recognition (docs/VOICE.md).
+stt = [
+    "faster-whisper==1.2.1",
+    # faster-whisper 1.2.1 passes av.open(metadata_errors=...), removed in PyAV 19.
+    "av==16.1.0",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.8",

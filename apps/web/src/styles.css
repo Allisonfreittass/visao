@@ -301,6 +301,20 @@ button.active {
 }
 
 .stop {
-  margin-bottom: 0.5rem;
   color: var(--accent);
+}
+
+.voice-bar {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.latency {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-align: center;
+  margin: 0 0 0.5rem;
 }

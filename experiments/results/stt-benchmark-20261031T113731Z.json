@@ -1,0 +1,329 @@
+{
+  "ran_at": "2026-10-31T11:37:31.865434+00:00",
+  "machine": "arm64 macOS-27.2-arm64-arm-64bit",
+  "snr_db": 15.0,
+  "results": [
+    {
+      "model": "tiny",
+      "load_s": 0.69,
+      "wer_clean": 0.21,
+      "wer_noisy": 0.314,
+      "mean_latency_s": 0.189,
+      "rtf": 0.055,
+      "peak_rss_mb": 379.9,
+      "rows": [
+        {
+          "condition": "clean",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "wer": 0.0,
+          "elapsed_s": 0.192,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "clean",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "wer": 0.0,
+          "elapsed_s": 0.201,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "clean",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "Você consegue explicar a diferença entre memória e pisódica e memória semantica.",
+          "wer": 0.182,
+          "elapsed_s": 0.204,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "clean",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "Tare de falar por favor.",
+          "wer": 0.2,
+          "elapsed_s": 0.164,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "clean",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curtas e diretas.",
+          "wer": 0.0,
+          "elapsed_s": 0.181,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "clean",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa post-crece que ele e faz de apenas servidor.",
+          "wer": 0.875,
+          "elapsed_s": 0.194,
+          "audio_s": 3.531
+        },
+        {
+          "condition": "noisy",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "wer": 0.0,
+          "elapsed_s": 0.189,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "noisy",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Lembra de revisar o orçamento amanhã às três da tarde.",
+          "wer": 0.091,
+          "elapsed_s": 0.202,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "noisy",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "Você consegue explicar a diferença entre memória tesódica e memória semática.",
+          "wer": 0.182,
+          "elapsed_s": 0.191,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "noisy",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "para e de falar por favor.",
+          "wer": 0.4,
+          "elapsed_s": 0.16,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "noisy",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curta-se e diretas.",
+          "wer": 0.333,
+          "elapsed_s": 0.187,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "noisy",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa post-crece que ele e faça a peino servidor.",
+          "wer": 0.875,
+          "elapsed_s": 0.199,
+          "audio_s": 3.531
+        }
+      ]
+    },
+    {
+      "model": "base",
+      "load_s": 0.63,
+      "wer_clean": 0.062,
+      "wer_noisy": 0.165,
+      "mean_latency_s": 0.354,
+      "rtf": 0.103,
+      "peak_rss_mb": 496.8,
+      "rows": [
+        {
+          "condition": "clean",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "wer": 0.0,
+          "elapsed_s": 0.347,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "clean",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Me lembra de revisar o orçamento amanhã às 3 da tarde.",
+          "wer": 0.0,
+          "elapsed_s": 0.371,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "clean",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "Você consegue explicar a diferença entre memória episodica e memória semântica.",
+          "wer": 0.0,
+          "elapsed_s": 0.38,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "clean",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "pare de falar por favor.",
+          "wer": 0.0,
+          "elapsed_s": 0.312,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "clean",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curtas e diretas.",
+          "wer": 0.0,
+          "elapsed_s": 0.347,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "clean",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa PostgreSQL e faz de API no servidor.",
+          "wer": 0.375,
+          "elapsed_s": 0.366,
+          "audio_s": 3.531
+        },
+        {
+          "condition": "noisy",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados.",
+          "wer": 0.0,
+          "elapsed_s": 0.372,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "noisy",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Lembra de revisar o orçamento amanhã às 3 da tarde.",
+          "wer": 0.091,
+          "elapsed_s": 0.371,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "noisy",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "Você consegue explicar a diferença entre memória episodica e memória semântica.",
+          "wer": 0.0,
+          "elapsed_s": 0.363,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "noisy",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "e espari de falar por favor.",
+          "wer": 0.4,
+          "elapsed_s": 0.328,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "noisy",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curtas e diretas.",
+          "wer": 0.0,
+          "elapsed_s": 0.343,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "noisy",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa Postcreas SQL e faz chapéi no servidor.",
+          "wer": 0.5,
+          "elapsed_s": 0.36,
+          "audio_s": 3.531
+        }
+      ]
+    },
+    {
+      "model": "small",
+      "load_s": 1.09,
+      "wer_clean": 0.083,
+      "wer_noisy": 0.075,
+      "mean_latency_s": 1.025,
+      "rtf": 0.301,
+      "peak_rss_mb": 957.0,
+      "rows": [
+        {
+          "condition": "clean",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "wer": 0.0,
+          "elapsed_s": 0.963,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "clean",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Me lembra de revisar o orçamento amanhã às 3 da tarde.",
+          "wer": 0.0,
+          "elapsed_s": 1.086,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "clean",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "Você consegue explicar a diferença entre memória episodica e memória semântica.",
+          "wer": 0.0,
+          "elapsed_s": 1.087,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "clean",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "Pare de falar, por favor.",
+          "wer": 0.0,
+          "elapsed_s": 0.94,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "clean",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curtas e diretas.",
+          "wer": 0.0,
+          "elapsed_s": 1.01,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "clean",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa Postgre SQL e faça TAPI no servidor.",
+          "wer": 0.5,
+          "elapsed_s": 1.065,
+          "audio_s": 3.531
+        },
+        {
+          "condition": "noisy",
+          "reference": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "hypothesis": "Qual ferramenta eu escolhi para a migração do banco de dados?",
+          "wer": 0.0,
+          "elapsed_s": 1.079,
+          "audio_s": 3.615
+        },
+        {
+          "condition": "noisy",
+          "reference": "Me lembra de revisar o orçamento amanhã às três da tarde.",
+          "hypothesis": "Me lembra de revisar o orçamento amanhã às 3 da tarde.",
+          "wer": 0.0,
+          "elapsed_s": 1.073,
+          "audio_s": 3.753
+        },
+        {
+          "condition": "noisy",
+          "reference": "Você consegue explicar a diferença entre memória episódica e memória semântica?",
+          "hypothesis": "você consegue explicar a diferença entre memória episodica e memória semântica.",
+          "wer": 0.0,
+          "elapsed_s": 1.088,
+          "audio_s": 5.075
+        },
+        {
+          "condition": "noisy",
+          "reference": "Pare de falar, por favor.",
+          "hypothesis": "Espare de falar, por favor.",
+          "wer": 0.2,
+          "elapsed_s": 0.951,
+          "audio_s": 2.008
+        },
+        {
+          "condition": "noisy",
+          "reference": "Eu prefiro respostas curtas e diretas.",
+          "hypothesis": "Eu prefiro respostas curtas e diretas.",
+          "wer": 0.0,
+          "elapsed_s": 1.009,
+          "audio_s": 2.632
+        },
+        {
+          "condition": "noisy",
+          "reference": "O projeto usa PostgreSQL e FastAPI no servidor.",
+          "hypothesis": "O projeto usa PostgreSQL e faz TAPI no servidor.",
+          "wer": 0.25,
+          "elapsed_s": 1.05,
+          "audio_s": 3.531
+        }
+      ]
+    }
+  ],
+  "note": "WER recalculado com algarismos 0-10 equivalentes ao número por extenso."
+}
