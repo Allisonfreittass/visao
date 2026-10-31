@@ -36,6 +36,16 @@ elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
 
 ## Execução local
 
+### Tudo de uma vez (uso no dia a dia, sem Docker)
+
+```bash
+npm start
+```
+
+Aplica as migrações e sobe API (8000), worker e interface (http://localhost:5173) no mesmo
+terminal, com a saída prefixada por `[api]`, `[worker]` e `[web]`. Ctrl+C para os três; se um
+deles cair, os outros param junto. Requer o `.venv` e o `npm --prefix apps/web install` abaixo.
+
 ### Com Docker (caminho oficial)
 
 ```bash
