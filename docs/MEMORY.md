@@ -1,7 +1,8 @@
 # Memória
 
-> Estado: **Fase 3a implementada** (curadoria, política, recuperação lexical, controles do
-> usuário). Recuperação semântica (3b) e comparação formal com baseline (3c) pendentes.
+> Estado: **Fase 3 concluída.** Curadoria, política, recuperação lexical e controles do
+> usuário implementados; comparação com baseline (3c) superou memória passiva e ausência de
+> memória. Recuperação semântica (3b) opcional.
 
 ## Princípios
 

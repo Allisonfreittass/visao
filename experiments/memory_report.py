@@ -58,6 +58,7 @@ def summarize(results: dict[tuple[str, str, str], dict[str, Any]]) -> dict[tuple
             "memory_chars": 0,
             "calls": 0,
             "tokens": 0,
+            "served_by": set(),
         }
     )
     for (model, scenario, variant), r in results.items():
@@ -75,6 +76,7 @@ def summarize(results: dict[tuple[str, str, str], dict[str, Any]]) -> dict[tuple
         row["memories"] += len(r["stored_memories"])
         row["memory_chars"] += r["memory_chars"]
         row["calls"] += r["llm_calls"]
+        row["served_by"].update(r.get("served_by", []))
         row["tokens"] += r["input_tokens"] + r["output_tokens"]
     return table
 
@@ -92,6 +94,9 @@ def render(table: dict[tuple[str, str], dict[str, Any]]) -> str:
             f"| {r['leaks']}/{r['probes']} | {store} | {r['forbidden_stored']} "
             f"| {r['memories']} | {r['calls']} | {r['tokens']} |"
         )
+    hosts = sorted({h for r in table.values() for h in r["served_by"]})
+    if hosts:
+        lines.append("\nRespondido por: " + ", ".join(hosts))
     return "\n".join(lines)
 
 

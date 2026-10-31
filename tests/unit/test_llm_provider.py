@@ -1,4 +1,5 @@
 import json
+import time
 from decimal import Decimal
 
 import httpx
@@ -186,3 +187,51 @@ def test_retry_after_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert sleeps == [30.0]
+
+
+def _quota_body(reset_in_seconds: float) -> dict:
+    reset_ms = int((time.time() + reset_in_seconds) * 1000)
+    return {
+        "error": {
+            "message": "Rate limit exceeded: free-models-per-day",
+            "code": 429,
+            "metadata": {
+                "headers": {
+                    "X-RateLimit-Limit": "50",
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(reset_ms),
+                }
+            },
+        }
+    }
+
+
+def test_daily_quota_fails_fast_without_retrying(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr(openai_compatible.time, "sleep", sleeps.append)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(429, json=_quota_body(reset_in_seconds=6 * 3600))
+
+    with pytest.raises(LLMError) as exc:
+        _provider(handler).complete([ChatMessage("user", "oi")], max_output_tokens=5)
+    assert exc.value.kind == "quota_exhausted"
+    assert calls == 1
+    assert sleeps == []
+
+
+def test_short_rate_limit_is_still_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(openai_compatible.time, "sleep", lambda _: None)
+    responses = iter(
+        [
+            httpx.Response(429, json=_quota_body(reset_in_seconds=5)),
+            httpx.Response(200, json=OK_BODY),
+        ]
+    )
+    result = _provider(lambda request: next(responses)).complete(
+        [ChatMessage("user", "oi")], max_output_tokens=5
+    )
+    assert result.text == "olá"

@@ -137,6 +137,11 @@ def _store_passively(world: World, persona: str, conversation: Conversation) -> 
     world.session.commit()
 
 
+def _error(stage: str, exc: Exception) -> dict[str, str]:
+    kind = getattr(exc, "kind", None) or type(exc).__name__
+    return {"stage": stage, "kind": kind, "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
 def _budgets(settings: Settings) -> Budgets:
     return Budgets(
         daily_usd=settings.llm_daily_budget_usd,
@@ -166,7 +171,7 @@ def run_scenario(
                 )
             except (LLMError, CurationOutputError, BudgetExceededError) as exc:
                 world.session.rollback()
-                errors.append({"stage": "curation", "error": f"{type(exc).__name__}: {exc}"[:300]})
+                errors.append(_error("curation", exc))
 
     stored = list(world.session.scalars(select(MemoryRecord.content)))
     memory_text = "\n".join(stored)
@@ -199,7 +204,7 @@ def run_scenario(
             )
         except (LLMError, EmptyReplyError, BudgetExceededError) as exc:
             world.session.rollback()
-            errors.append({"stage": "probe", "error": f"{type(exc).__name__}: {exc}"[:300]})
+            errors.append(_error("probe", exc))
             probes.append({"question": probe["question"], "error": True})
             continue
         answer = turn.assistant_message.content
@@ -232,6 +237,8 @@ def run_scenario(
         "memory_chars": len(memory_text),
         "probes": probes,
         "llm_calls": len(usage),
+        # Which host/model actually answered each call (a fallback may have taken over).
+        "served_by": sorted({f"{u.provider}:{u.model}" for u in usage if u.outcome != "error"}),
         "input_tokens": sum(u.input_tokens for u in usage),
         "output_tokens": sum(u.output_tokens for u in usage),
         "cost_usd": str(sum(u.cost_usd for u in usage)),
@@ -256,12 +263,24 @@ def main(argv: list[str] | None = None) -> int:
     scenarios = [s for s in dataset["scenarios"] if wanted is None or s["id"] in wanted]
     variants = [v for v in args.variants.split(",") if v in VARIANTS]
 
-    results = []
+    RESULTS_DIR.mkdir(exist_ok=True)
+    out = RESULTS_DIR / f"memory-benchmark-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
+    run: dict[str, Any] = {
+        "ran_at": datetime.now(UTC).isoformat(),
+        "dataset": dataset["version"],
+        "provider": provider.name,
+        "model": provider.model,
+        "results": [],
+    }
+
+    quota_hit = False
     for scenario in scenarios:
         for variant in variants:
             print(f"-> {scenario['id']} / {variant}", flush=True)
             result = run_scenario(scenario, variant, provider, settings)
-            results.append(result)
+            run["results"].append(result)
+            # Saved after every variant, so an interruption loses at most the one in progress.
+            out.write_text(json.dumps(run, ensure_ascii=False, indent=2))
             hits = [p.get("hit") for p in result["probes"] if p.get("hit") is not None]
             print(
                 f"   acertos {sum(hits)}/{len(hits)}, vazamentos "
@@ -270,22 +289,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"{result['store_forbidden_found'] or 0}, erros {len(result['errors'])}",
                 flush=True,
             )
+            if any(e["kind"] == "quota_exhausted" for e in result["errors"]):
+                quota_hit = True
+                break
+        if quota_hit:
+            print("\nCota do provedor esgotada: parando. Rode de novo quando ela renovar.")
+            break
 
-    RESULTS_DIR.mkdir(exist_ok=True)
-    out = RESULTS_DIR / f"memory-benchmark-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
-    out.write_text(
-        json.dumps(
-            {
-                "ran_at": datetime.now(UTC).isoformat(),
-                "dataset": dataset["version"],
-                "provider": provider.name,
-                "model": provider.model,
-                "results": results,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-    )
     print(f"\nResultado salvo em {out}")
     return 0
 

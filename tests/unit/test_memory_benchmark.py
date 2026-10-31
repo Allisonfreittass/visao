@@ -98,3 +98,9 @@ def test_report_compares_only_scenarios_complete_in_every_variant(secrets_scenar
         ("m", "s9-incompleto", "A"): _run(secrets_scenario, "A"),
     }
     assert set(comparable(results)) == {("m", "s4-segredos", "A"), ("m", "s4-segredos", "C")}
+
+
+def test_errors_carry_the_provider_error_kind(secrets_scenario: dict) -> None:
+    provider = FakeLLMProvider(fail_with="quota_exhausted")
+    result = run_scenario(secrets_scenario, "A", provider, Settings())
+    assert {e["kind"] for e in result["errors"]} == {"quota_exhausted"}

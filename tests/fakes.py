@@ -32,4 +32,5 @@ class FakeLLMProvider:
             output_tokens=500,
             latency_ms=5,
             finish_reason="stop",
+            cost_usd=self.pricing.cost(1000, 500),
         )

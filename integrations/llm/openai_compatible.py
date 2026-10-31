@@ -66,6 +66,7 @@ class OpenAICompatibleProvider:
             output_tokens=output_tokens,
             latency_ms=latency_ms,
             finish_reason=choice.get("finish_reason"),
+            cost_usd=self.pricing.cost(input_tokens, output_tokens),
         )
 
     def _post_with_retries(self, payload: dict) -> httpx.Response:
@@ -83,6 +84,11 @@ class OpenAICompatibleProvider:
             else:
                 if response.status_code < 400:
                     return response
+                if response.status_code == 429 and _quota_exhausted(response):
+                    raise LLMError(
+                        "quota_exhausted",
+                        f"provider quota exhausted; retrying won't help: {response.text[:300]}",
+                    )
                 if response.status_code not in _RETRYABLE_STATUS or last_attempt:
                     raise LLMError(
                         f"http_{response.status_code}",
@@ -109,3 +115,42 @@ def _retry_delay(response: httpx.Response | None, attempt: int) -> float:
         if response.status_code == 429:
             return min(5.0 * 2**attempt, _MAX_RETRY_DELAY_SECONDS)
     return min(0.5 * 2**attempt, _MAX_RETRY_DELAY_SECONDS)
+
+
+def _rate_limit_headers(response: httpx.Response) -> dict[str, str]:
+    """X-RateLimit-* from the HTTP headers or, as OpenRouter does on errors, from the body's
+    error.metadata.headers. Keys are lower-cased."""
+    found = {
+        k.lower(): v for k, v in response.headers.items() if k.lower().startswith("x-ratelimit")
+    }
+    if found:
+        return found
+    try:
+        nested = response.json()["error"]["metadata"]["headers"]
+    except (ValueError, KeyError, TypeError):
+        return {}
+    if not isinstance(nested, dict):
+        return {}
+    return {
+        str(k).lower(): str(v)
+        for k, v in nested.items()
+        if str(k).lower().startswith("x-ratelimit")
+    }
+
+
+def _quota_exhausted(response: httpx.Response) -> bool:
+    """True when the provider says no requests remain until a reset further away than we would
+    ever wait (e.g. a daily free-tier cap). Short per-minute limits still get retried."""
+    headers = _rate_limit_headers(response)
+    if headers.get("x-ratelimit-remaining") != "0":
+        return False
+    reset = headers.get("x-ratelimit-reset")
+    if reset is None:
+        return True
+    try:
+        reset_at = float(reset)
+    except ValueError:
+        return True
+    if reset_at > 1e12:  # milliseconds since epoch
+        reset_at /= 1000
+    return reset_at - time.time() > _MAX_RETRY_DELAY_SECONDS

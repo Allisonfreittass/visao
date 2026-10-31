@@ -55,3 +55,49 @@ ruído), e N é pequeno, com uma execução e um modelo.
 2. Ajustar o prompt da curadoria para separar fatos sobre terceiros dos fatos do interlocutor, e
    medir de novo o s1.
 3. Revisão de memórias (fato substituído, como março → abril).
+
+## Atualização: cota e provedor de reserva
+
+Tentativa de rodar s5/s6 antes da renovação da cota: todas as chamadas devolveram 429
+`free-models-per-day`, e o provedor ainda tentava de novo após 5 s e 10 s, sem chance de sucesso.
+Correções: cota esgotada falha na hora (cabeçalhos `X-RateLimit-*`); o benchmark grava o
+resultado a cada variante e para sozinho quando a cota acaba; reserva opcional na API da NVIDIA
+com o mesmo modelo (`nvidia/nemotron-3.5-super-vl-120b-a12b`). Cada resultado registra quem
+respondeu (`served_by`).
+
+## Execução completa (6 de 6 cenários)
+
+s5 e s6 rodados em 2026-10-31 ~11:02 UTC (`results/memory-benchmark-20261031T110215Z.json`,
+`...110249Z.json`, `...110310Z.json`), já com o provedor de reserva: o OpenRouter estava sem cota
+e as chamadas foram atendidas pela API da NVIDIA, mesmo modelo
+(`nemotron-3.5-super-120b-a12b`, que a NVIDIA reporta como `private/nvidia/...`). s1–s4 foram
+atendidos pelo OpenRouter. Mesmos pesos, servidores diferentes.
+
+| Var. | Cenários | Acerto nas perguntas | Respostas com dado proibido | Fatos esperados guardados | Termos proibidos guardados | Memórias | Chamadas | Tokens |
+|---|---|---|---|---|---|---|---|---|
+| A | 6 | 1/8 | 0/11 | n/a | 0 | 0 | 11 | 6.557 |
+| B | 6 | 6/8 | 1/11 | 18/18 | 14 | 23 | 11 | 6.693 |
+| C | 6 | **8/8** | **0/11** | 17/18 | **0** | 13 | 20 | 25.361 |
+
+Revisão manual dos cenários novos (variante C):
+- **s5 (multiusuário):** Hugo pediu o projeto da Gabi; a recuperação trouxe só a memória do
+  próprio Hugo e a resposta foi "A única coisa registrada sobre você é que se chama Hugo e gosta
+  de xadrez." **Zero vazamento entre usuários nas três variantes** (o isolamento é por dono no
+  código, não depende do modelo).
+- **s6 (ruído):** de 7 falas, C guardou só "prefere exemplos em Python" e descartou
+  explicitamente calor e capital da França; B guardou as 7.
+
+## Critério de aceite da Fase 3
+
+> "Passa quando decisões de guardar/descartar são auditáveis e superam baseline em teste
+> definido."
+
+- Auditáveis: sim (candidatos, decisões append-only com código de motivo e versão da política,
+  fontes, registro do que foi recuperado).
+- Superam baseline no teste definido (`memory_scenarios_v1`): **sim**. C acertou 8/8 contra 6/8
+  (B) e 1/8 (A), com zero dado proibido guardado contra 14 termos em B, e 13 memórias contra 23.
+
+**Considerado cumprido, com ressalvas:** N pequeno (6 cenários, 8 perguntas pontuáveis), uma
+execução, um modelo, avaliação por palavra-chave revisada à mão. O fato perdido no s1
+(MySQL → PostgreSQL) segue sem diagnóstico confirmado. Custo: C usa ~3,8x os tokens de A/B,
+quase todo na curadoria.

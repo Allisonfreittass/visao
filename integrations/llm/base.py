@@ -22,6 +22,8 @@ class LLMResponse:
     output_tokens: int
     latency_ms: int
     finish_reason: str | None
+    # Priced by whichever provider actually answered (matters when a fallback took over).
+    cost_usd: Decimal
 
 
 @dataclass(frozen=True)

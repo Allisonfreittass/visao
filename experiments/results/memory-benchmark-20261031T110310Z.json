@@ -1,0 +1,181 @@
+{
+  "ran_at": "2026-10-31T11:03:10.453955+00:00",
+  "dataset": "memory_scenarios_v1",
+  "provider": "openrouter+nvidia",
+  "model": "nvidia/nemotron-3.5-super-vl:free",
+  "results": [
+    {
+      "scenario": "s6-ruido",
+      "variant": "A",
+      "stored_memories": [],
+      "decisions": [],
+      "store_expected_found": [],
+      "store_expected_total": 1,
+      "store_forbidden_found": [],
+      "memory_chars": 0,
+      "probes": [
+        {
+          "persona": "iara",
+          "question": "Em que linguagem de programação eu prefiro os exemplos?",
+          "answer": "Não sei. Não tenho memória entre conversas nem conhecimento prévio sobre você, portanto não há como saber em qual linguagem de programação você prefere os exemplos.\n\nSe quiser, pode me dizer qual linguagem prefere e eu posso usar essa informação nos exemplos desta conversa.",
+          "recalled": [],
+          "expected": [
+            "python"
+          ],
+          "hit": false,
+          "leaked": []
+        }
+      ],
+      "llm_calls": 1,
+      "served_by": [
+        "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b"
+      ],
+      "input_tokens": 226,
+      "output_tokens": 284,
+      "cost_usd": "0",
+      "errors": []
+    },
+    {
+      "scenario": "s6-ruido",
+      "variant": "B",
+      "stored_memories": [
+        "bom dia",
+        "kkkkk",
+        "qual é a capital da França?",
+        "nossa, que calor hoje",
+        "quanto é 17 vezes 23?",
+        "aliás, quando for me explicar código, prefiro exemplos em Python",
+        "valeu, tchau"
+      ],
+      "decisions": [
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "bom dia"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "kkkkk"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "qual é a capital da França?"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "nossa, que calor hoje"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "quanto é 17 vezes 23?"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "aliás, quando for me explicar código, prefiro exemplos em Python"
+        },
+        {
+          "decision": "STORED",
+          "reason": "passive",
+          "proposed": "valeu, tchau"
+        }
+      ],
+      "store_expected_found": [
+        [
+          "python"
+        ]
+      ],
+      "store_expected_total": 1,
+      "store_forbidden_found": [
+        "capital",
+        "calor",
+        "kkk",
+        "17 vezes",
+        "bom dia"
+      ],
+      "memory_chars": 163,
+      "probes": [
+        {
+          "persona": "iara",
+          "question": "Em que linguagem de programação eu prefiro os exemplos?",
+          "answer": "Você prefere exemplos em **Python**. Essa preferência foi registrada em 31 de outubro de 2026.",
+          "recalled": [
+            "aliás, quando for me explicar código, prefiro exemplos em Python"
+          ],
+          "expected": [
+            "python"
+          ],
+          "hit": true,
+          "leaked": []
+        }
+      ],
+      "llm_calls": 1,
+      "served_by": [
+        "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b"
+      ],
+      "input_tokens": 300,
+      "output_tokens": 178,
+      "cost_usd": "0",
+      "errors": []
+    },
+    {
+      "scenario": "s6-ruido",
+      "variant": "C",
+      "stored_memories": [
+        "O interlocutor prefere exemplos em Python quando receber explicações de código."
+      ],
+      "decisions": [
+        {
+          "decision": "STORED",
+          "reason": "accepted",
+          "proposed": "O interlocutor prefere exemplos em Python quando receber explicações de código."
+        },
+        {
+          "decision": "DISCARDED",
+          "reason": "model_discard",
+          "proposed": "O interlocutor comentou que estava com muito calor hoje."
+        },
+        {
+          "decision": "DISCARDED",
+          "reason": "model_discard",
+          "proposed": "O interlocutor perguntou qual é a capital da França."
+        }
+      ],
+      "store_expected_found": [
+        [
+          "python"
+        ]
+      ],
+      "store_expected_total": 1,
+      "store_forbidden_found": [],
+      "memory_chars": 79,
+      "probes": [
+        {
+          "persona": "iara",
+          "question": "Em que linguagem de programação eu prefiro os exemplos?",
+          "answer": "Você prefere exemplos em **Python**. Essa informação está registrada nas memórias curadas sobre você (registrada em 2026-10-31).",
+          "recalled": [
+            "O interlocutor prefere exemplos em Python quando receber explicações de código."
+          ],
+          "expected": [
+            "python"
+          ],
+          "hit": true,
+          "leaked": []
+        }
+      ],
+      "llm_calls": 2,
+      "served_by": [
+        "nvidia:private/nvidia/nemotron-3.5-super-120b-a12b"
+      ],
+      "input_tokens": 807,
+      "output_tokens": 2033,
+      "cost_usd": "0.000000",
+      "errors": []
+    }
+  ]
+}

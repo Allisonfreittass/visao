@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     llm_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_timeout_seconds: float = Field(default=60.0, gt=0)
+
+    # Optional fallback provider, tried when the primary is out of quota, rate-limited or down.
+    llm_fallback_provider_name: str | None = None
+    llm_fallback_base_url: str | None = None
+    llm_fallback_api_key: SecretStr | None = None
+    llm_fallback_model: str | None = None
+    llm_fallback_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
+    llm_fallback_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_max_output_tokens: int = Field(default=1024, ge=1)
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
@@ -49,6 +57,12 @@ class Settings(BaseSettings):
         "llm_model",
         "llm_price_input_per_mtok",
         "llm_price_output_per_mtok",
+        "llm_fallback_provider_name",
+        "llm_fallback_base_url",
+        "llm_fallback_api_key",
+        "llm_fallback_model",
+        "llm_fallback_price_input_per_mtok",
+        "llm_fallback_price_output_per_mtok",
         mode="before",
     )
     @classmethod

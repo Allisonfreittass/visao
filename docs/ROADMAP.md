@@ -8,7 +8,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
-| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **3a implementada**; 3c em andamento (4 de 6 cenários: C > B > A); 3b pendente |
+| 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
@@ -77,13 +77,14 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fase 3c: comparação com baseline** (critério de aceite da Fase 3). Conjunto fixo de cenários
-fictícios multi-conversa, variantes A (sem memória), B (memória passiva: guarda tudo) e C
-(curada), métricas de recall/precisão de memória relevante, vazamento entre usuários (meta zero),
-dados proibidos guardados e custo. Fica antes da 3b para medir se a busca lexical é mesmo o
-gargalo antes de adicionar embeddings.
+Fase 3 concluída (ver diário 2026-10-31-fase-3c-baseline.md). Candidatos, em ordem sugerida:
 
-Depois: Fase 3b (embeddings) se a 3c mostrar perda por paráfrase; ou Fase 2 (voz).
+1. **Fase 2 (voz + interface com a bolha laranja)**: próxima fase do master prompt e obrigatória
+   na v0.1.
+2. Melhorias de memória que o benchmark apontou: revisão de memória substituída (março → abril),
+   separar fatos de terceiros do resto (fato perdido no s1), regra lexical extra para saúde.
+3. Fase 3b (embeddings): a NVIDIA oferece modelos de embedding (`nemotron-3.5-embed-*`); vale só
+   se um conjunto com paráfrases mostrar perda na busca lexical.
 
 ## Visual da interface (entra no início da Fase 2)
 

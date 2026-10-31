@@ -43,3 +43,17 @@ Hospedar o modelo no Lightsail não é viável; a inferência começa via API.
 - https://www.yottalabs.ai/post/qwen-3-8-max-release-date-specs-how-to-access-2026
 - https://www.cloudzero.com/blog/qwen-api-pricing/
 - https://www.mercatus-ai.com/blog/qwen-api-pricing
+
+## Adendo (2026-10-31): modelo em uso e provedor de reserva
+
+- Para custo zero, o modelo em uso passou a ser `nvidia/nemotron-3.5-super-vl` (120B, 12B ativos)
+  no plano grátis do OpenRouter. Qwen continua sendo a família preferida; nenhum Qwen estava
+  grátis no OpenRouter nesta data.
+- O plano grátis do OpenRouter limita a 50 requisições/dia. Foi adicionado um
+  `FallbackLLMProvider`: o principal é tentado primeiro e, em cota esgotada, 429, erro 5xx,
+  timeout, erro de rede ou resposta malformada, a chamada vai para a reserva (API da NVIDIA,
+  mesmo modelo). Erros de configuração (401, 400, 404) não acionam a reserva, para não esconder
+  chave errada. Um provedor com cota esgotada é pulado por 15 minutos.
+- Cota diária esgotada é detectada pelos cabeçalhos `X-RateLimit-Remaining: 0` e
+  `X-RateLimit-Reset` e falha na hora, sem novas tentativas.
+- O custo de cada chamada passou a vir de quem respondeu (`LLMResponse.cost_usd`).

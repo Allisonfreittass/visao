@@ -188,7 +188,7 @@ def curate_conversation(
         model=response.model,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
-        cost_usd=provider.pricing.cost(response.input_tokens, response.output_tokens),
+        cost_usd=response.cost_usd,
         latency_ms=response.latency_ms,
         outcome="success",
     )
