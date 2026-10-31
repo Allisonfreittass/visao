@@ -330,3 +330,28 @@ button.active {
 .sources a {
   color: var(--accent);
 }
+
+.initiatives h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  margin: 0.5rem 0;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.card .row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pre {
+  white-space: pre-wrap;
+}

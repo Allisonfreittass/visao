@@ -41,6 +41,23 @@ export interface VoiceStatus {
   source: "chosen" | "system_default" | "none";
 }
 
+export interface Goal {
+  id: string;
+  title: string;
+  rationale: string;
+  success_criteria: string;
+  required_permissions: string[];
+  status: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -125,6 +142,40 @@ export class Api {
       method: "POST",
       body: wav,
       headers: { "Content-Type": "audio/wav" },
+    });
+  }
+
+  approvals(): Promise<Goal[]> {
+    return this.request("/approvals");
+  }
+
+  decideGoal(goalId: string, decision: "approve" | "reject"): Promise<Goal> {
+    return this.request(`/goals/${encodeURIComponent(goalId)}/${decision}`, {
+      method: "POST",
+      body: JSON.stringify({ reason: "" }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  notifications(): Promise<AppNotification[]> {
+    return this.request("/notifications");
+  }
+
+  markRead(notificationId: string): Promise<void> {
+    return this.request(`/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: "POST",
+    });
+  }
+
+  autonomy(): Promise<{ paused: boolean }> {
+    return this.request("/system/autonomy");
+  }
+
+  setAutonomyPaused(paused: boolean): Promise<{ paused: boolean }> {
+    return this.request("/system/autonomy", {
+      method: "PUT",
+      body: JSON.stringify({ paused, reason: paused ? "pausa pela interface" : "retomada" }),
+      headers: { "Content-Type": "application/json" },
     });
   }
 

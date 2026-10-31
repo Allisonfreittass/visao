@@ -1,0 +1,41 @@
+{
+  "ran_at": "2026-10-31T12:08:37.410747+00:00",
+  "attempts": [
+    {
+      "question": "Em que ano foi inaugurada a Ponte Rio-Niterói?",
+      "decision": "seeded DEFER",
+      "proposed_goal": "ab95ec40-2abb-44e8-9f0e-1fc850d1757b"
+    }
+  ],
+  "goal": {
+    "title": "Pesquisar de novo: Em que ano foi inaugurada a Ponte Rio-Niterói?",
+    "status": "COMPLETED",
+    "history": [
+      "None->PROPOSED (agent: Pergunta de fato público ficou sem resposta (a pesquisa foi adiada por falta de orçamento).)",
+      "PROPOSED->EVALUATED (policy: dentro das permissões e do orçamento)",
+      "EVALUATED->APPROVED (user: aprovada pelo interlocutor)",
+      "APPROVED->ACTIVE (worker: execução iniciada)",
+      "ACTIVE->COMPLETED (worker: fonte encontrada e resumida)"
+    ],
+    "evidence": {
+      "research_sessions": [
+        "cceab5c5-55e3-4816-b01b-54d45b124d05",
+        "93b64136-ae10-4f84-bcc7-3f8effcbff92"
+      ],
+      "sources": [
+        "https://pt.wikipedia.org/wiki/Ponte_Rio-Niter%C3%B3i",
+        "https://pt.wikipedia.org/wiki/Niter%C3%B3i",
+        "https://pt.wikipedia.org/wiki/BR-101",
+        "https://pt.wikipedia.org/wiki/Avenida_Brasil_(Rio_de_Janeiro)"
+      ],
+      "summary": "A Ponte Rio-Niterói foi entregue no dia 4 de março de 1974, segundo a página da Wikipédia https://pt.wikipedia.org/wiki/Ponte_Rio-Niter%C3%B3i. Portanto, o ano de inauguração é 1974.",
+      "notification_id": "58a9fd16-be4a-4ef3-a89f-8171b769a798",
+      "notification_skipped": null
+    }
+  },
+  "notification": {
+    "title": "Encontrei algo sobre: Em que ano foi inaugurada a Ponte Rio-Niterói?",
+    "body": "A Ponte Rio-Niterói foi entregue no dia 4 de março de 1974, segundo a página da Wikipédia https://pt.wikipedia.org/wiki/Ponte_Rio-Niter%C3%B3i. Portanto, o ano de inauguração é 1974."
+  },
+  "worker_outcome": "done"
+}

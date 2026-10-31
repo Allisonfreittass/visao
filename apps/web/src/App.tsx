@@ -9,6 +9,7 @@ import {
   type VoiceStatus,
 } from "./api";
 import { ChatView } from "./components/ChatView";
+import { InitiativesPanel } from "./components/InitiativesPanel";
 import { Login } from "./components/Login";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
@@ -356,6 +357,7 @@ export function App() {
                 </li>
               ))}
             </ul>
+            <InitiativesPanel api={api} onError={handleError} />
             <label className="memory-toggle">
               <input type="checkbox" checked={memoryEnabled} onChange={toggleMemory} />
               Memória entre conversas

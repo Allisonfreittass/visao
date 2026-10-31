@@ -82,6 +82,8 @@ class CuriosityOut(BaseModel):
     reason: str
     status: str
     question: str
+    # Set when an unanswered question became a goal proposal waiting for approval.
+    proposed_goal_id: uuid.UUID | None = None
 
 
 class TurnOut(BaseModel):
@@ -296,6 +298,9 @@ def send_message(
             reason=gap.decision_reason,
             status=gap.status,
             question=gap.question,
+            proposed_goal_id=outcome.proposed_goal.id
+            if outcome.proposed_goal is not None and outcome.proposed_goal.status == "EVALUATED"
+            else None,
         )
         if gap is not None
         else None,

@@ -10,7 +10,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **implementada** (interface, fala, escuta, barge-in; latência mediana ~4,1 s); aceite pendente de teste com microfone real e iPhone |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | **concluída** (6/6 casos reais após correção; Wikipédia pt) |
-| 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
+| 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | **implementada** (evento real ponta a ponta; aviso útil verificado com lacuna semeada) |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | não iniciada |
 | 7. Pesquisa avançada | fine-tuning, TTS próprio, continual learning | só após baselines e datasets | não iniciada |
 
@@ -77,12 +77,16 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fase 5: metas e iniciativas.** Scheduler persistente, ciclo de metas
-(`PROPOSED → EVALUATED → APPROVED → ACTIVE → COMPLETED`), `PROPOSE_GOAL` da curiosidade,
-aprovações e notificações com horário silencioso.
+**Fase 6: reflexão e desenvolvimento comportamental.** Lições revisáveis a partir de resultados
+(esperado × observado), métricas de estilo e comportamento ao longo do tempo, adaptação
+rastreável, versionada e reversível.
 
-Pendentes de fases anteriores: teste da conversa por voz com microfone real e no iPhone (Fase 2);
-revisão de memórias substituídas (Fase 3); trechos além da introdução e segunda fonte (Fase 4).
+Antes da Fase 6, vale considerar a **implantação** (Lightsail + Cloudflare, com HTTPS): destrava o
+teste da voz no iPhone e os avisos push. Requer acesso à instância e aprovação explícita.
+
+Pendentes: teste da voz com microfone real (Fase 2); revisão de memórias substituídas (Fase 3);
+trechos além da introdução e consulta pelo título exato (Fases 4 e 5); rota para metas criadas pelo
+usuário.
 
 ## Visual da interface (entra no início da Fase 2)
 

@@ -21,10 +21,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.conversation.service import Budgets, check_budgets
+from core.goals.followup import propose_followup
 from core.memory.text import jaccard, tokens
 from core.research.service import run_research
 from infrastructure.database.models import (
     Conversation,
+    Goal,
     KnowledgeGap,
     Message,
     ModelUsage,
@@ -114,6 +116,7 @@ class CuriosityOutcome:
     gap: KnowledgeGap | None
     system_context: str | None
     sources: list[ResearchSource]
+    proposed_goal: Goal | None = None
 
 
 NO_OUTCOME = CuriosityOutcome(gap=None, system_context=None, sources=[])
@@ -373,5 +376,14 @@ def consider(
         )
         gap.resolved_at = datetime.now(UTC)
         context = _sources_context(sources, assessment.question)
+
+    # Real event -> initiative proposal: an unanswered public-fact question may be worth
+    # researching again later. Proposing grants nothing; the owner must approve.
+    goal = propose_followup(session, gap=gap, owner=owner, search_query=assessment.search_query)
+    if goal is not None and goal.status == "EVALUATED":
+        context = (context + "\n\n" if context else "") + (
+            "Foi registrada uma proposta de pesquisar isso de novo mais tarde; ela só será feita "
+            "se o interlocutor aprovar. Se fizer sentido, mencione isso em uma frase."
+        )
     session.commit()
-    return CuriosityOutcome(gap=gap, system_context=context, sources=sources)
+    return CuriosityOutcome(gap=gap, system_context=context, sources=sources, proposed_goal=goal)

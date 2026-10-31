@@ -32,6 +32,12 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Explicit opt-in. Without it nothing from this user's conversations is curated or recalled.
     memory_consent: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Quiet hours for notifications, local wall-clock "HH:MM" in `timezone`; equal = none.
+    quiet_start: Mapped[str] = mapped_column(String(5), default="22:00", server_default="22:00")
+    quiet_end: Mapped[str] = mapped_column(String(5), default="08:00", server_default="08:00")
+    timezone: Mapped[str] = mapped_column(
+        String(64), default="America/Sao_Paulo", server_default="America/Sao_Paulo"
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -352,3 +358,104 @@ class ResearchSource(Base):
     source: Mapped[str] = mapped_column(String(100))
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ScheduledJob(Base):
+    """Persistent work item for the worker. Claimed with an optimistic lock; never run twice for
+    the same idempotency key."""
+
+    __tablename__ = "scheduled_jobs"
+    __table_args__ = (Index("ix_scheduled_jobs_status_run_after", "status", "run_after"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    idempotency_key: Mapped[str] = mapped_column(String(200), unique=True)
+    # Why this job exists, in plain words (master prompt §9: record why initiatives happen).
+    reason: Mapped[str] = mapped_column(Text)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    status: Mapped[str] = mapped_column(String(16))
+    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    locked_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Goal(Base):
+    """A goal with an explicit lifecycle. A proposal grants nothing: only approval does, and only
+    the permissions the goal declared."""
+
+    __tablename__ = "goals"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    origin: Mapped[str] = mapped_column(String(16))  # agent | user
+    kind: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str] = mapped_column(Text)
+    success_criteria: Mapped[str] = mapped_column(Text)
+    required_permissions: Mapped[list[str]] = mapped_column(JSON)
+    budget: Mapped[dict[str, Any]] = mapped_column(JSON)
+    priority: Mapped[int] = mapped_column(Integer, default=3)
+    deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_gap_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("knowledge_gaps.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    evidence: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GoalEvent(Base):
+    """Append-only history of every goal transition, with who caused it and why."""
+
+    __tablename__ = "goal_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    goal_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("goals.id", ondelete="RESTRICT"), index=True
+    )
+    from_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(16))
+    actor: Mapped[str] = mapped_column(String(32))  # agent | user | policy | worker | system
+    reason: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(Text)
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("goals.id", ondelete="SET NULL"), nullable=True
+    )
+    # Created during quiet hours: held until this instant.
+    deliver_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SystemFlag(Base):
+    """Operational switches, e.g. the global autonomy pause."""
+
+    __tablename__ = "system_flags"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

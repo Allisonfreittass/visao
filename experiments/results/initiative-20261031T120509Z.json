@@ -1,0 +1,36 @@
+{
+  "ran_at": "2026-10-31T12:05:09.324068+00:00",
+  "attempts": [
+    {
+      "question": "Em que ano foi fundada a cidade de Uberlândia?",
+      "decision": "DEFER/research_budget",
+      "proposed_goal": "32e566d3-bd15-4cfe-a81f-5046d8745f27"
+    }
+  ],
+  "goal": {
+    "title": "Pesquisar de novo: Em que ano a cidade de Uberlândia (MG) foi fundada?",
+    "status": "FAILED",
+    "history": [
+      "None->PROPOSED (agent: Pergunta de fato público ficou sem resposta (a pesquisa foi adiada por falta de orçamento).)",
+      "PROPOSED->EVALUATED (policy: dentro das permissões e do orçamento)",
+      "EVALUATED->APPROVED (user: aprovada pelo interlocutor)",
+      "APPROVED->ACTIVE (worker: execução iniciada)",
+      "ACTIVE->FAILED (worker: fontes não respondem à pergunta)"
+    ],
+    "evidence": {
+      "research_sessions": [
+        "ba462e8e-7202-4eb8-b99d-8aa5d1778b76",
+        "ac0d90ee-9981-4074-a392-31dc92fffb58"
+      ],
+      "sources": [
+        "https://pt.wikipedia.org/wiki/Uberl%C3%A2ndia_Esporte_Clube",
+        "https://pt.wikipedia.org/wiki/Universidade_do_Estado_de_Minas_Gerais",
+        "https://pt.wikipedia.org/wiki/Minas_Gerais",
+        "https://pt.wikipedia.org/wiki/Tri%C3%A2ngulo_Mineiro"
+      ],
+      "judgement": "fontes não respondem"
+    }
+  },
+  "notification": null,
+  "worker_outcome": "done"
+}
