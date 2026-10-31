@@ -9,8 +9,9 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 0: Fundação.** Veja [docs/ROADMAP.md](docs/ROADMAP.md) para o que existe e o que falta.
-Nada de cognição (memória, curiosidade, voz, genesis) foi implementado ainda.
+**Fase 1a: Genesis.** Fase 0 concluída; a identidade mínima do agente existe (UUID, nome `null`,
+registro de genesis imutável). Ainda não há conversa, memória, curiosidade nem voz. Veja
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Execução local
 
@@ -24,10 +25,14 @@ docker compose up --build
 - API: http://127.0.0.1:8000 (`/health`, `/ready`, `/docs`)
 - PostgreSQL fica acessível apenas em `127.0.0.1:5432`.
 
-Criar o usuário inicial:
+Criar o usuário inicial e executar o genesis (idempotente):
 
 ```bash
 docker compose exec api python -m apps.api.cli create-user --email voce@exemplo.com
+```
+
+```bash
+docker compose exec api python -m apps.api.cli genesis
 ```
 
 ### Sem Docker (desenvolvimento)

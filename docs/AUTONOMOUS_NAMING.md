@@ -1,6 +1,9 @@
 # Formação autônoma do nome
 
-> Estado: **especificação**. Implementação prevista na Fase 1.
+> Estado: **registro implementado na Fase 1a** (`core/identity/naming.py`): esquema, eventos
+> append-only, transação e histórico. **O mecanismo de deliberação que decide escolher um nome
+> ainda não existe**: hoje nada chama `record_naming_decision` fora dos testes, então o nome
+> permanece `null`. Não há endpoint para definir nome, e não haverá.
 
 ## Regras
 

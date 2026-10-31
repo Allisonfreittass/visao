@@ -2,6 +2,7 @@
 
 import argparse
 import getpass
+import json
 import sys
 
 from email_validator import EmailNotValidError, validate_email
@@ -9,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.security import hash_password
+from core.identity.genesis import get_genesis_record, get_identity, run_genesis
 from infrastructure.database.audit import record_audit
-from infrastructure.database.models import User
+from infrastructure.database.models import AgentIdentity, IdentityVersion, User
 from infrastructure.database.session import get_sessionmaker
 
 MIN_PASSWORD_LENGTH = 12
@@ -30,12 +32,47 @@ def create_user(session: Session, email: str, password: str) -> User:
     return user
 
 
+def _describe(identity: AgentIdentity, record: IdentityVersion) -> str:
+    return json.dumps(
+        {
+            "internal_id": str(identity.id),
+            "chosen_name": identity.chosen_name,
+            "genesis_version": record.genesis_version,
+            "config_hash": record.config_hash,
+            "components": record.components,
+            "permissions": record.permissions,
+            "created_at": record.created_at.isoformat(),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m apps.api.cli")
     sub = parser.add_subparsers(dest="command", required=True)
     create = sub.add_parser("create-user", help="cria um usuário (senha pedida no terminal)")
     create.add_argument("--email", required=True)
+    genesis = sub.add_parser("genesis", help="cria a identidade mínima do agente, se não existir")
+    genesis.add_argument("--status", action="store_true", help="só mostra o registro atual")
     args = parser.parse_args(argv)
+
+    if args.command == "genesis":
+        with get_sessionmaker()() as session:
+            if args.status:
+                identity = get_identity(session)
+                if identity is None:
+                    print("Genesis ainda não executado.")
+                    return 0
+                print(_describe(identity, get_genesis_record(session, identity)))
+                return 0
+            result = run_genesis(session)
+            if result.created:
+                print("Genesis concluído.")
+            else:
+                print("Identidade já existe; nada foi alterado.")
+            print(_describe(result.identity, result.genesis_record))
+        return 0
 
     if args.command == "create-user":
         password = getpass.getpass("Senha: ")

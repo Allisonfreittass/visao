@@ -6,7 +6,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | Fase | Escopo | Critério de aceite | Estado |
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
-| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | não iniciada |
+| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **1a concluída localmente**; 1b não iniciada |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | não iniciada |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
@@ -34,13 +34,24 @@ Adiado para fases seguintes:
 - Worker persistente: Fase 1/5, quando houver job real (evitar stub vazio).
 - `docker compose up` na máquina local (Docker ainda não instalado aqui).
 
+## Fase 1a: Genesis (concluída localmente; CI pendente)
+
+- Tabelas `agent_identities`, `identity_versions` e `identity_name_events` (migração `0002`), com
+  triggers append-only no histórico.
+- `python -m apps.api.cli genesis [--status]`, idempotente e sem reset.
+- `GET /system/status` autenticado.
+- Registro auditado de decisões de nome (escolher, mudar, adiar, recusar), sem endpoint público.
+- Testes de aceite das seções 2, 8.1 e 8.3 que não dependem de LLM.
+
+Fora da 1a (vai para a 1b): "não afirma lembrar do criador", "conversas sem nome funcionam" e
+"troca de LLM não apaga histórico", que só fazem sentido com conversa e `LLMProvider`.
+
 ## Próximo incremento proposto
 
-**Fase 1a: Genesis.** Tabelas `agent_identities`, `identity_name_events`, `identity_versions`;
-comando `python -m apps.api.cli genesis` idempotente (recusa recriar sem confirmação + backup);
-`GET /system/status` com `internal_id`, `chosen_name: null`, `genesis_version: "2.1"`;
-testes de aceite da seção 2 e 8.1.
+**Fase 1b: conversa.** `LLMProvider` com um provedor real, tabelas `conversations` e `messages`,
+`model_usage` com custo por chamada, prompt de sistema mínimo (sem nome nem persona, coberto pela
+varredura), `POST /conversations` e `POST /conversations/{id}/messages`, e os testes de aceite
+pendentes acima.
 
-Dependências: Fase 0 validada com Docker; nenhuma credencial externa necessária.
-Fase 1b (conversa) depende da escolha do provedor de LLM e de uma chave de API com limite de
-gasto (ver [MODEL_SELECTION.md](MODEL_SELECTION.md) e [COSTS.md](COSTS.md)).
+Dependências: **escolha do provedor de LLM e uma chave de API com limite de gasto configurado no
+painel** (decisão sua; ver [MODEL_SELECTION.md](MODEL_SELECTION.md) e [COSTS.md](COSTS.md)).

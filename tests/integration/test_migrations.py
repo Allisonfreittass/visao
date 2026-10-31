@@ -8,9 +8,14 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import Engine, create_engine, delete, inspect, update
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import sessionmaker
 
+from core.identity.genesis import run_genesis
+from core.identity.naming import NamingDecision, record_naming_decision
 from infrastructure.database.base import Base
+from infrastructure.database.models import IdentityNameEvent, IdentityVersion
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,6 +27,34 @@ def _alembic_config(url: str) -> Config:
     return config
 
 
+def _assert_identity_history_is_append_only(engine: Engine) -> None:
+    with sessionmaker(bind=engine)() as session:
+        result = run_genesis(session)
+        assert result.genesis_record.components["schema_revision"] == "0002"
+        record_naming_decision(
+            session,
+            result.identity,
+            NamingDecision(
+                action="defer",
+                context_summary="teste",
+                rationale_summary="teste",
+                model_provider="test-provider",
+                model_version="test-model-1",
+            ),
+        )
+
+        for statement in (
+            update(IdentityVersion).values(config_hash="0" * 64),
+            delete(IdentityVersion),
+            update(IdentityNameEvent).values(rationale_summary="reescrito"),
+            delete(IdentityNameEvent),
+        ):
+            with pytest.raises(DBAPIError):
+                session.execute(statement)
+                session.flush()
+            session.rollback()
+
+
 def _assert_migrations_roundtrip(url: str) -> None:
     config = _alembic_config(url)
     command.upgrade(config, "head")
@@ -30,6 +63,8 @@ def _assert_migrations_roundtrip(url: str) -> None:
     with engine.connect() as connection:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     assert diff == [], f"models and migrations diverge: {diff}"
+
+    _assert_identity_history_is_append_only(engine)
 
     command.downgrade(config, "base")
     assert set(inspect(engine).get_table_names()) <= {"alembic_version"}
