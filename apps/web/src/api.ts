@@ -25,6 +25,12 @@ export interface SystemStatus {
   identity: { internal_id: string; chosen_name: string | null } | null;
 }
 
+export interface VoiceStatus {
+  enabled: boolean;
+  current_voice: string | null;
+  source: "chosen" | "system_default" | "none";
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -104,7 +110,35 @@ export class Api {
     });
   }
 
+  voiceStatus(): Promise<VoiceStatus> {
+    return this.request("/voice/status");
+  }
+
+  async sentences(text: string): Promise<string[]> {
+    const body = await this.request<{ sentences: string[] }>("/voice/sentences", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+      headers: { "Content-Type": "application/json" },
+    });
+    return body.sentences;
+  }
+
+  async tts(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+    const response = await this.sendRaw("/voice/tts", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+      headers: { "Content-Type": "application/json" },
+      signal,
+    });
+    return response.arrayBuffer();
+  }
+
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const response = await this.sendRaw(path, init);
+    return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+  }
+
+  private async sendRaw(path: string, init: RequestInit): Promise<Response> {
     const headers = new Headers(init.headers);
     if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, { ...init, headers });
@@ -119,6 +153,6 @@ export class Api {
       if (response.status === 401) this.token = null;
       throw new ApiError(response.status, detail);
     }
-    return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+    return response;
   }
 }

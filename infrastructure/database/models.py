@@ -59,6 +59,8 @@ class AgentIdentity(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     chosen_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Voice id from integrations/tts/catalog.py, chosen by the agent; None until it decides.
+    chosen_voice: Mapped[str | None] = mapped_column(String(64), nullable=True)
     genesis_version: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -99,6 +101,27 @@ class IdentityNameEvent(Base):
     rationale_summary: Mapped[str] = mapped_column(Text)
     model_provider: Mapped[str] = mapped_column(String(100))
     model_version: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class IdentityVoiceEvent(Base):
+    """Append-only log of voice decisions, mirroring IdentityNameEvent."""
+
+    __tablename__ = "identity_voice_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    identity_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("agent_identities.id", ondelete="RESTRICT"), index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(16))
+    previous_voice: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    new_voice: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    options_offered: Mapped[list[str]] = mapped_column(JSON)
+    rationale_summary: Mapped[str] = mapped_column(Text)
+    model_provider: Mapped[str] = mapped_column(String(100))
+    model_version: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )

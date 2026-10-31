@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
 
+    # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
+    # human quality gate; which approved voice is the agent's own is the agent's decision.
+    tts_models_dir: str = "models/tts"
+    tts_approved_voices: str = ""
+    tts_max_chars: int = Field(default=600, ge=10)
+
     # Budgets in USD (docs/COSTS.md). Enforced in code before every call.
     llm_daily_budget_usd: Decimal = Field(default=Decimal("1.50"), ge=0)
     llm_conversation_budget_usd: Decimal = Field(default=Decimal("0.30"), ge=0)

@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Api, ApiError, type Conversation, type Message, type SystemStatus } from "./api";
+import {
+  Api,
+  ApiError,
+  type Conversation,
+  type Message,
+  type SystemStatus,
+  type VoiceStatus,
+} from "./api";
 import { ChatView } from "./components/ChatView";
 import { Login } from "./components/Login";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
-import { loadToken, saveToken } from "./session";
+import { loadPreference, loadToken, savePreference, saveToken } from "./session";
+import { Speaker } from "./speech/speaker";
 
 const HEALTH_INTERVAL_MS = 15_000;
 const DEMO_STATES: OrbState[] = [
@@ -56,6 +64,7 @@ export function App() {
     instance.setToken(loadToken());
     return instance;
   }, []);
+  const speaker = useMemo(() => new Speaker(api), [api]);
   const online = useHealth(api);
   const demo = new URLSearchParams(window.location.search).get("orb") === "demo";
 
@@ -68,6 +77,11 @@ export function App() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [voice, setVoice] = useState<VoiceStatus | null>(null);
+  const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
+  const [speaking, setSpeaking] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
+  const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
   const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
 
@@ -82,6 +96,7 @@ export function App() {
 
   useEffect(() => {
     if (!loggedIn) return;
+    api.voiceStatus().then(setVoice, () => setVoice(null));
     Promise.all([api.status(), api.memorySettings(), api.listConversations()])
       .then(([s, memory, list]) => {
         setStatus(s);
@@ -112,8 +127,30 @@ export function App() {
     }
   }
 
+  function stopSpeaking() {
+    if (!speaker.speaking) return;
+    speaker.stop();
+    setSpeaking(false);
+    setInterrupted(true);
+    setTimeout(() => setInterrupted(false), 700);
+  }
+
+  function speak(text: string) {
+    setSpeaking(true);
+    setFirstAudioMs(null);
+    speaker
+      .speak(text, (ms) => setFirstAudioMs(Math.round(ms)))
+      .catch((e) => setError(`Voz indisponível (${e instanceof Error ? e.message : e}); a resposta segue em texto.`))
+      .finally(() => setSpeaking(false));
+  }
+
   async function send(text: string) {
     setError(null);
+    // Barge-in by text: a new message cuts whatever is being spoken.
+    stopSpeaking();
+    const willSpeak = speakReplies && voice?.enabled === true;
+    // Audio must be unlocked inside the user gesture, before any await.
+    if (willSpeak) speaker.unlock();
     let conversationId = current;
     try {
       if (!conversationId) {
@@ -125,6 +162,7 @@ export function App() {
       setSending(true);
       const turn = await api.send(conversationId, text);
       setMessages((list) => [...list, turn.user_message, turn.assistant_message]);
+      if (willSpeak) speak(turn.assistant_message.content);
     } catch (e) {
       handleError(e);
       // The user message may have been stored even if the reply failed: reload the transcript.
@@ -142,7 +180,16 @@ export function App() {
     }
   }
 
+  function toggleSpeak() {
+    const next = !speakReplies;
+    setSpeakReplies(next);
+    savePreference("speak", next ? "1" : "0");
+    if (next) speaker.unlock();
+    else stopSpeaking();
+  }
+
   function logout() {
+    stopSpeaking();
     api.setToken(null);
     saveToken(null);
     setLoggedIn(false);
@@ -156,7 +203,11 @@ export function App() {
       ? "DISCONNECTED"
       : sending
         ? "THINKING"
-        : "IDLE";
+        : interrupted
+          ? "INTERRUPTED"
+          : speaking
+            ? "SPEAKING"
+            : "IDLE";
   const agentName = status?.identity?.chosen_name ?? null;
 
   return (
@@ -207,12 +258,33 @@ export function App() {
               Desligada por padrão. Ligada, guarda só o que passar pela curadoria; dá para ver e
               apagar tudo pela API (/memory).
             </p>
+            <label className="memory-toggle">
+              <input
+                type="checkbox"
+                checked={speakReplies}
+                onChange={toggleSpeak}
+                disabled={!voice?.enabled}
+              />
+              Falar respostas
+            </label>
+            <p className="note">
+              {!voice?.enabled
+                ? "Voz desativada: nenhuma voz aprovada no servidor."
+                : `Voz: ${voice.current_voice} (${
+                    voice.source === "chosen" ? "escolhida pelo agente" : "padrão do sistema"
+                  })`}
+              {firstAudioMs !== null && ` · 1º áudio em ${firstAudioMs} ms`}
+            </p>
           </aside>
         )}
 
         <main className="main">
           <div className="orb-wrap">
-            <Orb state={orbState} level={demoLevel} />
+            <Orb
+              state={orbState}
+              level={demoLevel}
+              getLevel={speaking ? () => speaker.level() : undefined}
+            />
             <p className="state-label">{STATE_LABELS[orbState]}</p>
           </div>
 
@@ -241,7 +313,14 @@ export function App() {
               Genesis ainda não foi executado. Rode <code>python -m apps.api.cli genesis</code>.
             </p>
           ) : (
-            <ChatView messages={messages} sending={sending} error={error} onSend={send} />
+            <>
+              {speaking && (
+                <button className="ghost stop" onClick={stopSpeaking}>
+                  Parar de falar
+                </button>
+              )}
+              <ChatView messages={messages} sending={sending} error={error} onSend={send} />
+            </>
           )}
         </main>
       </div>

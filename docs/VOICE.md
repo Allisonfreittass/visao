@@ -1,7 +1,9 @@
 # Voz
 
-> Estado: **Fase 2a concluída** (interface web com a bolha e os estados). Voz ainda não existe:
-> **2b** (TTS) e **2c** (microfone, STT, barge-in) pendentes. Nenhuma latência foi medida.
+> Estado: **Fase 2b concluída**: o sistema fala as respostas com voz própria (Kokoro, voz
+> `kokoro-dora`, escolhida pelo agente entre as aprovadas; ver
+> [ADR-0004](decisions/0004-tts-kokoro-e-voz-escolhida-pelo-agente.md)). **2c** (microfone, STT,
+> barge-in por voz) pendente.
 
 ## Restrições do master prompt
 
@@ -27,12 +29,22 @@
 | `THINKING` | rotação rápida + turbulência | sim (aguardando resposta) |
 | `DISCONNECTED` | cinza e parada | sim (`/health` falhou) |
 | `LISTENING` | expande com o nível do microfone | só na demonstração (`?orb=demo`) |
-| `SPEAKING` | expande com o nível do áudio gerado | só na demonstração |
-| `INTERRUPTED` | contração rápida | só na demonstração |
+| `SPEAKING` | expande com o nível do áudio gerado | sim (resposta falada) |
+| `INTERRUPTED` | contração rápida | sim ("Parar de falar" ou nova mensagem) |
 
 - A interface não chama o agente de "VISÃO": mostra o nome escolhido ou "sem nome pessoal".
 
-## Plano da 2b: TTS próprio
+## 2b: TTS próprio (feito)
+
+- Medição e escolha: `docs/research-log/2026-10-31-fase-2b-tts.md` e ADR-0004.
+- Código: `integrations/tts/` (`engines.py`, `catalog.py`, `text.py`), `core/identity/voice.py`,
+  rotas `/voice/status`, `/voice/sentences`, `/voice/tts`, comando `voice-deliberation`.
+- Interface: "Falar respostas", fala frase a frase com pré-síntese da próxima, bolha em
+  `SPEAKING` pelo nível real do áudio, "Parar de falar" e nova mensagem interrompem, tempo até o
+  1º áudio exibido.
+- Instalação opcional: `pip install -e ".[tts]"` + modelos em `models/tts/` (não versionados).
+
+### Plano original da 2b (mantido para referência)
 
 Candidatos (licenças a reconferir na fonte no dia da escolha, ver `MODEL_SELECTION.md`):
 

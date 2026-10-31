@@ -7,7 +7,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
 | 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **concluída** (1b avaliada com LLM real em 2026-10-31; Qwen ainda não avaliado) |
-| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **2a concluída** (interface + bolha); 2b (TTS) e 2c (escuta) pendentes |
+| 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | **2a e 2b concluídas** (interface, bolha, voz própria escolhida pelo agente); 2c (escuta) pendente |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | **concluída** (3c: curada 8/8, passiva 6/8, sem memória 1/8; zero vazamento); 3b opcional |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | não iniciada |
@@ -77,12 +77,11 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-**Fase 2b: TTS próprio.** Instalar e medir Kokoro e Piper em pt-BR (tempo até o primeiro áudio,
-fator de tempo real, RAM, qualidade subjetiva), escolher por ADR, criar `integrations/tts` e
-ligar ao estado `SPEAKING` da bolha. Plano completo em [VOICE.md](VOICE.md).
+**Fase 2c: escuta.** Microfone com consentimento explícito, detecção de fala no navegador, STT
+(medir `faster-whisper` em CPU contra STT por API), barge-in por voz durante `SPEAKING`, e a
+latência ponta a ponta medida, que é o critério de aceite da Fase 2.
 
-Pendências de memória que o benchmark apontou (revisão de fato substituído, terceiros, saúde)
-continuam registradas e podem entrar entre fases.
+Em paralelo, opcional: pesquisar modelos abertos de TTS mais naturais em pt-BR (ADR-0004).
 
 ## Visual da interface (entra no início da Fase 2)
 

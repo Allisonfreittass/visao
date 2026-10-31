@@ -48,6 +48,50 @@ def _describe(identity: AgentIdentity, record: IdentityVersion) -> str:
     )
 
 
+def _voice_deliberation() -> int:
+    from apps.api.llm import build_llm_provider, missing_llm_settings
+    from apps.api.settings import get_settings
+    from core.identity.voice import (
+        DeliberationOutputError,
+        deliberate_voice,
+        resolve_voice,
+    )
+    from integrations.llm.base import LLMError
+    from integrations.tts.catalog import approved_voices
+
+    settings = get_settings()
+    provider = build_llm_provider(settings)
+    if provider is None:
+        print("LLM não configurado. Faltam: " + ", ".join(missing_llm_settings(settings)))
+        return 1
+    approved = approved_voices(settings.tts_approved_voices)
+    if not approved:
+        print("Nenhuma voz aprovada (VISION_TTS_APPROVED_VOICES).")
+        return 1
+    with get_sessionmaker()() as session:
+        identity = get_identity(session)
+        if identity is None:
+            print("Genesis ainda não executado.")
+            return 1
+        try:
+            event = deliberate_voice(
+                session,
+                identity,
+                approved,
+                provider,
+                max_output_tokens=settings.llm_curation_max_output_tokens,
+            )
+        except (LLMError, DeliberationOutputError, ValueError) as exc:
+            print(f"Deliberação sem decisão registrada: {exc}")
+            return 1
+        resolved = resolve_voice(identity, approved)
+        print(f"Decisão: {event.event_type} | voz: {event.new_voice or '-'}")
+        print(f"Justificativa: {event.rationale_summary}")
+        print(f"Modelo: {event.model_provider} / {event.model_version}")
+        print(f"Voz em uso: {resolved.spec.id if resolved.spec else '-'} ({resolved.source})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m apps.api.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -55,7 +99,14 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--email", required=True)
     genesis = sub.add_parser("genesis", help="cria a identidade mínima do agente, se não existir")
     genesis.add_argument("--status", action="store_true", help="só mostra o registro atual")
+    sub.add_parser(
+        "voice-deliberation",
+        help="apresenta ao agente as vozes aprovadas; ele escolhe, adia ou recusa",
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "voice-deliberation":
+        return _voice_deliberation()
 
     if args.command == "genesis":
         with get_sessionmaker()() as session:

@@ -19,3 +19,21 @@ export function saveToken(token: string | null): void {
     // Without storage the user simply logs in again after a reload.
   }
 }
+
+const PREFIX = "visao.pref.";
+
+export function loadPreference(name: string): string | null {
+  try {
+    return localStorage.getItem(PREFIX + name);
+  } catch {
+    return null;
+  }
+}
+
+export function savePreference(name: string, value: string): void {
+  try {
+    localStorage.setItem(PREFIX + name, value);
+  } catch {
+    // Preference just won't persist.
+  }
+}

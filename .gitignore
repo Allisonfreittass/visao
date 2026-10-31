@@ -10,3 +10,8 @@ build/
 dist/
 node_modules/
 .DS_Store
+
+# Downloaded model weights (docs/VOICE.md)
+models/
+# Generated audio samples
+experiments/results/tts/

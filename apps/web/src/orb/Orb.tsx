@@ -21,16 +21,20 @@ interface OrbProps {
   state: OrbState;
   /** Current audio level 0..1 (microphone while LISTENING, playback while SPEAKING). */
   level?: number;
+  /** Alternative to `level` for live audio: polled every frame, no React re-render. */
+  getLevel?: () => number;
   size?: number;
 }
 
-export function Orb({ state, level = 0, size = 280 }: OrbProps) {
+export function Orb({ state, level = 0, getLevel, size = 280 }: OrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // The animation loop reads these refs so prop changes never restart it.
   const stateRef = useRef(state);
   const levelRef = useRef(level);
+  const getLevelRef = useRef(getLevel);
   stateRef.current = state;
   levelRef.current = level;
+  getLevelRef.current = getLevel;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -63,6 +67,7 @@ export function Orb({ state, level = 0, size = 280 }: OrbProps) {
       let target = STATE_PARAMS[stateRef.current];
       if (motionQuery.matches) target = reducedMotion(target);
       params = lerpParams(params, target, smoothingFactor(dt));
+      const level = getLevelRef.current ? getLevelRef.current() : levelRef.current;
       angle += params.rotationSpeed * dt;
 
       const center = size / 2;
@@ -82,7 +87,7 @@ export function Orb({ state, level = 0, size = 280 }: OrbProps) {
       for (let i = 0; i < points.length; i++) {
         const { p, shell } = points[i];
         const [px, py, pz] = p;
-        const r = particleRadius(params, i, time, levelRef.current) * shell;
+        const r = particleRadius(params, i, time, level) * shell;
         // Rotate around Y, then tilt around X.
         const x1 = px * cosA + pz * sinA;
         const z1 = -px * sinA + pz * cosA;

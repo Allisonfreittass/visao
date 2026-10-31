@@ -19,6 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Self-hosted speech synthesis (docs/VOICE.md). Heavy; not needed by the API core or the tests.
+tts = [
+    "kokoro-onnx==0.6.1",
+    "piper-tts==1.8.0",
+]
 dev = [
     "pytest>=8.3",
     "ruff>=0.8",

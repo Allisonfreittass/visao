@@ -9,12 +9,12 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 2a: interface web.** Fases 0, 1 e 3 concluídas. Identidade mínima (UUID, nome `null`),
-conversa por texto via LLM substituível (qualquer endpoint compatível com OpenAI) com orçamento e
-custo registrados, memória curada entre conversas, opt-in por usuário
-([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados
-([docs/VOICE.md](docs/VOICE.md)). Ainda não há voz nem curiosidade. Veja
-[docs/ROADMAP.md](docs/ROADMAP.md).
+**Fase 2b: voz própria.** Fases 0, 1 e 3 concluídas; 2a (interface) e 2b (fala) também.
+Identidade mínima (UUID, nome `null`), conversa por texto via LLM substituível (qualquer endpoint
+compatível com OpenAI) com orçamento e custo registrados, memória curada entre conversas, opt-in
+por usuário ([docs/MEMORY.md](docs/MEMORY.md)), e interface web com a bolha de estados, que já
+fala as respostas com uma voz escolhida pelo próprio agente ([docs/VOICE.md](docs/VOICE.md)).
+Ainda não escuta, e não há curiosidade. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
 
 Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
 elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
@@ -65,6 +65,20 @@ npm --prefix apps/web run dev
 
 Abra http://localhost:5173. A demonstração dos estados da bolha fica em
 http://localhost:5173/?orb=demo.
+
+### Voz (opcional)
+
+```bash
+.venv/bin/pip install -e ".[tts]"
+```
+
+Baixe os modelos para `models/tts/` (links e tamanhos em
+[docs/research-log/2026-10-31-fase-2b-tts.md](docs/research-log/2026-10-31-fase-2b-tts.md)),
+defina `VISION_TTS_APPROVED_VOICES` no `.env` e deixe o agente decidir:
+
+```bash
+.venv/bin/python -m apps.api.cli voice-deliberation
+```
 
 ### Testes
 
