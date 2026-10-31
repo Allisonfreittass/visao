@@ -80,9 +80,16 @@ services:
       VISION_AUTONOMY_TOKENS_PER_DAY: ${VISION_AUTONOMY_TOKENS_PER_DAY:-60000}
       VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE: ${VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE:-3}
       VISION_AUTONOMY_MAX_SECONDS: ${VISION_AUTONOMY_MAX_SECONDS:-120}
+    # The image's HEALTHCHECK probes the API port; the worker reports health by heartbeat instead.
+    healthcheck:
+      test: ["CMD", "python", "-m", "apps.worker.health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

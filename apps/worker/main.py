@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 from apps.api.settings import get_settings
 from apps.worker.handlers import build_handlers
+from apps.worker.health import beat
 from apps.worker.runner import run_once
 from core.autonomy.cycle import schedule
 from infrastructure.database.session import get_sessionmaker
@@ -43,6 +44,7 @@ def main() -> int:
         with factory() as session:
             schedule(session, datetime.now(UTC), settings.autonomy_cycle_minutes)
         outcome = run_once(factory, handlers, worker_id)
+        beat()
         if outcome in ("idle", "paused"):
             time.sleep(IDLE_SLEEP_SECONDS)
     logger.info("worker stopped", extra={"event": "worker_stopped"})
