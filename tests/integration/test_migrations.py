@@ -8,6 +8,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, create_engine, delete, inspect, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import sessionmaker
@@ -27,10 +28,10 @@ def _alembic_config(url: str) -> Config:
     return config
 
 
-def _assert_identity_history_is_append_only(engine: Engine) -> None:
+def _assert_identity_history_is_append_only(engine: Engine, head: str) -> None:
     with sessionmaker(bind=engine)() as session:
         result = run_genesis(session)
-        assert result.genesis_record.components["schema_revision"] == "0002"
+        assert result.genesis_record.components["schema_revision"] == head
         record_naming_decision(
             session,
             result.identity,
@@ -64,7 +65,8 @@ def _assert_migrations_roundtrip(url: str) -> None:
         diff = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     assert diff == [], f"models and migrations diverge: {diff}"
 
-    _assert_identity_history_is_append_only(engine)
+    head = ScriptDirectory.from_config(config).get_current_head()
+    _assert_identity_history_is_append_only(engine, head)
 
     command.downgrade(config, "base")
     assert set(inspect(engine).get_table_names()) <= {"alembic_version"}

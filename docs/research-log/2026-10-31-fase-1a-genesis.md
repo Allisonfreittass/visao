@@ -16,7 +16,7 @@
 | `ruff check .` / `ruff format --check .` | passou |
 | `pytest` (SQLite) | 48 passaram, 1 pulado (`test_migrations_postgres`) |
 | Smoke manual: `alembic upgrade head` → `genesis --status` (vazio) → `genesis` → `genesis` de novo (mesmo UUID, nada alterado) → login → `/system/status` com `chosen_name: null` → `alembic downgrade base` | passou (SQLite) |
-| Triggers append-only e migração `0002` no PostgreSQL | **não executado localmente**; roda no CI |
+| Triggers append-only e migração `0002` no PostgreSQL | passou no CI (commit `8bc36bd`), conforme relatado; não executado localmente |
 
 ## Decisões
 

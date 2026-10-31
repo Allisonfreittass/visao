@@ -9,9 +9,12 @@ um LLM substituível.
 
 ## Estado atual
 
-**Fase 1a: Genesis.** Fase 0 concluída; a identidade mínima do agente existe (UUID, nome `null`,
-registro de genesis imutável). Ainda não há conversa, memória, curiosidade nem voz. Veja
-[docs/ROADMAP.md](docs/ROADMAP.md).
+**Fase 1b: conversa por texto.** Identidade mínima (UUID, nome `null`) e conversa via LLM
+(família Qwen, qualquer endpoint compatível com OpenAI), com orçamento e custo registrados.
+Ainda não há memória entre conversas, curiosidade nem voz. Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+
+Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
+elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
 
 ## Execução local
 

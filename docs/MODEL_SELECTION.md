@@ -15,6 +15,9 @@
 
 ## LLM
 
+> **Decisão (2026-10-31): família Qwen**, via API compatível com OpenAI. Provedor de inferência
+> e versão exata ainda pendentes. Ver [ADR-0002](decisions/0002-qwen-via-api-compativel-openai.md).
+
 Inferência **via API** no início. Hospedar LLM grande no Lightsail não é viável.
 
 | Candidato | Tipo | Licença (a confirmar) | Observações |

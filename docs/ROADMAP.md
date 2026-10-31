@@ -6,7 +6,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | Fase | Escopo | Critério de aceite | Estado |
 |---|---|---|---|
 | 0. Fundação | repo, Docker, PostgreSQL, migrações, auth, CI, testes, health checks, docs | `docker compose up` sobe e os testes passam | **concluída** (CI, commit 1c777a9) |
-| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **1a concluída localmente**; 1b não iniciada |
+| 1. Genesis e conversa | UUID técnico, `chosen_name = null`, identidade mínima, `LLMProvider`, chat persistente, histórico de nomes | primeira sessão sem memórias prévias, nenhum nome imposto, segunda sessão recupera só experiências reais | **1a concluída** (CI, commit 8bc36bd); **1b implementada, sem validação com LLM real** |
 | 2. Voz natural | sessão web desktop/iPhone, VAD, STT, TTS com pesos abertos, barge-in, fallback texto | conversa de vários turnos com latência medida | não iniciada |
 | 3. Curadoria de memória | candidatos, decisões, proveniência, recuperação híbrida, exclusão/exportação | decisões auditáveis e melhores que baseline em teste definido | não iniciada |
 | 4. Curiosidade e pesquisa | `CuriosityEngine`, `ResearchService`, fontes, orçamento | perguntas úteis, pesquisa só de fatos públicos, sem busca compulsiva | não iniciada |
@@ -34,7 +34,7 @@ Adiado para fases seguintes:
 - Worker persistente: Fase 1/5, quando houver job real (evitar stub vazio).
 - `docker compose up` na máquina local (Docker ainda não instalado aqui).
 
-## Fase 1a: Genesis (concluída localmente; CI pendente)
+## Fase 1a: Genesis (concluída)
 
 - Tabelas `agent_identities`, `identity_versions` e `identity_name_events` (migração `0002`), com
   triggers append-only no histórico.
@@ -46,12 +46,27 @@ Adiado para fases seguintes:
 Fora da 1a (vai para a 1b): "não afirma lembrar do criador", "conversas sem nome funcionam" e
 "troca de LLM não apaga histórico", que só fazem sentido com conversa e `LLMProvider`.
 
+## Fase 1b: conversa (implementada; validação com LLM real pendente)
+
+- `LLMProvider` + `OpenAICompatibleProvider` (retries, timeout, erros tipados), Qwen como família
+  escolhida (ADR-0002). Preço obrigatório; sem ele a conversa fica desligada.
+- Tabelas `conversations`, `messages`, `model_usage` (migração `0003`).
+- `POST /conversations`, `GET /conversations`, `GET /conversations/{id}/messages`,
+  `POST /conversations/{id}/messages`.
+- Prompt de sistema mínimo só com fatos operacionais (sem nome, persona nem codinome).
+- Orçamento diário e por conversa aplicados no código; toda chamada registrada com custo.
+- Contexto restrito à conversa atual; conversas isoladas por usuário.
+- Testes com provedor falso cobrindo: conversa sem nome, isolamento entre conversas e usuários,
+  troca de LLM sem perda de histórico, falha do provedor sem resposta inventada, orçamentos.
+
+Pendente para fechar a Fase 1:
+- Configurar provedor real no `.env` e rodar `python -m experiments.eval_genesis_conversation`
+  ("não afirma lembrar do criador", "responde que não tem nome", sem experiências ou sentimentos
+  inventados), com revisão humana das respostas.
+- Lacunas conhecidas do `LLMProvider`: streaming, tools, saída estruturada, cancelamento.
+
 ## Próximo incremento proposto
 
-**Fase 1b: conversa.** `LLMProvider` com um provedor real, tabelas `conversations` e `messages`,
-`model_usage` com custo por chamada, prompt de sistema mínimo (sem nome nem persona, coberto pela
-varredura), `POST /conversations` e `POST /conversations/{id}/messages`, e os testes de aceite
-pendentes acima.
-
-Dependências: **escolha do provedor de LLM e uma chave de API com limite de gasto configurado no
-painel** (decisão sua; ver [MODEL_SELECTION.md](MODEL_SELECTION.md) e [COSTS.md](COSTS.md)).
+Depois da avaliação com o LLM real: **Fase 2 (voz)** ou **Fase 3 (curadoria de memória)**.
+A ordem do master prompt põe voz antes; memória é o que mais avança a hipótese científica.
+Decisão a tomar quando a Fase 1 fechar.
