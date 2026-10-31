@@ -8,8 +8,9 @@ calls a model runs. Every action is persisted as an autonomous decision.
 
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -40,6 +41,8 @@ AUTONOMOUS_PURPOSES = (
     "followup_summary",
     "reflection",
     "conversation_followup",
+    "study_plan",
+    "study_review",
 )
 REFLECT_AFTER_IDLE = timedelta(minutes=30)
 NAME_QUESTION_AFTER = timedelta(days=1)
@@ -55,6 +58,7 @@ class AutonomyBudget:
     max_seconds: float
     research_per_day: int
     max_output_tokens: int
+    daily_usd: Decimal = Decimal("1.50")
 
 
 @dataclass
@@ -224,6 +228,35 @@ def run_cycle(
                     executed=outcome == "notified",
                     reason=outcome,
                     gap_id=str(gap.id),
+                )
+            )
+
+    # A study round is one bounded action, with two separately budgeted model calls.
+    from core.study.service import study_once
+
+    for owner in session.scalars(select(User).where(User.is_active.is_(True))).all():
+        if not room():
+            break
+        entry = study_once(
+            session,
+            owner=owner,
+            provider=provider,
+            search=search,
+            now=now,
+            budget=replace(
+                budget, max_seconds=max(0.001, budget.max_seconds - (time.monotonic() - started))
+            ),
+        )
+        if entry is not None:
+            report.actions.append(
+                _record(
+                    session,
+                    owner.id,
+                    action="autonomous_study",
+                    executed=entry.status == "READY",
+                    reason=entry.outcome_reason,
+                    study_id=str(entry.id),
+                    status=entry.status,
                 )
             )
 

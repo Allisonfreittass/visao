@@ -25,6 +25,7 @@ class Capabilities:
     autonomy_paused: bool = False
     reflection: bool = True
     notifications: bool = True
+    autonomous_study: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -43,6 +44,11 @@ class Capabilities:
             items.append("retomar sozinho pesquisas pendentes, sem nova mensagem")
         else:
             items.append("propor metas de pesquisa que só rodam com aprovação do interlocutor")
+        if self.autonomous_study:
+            items.append(
+                "escolher perguntas de estudo público, ler trechos da Wikipédia e manter"
+                " um caderno com fontes, achados provisórios e próximas perguntas"
+            )
         if self.notifications:
             items.append("avisar o interlocutor no aplicativo quando encontrar algo")
         return items
@@ -82,4 +88,5 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         voice_in=bool(inputs.stt_model.strip()),
         auto_research=bool(permissions.get("auto_research")),
         autonomy_paused=is_paused(session),
+        autonomous_study=bool(permissions.get("auto_study")),
     )

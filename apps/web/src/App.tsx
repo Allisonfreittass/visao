@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Api,
   ApiError,
+  utcDate,
   type Conversation,
   type Message,
   type SystemStatus,
@@ -10,6 +11,7 @@ import {
 } from "./api";
 import { ChatView } from "./components/ChatView";
 import { InitiativesPanel } from "./components/InitiativesPanel";
+import { StudyPanel } from "./components/StudyPanel";
 import { NotificationFeed } from "./components/NotificationFeed";
 import { Login } from "./components/Login";
 import { Orb, STATE_LABELS } from "./orb/Orb";
@@ -90,11 +92,11 @@ export function App() {
   const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<"conversation" | "study">("conversation");
   const [voice, setVoice] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
   const [speaking, setSpeaking] = useState(false);
   const [interrupted, setInterrupted] = useState(false);
-  const [firstAudioMs, setFirstAudioMs] = useState<number | null>(null);
   const [voiceSession, setVoiceSession] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [latency, setLatency] = useState<TurnLatency | null>(null);
@@ -124,6 +126,16 @@ export function App() {
       })
       .catch(handleError);
   }, [api, loggedIn, handleError]);
+
+  // Identity decisions happen in the background; reflect them without reloading the page.
+  useEffect(() => {
+    if (!loggedIn || demo) return;
+    let alive = true;
+    const timer = setInterval(() => {
+      api.status().then((next) => { if (alive) setStatus(next); }).catch(() => undefined);
+    }, HEALTH_INTERVAL_MS);
+    return () => { alive = false; clearInterval(timer); };
+  }, [api, loggedIn, demo]);
 
   useEffect(() => {
     if (!current) {
@@ -168,10 +180,8 @@ export function App() {
 
   function speak(text: string, onFirstAudio?: (ms: number) => void) {
     setSpeaking(true);
-    setFirstAudioMs(null);
     speaker
       .speak(text, (ms) => {
-        setFirstAudioMs(Math.round(ms));
         onFirstAudio?.(ms);
       })
       .catch((e) => setError(`Voz indisponível (${e instanceof Error ? e.message : e}); a resposta segue em texto.`))
@@ -301,7 +311,7 @@ export function App() {
     try {
       const result = await api.feedback(messageId, rating, tags);
       return result.state_changed
-        ? `Obrigado. Ajuste de comunicação atualizado (versão ${result.state_version}, revertível).`
+        ? "Obrigado. Ajustei a comunicação com base no seu retorno."
         : "Obrigado.";
     } catch (e) {
       handleError(e);
@@ -353,13 +363,14 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
+        <a className="brand" href="/" aria-label="VISÃO, início"><span className="brand-mark">◉</span><span>VISÃO<span className="brand-dot">.</span></span></a>
         {loggedIn && !demo && (
           <button className="ghost" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
-            Conversas
+            Menu
           </button>
         )}
         <span className="identity" title={status?.identity?.internal_id}>
-          {agentName ?? "sem nome pessoal"}
+          <span className="identity-dot" />{agentName ?? "Identidade em construção"}
         </span>
         {loggedIn && !demo && (
           <button className="ghost" onClick={logout}>
@@ -371,20 +382,27 @@ export function App() {
       <div className="layout">
         {loggedIn && !demo && (
           <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
-            <button onClick={newConversation} disabled={preparing || sending}>
+            <p className="sidebar-label">SEU ESPAÇO</p>
+            <nav className="workspace-nav" aria-label="Navegação principal">
+              <button className={workspaceView === "conversation" ? "nav-active" : "ghost"} onClick={() => { setWorkspaceView("conversation"); setMenuOpen(false); }}><span>↗</span> Conversa</button>
+              <button className={workspaceView === "study" ? "nav-active" : "ghost"} onClick={() => { setWorkspaceView("study"); setMenuOpen(false); }}><span>⌘</span> Caderno de estudos</button>
+            </nav>
+            <button className="new-conversation" onClick={() => { setWorkspaceView("conversation"); void newConversation(); }} disabled={preparing || sending}>
               {preparing ? "Preparando memórias…" : "Nova conversa"}
             </button>
-            <ul>
+            <p className="sidebar-label history-label">CONVERSAS RECENTES</p>
+            <ul className="conversation-list">
               {conversations.map((c) => (
                 <li key={c.id}>
                   <button
                     className={c.id === current ? "active" : "ghost"}
                     onClick={() => {
                       setCurrent(c.id);
+                      setWorkspaceView("conversation");
                       setMenuOpen(false);
                     }}
                   >
-                    {new Date(c.created_at).toLocaleString("pt-BR", {
+                    {utcDate(c.created_at).toLocaleString("pt-BR", {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}
@@ -392,14 +410,14 @@ export function App() {
                 </li>
               ))}
             </ul>
+            <details className="preferences"><summary>Preferências e autonomia <span>+</span></summary><div className="preferences-content">
             <InitiativesPanel api={api} onError={handleError} />
             <label className="memory-toggle">
               <input type="checkbox" checked={memoryEnabled} onChange={toggleMemory} />
               Memória entre conversas
             </label>
             <p className="note">
-              Desligada por padrão. Ligada, guarda só o que passar pela curadoria; dá para ver e
-              apagar tudo pela API (/memory).
+              Guarda informações selecionadas para dar continuidade às próximas conversas.
             </p>
             <label className="memory-toggle">
               <input
@@ -412,19 +430,25 @@ export function App() {
             </label>
             <p className="note">
               {!voice?.enabled
-                ? "Voz desativada: nenhuma voz aprovada no servidor."
-                : `Voz: ${voice.current_voice} (${
-                    voice.source === "chosen" ? "escolhida pelo agente" : "padrão do sistema"
-                  })`}
-              {firstAudioMs !== null && ` · 1º áudio em ${firstAudioMs} ms`}
+                ? "A voz está indisponível neste momento."
+                : "Quando ligada, as respostas também são lidas em voz alta."}
+
             </p>
+            </div></details>
+            <div className="sidebar-bottom"><span className="status-dot" /> {online ? "Conectado" : "Sem conexão"}<span>Projeto experimental</span></div>
           </aside>
         )}
 
-        <main className="main">
+        <main className={`main ${!loggedIn ? "auth-main" : ""}`}>
+          {loggedIn && !demo && <>
+            <div className="workspace-heading"><div><span className="eyebrow">{workspaceView === "conversation" ? "PRESENÇA & CONTINUIDADE" : "CURIOSIDADE EM MOVIMENTO"}</span><h1>{workspaceView === "conversation" ? "Toda ideia pode ser um começo." : "Um caderno em construção."}</h1><p>{workspaceView === "conversation" ? "Um espaço para conversar, explorar e retomar." : "Perguntas escolhidas, fontes consultadas e caminhos que continuam."}</p></div></div>
+            <nav className="workspace-tabs" aria-label="Área de trabalho"><button className={workspaceView === "conversation" ? "selected" : "ghost"} onClick={() => setWorkspaceView("conversation")}>Conversa</button><button className={workspaceView === "study" ? "selected" : "ghost"} onClick={() => setWorkspaceView("study")}>Estudos</button></nav>
+          </>}
+          <div className={`presence ${workspaceView === "study" && loggedIn ? "study-presence" : ""}`}>
           <div className="orb-wrap">
             <Orb
               state={orbState}
+              size={loggedIn && !demo ? 100 : 240}
               level={demoLevel}
               getLevel={
                 speaking
@@ -434,7 +458,8 @@ export function App() {
                     : undefined
               }
             />
-            <p className="state-label">{STATE_LABELS[orbState]}</p>
+          </div>
+          <div className="presence-copy"><p className="state-label">{STATE_LABELS[orbState]}</p><span>{orbState === "IDLE" ? "Por aqui, quando quiser continuar." : orbState === "THINKING" ? "Preparando uma resposta para você." : orbState === "DISCONNECTED" ? "Tentando restabelecer a conexão." : "Acompanhe a conversa no seu ritmo."}</span></div>
           </div>
 
           {demo ? (
@@ -463,7 +488,7 @@ export function App() {
             </p>
           ) : (
             <>
-              <div className="voice-bar">
+              {(workspaceView === "conversation" || voiceSession) && <div className="voice-bar">
                 {voice?.listening && voice.enabled && (
                   <button
                     className={voiceSession ? "active" : "ghost"}
@@ -478,7 +503,7 @@ export function App() {
                     Parar de falar
                   </button>
                 )}
-              </div>
+              </div>}
               {latency && (
                 <p className="latency">
                   Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta{" "}
@@ -490,8 +515,11 @@ export function App() {
                 </p>
               )}
               <NotificationFeed api={api} onError={handleError} />
+              {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
               {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
               <ChatView
+                hidden={workspaceView !== "conversation"}
+                agentName={agentName}
                 messages={messages}
                 sending={sending || preparing}
                 error={error}
@@ -502,7 +530,7 @@ export function App() {
           )}
         </main>
       </div>
-      <footer className="footer">Projeto VISÃO · pesquisa experimental</footer>
+      <footer className="footer">VISÃO <span>·</span> Um projeto em descoberta</footer>
     </div>
   );
 }

@@ -14,12 +14,12 @@ from sqlalchemy.orm import Session
 
 from core.goals import lifecycle
 from core.initiatives.notify import notify
+from core.research.budget import searches_today
 from core.research.service import run_research
 from infrastructure.database.models import (
     Goal,
     KnowledgeGap,
     ModelUsage,
-    ResearchSession,
     ScheduledJob,
     User,
 )
@@ -253,11 +253,4 @@ def run_goal(
 
 
 def research_count_today(session: Session, owner_id: uuid.UUID) -> int:
-    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    return len(
-        session.scalars(
-            select(ResearchSession.id).where(
-                ResearchSession.owner_user_id == owner_id, ResearchSession.created_at >= start
-            )
-        ).all()
-    )
+    return searches_today(session, owner_id)

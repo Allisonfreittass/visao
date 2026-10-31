@@ -24,6 +24,7 @@ _DESCRIBE = {
     ),
     "goal_proposed": "proposta de meta registrada; só roda com aprovação",
     "continuity": "investigações anteriores relacionadas foram consultadas no registro",
+    "recall_study": "o caderno de estudos foi consultado; use o estado e as evidências reais",
     "name_deliberation_requested": (
         "uma deliberação sobre o nome foi agendada para o worker; o resultado ainda não está"
         " disponível. Há um mecanismo de aviso do resultado, inclusive adiamento ou recusa,"

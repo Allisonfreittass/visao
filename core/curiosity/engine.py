@@ -24,6 +24,7 @@ from core.conversation.service import Budgets, check_budgets
 from core.goals.followup import propose_followup
 from core.memory.retrieval import retrieve
 from core.memory.text import jaccard, tokens
+from core.research.budget import searches_today
 from core.research.service import run_research
 from infrastructure.database.models import (
     Conversation,
@@ -219,15 +220,7 @@ def decide(
 def _research_budget_left(
     session: Session, owner: User, conversation: Conversation, limits: CuriosityLimits
 ) -> bool:
-    start_of_day = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    today = session.scalar(
-        select(func.count())
-        .select_from(ResearchSession)
-        .where(
-            ResearchSession.owner_user_id == owner.id,
-            ResearchSession.created_at >= start_of_day,
-        )
-    )
+    today = searches_today(session, owner.id)
     in_conversation = session.scalar(
         select(func.count())
         .select_from(ResearchSession)

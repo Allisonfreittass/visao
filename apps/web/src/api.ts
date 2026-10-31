@@ -1,5 +1,10 @@
 // Thin typed client for the VISÃO API. In development, /api is proxied by Vite.
 
+// API timestamps are UTC, including older SQLite rows serialized without an offset.
+export function utcDate(value: string): Date {
+  return new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`);
+}
+
 export type Role = "user" | "assistant";
 
 export interface Source {
@@ -57,6 +62,32 @@ export interface AppNotification {
   body: string;
   created_at: string;
   read_at: string | null;
+}
+
+export interface StudyEntry {
+  id: string;
+  previous_entry_id: string | null;
+  status: string;
+  topic: string;
+  question: string;
+  rationale: string;
+  outcome_reason: string;
+  created_at: string;
+  evidence: {
+    findings?: Array<{ claim: string; sources: number[] }>;
+    sources?: Array<{ id: number; url: string; title: string; retrieved_at: string }>;
+    uncertain?: string;
+    next_question?: string;
+  };
+}
+
+export interface StudyNotebook {
+  enabled: boolean;
+  paused: boolean;
+  interval_hours: number;
+  next_eligible_at: string | null;
+  source: string;
+  entries: StudyEntry[];
 }
 
 export class ApiError extends Error {
@@ -229,6 +260,17 @@ export class Api {
       signal,
     });
     return response.arrayBuffer();
+  }
+
+  study(): Promise<StudyNotebook> {
+    return this.request("/study");
+  }
+
+  setStudyEnabled(enabled: boolean): Promise<{ enabled: boolean }> {
+    return this.request("/study/settings", {
+      method: "PUT", body: JSON.stringify({ enabled }),
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {

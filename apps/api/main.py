@@ -9,6 +9,7 @@ from apps.api.routes import (
     goals,
     health,
     memory,
+    study,
     system,
     voice,
 )
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(goals.router)
     app.include_router(behavior.router)
     app.include_router(cognition.router)
+    app.include_router(study.router)
     return app
 
 

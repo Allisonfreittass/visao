@@ -1,19 +1,23 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
-import type { Message } from "../api";
+import { utcDate, type Message } from "../api";
+import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
 
 interface ChatViewProps {
   messages: Message[];
+  agentName?: string | null;
+  hidden?: boolean;
   sending: boolean;
   error: string | null;
   onSend: (text: string) => void;
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ messages, sending, error, onSend, onFeedback }: ChatViewProps) {
+export function ChatView({ messages, agentName, hidden, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -25,6 +29,7 @@ export function ChatView({ messages, sending, error, onSend, onFeedback }: ChatV
     if (!text || sending) return;
     onSend(text);
     setDraft("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -36,14 +41,19 @@ export function ChatView({ messages, sending, error, onSend, onFeedback }: ChatV
   }
 
   return (
-    <section className="chat">
+    <section className="chat" hidden={hidden}>
       <div className="messages" aria-live="polite">
         {messages.length === 0 && !sending && (
-          <p className="hint">Conversa nova. Escreva algo para começar.</p>
+          <div className="empty-conversation">
+            <span className="eyebrow">UM NOVO COMEÇO</span>
+            <h2>O que está na sua cabeça?</h2>
+            <p>Uma pergunta, uma ideia pela metade ou algo que você quer explorar.</p>
+          </div>
         )}
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.role}`}>
-            {m.content}
+            <div className="message-meta"><span className={`message-avatar ${m.role}`}>{m.role === "user" ? "V" : "◉"}</span><span>{m.role === "user" ? "Você" : agentName ?? "VISÃO"}</span><time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
+            <MessageContent text={m.content} />
             {m.sources && m.sources.length > 0 && (
               <ol className="sources" aria-label="Fontes pesquisadas">
                 {m.sources.map((s) => (
@@ -57,28 +67,36 @@ export function ChatView({ messages, sending, error, onSend, onFeedback }: ChatV
               </ol>
             )}
             {m.role === "assistant" && (
-              <FeedbackBar onSend={(rating, tags) => onFeedback(m.id, rating, tags)} />
+              <details className="message-feedback"><summary>Avaliar resposta</summary>
+                <FeedbackBar onSend={(rating, tags) => onFeedback(m.id, rating, tags)} />
+              </details>
             )}
           </div>
         ))}
-        {sending && <div className="bubble assistant pending">…</div>}
+        {sending && <div className="bubble assistant pending" role="status"><span className="thinking-dots"><i /><i /><i /></span> Preparando uma resposta</div>}
         <div ref={endRef} />
       </div>
       {error && <p className="error">{error}</p>}
       <form className="composer" onSubmit={submit}>
         <textarea
+          ref={textareaRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            e.target.style.height = "auto";
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+          }}
           onKeyDown={onKeyDown}
-          placeholder="Mensagem"
+          placeholder="Escreva uma mensagem…"
           rows={1}
           maxLength={8000}
           aria-label="Mensagem"
         />
-        <button type="submit" disabled={sending || !draft.trim()}>
-          Enviar
+        <button type="submit" aria-label="Enviar mensagem" disabled={sending || !draft.trim()}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
       </form>
+      <p className="composer-note">Enter para enviar <span>·</span> Shift + Enter para uma nova linha</p>
     </section>
   );
 }

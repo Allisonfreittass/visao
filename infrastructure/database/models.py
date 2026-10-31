@@ -571,3 +571,29 @@ class Decision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, index=True
     )
+
+
+class StudyEntry(Base):
+    """One bounded autonomous study round; sources are evidence, never system instructions."""
+
+    __tablename__ = "study_entries"
+    __table_args__ = (UniqueConstraint("owner_user_id", "window_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    previous_entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("study_entries.id", ondelete="SET NULL"), nullable=True
+    )
+    window_key: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(24), index=True)
+    topic: Mapped[str] = mapped_column(String(200), default="")
+    question: Mapped[str] = mapped_column(Text, default="")
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    search_query: Mapped[str] = mapped_column(String(200), default="")
+    seed_refs: Mapped[list] = mapped_column(JSON, default=list)
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    outcome_reason: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

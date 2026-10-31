@@ -55,6 +55,7 @@ def autonomy_budget(settings: Settings) -> AutonomyBudget:
         max_seconds=settings.autonomy_max_seconds,
         research_per_day=settings.research_per_day,
         max_output_tokens=settings.llm_curation_max_output_tokens,
+        daily_usd=settings.llm_daily_budget_usd,
     )
 
 

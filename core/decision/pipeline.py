@@ -26,6 +26,7 @@ from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.policies.autonomy import is_paused
+from core.study.service import related_context
 from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
 from infrastructure.jobs import queue
 from integrations.llm.base import LLMProvider
@@ -123,6 +124,11 @@ def run_turn(
     if related:
         plan.add("continuity", executed=True, reason="related_investigations", count=len(related))
         blocks.append(continuity.context_block(related) or "")
+
+    study_context = related_context(session, owner.id, text)
+    if study_context:
+        blocks.append(study_context)
+        plan.add("recall_study", executed=True, reason="related_notebook")
 
     if name_deliberation.asks_about_name(text) and not is_paused(session):
         queued = name_deliberation.request(
