@@ -79,7 +79,15 @@ São microexperimentos locais em memória/SQLite e fakes, sem modificar código/
 ```python
 def candidate_queries(query: str, topic: str) -> list[str]:
     if len(query) > len(topic):
-        return [x for x in query for y in query for z in query for a in query for b in query for c in query]
+        return [
+            x
+            for x in query
+            for y in query
+            for z in query
+            for a in query
+            for b in query
+            for c in query
+        ]
     return [query, topic]
 ```
 
