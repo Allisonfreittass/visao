@@ -30,6 +30,7 @@
     "VISION_DATABASE_SCHEMA": "visao",
     "VISION_LOG_LEVEL": "INFO",
     "VISION_LLM_MAX_PAID_SPEND_USD": "0",
+    "VISION_LLM_BUDGET_OUTPUT_TOKENS_PER_DAY": "60000",
     "VISION_LLM_FREE_GRANTS": "[{\"provider\":\"openrouter\",\"endpoint\":\"https://openrouter.ai/api/v1\",\"model\":\"nvidia/nemotron-3.5-super-vl:free\",\"evidence_url\":\"https://openrouter.ai/docs/guides/routing/model-variants/free\",\"verified_at\":\"2026-11-01T19:48:16Z\",\"expires_at\":\"2026-11-08T19:48:16Z\",\"prices\":{\"platform\":\"0\",\"tools\":\"0\",\"audio\":\"0\",\"cache\":\"0\",\"routing\":\"0\",\"input\":\"0\",\"output\":\"0\"}}]",
     "VISION_CURIOSITY_ENABLED": "true",
     "VISION_AUTONOMY_CYCLE_MINUTES": "60",
