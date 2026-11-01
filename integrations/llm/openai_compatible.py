@@ -3,6 +3,7 @@ OpenRouter, DeepInfra, vLLM...). Choosing a host is configuration, not code."""
 
 import logging
 import time
+from decimal import Decimal, InvalidOperation
 
 import httpx
 
@@ -55,7 +56,13 @@ class OpenAICompatibleProvider:
             text = choice["message"]["content"] or ""
             input_tokens = int(usage["prompt_tokens"])
             output_tokens = int(usage["completion_tokens"])
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            configured_cost = self.pricing.cost(input_tokens, output_tokens)
+            reported_cost = (
+                Decimal(str(usage["cost"])) if usage.get("cost") is not None else configured_cost
+            )
+            if not reported_cost.is_finite() or reported_cost < 0:
+                raise ValueError("invalid reported cost")
+        except (ValueError, KeyError, IndexError, TypeError, InvalidOperation) as exc:
             raise LLMError("bad_response", f"unexpected response shape: {exc}") from exc
 
         return LLMResponse(
@@ -66,7 +73,8 @@ class OpenAICompatibleProvider:
             output_tokens=output_tokens,
             latency_ms=latency_ms,
             finish_reason=choice.get("finish_reason"),
-            cost_usd=self.pricing.cost(input_tokens, output_tokens),
+            # Never hide a positive provider-reported cost behind configured free prices.
+            cost_usd=max(configured_cost, reported_cost),
         )
 
     def _post_with_retries(self, payload: dict) -> httpx.Response:

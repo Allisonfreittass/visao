@@ -59,4 +59,18 @@ describe("Cloudflare edge routing", () => {
     expect(config.VISION_ENVIRONMENT).toBe("production");
     expect(() => appEnvironment({...value, VISION_DATABASE_URL:"sqlite:///dev.db"})).toThrow();
   });
+  it("forwards the reviewed budget configuration into the Python container", () => {
+    const { value } = env();
+    const budget = {
+      VISION_LLM_MAX_PAID_SPEND_USD: "0",
+      VISION_LLM_FREE_GRANTS: '[{"provider":"test-only"}]',
+      VISION_LLM_BUDGET_CALLS_PER_DAY: "30", VISION_LLM_BUDGET_CALLS_PER_HOUR: "10",
+      VISION_LLM_BUDGET_INPUT_TOKENS_PER_DAY: "60000",
+      VISION_LLM_BUDGET_OUTPUT_TOKENS_PER_DAY: "15000",
+      VISION_LLM_BUDGET_INPUT_TOKENS_PER_CALL: "32768",
+      VISION_LLM_BUDGET_OUTPUT_TOKENS_PER_CALL: "4096",
+      VISION_LLM_BUDGET_CONCURRENCY: "1",
+    };
+    expect(appEnvironment({ ...value, ...budget })).toMatchObject(budget);
+  });
 });

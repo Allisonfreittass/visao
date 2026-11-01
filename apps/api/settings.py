@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from integrations.llm.budget import FreeEndpointGrant
+
 DEFAULT_SECRET_KEY = "dev-insecure-change-me"  # noqa: S105 (rejected in production)
 
 
@@ -38,6 +40,16 @@ class Settings(BaseSettings):
     llm_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_timeout_seconds: float = Field(default=60.0, gt=0)
+    # Explicit operator-reviewed grants; zero configured prices alone do not authorize I/O.
+    llm_max_paid_spend_usd: Decimal = Field(default=Decimal(0), ge=0, le=0)
+    llm_free_grants: list[FreeEndpointGrant] = Field(default_factory=list, max_length=32)
+    llm_budget_calls_per_day: int = Field(default=30, ge=1)
+    llm_budget_calls_per_hour: int = Field(default=10, ge=1)
+    llm_budget_input_tokens_per_day: int = Field(default=60_000, ge=1)
+    llm_budget_output_tokens_per_day: int = Field(default=15_000, ge=1)
+    llm_budget_input_tokens_per_call: int = Field(default=32_768, ge=1)
+    llm_budget_output_tokens_per_call: int = Field(default=4096, ge=1)
+    llm_budget_concurrency: int = Field(default=1, ge=1)
 
     # Optional fallback provider, tried when the primary is out of quota, rate-limited or down.
     llm_fallback_provider_name: str | None = None

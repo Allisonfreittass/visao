@@ -12,7 +12,14 @@ from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMRespons
 
 logger = logging.getLogger(__name__)
 
-_FALLBACK_KINDS = {"quota_exhausted", "http_429", "timeout", "network", "bad_response"}
+_FALLBACK_KINDS = {
+    "quota_exhausted",
+    "http_429",
+    "timeout",
+    "network",
+    "bad_response",
+    "budget_denied",
+}
 QUOTA_COOLDOWN_SECONDS = 15 * 60
 
 
@@ -31,10 +38,13 @@ class FallbackLLMProvider:
         self.pricing: Pricing = providers[0].pricing
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
-        last_error: LLMError | None = None
+        last_error = LLMError("budget_denied", "no eligible provider outside cooldown")
         for index, provider in enumerate(self._providers):
             # A provider whose quota ran out is skipped for a while instead of wasting a call.
-            if time.monotonic() < self._skip_until[index] and index < len(self._providers) - 1:
+            if time.monotonic() < self._skip_until[index]:
+                continue
+            if provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0:
+                last_error = LLMError("budget_denied", "paid provider refused before dispatch")
                 continue
             try:
                 return provider.complete(messages, max_output_tokens=max_output_tokens)
@@ -48,5 +58,4 @@ class FallbackLLMProvider:
                     extra={"event": "llm_fallback"},
                 )
                 last_error = exc
-        assert last_error is not None
         raise last_error

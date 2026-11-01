@@ -5,7 +5,7 @@ import logging
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import ScheduledJob
 from infrastructure.jobs import queue
+from integrations.llm.base import LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,9 @@ class HandlerResult:
 
 Handler = Callable[[Session, ScheduledJob], HandlerResult]
 
-IterationOutcome = Literal["paused", "idle", "done", "deferred", "failed", "unknown_kind"]
+IterationOutcome = Literal[
+    "paused", "idle", "done", "deferred", "failed", "unknown_kind", "lease_lost"
+]
 
 
 def run_once(
@@ -39,20 +42,31 @@ def run_once(
         job = queue.claim_next(session, worker_id)
         if job is None:
             return "idle"
+        lease = queue.lease_for(job)
         handler = handlers.get(job.kind)
         if handler is None:
-            queue.fail(session, job, f"no handler for kind {job.kind!r}")
-            return "unknown_kind"
+            accepted = queue.fail(session, job, f"no handler for kind {job.kind!r}", lease=lease)
+            return "unknown_kind" if accepted else "lease_lost"
         try:
             outcome = handler(session, job)
         except Exception as exc:  # any handler failure becomes a retry or a dead letter
             session.rollback()
-            job = session.get(ScheduledJob, job.id)
-            queue.fail(session, job, f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}")
+            if isinstance(exc, LLMError) and exc.kind == "budget_denied":
+                accepted = queue.defer(
+                    session,
+                    job,
+                    datetime.now(UTC) + timedelta(minutes=15),
+                    "budget_denied",
+                    lease=lease,
+                )
+                return "deferred" if accepted else "lease_lost"
+            accepted = queue.fail(
+                session, job, f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}", lease=lease
+            )
             logger.warning("job failed", extra={"event": "job_failed"})
-            return "failed"
+            return "failed" if accepted else "lease_lost"
         if outcome.outcome == "defer" and outcome.defer_until is not None:
-            queue.defer(session, job, outcome.defer_until, outcome.reason)
-            return "deferred"
-        queue.complete(session, job, outcome.result)
-        return "done"
+            accepted = queue.defer(session, job, outcome.defer_until, outcome.reason, lease=lease)
+            return "deferred" if accepted else "lease_lost"
+        accepted = queue.complete(session, job, outcome.result, lease=lease)
+        return "done" if accepted else "lease_lost"

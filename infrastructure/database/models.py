@@ -369,8 +369,10 @@ class ResearchSource(Base):
 
 
 class ScheduledJob(Base):
-    """Persistent work item for the worker. Claimed with an optimistic lock; never run twice for
-    the same idempotency key."""
+    """Persistent work item, deduplicated at enqueue and fenced at queue completion.
+
+    Expired work can be retried; external/domain effects still require their own idempotency.
+    """
 
     __tablename__ = "scheduled_jobs"
     __table_args__ = (Index("ix_scheduled_jobs_status_run_after", "status", "run_after"),)

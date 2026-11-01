@@ -120,6 +120,37 @@ def test_pricing_cost() -> None:
     assert PRICING.cost(1000, 500) == Decimal("0.002")
 
 
+def test_reported_cost_cannot_be_hidden_by_free_configured_price() -> None:
+    provider = _provider(
+        lambda _: httpx.Response(
+            200,
+            json={
+                **OK_BODY,
+                "usage": {**OK_BODY["usage"], "cost": "0.02"},
+            },
+        )
+    )
+    provider.pricing = Pricing(Decimal(0), Decimal(0))
+    response = provider.complete([ChatMessage("user", "oi")], max_output_tokens=50)
+    assert response.cost_usd == Decimal("0.02")
+
+
+@pytest.mark.parametrize("cost", ["NaN", "Infinity", "-1", "invalid"])
+def test_invalid_reported_cost_is_a_bad_response(cost) -> None:
+    provider = _provider(
+        lambda _: httpx.Response(
+            200,
+            json={
+                **OK_BODY,
+                "usage": {**OK_BODY["usage"], "cost": cost},
+            },
+        )
+    )
+    with pytest.raises(LLMError) as exc:
+        provider.complete([ChatMessage("user", "oi")], max_output_tokens=50)
+    assert exc.value.kind == "bad_response"
+
+
 def test_provider_disabled_until_fully_configured() -> None:
     complete = {
         "llm_provider_name": "alibaba",

@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 from apps.api.settings import Settings, get_settings
 from integrations.llm.base import LLMProvider, Pricing
+from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
 from integrations.llm.fallback import FallbackLLMProvider
 from integrations.llm.openai_compatible import OpenAICompatibleProvider
 
@@ -67,15 +68,35 @@ def _openai_compatible(
         model=model,
         pricing=Pricing(input_per_mtok=price_in, output_per_mtok=price_out),
         timeout_seconds=settings.llm_timeout_seconds,
+        # Each transport attempt needs its own reservation; fallback handles retry admission.
+        max_retries=0,
     )
 
 
-def build_llm_provider(settings: Settings) -> LLMProvider | None:
+def build_llm_provider(
+    settings: Settings, *, budget_guard: BudgetGuard | None = None
+) -> LLMProvider | None:
     """Returns None unless every primary setting, prices included, is present. A fully
     configured fallback is chained after the primary; a partial one is ignored with a warning."""
     if missing_llm_settings(settings):
         return None
-    primary = _openai_compatible(
+    if budget_guard is None:
+        from infrastructure.database.session import get_sessionmaker
+
+        budget_guard = BudgetGuard(
+            lambda: get_sessionmaker()(),
+            settings.llm_free_grants,
+            BudgetLimits(
+                calls_per_day=settings.llm_budget_calls_per_day,
+                calls_per_hour=settings.llm_budget_calls_per_hour,
+                input_tokens_per_day=settings.llm_budget_input_tokens_per_day,
+                output_tokens_per_day=settings.llm_budget_output_tokens_per_day,
+                input_tokens_per_call=settings.llm_budget_input_tokens_per_call,
+                output_tokens_per_call=settings.llm_budget_output_tokens_per_call,
+                concurrency=settings.llm_budget_concurrency,
+            ),
+        )
+    primary_raw = _openai_compatible(
         settings,
         settings.llm_provider_name,
         settings.llm_base_url,
@@ -84,6 +105,7 @@ def build_llm_provider(settings: Settings) -> LLMProvider | None:
         settings.llm_price_input_per_mtok,
         settings.llm_price_output_per_mtok,
     )
+    primary = GuardedLLMProvider(primary_raw, settings.llm_base_url, budget_guard)
     missing = missing_fallback_settings(settings)
     if len(missing) == 6:
         return primary
@@ -93,7 +115,7 @@ def build_llm_provider(settings: Settings) -> LLMProvider | None:
             extra={"event": "llm_fallback_incomplete"},
         )
         return primary
-    fallback = _openai_compatible(
+    fallback_raw = _openai_compatible(
         settings,
         settings.llm_fallback_provider_name,
         settings.llm_fallback_base_url,
@@ -102,4 +124,5 @@ def build_llm_provider(settings: Settings) -> LLMProvider | None:
         settings.llm_fallback_price_input_per_mtok,
         settings.llm_fallback_price_output_per_mtok,
     )
+    fallback = GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard)
     return FallbackLLMProvider([primary, fallback])

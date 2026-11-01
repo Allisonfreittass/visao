@@ -61,7 +61,8 @@ def test_claim_respects_run_after_and_marks_running(db: Session) -> None:
     db.commit()
     job = queue.claim_next(db, "w1", now)
     assert job is not None and job.idempotency_key == "now"
-    assert (job.status, job.attempts, job.locked_by) == ("RUNNING", 1, "w1")
+    assert (job.status, job.attempts) == ("RUNNING", 1)
+    assert job.locked_by.startswith("w1:")
     assert queue.claim_next(db, "w2", now) is None  # nothing else due
 
 
@@ -72,7 +73,7 @@ def test_expired_lease_is_reclaimed_after_a_crash(db: Session) -> None:
     queue.claim_next(db, "dead-worker", now)
     later = now + timedelta(seconds=queue.LEASE_SECONDS + 1)
     job = queue.claim_next(db, "w2", later)
-    assert job is not None and (job.locked_by, job.attempts) == ("w2", 2)
+    assert job is not None and job.attempts == 2 and job.locked_by.startswith("w2:")
 
 
 def test_backoff_then_dead_letter(db: Session) -> None:
@@ -82,12 +83,12 @@ def test_backoff_then_dead_letter(db: Session) -> None:
     )
     db.commit()
     job = queue.claim_next(db, "w", now)
-    queue.fail(db, job, "boom", now)
+    queue.fail(db, job, "boom", now, lease=queue.lease_for(job))
     assert job.status == "PENDING"
     assert job.run_after.replace(tzinfo=UTC) == now + timedelta(seconds=queue.BASE_BACKOFF_SECONDS)
 
     job = queue.claim_next(db, "w", now + timedelta(minutes=5))
-    queue.fail(db, job, "boom again", now)
+    queue.fail(db, job, "boom again", now, lease=queue.lease_for(job))
     assert (job.status, job.last_error) == ("DEAD", "boom again")
 
 
@@ -96,7 +97,7 @@ def test_defer_does_not_spend_an_attempt(db: Session) -> None:
     queue.enqueue(db, kind="k", payload={}, idempotency_key="j", reason="r", run_after=now)
     db.commit()
     job = queue.claim_next(db, "w", now)
-    queue.defer(db, job, now + timedelta(days=1), "sem orçamento")
+    queue.defer(db, job, now + timedelta(days=1), "sem orçamento", lease=queue.lease_for(job))
     assert (job.status, job.attempts) == ("PENDING", 0)
 
 

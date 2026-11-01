@@ -14,7 +14,12 @@ PROMPT = [ChatMessage("user", "oi")]
 
 
 def _primary(**kwargs: object) -> FakeLLMProvider:
-    return FakeLLMProvider(name="openrouter", reply_text="do primário", **kwargs)
+    return FakeLLMProvider(
+        name="openrouter",
+        reply_text="do primário",
+        pricing=Pricing(Decimal(0), Decimal(0)),
+        **kwargs,
+    )
 
 
 def _backup() -> FakeLLMProvider:
@@ -22,7 +27,7 @@ def _backup() -> FakeLLMProvider:
         name="nvidia",
         model="nemotron-nvidia",
         reply_text="da reserva",
-        pricing=Pricing(Decimal("10"), Decimal("10")),
+        pricing=Pricing(Decimal(0), Decimal(0)),
     )
 
 
@@ -40,8 +45,17 @@ def test_falls_back_on_transient_or_quota_errors(kind: str) -> None:
     provider = FallbackLLMProvider([_primary(fail_with=kind), _backup()])
     response = provider.complete(PROMPT, max_output_tokens=5)
     assert (response.text, response.provider) == ("da reserva", "nvidia")
-    # Cost comes from the provider that answered, not from the primary's prices.
-    assert response.cost_usd == Decimal("0.015")
+    assert response.cost_usd == 0
+
+
+def test_timeout_never_dispatches_paid_backup() -> None:
+    backup = _backup()
+    backup.pricing = Pricing(Decimal(1), Decimal(2))
+    provider = FallbackLLMProvider([_primary(fail_with="timeout"), backup])
+    with pytest.raises(LLMError, match="paid provider") as exc:
+        provider.complete(PROMPT, max_output_tokens=5)
+    assert exc.value.kind == "budget_denied"
+    assert not backup.prompts
 
 
 @pytest.mark.parametrize("kind", ["http_401", "http_400", "http_404"])
