@@ -129,6 +129,7 @@ VISION_TEST_DATABASE_URL=postgresql+psycopg://... .venv/bin/pytest -m postgres
 - [Nome autônomo](docs/AUTONOMOUS_NAMING.md)
 - [Curiosidade](docs/CURIOSITY.md)
 - [Autonomia e ciclo autônomo](docs/AUTONOMY.md)
+- [Mente: pensar, estudar e puxar conversa](docs/MIND.md)
 - [Fase 9: auditoria, plano e avaliação](docs/research/)
 - [Seleção de modelos](docs/MODEL_SELECTION.md)
 - [Custos e limites](docs/COSTS.md)

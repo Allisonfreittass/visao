@@ -114,7 +114,8 @@ def propose(db, *, provider, budget, base_sha, files, now=None):
                     ),
                 ),
             ],
-            replace(budget, max_output_tokens=min(2048, budget.tokens_per_day)),
+            # Whole files plus the model's reasoning: a tight cap truncates the JSON every time.
+            replace(budget, max_output_tokens=max(budget.max_output_tokens, 4096)),
             now,
         )
         changes = validate_patch(files, data)
@@ -141,7 +142,7 @@ def propose(db, *, provider, budget, base_sha, files, now=None):
         flag.value = {
             **flag.value,
             "status": "failed",
-            "error": type(exc).__name__,
+            "error": f"{type(exc).__name__}: {exc}"[:200],
             "updated_at": datetime.now(UTC).isoformat(),
         }
         db.commit()

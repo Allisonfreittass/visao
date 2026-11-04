@@ -11,6 +11,7 @@ import {
 } from "./api";
 import { ChatView } from "./components/ChatView";
 import { InitiativesPanel } from "./components/InitiativesPanel";
+import { MindPanel } from "./components/MindPanel";
 import { StudyPanel } from "./components/StudyPanel";
 import { NotificationFeed } from "./components/NotificationFeed";
 import { Login } from "./components/Login";
@@ -29,6 +30,7 @@ interface TurnLatency {
 }
 
 const HEALTH_INTERVAL_MS = 15_000;
+const INITIATIVE_POLL_MS = 15_000;
 const DEMO_STATES: OrbState[] = [
   "IDLE",
   "LISTENING",
@@ -88,6 +90,11 @@ export function App() {
   const [current, setCurrent] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
+  const speakRef = useRef<((text: string) => void) | null>(null);
+  sendingRef.current = sending;
+  messagesRef.current = messages;
   const [preparing, setPreparing] = useState(false);
   const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +152,24 @@ export function App() {
     api.messages(current).then(setMessages).catch(handleError);
   }, [api, current, handleError]);
 
+  // The agent can speak first: pick up what it said on its own, and say it aloud if replies are.
+  useEffect(() => {
+    if (!current || !loggedIn || demo) return;
+    let alive = true;
+    const timer = setInterval(() => {
+      if (sendingRef.current) return;
+      api.messages(current).then((next) => {
+        if (!alive || sendingRef.current) return;
+        const known = new Set(messagesRef.current.map((m) => m.id));
+        const fresh = next.filter((m) => m.origin === "initiative" && !known.has(m.id));
+        if (next.length !== messagesRef.current.length) setMessages(next);
+        const last = fresh[fresh.length - 1];
+        if (last && known.size > 0 && speakRef.current) speakRef.current(last.content);
+      }).catch(() => undefined);
+    }, INITIATIVE_POLL_MS);
+    return () => { alive = false; clearInterval(timer); };
+  }, [api, current, loggedIn, demo]);
+
   function checkMemoryPreparation(conversation: Conversation) {
     setMemoryWarning(
       conversation.memory_status === "failed" || conversation.memory_status === "unavailable"
@@ -177,6 +202,8 @@ export function App() {
     setInterrupted(true);
     setTimeout(() => setInterrupted(false), 700);
   }
+
+  speakRef.current = speakReplies && voice?.enabled ? (text) => speak(text) : null;
 
   function speak(text: string, onFirstAudio?: (ms: number) => void) {
     setSpeaking(true);
@@ -515,6 +542,7 @@ export function App() {
                 </p>
               )}
               <NotificationFeed api={api} onError={handleError} />
+              {workspaceView === "study" && <MindPanel api={api} onError={handleError} />}
               {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
               {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
               <ChatView

@@ -7,6 +7,7 @@ for the worker instead of delaying the reply.
 """
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,7 @@ from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.memory.text import tokens
+from core.mind import state as mind_state
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
@@ -45,6 +47,7 @@ class TurnConfig:
     tts_approved_voices: str = ""
     stt_model: str = ""
     code_autonomy_enabled: bool = False
+    mind_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -77,6 +80,7 @@ def run_turn(
             tts_approved_voices=config.tts_approved_voices,
             stt_model=config.stt_model,
             code_autonomy_enabled=config.code_autonomy_enabled,
+            mind_enabled=config.mind_enabled,
         ),
     )
 
@@ -164,6 +168,10 @@ def run_turn(
             "publicação; só published confirma publicação):\n"
             + json.dumps(recent_runs(session), ensure_ascii=False)
         )
+    if config.mind_enabled:
+        on_mind = mind_state.context_block(session, owner.id, datetime.now(UTC))
+        if on_mind:
+            blocks.append(on_mind)
     blocks.append(plan.facts())
     result = reply(
         session,
@@ -179,6 +187,7 @@ def run_turn(
         capabilities=capabilities,
         modality=modality,
         name_history_summary=name_deliberation.history_summary(session, identity),
+        self_text=mind_state.current_self(session) if config.mind_enabled else None,
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id

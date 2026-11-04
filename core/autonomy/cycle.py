@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ from integrations.search.base import SearchProvider
 JOB_KIND = "cognitive_cycle"
 AUTONOMOUS_PURPOSES = (
     "code_proposal",
+    "mind_think",
     "name_deliberation",
     "followup_summary",
     "reflection",
@@ -60,6 +62,9 @@ class AutonomyBudget:
     research_per_day: int
     max_output_tokens: int
     daily_usd: Decimal = Decimal("1.50")
+    study_interval: timedelta = timedelta(hours=6)
+    open_web: bool = False
+    mind: Any = None  # core.mind.think.MindConfig when the inner loop is on
 
 
 @dataclass
@@ -147,6 +152,28 @@ def run_cycle(
             and time.monotonic() - started < budget.max_seconds
             and _budget_left(session, budget, now)
         )
+
+    # Thinking comes first: it can shape what gets studied and said in this same cycle.
+    if budget.mind is not None:
+        from core.mind.think import think_once
+
+        for owner in session.scalars(select(User).where(User.is_active.is_(True))).all():
+            if not room():
+                break
+            result = think_once(
+                session, owner=owner, provider=provider, budget=budget, config=budget.mind, now=now
+            )
+            if result.reason != "not_due":
+                report.actions.append(
+                    _record(
+                        session,
+                        owner.id,
+                        action="mind_think",
+                        executed=result.thought is not None,
+                        reason=result.reason,
+                        delivery=result.delivery,
+                    )
+                )
 
     # 1. Unanswered public-fact questions: propose (free); research if the owner allowed it.
     gaps = session.scalars(

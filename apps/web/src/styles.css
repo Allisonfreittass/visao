@@ -202,3 +202,9 @@ a { color: var(--accent); text-underline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+.initiative-tag { color: var(--accent); background: var(--accent-soft); border-radius: 20px; padding: 1px 7px; font-size: 9px; }
+.mind-panel { width: 100%; max-width: 900px; overflow-y: auto; flex-shrink: 0; max-height: 45vh; }
+.mind-thought { border-top: 1px solid #ffffff0c; padding: 12px 0; }
+.mind-thought time { color: var(--muted); font-size: 9px; }
+.link-button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }

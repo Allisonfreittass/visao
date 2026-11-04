@@ -47,7 +47,8 @@ def missing_fallback_settings(settings: Settings) -> list[str]:
 
 @lru_cache
 def get_llm_provider() -> LLMProvider | None:
-    return build_llm_provider(get_settings())
+    # Conversation favours speed; background thinking keeps the model's full reasoning.
+    return build_llm_provider(get_settings(), fast=True)
 
 
 def _openai_compatible(
@@ -58,6 +59,7 @@ def _openai_compatible(
     model: str | None,
     price_in: Decimal | None,
     price_out: Decimal | None,
+    extra_body: dict | None = None,
 ) -> OpenAICompatibleProvider:
     assert name and base_url and api_key and model
     assert price_in is not None and price_out is not None
@@ -70,11 +72,12 @@ def _openai_compatible(
         timeout_seconds=settings.llm_timeout_seconds,
         # Each transport attempt needs its own reservation; fallback handles retry admission.
         max_retries=0,
+        extra_body=extra_body,
     )
 
 
 def build_llm_provider(
-    settings: Settings, *, budget_guard: BudgetGuard | None = None
+    settings: Settings, *, budget_guard: BudgetGuard | None = None, fast: bool = False
 ) -> LLMProvider | None:
     """Returns None unless every primary setting, prices included, is present. A fully
     configured fallback is chained after the primary; a partial one is ignored with a warning."""
@@ -95,6 +98,7 @@ def build_llm_provider(
                 output_tokens_per_call=settings.llm_budget_output_tokens_per_call,
                 concurrency=settings.llm_budget_concurrency,
             ),
+            trust_zero_price=settings.llm_trust_zero_price,
         )
     primary_raw = _openai_compatible(
         settings,
@@ -104,6 +108,7 @@ def build_llm_provider(
         settings.llm_model,
         settings.llm_price_input_per_mtok,
         settings.llm_price_output_per_mtok,
+        settings.llm_fast_extra_body if fast else None,
     )
     primary = GuardedLLMProvider(primary_raw, settings.llm_base_url, budget_guard)
     missing = missing_fallback_settings(settings)
@@ -123,6 +128,7 @@ def build_llm_provider(
         settings.llm_fallback_model,
         settings.llm_fallback_price_input_per_mtok,
         settings.llm_fallback_price_output_per_mtok,
+        settings.llm_fallback_fast_extra_body if fast else None,
     )
     fallback = GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard)
     return FallbackLLMProvider([primary, fallback])

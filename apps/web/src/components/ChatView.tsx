@@ -52,7 +52,7 @@ export function ChatView({ messages, agentName, hidden, sending, error, onSend, 
         )}
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.role}`}>
-            <div className="message-meta"><span className={`message-avatar ${m.role}`}>{m.role === "user" ? "V" : "◉"}</span><span>{m.role === "user" ? "Você" : agentName ?? "VISÃO"}</span><time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
+            <div className="message-meta"><span className={`message-avatar ${m.role}`}>{m.role === "user" ? "V" : "◉"}</span><span>{m.role === "user" ? "Você" : agentName ?? "VISÃO"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou assunto</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
             <MessageContent text={m.content} />
             {m.sources && m.sources.length > 0 && (
               <ol className="sources" aria-label="Fontes pesquisadas">

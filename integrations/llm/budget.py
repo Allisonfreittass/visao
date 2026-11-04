@@ -93,7 +93,11 @@ class BudgetGuard:
         limits: BudgetLimits | None = None,
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        trust_zero_price: bool = False,
     ) -> None:
+        # Local use: a configured zero price is taken at its word. A provider reporting any cost
+        # still freezes the ledger in finish(), so this cannot turn into spending.
+        self.trust_zero_price = trust_zero_price
         self.factory = factory
         # Deep copies prevent mutation of a caller's prices dict after validation.
         self.grants = tuple(FreeEndpointGrant.model_validate(g.model_dump()) for g in grants)
@@ -133,6 +137,10 @@ class BudgetGuard:
                 return hashlib.sha256(
                     json.dumps([grant.provider, grant.endpoint, grant.model]).encode()
                 ).hexdigest()
+        if self.trust_zero_price:
+            return hashlib.sha256(
+                json.dumps([provider.name, endpoint, provider.model]).encode()
+            ).hexdigest()
         raise _deny("no current zero-price evidence for this exact endpoint/model")
 
     def reserve(self, provider: LLMProvider, endpoint: str, messages, output: int) -> str:

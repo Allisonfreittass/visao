@@ -109,6 +109,7 @@ def reply(
     capabilities: Capabilities | None = None,
     modality: str = "text",
     name_history_summary: str | None = None,
+    self_text: str | None = None,
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
@@ -131,6 +132,7 @@ def reply(
         capabilities=capabilities,
         name_history_summary=name_history_summary,
         modality=modality,
+        self_text=self_text,
     )
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)

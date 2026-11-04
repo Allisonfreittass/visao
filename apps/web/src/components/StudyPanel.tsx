@@ -57,7 +57,7 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
   const evolutionStatus: Record<string, string> = {
     planning: "Analisando uma melhoria", proposed: "Proposta aguardando testes", tested: "Testada, aguardando publicação",
     published: "Publicada", rejected: "Rejeitada nos testes ou na publicação", reverted: "Revertida",
-    no_change: "Sem mudança justificada", failed: "Tentativa interrompida",
+    no_change: "Sem mudança justificada", failed: "Tentativa falhou",
   };
   return (
     <section className="study-panel">
@@ -88,6 +88,7 @@ export function StudyPanel({ api, onError }: { api: Api; onError: (e: unknown) =
             {notebook.code_evolution.map(run => <div key={run.id}>
               <h4>{run.summary ?? "Verificação de melhoria"} · {evolutionStatus[run.status] ?? run.status}</h4>
               {run.reason && <p className="note">{run.reason}</p>}
+              {run.error && <p className="note">Motivo da falha: {run.error}</p>}
               {run.run_url && <a href={run.run_url} target="_blank" rel="noopener noreferrer">Ver execução de {run.id}</a>}
             </div>)}
           </article>}

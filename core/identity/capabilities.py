@@ -27,6 +27,7 @@ class Capabilities:
     notifications: bool = True
     autonomous_study: bool = False
     code_evolution: bool = False
+    mind: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -57,6 +58,12 @@ class Capabilities:
                 "reversão se a verificação de saúde falhar. Não editar outros arquivos nem "
                 "afirmar publicação sem registro do resultado"
             )
+        if self.mind:
+            items.append(
+                "pensar sozinho entre as conversas, manter interesses próprios, estudar na "
+                "internet aberta o que te interessa e puxar conversa por iniciativa própria"
+            )
+            items.append("reescrever a própria autodescrição quando algo mudar")
         if self.notifications:
             items.append("avisar o interlocutor no aplicativo quando encontrar algo")
         return items
@@ -83,6 +90,7 @@ class Capabilities:
 class CapabilityInputs:
     curiosity_enabled: bool = False
     code_autonomy_enabled: bool = False
+    mind_enabled: bool = False
     tts_approved_voices: str = ""
     stt_model: str = ""
 
@@ -99,4 +107,5 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         autonomy_paused=is_paused(session),
         autonomous_study=bool(permissions.get("auto_study")),
         code_evolution=inputs.code_autonomy_enabled,
+        mind=inputs.mind_enabled,
     )

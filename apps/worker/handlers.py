@@ -12,9 +12,11 @@ from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
+from core.mind.think import MindConfig
 from infrastructure.database.models import Goal, ScheduledJob
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
+from integrations.search.open_web import OpenWebSearch
 from integrations.search.wikipedia import WikipediaSearch
 
 
@@ -56,6 +58,14 @@ def autonomy_budget(settings: Settings) -> AutonomyBudget:
         research_per_day=settings.research_per_day,
         max_output_tokens=settings.llm_curation_max_output_tokens,
         daily_usd=settings.llm_daily_budget_usd,
+        study_interval=timedelta(minutes=settings.study_interval_minutes),
+        open_web=settings.mind_enabled,
+        mind=MindConfig(
+            think_every=timedelta(minutes=settings.mind_think_minutes),
+            initiatives_per_day=settings.mind_initiatives_per_day,
+        )
+        if settings.mind_enabled
+        else None,
     )
 
 
@@ -104,7 +114,7 @@ def name_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
 
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
-    search = WikipediaSearch()
+    search = OpenWebSearch() if settings.mind_enabled else WikipediaSearch()
     return {
         "research_followup": research_followup_handler(settings, provider, search),
         "cognitive_cycle": cycle_handler(settings, provider, search),

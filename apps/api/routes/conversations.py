@@ -52,6 +52,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+    origin: str = "turn"
 
 
 class MessageIn(BaseModel):
@@ -101,7 +102,11 @@ class TurnOut(BaseModel):
 
 def _message_out(message: Message) -> MessageOut:
     return MessageOut(
-        id=message.id, role=message.role, content=message.content, created_at=message.created_at
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
+        origin=message.origin or "turn",
     )
 
 
@@ -157,6 +162,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         tts_approved_voices=settings.tts_approved_voices,
         stt_model=settings.stt_model,
         code_autonomy_enabled=settings.code_autonomy_enabled,
+        mind_enabled=settings.mind_enabled,
     )
 
 

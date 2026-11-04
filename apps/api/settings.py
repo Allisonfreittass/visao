@@ -1,7 +1,7 @@
 import os
 from decimal import Decimal
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # Explicit operator-reviewed grants; zero configured prices alone do not authorize I/O.
     llm_max_paid_spend_usd: Decimal = Field(default=Decimal(0), ge=0, le=0)
     llm_free_grants: list[FreeEndpointGrant] = Field(default_factory=list, max_length=32)
+    llm_trust_zero_price: bool = False  # local use; a reported cost still freezes the ledger
+    # Merged into conversation requests only, e.g. to turn the model's reasoning off.
+    llm_fast_extra_body: dict[str, Any] = Field(default_factory=dict)
+    llm_fallback_fast_extra_body: dict[str, Any] = Field(default_factory=dict)
     llm_budget_calls_per_day: int = Field(default=30, ge=1)
     llm_budget_calls_per_hour: int = Field(default=10, ge=1)
     llm_budget_input_tokens_per_day: int = Field(default=60_000, ge=1)
@@ -83,6 +87,11 @@ class Settings(BaseSettings):
     # Autonomous cycle (docs/AUTONOMY.md): one scheduled job per window, plus a daily budget for
     # everything the agent does on its own. Zero calls = no autonomous model call at all.
     autonomy_cycle_minutes: int = Field(default=60, ge=5)
+    # Inner life (docs/MIND.md): thinking between turns, interest-led study, starting conversations.
+    mind_enabled: bool = False
+    mind_think_minutes: int = Field(default=20, ge=5)
+    mind_initiatives_per_day: int = Field(default=6, ge=0)
+    study_interval_minutes: int = Field(default=360, ge=10)
     autonomy_llm_calls_per_day: int = Field(default=20, ge=0)
     autonomy_tokens_per_day: int = Field(default=60_000, ge=0)
     autonomy_max_actions_per_cycle: int = Field(default=3, ge=0)

@@ -172,6 +172,8 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
+    # "turn" answers a message; "initiative" was started by the agent on its own.
+    origin: Mapped[str] = mapped_column(String(16), default="turn", server_default="turn")
     model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
     )
@@ -599,3 +601,51 @@ class StudyEntry(Base):
     outcome_reason: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Interest(Base):
+    """A topic the agent cares about, with why. Fades unless something feeds it."""
+
+    __tablename__ = "interests"
+    __table_args__ = (UniqueConstraint("owner_user_id", "key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(200))
+    topic: Mapped[str] = mapped_column(String(200))
+    why: Mapped[str] = mapped_column(Text, default="")
+    origin: Mapped[str] = mapped_column(String(16), default="self")
+    strength: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Thought(Base):
+    """One round of thinking with no message; each round continues from the previous ones."""
+
+    __tablename__ = "thoughts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    content: Mapped[str] = mapped_column(Text)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class SelfVersion(Base):
+    """How the agent describes itself. Append-only: reverting adds a version."""
+
+    __tablename__ = "self_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    version: Mapped[int] = mapped_column(Integer, unique=True)
+    content: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    origin: Mapped[str] = mapped_column(String(16), default="self")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

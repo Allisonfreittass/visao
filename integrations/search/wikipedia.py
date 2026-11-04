@@ -43,7 +43,11 @@ class WikipediaSearch:
         self,
         timeout_seconds: float = 10.0,
         transport: httpx.BaseTransport | None = None,
+        language: str = "pt",
     ) -> None:
+        self.language = language
+        self.name = f"wikipedia-{language}"
+        self._api_url = API_URL.replace("//pt.", f"//{language}.")
         self._client = httpx.Client(
             timeout=timeout_seconds,
             headers={"User-Agent": USER_AGENT},
@@ -97,14 +101,14 @@ class WikipediaSearch:
             if not page or "missing" in page:
                 continue
             url = str(page.get("fullurl", ""))
-            if not url.startswith("https://pt.wikipedia.org/"):
+            if not url.startswith(f"https://{self.language}.wikipedia.org/"):
                 continue
             results.append(
                 SearchResult(
                     url=url,
                     title=_clean(str(page.get("title", "")))[:300],
                     snippet=_clean(str(page.get("extract", "")))[:MAX_SNIPPET_CHARS],
-                    source="Wikipédia (pt)",
+                    source=f"Wikipédia ({self.language})",
                     retrieved_at=now,
                     updated_at=_parse_time(page.get("touched")),
                 )
@@ -114,7 +118,7 @@ class WikipediaSearch:
 
     def _get(self, params: dict[str, str]) -> dict:
         try:
-            response = self._client.get(API_URL, params=params)
+            response = self._client.get(self._api_url, params=params)
         except httpx.TimeoutException as exc:
             raise SearchError("timeout", "Wikipedia timed out") from exc
         except httpx.HTTPError as exc:

@@ -27,11 +27,13 @@ class OpenAICompatibleProvider:
         timeout_seconds: float = 60.0,
         max_retries: int = 2,
         transport: httpx.BaseTransport | None = None,
+        extra_body: dict | None = None,
     ) -> None:
         self.name = name
         self.model = model
         self.pricing = pricing
         self._max_retries = max_retries
+        self._extra_body = extra_body or {}
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {api_key}"},
@@ -41,6 +43,7 @@ class OpenAICompatibleProvider:
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
         payload = {
+            **self._extra_body,
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
             "max_tokens": max_output_tokens,

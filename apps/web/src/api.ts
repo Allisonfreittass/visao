@@ -18,8 +18,18 @@ export interface Message {
   role: Role;
   content: string;
   created_at: string;
+  /** "initiative" when the agent started this message on its own. */
+  origin?: string;
   /** Sources the reply was given (only known for replies received in this session). */
   sources?: Source[];
+}
+
+export interface Mind {
+  enabled: boolean;
+  self_text: string;
+  interests: { topic: string; why: string; strength: number }[];
+  thoughts: { content: string; created_at: string; ask_owner: string; wanted_to_say: string; delivery: string | null }[];
+  self_history: { version: number; content: string; reason: string; created_at: string }[];
 }
 
 export interface Conversation {
@@ -85,7 +95,7 @@ export interface StudyNotebook {
   scheduler?: { last_tick_at: string; status: string } | null;
   enabled: boolean;
   paused: boolean;
-  code_evolution?: Array<{ id: string; status: string; summary?: string; reason?: string; files?: string[]; commit?: string; run_url?: string }>;
+  code_evolution?: Array<{ id: string; status: string; summary?: string; reason?: string; files?: string[]; commit?: string; run_url?: string; error?: string }>;
   interval_hours: number;
   next_eligible_at: string | null;
   source: string;
@@ -262,6 +272,17 @@ export class Api {
       signal,
     });
     return response.arrayBuffer();
+  }
+
+  mind(): Promise<Mind> {
+    return this.request("/mind");
+  }
+
+  revertSelf(version: number | null): Promise<void> {
+    return this.request("/mind/self/revert", {
+      method: "POST",
+      body: JSON.stringify({ version }),
+    });
   }
 
   study(): Promise<StudyNotebook> {
