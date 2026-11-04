@@ -30,8 +30,24 @@ export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) =>
     await api.revertSelf(previous ? previous.version : null);
     setMind(await api.mind());
   }
+  async function change(action: Promise<void>) {
+    await action;
+    setMind(await api.mind());
+  }
+  const note = (kind: "profile" | "rules", title: string, empty: string) => {
+    const item = mind[kind];
+    return <article className="study-entry">
+      <h3>{title}</h3>
+      <p className="mind-note">{item.content || empty}</p>
+      {item.content && <p className="note">{item.reason && `Mudou porque: ${item.reason} `}
+        <button type="button" className="link-button" onClick={() => void change(api.undoNote(kind))}>desfazer</button>{" · "}
+        <button type="button" className="link-button" onClick={() => void change(api.eraseNote(kind))}>apagar</button></p>}
+    </article>;
+  };
   return (
     <section className="mind-panel">
+      {note("profile", "O que ele sabe sobre você", "Ainda não anotou nada: isso aparece depois de algumas conversas.")}
+      {note("rules", "O que aprendeu com as suas correções", "Nenhuma correção ainda. Diga quando ele errar: vira regra na hora.")}
       <article className="study-entry">
         <h3>Como ele se descreve agora</h3>
         <p>{mind.self_text}</p>

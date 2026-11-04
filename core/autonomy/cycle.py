@@ -39,6 +39,7 @@ from integrations.search.base import SearchProvider
 JOB_KIND = "cognitive_cycle"
 AUTONOMOUS_PURPOSES = (
     "code_proposal",
+    "mind_review",
     "mind_think",
     "name_deliberation",
     "followup_summary",
@@ -155,9 +156,25 @@ def run_cycle(
 
     # Thinking comes first: it can shape what gets studied and said in this same cycle.
     if budget.mind is not None:
+        from core.mind.review import idle_review_due, review_once
         from core.mind.think import think_once
 
         for owner in session.scalars(select(User).where(User.is_active.is_(True))).all():
+            if room() and idle_review_due(session, owner, now):
+                reviewed = review_once(
+                    session, owner=owner, provider=provider, budget=budget, now=now
+                )
+                report.actions.append(
+                    _record(
+                        session,
+                        owner.id,
+                        action="mind_review",
+                        executed=reviewed.outcome == "reviewed",
+                        reason=reviewed.outcome,
+                        changed=list(reviewed.changed),
+                        rejected=list(reviewed.rejected),
+                    )
+                )
             if not room():
                 break
             result = think_once(

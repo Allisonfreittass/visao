@@ -649,3 +649,21 @@ class SelfVersion(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     origin: Mapped[str] = mapped_column(String(16), default="self")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class OwnerNote(Base):
+    """One version of a permanent note about the owner; the newest for each kind is current."""
+
+    __tablename__ = "owner_notes"
+    __table_args__ = (UniqueConstraint("owner_user_id", "kind", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))  # profile | rules
+    version: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    origin: Mapped[str] = mapped_column(String(16), default="review")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

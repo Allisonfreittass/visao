@@ -20,6 +20,25 @@ O estudo (`core/study/service.py`) parte dos interesses, com intervalo de
 `VISION_STUDY_INTERVAL_MINUTES`. Sem um interesse ou memória ligando o tema à pessoa, ele não
 estuda: antes o padrão era "organização do conhecimento" e por isso ele estudava coisas sem relação.
 
+## Aprender com a conversa
+
+Inspirado no Hermes Agent. Memórias recuperadas só aparecem quando a mensagem casa com elas, então
+ele podia falar com você sem o seu retrato na frente. Agora existem duas anotações curtas, sempre no
+prompt (`core/mind/notes.py`), versionadas e com limite de tamanho, que forçam escolher o que importa:
+
+- **Perfil** (1400 caracteres): quem você é.
+- **Regras** (1000 caracteres): como te tratar, vindas das suas correções.
+
+`core/mind/review.py` relê a conversa em segundo plano, num job do worker, sem atrasar a resposta: a
+cada `VISION_MIND_REVIEW_TURNS` turnos, na hora depois de uma correção ("para de", "muito longo"), e
+quando uma conversa curta fica parada por 15 min. Toda mudança precisa citar mensagens suas, e isso é
+conferido em código: nem as falas dele nem o que ele leu na web podem mudar o que ele acha de você.
+Saúde, religião, política, finanças e terceiros ficam de fora, como na memória.
+
+Tudo depende do consentimento de memória. `DELETE /memory` apaga também as duas anotações, e a
+exportação as inclui. Na aba Estudos dá para desfazer ou apagar cada uma; apagar uma memória isolada
+não muda o perfil, então um fato errado se corrige dizendo a ele ou apagando a anotação.
+
 ## Puxar conversa
 
 `core/mind/initiative.py` grava uma mensagem real no chat (`messages.origin = "initiative"`); a

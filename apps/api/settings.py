@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     # Inner life (docs/MIND.md): thinking between turns, interest-led study, starting conversations.
     mind_enabled: bool = False
     mind_think_minutes: int = Field(default=20, ge=5)
+    mind_review_turns: int = Field(default=4, ge=1)
     mind_initiatives_per_day: int = Field(default=6, ge=0)
     study_interval_minutes: int = Field(default=360, ge=10)
     autonomy_llm_calls_per_day: int = Field(default=20, ge=0)

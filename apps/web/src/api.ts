@@ -24,12 +24,21 @@ export interface Message {
   sources?: Source[];
 }
 
+export interface MindNote {
+  content: string;
+  reason: string;
+  limit: number;
+  updated_at: string | null;
+}
+
 export interface Mind {
   enabled: boolean;
   self_text: string;
   interests: { topic: string; why: string; strength: number }[];
   thoughts: { content: string; created_at: string; ask_owner: string; wanted_to_say: string; delivery: string | null }[];
   self_history: { version: number; content: string; reason: string; created_at: string }[];
+  profile: MindNote;
+  rules: MindNote;
 }
 
 export interface Conversation {
@@ -276,6 +285,14 @@ export class Api {
 
   mind(): Promise<Mind> {
     return this.request("/mind");
+  }
+
+  undoNote(kind: "profile" | "rules"): Promise<void> {
+    return this.request(`/mind/notes/${kind}/undo`, { method: "POST" });
+  }
+
+  eraseNote(kind: "profile" | "rules"): Promise<void> {
+    return this.request(`/mind/notes/${kind}`, { method: "DELETE" });
   }
 
   revertSelf(version: number | null): Promise<void> {

@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core.mind import notes
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import (
     MemoryCandidate,
@@ -68,6 +69,7 @@ def delete_all(session: Session, owner: User) -> int:
         )
     ):
         _scrub(candidate, now)
+    notes.erase(session, owner.id)
     record_audit(
         session,
         "memory.delete_all",
@@ -95,6 +97,8 @@ def export(session: Session, owner: User) -> dict[str, Any]:
     return {
         "exported_at": datetime.now(UTC).isoformat(),
         "memory_consent": owner.memory_consent,
+        "profile": notes.current(session, owner.id, notes.PROFILE),
+        "rules": notes.current(session, owner.id, notes.RULES),
         "records": [
             {
                 "id": str(r.id),

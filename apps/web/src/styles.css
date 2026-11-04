@@ -208,3 +208,4 @@ a { color: var(--accent); text-underline-offset: 3px; }
 .mind-thought { border-top: 1px solid #ffffff0c; padding: 12px 0; }
 .mind-thought time { color: var(--muted); font-size: 9px; }
 .link-button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.mind-note { white-space: pre-line; }

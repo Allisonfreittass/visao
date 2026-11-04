@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession
-from core.mind import state
+from core.mind import notes, state
+from infrastructure.database.audit import record_audit
 from infrastructure.database.models import SelfVersion
 
 router = APIRouter(prefix="/mind", tags=["mind"])
@@ -34,16 +35,37 @@ class SelfVersionOut(BaseModel):
     created_at: datetime
 
 
+class NoteOut(BaseModel):
+    content: str = ""
+    reason: str = ""
+    limit: int
+    updated_at: datetime | None = None
+
+
 class MindOut(BaseModel):
     enabled: bool
     self_text: str
     interests: list[InterestOut]
     thoughts: list[ThoughtOut]
     self_history: list[SelfVersionOut]
+    profile: NoteOut
+    rules: NoteOut
 
 
 class RevertIn(BaseModel):
     version: int | None = None  # None goes back to the original description
+
+
+def _note(db: DbSession, user_id, kind: str) -> NoteOut:
+    note = notes.latest(db, user_id, kind)
+    if note is None:
+        return NoteOut(limit=notes.LIMITS[kind])
+    return NoteOut(
+        content=note.content,
+        reason=note.reason,
+        limit=notes.LIMITS[kind],
+        updated_at=note.created_at,
+    )
 
 
 @router.get("")
@@ -72,7 +94,23 @@ def read_mind(db: DbSession, user: CurrentUser, settings: AppSettings) -> MindOu
             )
             for v in history
         ],
+        profile=_note(db, user.id, notes.PROFILE),
+        rules=_note(db, user.id, notes.RULES),
     )
+
+
+@router.post("/notes/{kind}/undo", status_code=status.HTTP_204_NO_CONTENT)
+def undo_note(kind: notes.Kind, db: DbSession, user: CurrentUser) -> None:
+    if not notes.undo(db, user.id, kind):
+        raise HTTPException(404, "Nada para desfazer")
+    db.commit()
+
+
+@router.delete("/notes/{kind}", status_code=status.HTTP_204_NO_CONTENT)
+def erase_note(kind: notes.Kind, db: DbSession, user: CurrentUser) -> None:
+    notes.erase(db, user.id, kind)
+    record_audit(db, "mind.note_erased", "success", actor_user_id=user.id, details={"kind": kind})
+    db.commit()
 
 
 @router.post("/self/revert", status_code=status.HTTP_204_NO_CONTENT)

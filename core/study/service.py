@@ -20,6 +20,7 @@ from core.autonomy.cycle import AutonomyBudget, _budget_left, usage_today
 from core.initiatives.notify import notify
 from core.memory import policy
 from core.memory.text import fold, overlap, tokens
+from core.mind import notes
 from core.mind.state import top_interests
 from core.policies.autonomy import is_paused
 from core.research.budget import searches_today
@@ -197,6 +198,9 @@ def _seeds(session: Session, owner: User, entries: list[StudyEntry]) -> list[dic
         for interest in top_interests(session, owner.id, 6)
     ]
     if owner.memory_consent:
+        profile = notes.current(session, owner.id, notes.PROFILE)
+        if profile:
+            seeds.append({"ref": "profile:owner", "text": profile[:800]})
         for memory in session.scalars(
             select(MemoryRecord)
             .where(

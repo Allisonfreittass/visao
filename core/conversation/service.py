@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from core.behavior import state as behavior_state
 from core.identity.capabilities import Capabilities
-from core.identity.system_prompt import build_system_prompt
+from core.identity.system_prompt import build_system_prompt, learned_rules_block
 from core.memory.retrieval import ScoredMemory, retrieve
 from infrastructure.database.models import (
     AgentIdentity,
@@ -110,6 +110,8 @@ def reply(
     modality: str = "text",
     name_history_summary: str | None = None,
     self_text: str | None = None,
+    owner_profile: str = "",
+    owner_rules: str = "",
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
@@ -133,6 +135,8 @@ def reply(
         name_history_summary=name_history_summary,
         modality=modality,
         self_text=self_text,
+        owner_profile=owner_profile,
+        owner_rules=owner_rules,
     )
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)
@@ -144,6 +148,8 @@ def reply(
     if extra_system:
         # Per-turn context from the curiosity pipeline (a question to ask, or sources).
         system_prompt += f"\n\nContexto desta resposta:\n{extra_system}"
+    if owner_rules:
+        system_prompt += "\n\n" + learned_rules_block(owner_rules)
     prompt = [ChatMessage(role="system", content=system_prompt)]
     prompt += build_context(conversation_history(session, conversation), context_char_budget)
 

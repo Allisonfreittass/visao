@@ -27,6 +27,8 @@ from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.memory.text import tokens
+from core.mind import notes as mind_notes
+from core.mind import review as mind_review
 from core.mind import state as mind_state
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
@@ -48,6 +50,7 @@ class TurnConfig:
     stt_model: str = ""
     code_autonomy_enabled: bool = False
     mind_enabled: bool = False
+    review_every_turns: int = 4
 
 
 @dataclass(frozen=True)
@@ -173,6 +176,9 @@ def run_turn(
         if on_mind:
             blocks.append(on_mind)
     blocks.append(plan.facts())
+    owner_profile, owner_rules = (
+        mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
+    )
     result = reply(
         session,
         conversation=conversation,
@@ -188,6 +194,8 @@ def run_turn(
         modality=modality,
         name_history_summary=name_deliberation.history_summary(session, identity),
         self_text=mind_state.current_self(session) if config.mind_enabled else None,
+        owner_profile=owner_profile,
+        owner_rules=owner_rules,
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id
@@ -218,6 +226,16 @@ def run_turn(
         reason="lexical_recall",
         count=len(result.recalled),
     )
+    if config.mind_enabled:
+        queued = mind_review.request(
+            session,
+            owner,
+            text=text,
+            message_id=result.user_message.id,
+            every_turns=config.review_every_turns,
+        )
+        if queued:
+            plan.add("review_scheduled", executed=True, reason="conversation_review")
     decision = plan.persist(
         session,
         owner_id=owner.id,

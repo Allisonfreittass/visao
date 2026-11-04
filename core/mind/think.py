@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.memory import policy
-from core.mind import initiative, state
+from core.mind import initiative, notes, state
 from core.study.service import _complete, _room
 from infrastructure.database.models import (
     Conversation,
@@ -42,7 +42,7 @@ mais que assuntos antigos. Exercícios fictícios e testes feitos por outros sis
 não são a vida dela: não os persiga.
 
 Regras de verdade: não invente fatos sobre a pessoa, conversas que não aconteceram, nem resultados
-de pesquisa. Só diga que estudou algo que esteja em findings.
+de pesquisa. Só diga que estudou algo que esteja em findings. Siga how_to_treat_them em say.
 
 Responda SOMENTE JSON:
 {"thought": "2 a 5 frases do que você está pensando agora",
@@ -184,6 +184,7 @@ def think_once(
     if not _room(session, budget, now):
         return ThinkReport(None, "autonomy_budget")
     last_spoke = initiative.last_owner_message_at(session, owner)
+    profile, rules = notes.for_prompt(session, owner)
     context = {
         "now": now.isoformat(),
         "self": state.current_self(session),
@@ -192,6 +193,8 @@ def think_once(
             {"topic": i.topic, "why": i.why, "strength": round(i.strength, 2)}
             for i in state.top_interests(session, owner.id, 12)
         ],
+        "who_they_are": profile,
+        "how_to_treat_them": rules,
         "memories": _memories(session, owner),
         "owner_recent": _owner_recent(session, owner),
         "hours_since_owner_spoke": round((now - last_spoke).total_seconds() / 3600, 1)

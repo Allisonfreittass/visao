@@ -163,6 +163,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         stt_model=settings.stt_model,
         code_autonomy_enabled=settings.code_autonomy_enabled,
         mind_enabled=settings.mind_enabled,
+        review_every_turns=settings.mind_review_turns,
     )
 
 

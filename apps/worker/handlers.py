@@ -12,8 +12,9 @@ from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
+from core.mind.review import review_once
 from core.mind.think import MindConfig
-from infrastructure.database.models import Goal, ScheduledJob
+from infrastructure.database.models import Goal, ScheduledJob, User
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
 from integrations.search.open_web import OpenWebSearch
@@ -88,6 +89,26 @@ def cycle_handler(
     return handle
 
 
+def review_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        owner = session.get(User, uuid.UUID(job.payload["owner_id"]))
+        if provider is None or owner is None:
+            raise RuntimeError("LLM or owner missing")
+        report = review_once(
+            session, owner=owner, provider=provider, budget=autonomy_budget(settings)
+        )
+        return HandlerResult(
+            "done",
+            {
+                "outcome": report.outcome,
+                "changed": list(report.changed),
+                "rejected": list(report.rejected),
+            },
+        )
+
+    return handle
+
+
 def name_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     def handle(session: Session, job: ScheduledJob) -> HandlerResult:
         identity = get_identity(session)
@@ -119,4 +140,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         "research_followup": research_followup_handler(settings, provider, search),
         "cognitive_cycle": cycle_handler(settings, provider, search),
         "name_deliberation": name_handler(settings, provider),
+        "mind_review": review_handler(settings, provider),
     }
