@@ -117,6 +117,7 @@ def build_system_prompt(
             "",
             "Como falar:",
             *(f"- {rule}" for rule in VOICE_RULES),
+            f"- {guidance()}",
         ]
         if "pergunt" not in owner_rules.lower():
             lines.append(f"- {QUESTION_RULE}")

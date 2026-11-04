@@ -75,6 +75,7 @@ class BudgetLimits:
     concurrency: int = 1
     failure_threshold: int = 3
     cooldown_seconds: int = 900
+    stale_reservation_seconds: int = 900
 
     def __post_init__(self):
         if any(value < 1 for value in vars(self).values()):
@@ -168,7 +169,14 @@ class BudgetGuard:
                 state.update(day=day, calls=0, input=0, output=0)
             if state.get("hour") != hour:
                 state.update(hour=hour, hourly_calls=0)
-            active = dict(state.get("active", {}))
+            # A call that timed out, or died with its container, is still charged but cannot
+            # hold a slot forever: one lost call must not silence the agent until an operator acts.
+            active = {
+                reservation_id: item
+                for reservation_id, item in state.get("active", {}).items()
+                if (now - datetime.fromisoformat(item["created_at"])).total_seconds()
+                < self.limits.stale_reservation_seconds
+            }
             circuit = state.get("circuits", {}).get(key, {})
             if circuit.get("until", 0) > now.timestamp():
                 raise _deny("provider circuit is cooling down")

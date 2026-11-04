@@ -54,7 +54,7 @@ def tick(
         outcomes = []
         # Short work bursts, rather than a permanently running poll loop that keeps the
         # database awake. Job leases and budgets are the same as in the local worker.
-        for _ in range(2):
+        for _ in range(3):
             if time.monotonic() - started >= settings.autonomy_max_seconds:
                 break
             outcome = run_once(factory, handlers, "cloud-cron")

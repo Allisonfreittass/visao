@@ -133,7 +133,7 @@ def test_success_retains_reservation_and_persists_quota_across_guard_restart(fac
 
 
 @pytest.mark.parametrize("kind", ["timeout", "network", "bad_response"])
-def test_uncertain_failure_does_not_refund_quota_or_release_slot_on_restart(factory, kind):
+def test_uncertain_failure_keeps_quota_charged_and_holds_the_slot_only_for_a_while(factory, kind):
     p = fake(fail_with=kind)
     guarded = GuardedLLMProvider(p, ENDPOINT, make_guard(factory))
     with pytest.raises(LLMError) as exc:
@@ -142,16 +142,20 @@ def test_uncertain_failure_does_not_refund_quota_or_release_slot_on_restart(fact
     state = ledger(factory)
     assert state["calls"] == 1
     assert list(state["active"].values())[0]["state"] == "unknown"
-    # Even a new day cannot silently drop a crashed/ambiguous in-flight reservation.
-    later = NOW + timedelta(days=1)
-    new = make_guard(
-        factory,
-        clock=lambda: later,
-        grants=[grant(verified_at=later, expires_at=later + timedelta(hours=1))],
-    )
+
+    def guard_at(moment):
+        return make_guard(
+            factory,
+            clock=lambda: moment,
+            grants=[grant(verified_at=moment, expires_at=moment + timedelta(hours=1))],
+        )
+
     with pytest.raises(LLMError):
-        new.reserve(fake(), ENDPOINT, PROMPT, 512)
+        guard_at(NOW + timedelta(minutes=14)).reserve(fake(), ENDPOINT, PROMPT, 512)
     assert ledger(factory)["calls"] == 1
+    # One lost call must not silence the agent for good; what it consumed is never refunded.
+    guard_at(NOW + timedelta(minutes=16)).reserve(fake(), ENDPOINT, PROMPT, 512)
+    assert ledger(factory)["calls"] == 2
 
 
 def test_crash_between_reserve_and_dispatch_blocks_second_dispatch(factory):

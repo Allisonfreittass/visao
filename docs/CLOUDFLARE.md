@@ -8,7 +8,7 @@ O disco do Container é temporário e nunca deve guardar o banco.
 ## Agendamento e limites
 
 O Cron do Cloudflare verifica trabalho a cada 15 minutos, mesmo sem navegador
-aberto. A API agenda o ciclo cognitivo por hora e executa no máximo dois jobs por
+aberto. A API agenda o ciclo cognitivo por hora e executa no máximo três jobs por
 verificação. Usa as permissões, pausa, limites de custo e leases do worker local.
 Rodadas novas de estudo continuam sujeitas ao intervalo de seis horas e às cotas
 diárias. Uma pesquisa inconclusiva por falta de fontes ou de resposta nos trechos
