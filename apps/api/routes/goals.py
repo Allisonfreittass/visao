@@ -12,8 +12,9 @@ from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
 from core.goals import lifecycle
+from core.mind import initiative
 from core.policies.autonomy import is_paused, set_paused
-from infrastructure.database.models import Goal, Notification, ScheduledJob
+from infrastructure.database.models import Conversation, Goal, Notification, ScheduledJob
 
 router = APIRouter(tags=["goals"])
 
@@ -57,6 +58,14 @@ class NotificationOut(BaseModel):
     created_at: datetime
     deliver_after: datetime
     read_at: datetime | None
+
+
+class NotificationReplyIn(BaseModel):
+    conversation_id: uuid.UUID | None = None
+
+
+class NotificationReplyOut(BaseModel):
+    conversation_id: uuid.UUID
 
 
 class InitiativeOut(BaseModel):
@@ -242,6 +251,29 @@ def mark_read(notification_id: uuid.UUID, db: DbSession, user: CurrentUser) -> N
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Notificação não encontrada")
     notification.read_at = notification.read_at or datetime.now(UTC)
     db.commit()
+
+
+@router.post("/notifications/{notification_id}/reply")
+def reply_to_notification(
+    notification_id: uuid.UUID, body: NotificationReplyIn, db: DbSession, user: CurrentUser
+) -> NotificationReplyOut:
+    """A notice is one-way; answering it moves it into a conversation, where it has a reply box
+    and the agent has the context. Initiative messages are already there."""
+    notification = db.get(Notification, notification_id)
+    if notification is None or notification.owner_user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notificação não encontrada")
+    conversation = db.get(Conversation, body.conversation_id) if body.conversation_id else None
+    if conversation is None or conversation.user_id != user.id:
+        conversation = initiative.conversation_for(db, user)
+    if conversation is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Execute o genesis primeiro")
+    now = datetime.now(UTC)
+    if notification.read_at is None:
+        if notification.kind != "initiative":
+            initiative.open_in_chat(db, conversation, notification.body, now)
+        notification.read_at = now
+    db.commit()
+    return NotificationReplyOut(conversation_id=conversation.id)
 
 
 @router.get("/notifications/settings")

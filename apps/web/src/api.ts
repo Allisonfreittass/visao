@@ -218,6 +218,14 @@ export class Api {
     return this.request("/notifications");
   }
 
+  replyToNotification(notificationId: string, conversationId: string | null): Promise<{ conversation_id: string }> {
+    return this.request(`/notifications/${encodeURIComponent(notificationId)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ conversation_id: conversationId }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   markRead(notificationId: string): Promise<void> {
     return this.request(`/notifications/${encodeURIComponent(notificationId)}/read`, {
       method: "POST",
@@ -299,6 +307,7 @@ export class Api {
     return this.request("/mind/self/revert", {
       method: "POST",
       body: JSON.stringify({ version }),
+      headers: { "Content-Type": "application/json" },
     });
   }
 

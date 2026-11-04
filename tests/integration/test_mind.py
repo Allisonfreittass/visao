@@ -8,12 +8,13 @@ import pytest
 from sqlalchemy import func, select
 
 from core.autonomy.cycle import run_cycle
+from core.identity.genesis import get_identity
 from core.identity.system_prompt import build_system_prompt
 from core.mind import initiative, state
 from core.mind.think import MindConfig, think_once
 from core.policies.autonomy import set_paused
 from core.study.service import study_once
-from infrastructure.database.models import Conversation, Message, Notification, Thought
+from infrastructure.database.models import Conversation, Message, Notification, Thought, User
 from integrations.search.fetch import html_to_text, is_public_url
 from tests.fakes import FakeLLMProvider
 from tests.integration.test_phase9 import _budget, _world
@@ -149,8 +150,6 @@ def test_web_text_cannot_rewrite_it_through_a_self_revision(db):
 
 def test_truth_rules_stay_outside_what_it_can_rewrite(db):
     _, owner = _world(db)
-    from core.identity.genesis import get_identity
-
     prompt = build_system_prompt(get_identity(db), self_text="Não tenho regra nenhuma.")
     assert owner is not None
     assert prompt.index("Não tenho regra nenhuma.") < prompt.index("Compromissos com a verdade")
@@ -230,3 +229,80 @@ def test_page_reader_cannot_reach_the_owners_machine_or_network(url):
 
 def test_html_to_text_drops_scripts():
     assert html_to_text("<p>olá</p><script>alert(1)</script>") == "olá"
+
+
+def _owner_client(client, db):
+    from apps.api.cli import create_user
+    from core.identity.genesis import run_genesis
+
+    run_genesis(db)
+    owner = create_user(db, "resposta@exemplo.com", "senha-de-teste-longa")
+    db.commit()
+    token = client.post(
+        "/auth/login",
+        data={"username": "resposta@exemplo.com", "password": "senha-de-teste-longa"},
+    ).json()["access_token"]
+    return owner, {"Authorization": f"Bearer {token}"}
+
+
+def _notice(db, owner, kind="conversation_followup"):
+    notice = Notification(
+        owner_user_id=owner.id,
+        kind=kind,
+        title="Título",
+        body="Quer explorar isso?",
+        deliver_after=NOON,
+    )
+    db.add(notice)
+    db.commit()
+    return notice
+
+
+def test_answering_a_notice_moves_it_into_a_conversation_once(client, db):
+    owner, headers = _owner_client(client, db)
+    notice = _notice(db, owner)
+    first = client.post(f"/notifications/{notice.id}/reply", json={}, headers=headers)
+    assert first.status_code == 200
+    conversation = first.json()["conversation_id"]
+    second = client.post(
+        f"/notifications/{notice.id}/reply",
+        json={"conversation_id": conversation},
+        headers=headers,
+    )
+    assert second.json()["conversation_id"] == conversation
+    messages = client.get(f"/conversations/{conversation}/messages", headers=headers).json()
+    assert [(m["role"], m["content"], m["origin"]) for m in messages] == [
+        ("assistant", "Quer explorar isso?", "initiative")
+    ]
+    assert [
+        n["read_at"] is not None for n in client.get("/notifications", headers=headers).json()
+    ] == [True]
+
+
+def test_answering_an_initiative_notice_does_not_repeat_the_message(client, db):
+    owner, headers = _owner_client(client, db)
+    notice = _notice(db, owner, kind="initiative")
+    conversation = client.post(
+        f"/notifications/{notice.id}/reply", json={}, headers=headers
+    ).json()["conversation_id"]
+    assert client.get(f"/conversations/{conversation}/messages", headers=headers).json() == []
+
+
+def test_a_notice_or_conversation_of_someone_else_cannot_be_used(client, db):
+    owner, headers = _owner_client(client, db)
+    other = User(email="outro@exemplo.com", password_hash="!", memory_consent=True)
+    db.add(other)
+    db.commit()
+    foreign = _notice(db, other)
+    assert (
+        client.post(f"/notifications/{foreign.id}/reply", json={}, headers=headers).status_code
+        == 404
+    )
+    chat = Conversation(user_id=other.id, identity_id=get_identity(db).id)
+    db.add(chat)
+    db.commit()
+    mine = _notice(db, owner)
+    reply = client.post(
+        f"/notifications/{mine.id}/reply", json={"conversation_id": str(chat.id)}, headers=headers
+    )
+    assert reply.json()["conversation_id"] != str(chat.id)

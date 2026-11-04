@@ -8,13 +8,15 @@ interface ChatViewProps {
   messages: Message[];
   agentName?: string | null;
   hidden?: boolean;
+  /** Changes when something outside wants the person typing here, e.g. answering a notice. */
+  focusRequest?: number;
   sending: boolean;
   error: string | null;
   onSend: (text: string) => void;
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ messages, agentName, hidden, sending, error, onSend, onFeedback }: ChatViewProps) {
+export function ChatView({ messages, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -22,6 +24,10 @@ export function ChatView({ messages, agentName, hidden, sending, error, onSend, 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, sending]);
+
+  useEffect(() => {
+    if (focusRequest) textareaRef.current?.focus();
+  }, [focusRequest]);
 
   function submit(event?: FormEvent) {
     event?.preventDefault();

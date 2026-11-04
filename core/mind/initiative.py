@@ -85,10 +85,8 @@ def can_speak(session: Session, owner: User, now: datetime, per_day: int) -> str
     return None
 
 
-def post(session: Session, owner: User, text: str, now: datetime, per_day: int) -> Delivery:
-    reason = can_speak(session, owner, now, per_day)
-    if reason is not None:
-        return Delivery(False, reason)
+def conversation_for(session: Session, owner: User) -> Conversation | None:
+    """The latest conversation, or a new one when there is none and an identity exists."""
     conversation = session.scalar(
         select(Conversation)
         .where(Conversation.user_id == owner.id)
@@ -98,10 +96,14 @@ def post(session: Session, owner: User, text: str, now: datetime, per_day: int) 
     if conversation is None:
         identity = get_identity(session)
         if identity is None:
-            return Delivery(False, "no_identity")
+            return None
         conversation = Conversation(user_id=owner.id, identity_id=identity.id)
         session.add(conversation)
         session.flush()
+    return conversation
+
+
+def open_in_chat(session: Session, conversation: Conversation, text: str, now: datetime) -> Message:
     message = Message(
         conversation_id=conversation.id,
         role="assistant",
@@ -110,6 +112,18 @@ def post(session: Session, owner: User, text: str, now: datetime, per_day: int) 
         created_at=now,
     )
     session.add(message)
+    session.flush()
+    return message
+
+
+def post(session: Session, owner: User, text: str, now: datetime, per_day: int) -> Delivery:
+    reason = can_speak(session, owner, now, per_day)
+    if reason is not None:
+        return Delivery(False, reason)
+    conversation = conversation_for(session, owner)
+    if conversation is None:
+        return Delivery(False, "no_identity")
+    message = open_in_chat(session, conversation, text, now)
     session.add(
         Notification(
             owner_user_id=owner.id,

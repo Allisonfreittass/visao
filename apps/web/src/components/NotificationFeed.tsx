@@ -3,7 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { Api, AppNotification } from "../api";
 
 /** Invitations stay visible even when the conversation menu is closed. */
-export function NotificationFeed({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
+export function NotificationFeed({ api, current, onError, onReply }: {
+  api: Api;
+  current: string | null;
+  onError: (e: unknown) => void;
+  onReply: (conversationId: string) => void;
+}) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const refresh = useCallback(async () => {
     setNotifications(await api.notifications());
@@ -28,6 +33,14 @@ export function NotificationFeed({ api, onError }: { api: Api; onError: (e: unkn
     try { await api.markRead(id); await refresh(); } catch (e) { onError(e); }
   }
 
+  async function reply(id: string) {
+    try {
+      const { conversation_id: conversationId } = await api.replyToNotification(id, current);
+      await refresh();
+      onReply(conversationId);
+    } catch (e) { onError(e); }
+  }
+
   const unread = notifications.filter((item) => !item.read_at);
   if (!unread.length) return null;
   return (
@@ -36,7 +49,10 @@ export function NotificationFeed({ api, onError }: { api: Api; onError: (e: unkn
         <div className="card" key={item.id}>
           <strong>{item.title}</strong>
           <p className="note pre">{item.body}</p>
-          <button className="ghost" onClick={() => void dismiss(item.id)}>Dispensar aviso</button>
+          <div className="notification-actions">
+            <button onClick={() => void reply(item.id)}>Responder</button>
+            <button className="ghost" onClick={() => void dismiss(item.id)}>Dispensar aviso</button>
+          </div>
         </div>
       ))}
     </section>

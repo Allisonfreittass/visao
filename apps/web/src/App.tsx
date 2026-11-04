@@ -90,6 +90,7 @@ export function App() {
   const [current, setCurrent] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
+  const [composerFocus, setComposerFocus] = useState(0);
   const sendingRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
   const speakRef = useRef<((text: string) => void) | null>(null);
@@ -541,12 +542,23 @@ export function App() {
                     ` · total fim da fala → voz ${Math.round(latency.totalMs)} ms`}
                 </p>
               )}
-              <NotificationFeed api={api} onError={handleError} />
+              <NotificationFeed
+                api={api}
+                current={current}
+                onError={handleError}
+                onReply={(conversationId) => {
+                  setWorkspaceView("conversation");
+                  setCurrent(conversationId);
+                  api.messages(conversationId).then(setMessages).catch(handleError);
+                  setComposerFocus((value) => value + 1);
+                }}
+              />
               {workspaceView === "study" && <MindPanel api={api} onError={handleError} />}
               {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
               {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
               <ChatView
                 hidden={workspaceView !== "conversation"}
+                focusRequest={composerFocus}
                 agentName={agentName}
                 messages={messages}
                 sending={sending || preparing}
