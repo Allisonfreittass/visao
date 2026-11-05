@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from core.conversation.service import Budgets, check_budgets
 from core.goals.followup import propose_followup
 from core.memory.retrieval import retrieve
-from core.memory.text import jaccard, tokens
+from core.memory.text import fold, jaccard, tokens
 from core.research.budget import searches_today
 from core.research.service import run_research
 from infrastructure.database.models import (
@@ -39,7 +39,7 @@ from infrastructure.database.models import (
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
-POLICY_VERSION = "2026-10-31.4"
+POLICY_VERSION = "2026-11-04.1"
 PURPOSE_ASSESSMENT = "curiosity_assessment"
 
 MIN_EXPECTED_VALUE = 0.4
@@ -56,6 +56,39 @@ _TRIVIAL = re.compile(
     r"valeu|vlw|ok+|okay|beleza|blz|show|massa|top|sim|n[aã]o|t[aá]|entendi|combinado|"
     r"perfeito|legal|kk+|haha+|rs+)[\s!.?,]*$",
     re.IGNORECASE,
+)
+
+_LATER = (
+    r"(?:depois|mais tarde|amanha|outra hora|outra vez|outra conversa|outro dia|outro momento|"
+    r"semana que vem|a?\s?proxima)"
+)
+# Matched on fold()ed text. "Por enquanto" and a bare "depois" are deliberately absent: "tirei o
+# Cloudflare por enquanto" and "depois do almoço subo a versão" leave nothing open.
+_DEFERRAL = re.compile(
+    r"\b(?:deix|fic)[a-z]*(?:\s+[\w-]+){0,4}?\s+(?:para|pra|pro)\s+" + _LATER + r"\b"
+    r"|\b(?:volt|retom|continu|pens|convers|fal|olh|resolv|decid|ve(?:r|mos|jo)\b)[a-z]*"
+    r"(?:\s+[\w-]+){0,3}?\s+" + _LATER + r"\b"
+    r"|\bdepois\s+(?:a gente\s+|eu\s+|nos\s+)?"
+    r"(?:volt|retom|continu|pens|convers|fal|olh|resolv|decid|ve(?:r|mos|jo)\b)"
+    r"|\bem aberto\b"
+    r"|\badi(?:ar|amos|ei|ado|ada|ando)\b"
+    r"|\b(?:vou|vamos|fazer uma|dar uma)\s+paus[a-z]*\b"
+    r"|\b(?:vou parar|vamos parar|paramos|parei)\s+por\s+(?:aqui|hoje|agora)\b"
+)
+_NEGATED = re.compile(
+    r"\bnao\s+(?:(?:vamos|vou|quero|precisa|precisamos|pode|podemos|deve|devemos)\s+)?$"
+)
+_RESOLVED = re.compile(r"\bja\s+(?:resolvi|resolvemos|decidi|decidimos|descobri|descobrimos)\b")
+# A postponed task is not an open question: something must be unknown or undecided.
+_UNKNOWN = re.compile(
+    r"\?"
+    r"|(?:^|[:;.]\s*)(?:como|qual|quais|onde|quem|por que)\b"
+    r"|\bnao\s+(?:sei|sabemos|sabia|decidi|decidimos|defini|definimos|descobri|descobrimos|"
+    r"entendi|entendemos|resolvi|resolvemos|faco ideia|tenho (?:certeza|ideia)|temos (?:certeza|"
+    r"ideia)|consegui|conseguimos)\b"
+    r"|\b(?:duvida|questao|pergunta|incognita|em aberto|sem resposta|sem solucao|sera que)\b"
+    r"|\b(?:falta|preciso|precisamos)\s+(?:descobrir|decidir|definir|entender|saber|resolver)\b",
+    re.MULTILINE,
 )
 
 ASSESSMENT_INSTRUCTIONS = """\
@@ -150,6 +183,16 @@ def is_trivial(text: str) -> bool:
     return len(stripped.split()) < 2 or bool(_TRIVIAL.match(stripped))
 
 
+def left_open_for_later(text: str, previous: str = "") -> bool:
+    """Did the person explicitly put a question aside? `previous` is their earlier message, for
+    "Não sei como organizar isso." followed by "Vamos deixar para depois."."""
+    folded = fold(text)
+    if _RESOLVED.search(folded):
+        return False
+    deferred = any(not _NEGATED.search(folded[: m.start()]) for m in _DEFERRAL.finditer(folded))
+    return deferred and bool(_UNKNOWN.search(f"{fold(previous)}\n{folded}"))
+
+
 def _score(value: Any) -> float:
     try:
         return min(max(float(value), 0.0), 1.0)
@@ -188,6 +231,7 @@ def decide(
     *,
     research_budget_left: bool,
     already_asked: bool,
+    left_open: bool = False,
 ) -> Decision:
     """Deterministic policy: same assessment and budget state, same decision."""
     if not assessment.gap or not assessment.question:
@@ -207,6 +251,10 @@ def decide(
     if assessment.risk >= MAX_RISK:
         return Decision(IGNORE, "risk")
     if assessment.depends_on == "conversation":
+        # The model reads a pending matter into ordinary statements, so its word is not enough
+        # to start a thread that can interrupt the owner later.
+        if not left_open:
+            return Decision(IGNORE, "not_left_open")
         return Decision(DEFER, "open_conversation_thread")
     if assessment.depends_on == "public_fact":
         if not assessment.search_query:
@@ -240,6 +288,16 @@ def _already_asked(session: Session, conversation: Conversation, question: str) 
     )
     wanted = tokens(question)
     return any(jaccard(wanted, tokens(q)) >= REPEAT_THRESHOLD for q in previous)
+
+
+def _previous_user_text(session: Session, conversation: Conversation) -> str:
+    latest = session.scalar(
+        select(Message.content)
+        .where(Message.conversation_id == conversation.id, Message.role == "user")
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(1)
+    )
+    return latest or ""
 
 
 def _recent_context(session: Session, conversation: Conversation, limit: int = 4) -> str:
@@ -343,10 +401,12 @@ def consider(
         return NO_OUTCOME
     session.flush()
 
+    left_open = left_open_for_later(user_text, _previous_user_text(session, conversation))
     decision = decide(
         assessment,
         research_budget_left=_research_budget_left(session, owner, conversation, limits),
         already_asked=_already_asked(session, conversation, assessment.question),
+        left_open=left_open,
     )
     gap = KnowledgeGap(
         owner_user_id=owner.id,
@@ -361,6 +421,7 @@ def consider(
             "urgency": assessment.urgency,
             "risk": assessment.risk,
             "policy_version": POLICY_VERSION,
+            "left_open": left_open,
             # Kept so the autonomous cycle can resume the same search later.
             "search_query": assessment.search_query,
         },

@@ -14,6 +14,7 @@ const DELIVERY: Record<string, string> = {
 /** What the agent is thinking, what it cares about and how it describes itself right now. */
 export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
   const [mind, setMind] = useState<Mind | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     const poll = () => api.mind().then((next) => { if (alive) setMind(next); }).catch((e) => {
@@ -24,30 +25,38 @@ export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) =>
     return () => { alive = false; clearInterval(timer); };
   }, [api, onError]);
 
-  if (!mind?.enabled) return null;
+  if (!mind) return null;
+  // The notes belong to the owner: they stay visible and erasable with the mind switched off.
+  if (!mind.enabled && !mind.profile.content && !mind.rules.content) return null;
   const previous = mind.self_history[1];
-  async function undo() {
-    await api.revertSelf(previous ? previous.version : null);
-    setMind(await api.mind());
+  async function change(action: () => Promise<void>) {
+    setFailure(null);
+    try {
+      await action();
+      setMind(await api.mind());
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) onError(e);
+      else setFailure(`Não deu para mudar: ${e instanceof Error ? e.message : e}. Continua como estava.`);
+    }
   }
-  async function change(action: Promise<void>) {
-    await action;
-    setMind(await api.mind());
-  }
+  const undo = () => change(() => api.revertSelf(previous ? previous.version : null));
   const note = (kind: "profile" | "rules", title: string, empty: string) => {
     const item = mind[kind];
     return <article className="study-entry">
       <h3>{title}</h3>
       <p className="mind-note">{item.content || empty}</p>
       {item.content && <p className="note">{item.reason && `Mudou porque: ${item.reason} `}
-        <button type="button" className="link-button" onClick={() => void change(api.undoNote(kind))}>desfazer</button>{" · "}
-        <button type="button" className="link-button" onClick={() => void change(api.eraseNote(kind))}>apagar</button></p>}
+        <button type="button" className="link-button" onClick={() => void change(() => api.undoNote(kind))}>desfazer</button>{" · "}
+        <button type="button" className="link-button" onClick={() => void change(() => api.eraseNote(kind))}>apagar</button></p>}
     </article>;
   };
   return (
     <section className="mind-panel">
+      {failure && <p className="error" role="alert">{failure}</p>}
+      {!mind.enabled && <p className="note">A mente está desligada nesta instalação: estas anotações ficam guardadas, mas não entram nas respostas dele.</p>}
       {note("profile", "O que ele sabe sobre você", "Ainda não anotou nada: isso aparece depois de algumas conversas.")}
       {note("rules", "O que aprendeu com as suas correções", "Nenhuma correção ainda. Diga quando ele errar: vira regra na hora.")}
+      {mind.enabled && <>
       <article className="study-entry">
         <h3>Como ele se descreve agora</h3>
         <p>{mind.self_text}</p>
@@ -68,6 +77,7 @@ export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) =>
           {thought.wanted_to_say && <p className="note">Quis dizer ({DELIVERY[thought.delivery ?? ""] ?? thought.delivery}): {thought.wanted_to_say}</p>}
         </div>)}
       </article>
+      </>}
     </section>
   );
 }

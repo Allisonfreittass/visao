@@ -213,3 +213,16 @@ def test_cycle_reviews_a_conversation_that_went_quiet(db):
     report = run_cycle(db, provider=provider, search=Search(), budget=mind_budget(), now=NOON)
     assert report.actions[0]["action"] == "mind_review"
     assert notes.current(db, owner.id, notes.PROFILE) == PROFILE
+
+
+def test_review_never_overwrites_a_note_changed_while_the_model_was_answering(db):
+    owner = setup(db)
+
+    def owner_writes_meanwhile(_prompt):
+        notes.write(db, owner.id, notes.PROFILE, "Escrito pelo dono.", "x", origin="owner")
+        db.commit()
+        return json.dumps({"profile": change(PROFILE), "rules": None, "sensitive": False})
+
+    report = run(db, owner, FakeLLMProvider(responder=owner_writes_meanwhile))
+    assert report.rejected == ("profile:changed_meanwhile",)
+    assert notes.current(db, owner.id, notes.PROFILE) == "Escrito pelo dono."

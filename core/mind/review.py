@@ -183,10 +183,11 @@ def review_once(
         {"n": n, "who": "pessoa" if m.role == "user" else "você", "text": m.content[:1200]}
         for n, m in enumerate(pending, 1)
     ]
+    seen = {kind: notes.current(session, owner.id, kind) for kind in notes.LIMITS}
     context = {
-        "profile": notes.current(session, owner.id, notes.PROFILE),
+        "profile": seen[notes.PROFILE],
         "profile_limit": notes.LIMITS[notes.PROFILE],
-        "rules": notes.current(session, owner.id, notes.RULES),
+        "rules": seen[notes.RULES],
         "rules_limit": notes.LIMITS[notes.RULES],
         "conversation": conversation,
     }
@@ -216,6 +217,9 @@ def review_once(
             if not isinstance(item, dict):
                 continue
             text, reason = _rejection(kind, item, grounds)
+            # The model rewrote the text it was shown; the owner may have changed it since.
+            if notes.current(session, owner.id, kind) != seen[kind]:
+                reason = "changed_meanwhile"
             if reason:
                 rejected.append(f"{kind}:{reason}")
             elif text != notes.current(session, owner.id, kind):

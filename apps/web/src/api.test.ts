@@ -31,6 +31,26 @@ describe("Api", () => {
     expect(new Headers(calls[1].init.headers).get("Authorization")).toBe("Bearer tok");
   });
 
+  it("sends onboarding answers and the skip as JSON", async () => {
+    const result = { completed: true, skipped: false, saved: [], discarded: false };
+    const { impl, calls } = fakeFetch([
+      { status: 200, body: result },
+      { status: 200, body: result },
+    ]);
+    const api = new Api("/api", impl);
+
+    await api.finishOnboarding({ who: "eu", work: "", goal: "", tone: "" });
+    await api.skipOnboarding();
+
+    expect(calls.map((call) => call.url)).toEqual(["/api/onboarding", "/api/onboarding"]);
+    expect(calls.map((call) => call.init.method)).toEqual(["POST", "POST"]);
+    for (const call of calls) {
+      expect(new Headers(call.init.headers).get("Content-Type")).toBe("application/json");
+    }
+    expect(JSON.parse(String(calls[0].init.body)).answers.who).toBe("eu");
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({ skip: true });
+  });
+
   it("surfaces the API detail and forgets the token on 401", async () => {
     const { impl } = fakeFetch([
       { status: 200, body: { access_token: "tok" } },

@@ -26,7 +26,7 @@ button.ghost:hover { background: #ffffff06; color: var(--text); }
 button.active { background: var(--accent-soft); color: var(--accent); }
 button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 a { color: var(--accent); text-underline-offset: 3px; }
-.app { display: flex; flex-direction: column; height: 100dvh; max-width: 1680px; margin: auto; overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100dvh; max-width: 1680px; margin: auto; overflow: hidden; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .topbar { min-height: 76px; display: flex; align-items: center; gap: 20px; padding: 0 32px; border-bottom: 1px solid #ffffff08; flex-shrink: 0; }
 .brand { display: inline-flex; align-items: center; gap: 10px; min-width: 200px; color: var(--text); text-decoration: none; font-size: 21px; letter-spacing: .11em; font-weight: 650; }
 .brand-mark { color: var(--accent); font-size: 27px; font-weight: 400; }
@@ -167,14 +167,14 @@ a { color: var(--accent); text-underline-offset: 3px; }
 ::-webkit-scrollbar-thumb { background: #3c4440; border-radius: 5px; }
 @media (min-width: 1000px) {
   .sidebar { display: flex; }
-  .topbar > button.ghost:first-of-type { display: none; }
+  .menu-button { display: none; }
 }
 @media (max-width: 999px) {
   .topbar { min-height: 64px; padding: 0 22px; gap: 14px; }
   .brand { min-width: auto; font-size: 18px; margin-right: auto; }
   .identity { margin-left: 0; font-size: 9px; }
   .topbar button.ghost { font-size: 10px; padding: 5px; }
-  .sidebar.open { display: flex; position: fixed; inset: 64px auto 0 0; width: min(330px, 90vw); background: #101314; z-index: 10; box-shadow: 24px 0 80px #000b; border-right: 1px solid #ffffff12; }
+  .sidebar.open { display: flex; position: fixed; inset: calc(64px + env(safe-area-inset-top)) auto 0 0; width: min(330px, 90vw); background: #101314; z-index: 10; box-shadow: 24px 0 80px #000b; border-right: 1px solid #ffffff12; }
   .main { padding: 22px 25px 8px; }
   .workspace-heading h1 { font-size: 26px; }
   .workspace-tabs { margin-top: 20px; }
@@ -191,9 +191,17 @@ a { color: var(--accent); text-underline-offset: 3px; }
   .presence-copy > span { font-size: 10px; }
   .message-meta { margin-bottom: 7px; }
   .bubble { font-size: 12px; }
+  /* iOS zooms the page when a field below 16px takes focus. */
+  .composer textarea, .login input { font-size: 16px; }
   .bubble.user { max-width: 92%; padding: 13px 15px; }
   .bubble.assistant { max-width: 100%; padding-right: 0; }
   .notification-feed { max-height: 125px; }
+  /* Two nested scrollers leave the notebook a sliver at this height: the page scrolls instead. */
+  .main:has(.study-presence) { overflow-y: auto; }
+  .main:has(.study-presence) > * { flex-shrink: 0; }
+  .main .mind-panel { max-height: none; overflow: visible; }
+  .study-panel { flex: none; }
+  .study-content { overflow: visible; padding-right: 0; }
   .study-title { align-items: flex-start; }
   .study-entry { padding: 16px; }
   .study-entry h3 { font-size: 17px; }
@@ -210,3 +218,33 @@ a { color: var(--accent); text-underline-offset: 3px; }
 .link-button { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
 .mind-note { white-space: pre-line; }
 .notification-actions { display: flex; gap: 8px; align-items: center; }
+.first-run-notice { width: 100%; max-width: 900px; flex-shrink: 0; margin-bottom: 8px; color: var(--text); }
+.onboarding-main { overflow-y: auto; }
+.onboarding { width: 100%; max-width: 620px; margin: auto; padding-bottom: 12px; font-size: 14px; }
+.onboarding-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.onboarding-top button { font-size: 12px; padding: 6px 0; }
+.onboarding h1 { font-size: clamp(23px, 2.4vw, 30px); line-height: 1.25; font-weight: 450; letter-spacing: -.04em; margin: 12px 0 10px; outline: none; }
+.onboarding-lead { color: var(--muted); margin: 0 0 20px; }
+.onboarding-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.onboarding-points li { padding: 13px 15px; border: 1px solid #ffffff0c; border-radius: 12px; background: var(--surface); }
+.onboarding-points strong { display: block; font-weight: 550; margin-bottom: 2px; }
+.onboarding-points span { color: var(--muted); font-size: 13px; }
+.onboarding-field { display: grid; gap: 7px; margin-bottom: 16px; }
+.onboarding-field textarea { width: 100%; min-height: 66px; resize: vertical; background: var(--surface); border: 1px solid #ffffff16; border-radius: 10px; padding: 10px 12px; outline: none; font-size: 14px; }
+.onboarding-field textarea:focus { border-color: var(--accent); }
+.onboarding-field textarea::placeholder { color: #7d8580; }
+.onboarding .note { font-size: 13px; }
+.onboarding-toggle { display: block; padding: 14px 15px; margin-bottom: 10px; border: 1px solid #ffffff0c; border-radius: 12px; background: var(--surface); cursor: pointer; }
+.onboarding-toggle > span { display: flex; align-items: center; gap: 11px; font-weight: 550; }
+.onboarding-toggle input { accent-color: var(--accent); width: 20px; height: 20px; margin: 0; flex-shrink: 0; }
+.onboarding-toggle .note { display: block; margin-top: 5px; font-weight: 400; }
+.onboarding-status { border-left: 2px solid var(--accent); padding: 4px 0 4px 12px; margin: 16px 0 0; }
+.onboarding .error { font-size: 13px; margin: 12px 0 0; }
+.onboarding-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 22px; }
+.onboarding-actions button { min-height: 44px; font-size: 14px; }
+.onboarding-actions .onboarding-next { margin-left: auto; }
+@media (max-width: 480px) {
+  .onboarding-field textarea { font-size: 16px; }
+  .onboarding-actions .onboarding-next { width: 100%; order: -1; }
+  .onboarding-actions button.ghost { flex: 1; }
+}

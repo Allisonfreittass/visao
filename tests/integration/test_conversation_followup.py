@@ -7,9 +7,17 @@ import pytest
 from sqlalchemy import select
 
 from core.autonomy.cycle import run_cycle, usage_today
-from core.initiatives.followup import INSTRUCTIONS
+from core.identity.genesis import get_identity
+from core.initiatives.followup import INSTRUCTIONS, PURPOSE
 from core.policies.autonomy import set_paused
-from infrastructure.database.models import Message, Notification
+from infrastructure.database.models import (
+    Conversation,
+    KnowledgeGap,
+    Message,
+    ModelUsage,
+    Notification,
+    ScheduledJob,
+)
 from tests.fakes import FakeLLMProvider
 from tests.integration.test_phase9 import Search, _budget, _llm, _turn, _world
 
@@ -43,6 +51,99 @@ def setup_thread(db):
     return owner, turn, now, llm
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Terminei a tela de login do app ontem.",
+        "Hoje vou mexer na parte de voz.",
+        "Decidi tirar o Cloudflare do caminho por enquanto.",
+        "Deixei a tela de perfil para depois.",
+    ],
+)
+def test_statement_the_model_reads_as_pending_creates_no_thread(db, text):
+    identity, owner = _world(db)
+    turn = _turn(db, identity, owner, text, _llm(THREAD))
+    gap = turn.curiosity.gap
+    assert (gap.chosen_action, gap.decision_reason) == ("IGNORE", "not_left_open")
+    assert gap.status == "IGNORED"
+    assert "conversation_thread_detected" not in turn.plan.executed()
+    assert "conversation_followup_scheduled" not in turn.plan.executed()
+    assert db.scalar(select(ScheduledJob)) is None
+
+
+def test_question_set_aside_after_it_was_raised_creates_a_thread(db):
+    identity, owner = _world(db)
+    first = _turn(db, identity, owner, "Não sei como localizar os livros.", _llm())
+    conversation = db.get(Conversation, first.result.user_message.conversation_id)
+    turn = _turn(
+        db,
+        identity,
+        owner,
+        "Vamos deixar isso para depois.",
+        _llm(THREAD),
+        conversation=conversation,
+    )
+    assert "conversation_thread_detected" in turn.plan.executed()
+
+
+def _legacy_thread(db, owner):
+    """A thread recorded by the old policy, which trusted the model alone."""
+    conversation = Conversation(user_id=owner.id, identity_id=get_identity(db).id)
+    db.add(conversation)
+    db.flush()
+    message = Message(conversation_id=conversation.id, role="user", content="Mexi na voz hoje.")
+    db.add_all(
+        [
+            message,
+            Message(conversation_id=conversation.id, role="assistant", content="Certo."),
+        ]
+    )
+    db.flush()
+    gap = KnowledgeGap(
+        owner_user_id=owner.id,
+        conversation_id=conversation.id,
+        trigger_message_id=message.id,
+        trigger_kind="dependency",
+        depends_on="conversation",
+        question="O que você vai implementar na voz?",
+        hypothesis="",
+        scores={"expected_value": 0.8, "policy_version": "2026-10-31.4"},
+        chosen_action="DEFER",
+        decision_reason="open_conversation_thread",
+        status="DEFERRED",
+    )
+    db.add(gap)
+    db.commit()
+    return gap
+
+
+def test_legacy_thread_never_notifies(db):
+    _, owner = _world(db)
+    gap = _legacy_thread(db, owner)
+    llm = FakeLLMProvider(reply_text=json.dumps({"send": True, "body": "E a voz?"}))
+    now = datetime.now(UTC) + timedelta(minutes=11)
+    run_cycle(db, provider=llm, search=Search(), budget=_budget(), now=now)
+    assert not llm.prompts
+    assert db.scalar(select(Notification)) is None
+    assert gap.status == "FOLLOWUP_SKIPPED"
+    assert gap.scores["followup"]["outcome"] == "not_left_open"
+
+
+def test_continuity_hides_a_legacy_thread_but_keeps_a_real_one(db):
+    identity, owner = _world(db)
+    gap = _legacy_thread(db, owner)
+    llm = _llm()
+    turn = _turn(db, identity, owner, "O que vou implementar na voz hoje", llm)
+    assert "continuity" not in turn.plan.executed()
+
+    gap.scores = {**gap.scores, "left_open": True}
+    db.commit()
+    llm = _llm()
+    turn = _turn(db, identity, owner, "O que vou implementar na voz hoje", llm)
+    assert "continuity" in turn.plan.executed()
+    assert "não anuncie uma pendência" in llm.prompts[-1][0].content
+
+
 def test_idle_thread_sends_once_and_counts_autonomy_usage(db):
     owner, turn, now, llm = setup_thread(db)
     report = run_cycle(db, provider=llm, search=Search(), budget=_budget(), now=now)
@@ -52,7 +153,10 @@ def test_idle_thread_sends_once_and_counts_autonomy_usage(db):
     assert "Maré" in notification.body
     assert llm.prompts[0][0].content == INSTRUCTIONS
     assert turn.curiosity.gap.status == "FOLLOWUP_NOTIFIED"
-    assert usage_today(db, now)[0] == 1
+    # `now` is simulated, 11 minutes ahead, but rows carry the real clock: near midnight they fall
+    # on different days. Asking about the row's own day holds at any hour.
+    usage = db.scalar(select(ModelUsage).where(ModelUsage.purpose == PURPOSE))
+    assert usage_today(db, usage.created_at)[0] == 1
     run_cycle(db, provider=llm, search=Search(), budget=_budget(), now=now)
     assert len(db.scalars(select(Notification)).all()) == 1
     assert len(llm.prompts) == 1
@@ -124,7 +228,6 @@ def test_scheduled_worker_delivers_without_another_user_turn(db, engine):
     from apps.api.settings import Settings
     from apps.worker.handlers import cycle_handler
     from apps.worker.runner import run_once
-    from infrastructure.database.models import ScheduledJob
 
     _, turn, _, llm = setup_thread(db)
     job = db.scalar(select(ScheduledJob).where(ScheduledJob.kind == "cognitive_cycle"))

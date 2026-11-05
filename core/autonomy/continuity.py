@@ -49,6 +49,9 @@ def related(
     for gap in gaps:
         if exclude_conversation_id is not None and gap.conversation_id == exclude_conversation_id:
             continue
+        # Threads recorded before the policy required an explicit deferral may be false ones.
+        if gap.depends_on == "conversation" and not gap.scores.get("left_open"):
+            continue
         score = overlap(query_tokens, tokens(gap.question))
         if score >= MIN_OVERLAP:
             scored.append((score, gap))
@@ -74,8 +77,10 @@ def context_block(items: list[ContinuityItem]) -> str | None:
     if not items:
         return None
     lines = [
-        "Investigações anteriores deste interlocutor relacionadas a esta mensagem (dados "
-        "registrados; descreva o estado real, inclusive o que não foi concluído):"
+        "Investigações anteriores deste interlocutor com palavras em comum com esta mensagem "
+        "(dados registrados, podem não ter relação). Se ele não estiver tratando disso, ignore e "
+        "não anuncie uma pendência; se estiver, descreva o estado real, inclusive o que não foi "
+        "concluído:"
     ]
     for item in items:
         gap = item.gap

@@ -111,6 +111,28 @@ export interface StudyNotebook {
   entries: StudyEntry[];
 }
 
+export interface OnboardingAnswers {
+  who: string;
+  work: string;
+  goal: string;
+  tone: string;
+}
+
+export interface OnboardingStatus {
+  completed: boolean;
+  mind_enabled: boolean;
+  /** Characters still free in each permanent note. */
+  room: { profile: number; rules: number };
+}
+
+export interface OnboardingResult {
+  completed: boolean;
+  skipped: boolean;
+  saved: Array<"profile" | "rules">;
+  /** The person wrote something and it was not kept. */
+  discarded: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -307,6 +329,26 @@ export class Api {
     return this.request("/mind/self/revert", {
       method: "POST",
       body: JSON.stringify({ version }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  onboarding(): Promise<OnboardingStatus> {
+    return this.request("/onboarding");
+  }
+
+  finishOnboarding(answers: OnboardingAnswers): Promise<OnboardingResult> {
+    return this.request("/onboarding", {
+      method: "POST",
+      body: JSON.stringify({ answers }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  skipOnboarding(): Promise<OnboardingResult> {
+    return this.request("/onboarding", {
+      method: "POST",
+      body: JSON.stringify({ skip: true }),
       headers: { "Content-Type": "application/json" },
     });
   }

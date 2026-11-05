@@ -2,8 +2,16 @@
 
 Raw history comes only from the current conversation. The only cross-conversation context is
 curated memory of the same owner, and only when that owner opted in.
+
+With learned rules, the finished reply goes through one short check that may rewrite it. The check
+fails open: whatever goes wrong there, the original reply stands and the turn succeeds.
 """
 
+import json
+import logging
+import re
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -13,8 +21,13 @@ from sqlalchemy.orm import Session
 
 from core.behavior import state as behavior_state
 from core.identity.capabilities import Capabilities
-from core.identity.system_prompt import build_system_prompt, learned_rules_block
+from core.identity.system_prompt import (
+    RULE_CHECK_INSTRUCTIONS,
+    build_system_prompt,
+    learned_rules_block,
+)
 from core.memory.retrieval import ScoredMemory, retrieve
+from core.memory.text import fold, tokens
 from infrastructure.database.models import (
     AgentIdentity,
     Conversation,
@@ -23,10 +36,30 @@ from infrastructure.database.models import (
     ModelUsage,
     User,
 )
-from integrations.llm.base import ChatMessage, LLMError, LLMProvider
+from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse
+
+logger = logging.getLogger(__name__)
 
 PURPOSE_CHAT = "chat_reply"
+PURPOSE_RULE_CHECK = "rule_check"
 TRUNCATION_NOTICE = "[resposta interrompida pelo limite de tamanho]"
+
+# Below this a reply is a thanks or a goodbye; a question is still worth checking.
+TRIVIAL_REPLY_CHARS = 40
+RULE_CHECK_DEADLINE_SECONDS = 4.0
+RECENT_ENDINGS = 3
+ENDING_CHARS = 120
+_URL = re.compile(r"https?://[^\s)\]>]+|www\.[^\s)\]>]+", re.IGNORECASE)
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+_WORD = re.compile(r"\w+")
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?:\n])\s+")
+# First-person past: what the truth rules forbid claiming without a record.
+_CLAIMED_ACTIONS = frozenset(
+    """
+    abri agendei anotei busquei chequei confirmei consultei encontrei enviei estudei executei fiz
+    guardei lembrei li mandei olhei pesquisei procurei publiquei rodei salvei testei verifiquei vi
+    """.split()
+)
 
 
 class BudgetExceededError(Exception):
@@ -181,6 +214,19 @@ def reply(
         raise EmptyReplyError("provider returned an empty reply")
 
     content = response.text
+    if owner_rules and not truncated:
+        # Committed first: the call's admission ledger needs the write lock this session would hold.
+        session.commit()
+        content = _obey_rules(
+            session,
+            conversation=conversation,
+            provider=provider,
+            budgets=budgets,
+            rules=owner_rules,
+            prompt=prompt,
+            draft=content,
+            max_output_tokens=max_output_tokens,
+        )
     if truncated:
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
     assistant_message = Message(conversation_id=conversation.id, role="assistant", content=content)
@@ -193,13 +239,166 @@ def reply(
     return TurnResult(user_message, assistant_message, usage, recalled)
 
 
+def _obey_rules(
+    session: Session,
+    *,
+    conversation: Conversation,
+    provider: LLMProvider,
+    budgets: Budgets,
+    rules: str,
+    prompt: list[ChatMessage],
+    draft: str,
+    max_output_tokens: int,
+) -> str:
+    """The reply to send: `draft`, or its rewrite when it broke a rule and the rewrite is safe."""
+    if len(draft.strip()) < TRIVIAL_REPLY_CHARS and "?" not in draft:
+        return draft
+    try:
+        check_budgets(session, conversation, budgets)
+    except BudgetExceededError:
+        return draft
+
+    user_text = prompt[-1].content
+    endings = [m.content[-ENDING_CHARS:] for m in prompt if m.role == "assistant"]
+    payload = {
+        "regras": rules,
+        "mensagem": user_text,
+        "respostas_anteriores": endings[-RECENT_ENDINGS:],
+        "resposta": draft,
+    }
+    messages = [
+        ChatMessage(role="system", content=RULE_CHECK_INSTRUCTIONS),
+        ChatMessage(role="user", content=json.dumps(payload, ensure_ascii=False)),
+    ]
+    # Reservations stay charged to the daily budget, so this asks only for what a rewrite can use.
+    limit = min(max_output_tokens, len(draft) // 2 + 200)
+    try:
+        response = _complete_within_deadline(provider, messages, limit)
+    except Exception as exc:
+        # Fail open on anything, not only LLMError: this step must never cost the owner the reply.
+        kind = exc.kind if isinstance(exc, LLMError) else type(exc).__name__
+        logger.warning(f"rule check skipped: {kind}", extra={"event": "rule_check_failed"})
+        _record_failure(session, conversation, provider, kind, purpose=PURPOSE_RULE_CHECK)
+        return draft
+
+    usage = ModelUsage(
+        conversation_id=conversation.id,
+        purpose=PURPOSE_RULE_CHECK,
+        provider=response.provider,
+        model=response.model,
+        input_tokens=response.input_tokens,
+        output_tokens=response.output_tokens,
+        cost_usd=response.cost_usd,
+        latency_ms=response.latency_ms,
+        outcome="success",
+    )
+    session.add(usage)
+    if response.finish_reason == "length":
+        usage.outcome = "truncated"
+        return draft
+    verdict = _parse_verdict(response.text)
+    if verdict is None:
+        usage.outcome = "bad_output"
+        return draft
+    if verdict is True or verdict == draft.strip():
+        return draft
+    refused = _refuse_rewrite(draft, verdict, context=f"{rules}\n{user_text}")
+    if refused:
+        usage.outcome, usage.error_kind = "refused", refused
+        return draft
+    usage.outcome = "rewritten"
+    return verdict
+
+
+def _complete_within_deadline(
+    provider: LLMProvider, messages: list[ChatMessage], limit: int
+) -> LLMResponse:
+    """The provider timeout is 60 s, too long to hold a reply that is already done. A call past the
+    deadline finishes on its thread, where the budget guard still settles it."""
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="rule-check")
+    try:
+        future = pool.submit(provider.complete, messages, max_output_tokens=limit)
+        try:
+            return future.result(timeout=RULE_CHECK_DEADLINE_SECONDS)
+        except FutureTimeoutError:
+            raise LLMError("deadline", "rule check over its deadline") from None
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _parse_verdict(text: str) -> bool | str | None:
+    """True when the reply obeys, the rewrite when it does not, None when the answer is unusable."""
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    try:
+        # strict=False: models often put raw line breaks inside the rewrite.
+        data = json.loads(match.group(0), strict=False) if match else None
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    if data.get("obeys") is True:
+        return True
+    rewrite = data.get("rewrite")
+    if data.get("obeys") is False and isinstance(rewrite, str) and rewrite.strip():
+        return rewrite.strip()
+    return None
+
+
+def _names(text: str) -> set[str]:
+    """Capitalized words past the first of each sentence, where a capital means a name."""
+    found: set[str] = set()
+    for sentence in _SENTENCE_BREAK.split(text):
+        found |= {w for w in _WORD.findall(sentence)[1:] if w[0].isupper()}
+    return {fold(name) for name in found}
+
+
+def _words(sentence: str) -> list[str]:
+    return _WORD.findall(fold(sentence))
+
+
+def _asserts_a_question(draft: str, rewrite: str) -> bool:
+    """Real case: "O churrasco rolou?" came back as "O churrasco rolou.", which states a fact."""
+    asked = [_words(s) for s in _SENTENCE_BREAK.split(draft) if s.rstrip().endswith("?")]
+    stated = [_words(s) for s in _SENTENCE_BREAK.split(rewrite) if not s.rstrip().endswith("?")]
+    return any(sentence in stated for sentence in asked)
+
+
+def _refuse_rewrite(draft: str, rewrite: str, *, context: str) -> str | None:
+    """Why this rewrite cannot replace the reply, or None. Checked in code, not left to the model:
+    the rules may reshape what was said, never add to it. Names may also come from `context`,
+    which holds the owner's words ("me chame de Ali")."""
+    if len(rewrite) > len(draft) * 1.2 + 40:
+        return "longer"
+    if set(_URL.findall(rewrite)) - set(_URL.findall(draft)):
+        return "new_url"
+    if set(_NUMBER.findall(rewrite)) - set(_NUMBER.findall(draft)):
+        return "new_number"
+    known = set(_words(f"{draft}\n{context}"))
+    if _names(rewrite) - known:
+        return "new_name"
+    if (set(_words(rewrite)) & _CLAIMED_ACTIONS) - set(_words(draft)):
+        return "new_action"
+    if _asserts_a_question(draft, rewrite):
+        return "question_as_statement"
+    # A rewrite trims what is there. Mostly new words means another reply took its place.
+    new_words = tokens(rewrite) - tokens(draft)
+    if len(new_words) > max(3, len(tokens(rewrite)) * 0.4):
+        return "new_words"
+    return None
+
+
 def _record_failure(
-    session: Session, conversation: Conversation, provider: LLMProvider, error_kind: str
+    session: Session,
+    conversation: Conversation,
+    provider: LLMProvider,
+    error_kind: str,
+    *,
+    purpose: str = PURPOSE_CHAT,
 ) -> None:
     session.add(
         ModelUsage(
             conversation_id=conversation.id,
-            purpose=PURPOSE_CHAT,
+            purpose=purpose,
             provider=provider.name,
             model=provider.model,
             outcome="error",

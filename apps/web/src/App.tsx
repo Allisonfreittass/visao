@@ -6,6 +6,7 @@ import {
   utcDate,
   type Conversation,
   type Message,
+  type OnboardingStatus,
   type SystemStatus,
   type VoiceStatus,
 } from "./api";
@@ -15,6 +16,7 @@ import { MindPanel } from "./components/MindPanel";
 import { StudyPanel } from "./components/StudyPanel";
 import { NotificationFeed } from "./components/NotificationFeed";
 import { Login } from "./components/Login";
+import { Onboarding } from "./components/Onboarding";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
@@ -98,6 +100,8 @@ export function App() {
   messagesRef.current = messages;
   const [preparing, setPreparing] = useState(false);
   const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | "checking" | "done">("checking");
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<"conversation" | "study">("conversation");
@@ -134,6 +138,18 @@ export function App() {
       })
       .catch(handleError);
   }, [api, loggedIn, handleError]);
+
+  // Whoever has not finished or skipped the first run sees it instead of the workspace. If this
+  // check fails the app still opens, with the error visible, and asks again on the next login.
+  useEffect(() => {
+    if (!loggedIn || demo) return;
+    let alive = true;
+    api.onboarding().then(
+      (next) => { if (alive) setOnboarding(next.completed ? "done" : next); },
+      (e) => { if (alive) { handleError(e); setOnboarding("done"); } },
+    );
+    return () => { alive = false; setOnboarding("checking"); };
+  }, [api, loggedIn, demo, handleError]);
 
   // Identity decisions happen in the background; reflect them without reloading the page.
   useEffect(() => {
@@ -387,13 +403,14 @@ export function App() {
               ? "LISTENING"
               : "IDLE";
   const agentName = status?.identity?.chosen_name ?? null;
+  const firstRun = loggedIn && !demo && onboarding !== "done";
 
   return (
     <div className="app">
       <header className="topbar">
         <a className="brand" href="/" aria-label="VISÃO, início"><span className="brand-mark">◉</span><span>VISÃO<span className="brand-dot">.</span></span></a>
-        {loggedIn && !demo && (
-          <button className="ghost" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
+        {loggedIn && !demo && !firstRun && (
+          <button className="ghost menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
             Menu
           </button>
         )}
@@ -407,7 +424,23 @@ export function App() {
         )}
       </header>
 
-      <div className="layout">
+      {firstRun && (
+        <main className="main onboarding-main">
+          {onboarding !== "checking" && (
+            <Onboarding
+              api={api}
+              status={onboarding}
+              onMemoryChange={setMemoryEnabled}
+              onError={handleError}
+              onDone={(message) => {
+                setNotice(message);
+                setOnboarding("done");
+              }}
+            />
+          )}
+        </main>
+      )}
+      {!firstRun && <div className="layout">
         {loggedIn && !demo && (
           <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
             <p className="sidebar-label">SEU ESPAÇO</p>
@@ -556,6 +589,7 @@ export function App() {
               {workspaceView === "study" && <MindPanel api={api} onError={handleError} />}
               {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
               {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
+              {notice && <p className="note first-run-notice" role="status">{notice}{" "}<button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button></p>}
               <ChatView
                 hidden={workspaceView !== "conversation"}
                 focusRequest={composerFocus}
@@ -569,7 +603,7 @@ export function App() {
             </>
           )}
         </main>
-      </div>
+      </div>}
       <footer className="footer">VISÃO <span>·</span> Um projeto em descoberta</footer>
     </div>
   );

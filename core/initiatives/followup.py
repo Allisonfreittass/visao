@@ -84,6 +84,12 @@ def consider_followup(
 ) -> str | None:
     if is_paused(session) or gap.status != "DEFERRED":
         return None
+    if not gap.scores.get("left_open"):
+        # Recorded before the policy required an explicit deferral: never interrupt for it.
+        gap.status = "FOLLOWUP_SKIPPED"
+        gap.scores = {**gap.scores, "followup": {"outcome": "not_left_open"}}
+        session.commit()
+        return "not_left_open"
     owner = session.get(User, gap.owner_user_id)
     conversation = session.get(Conversation, gap.conversation_id) if gap.conversation_id else None
     if owner is None or conversation is None or conversation.user_id != owner.id:

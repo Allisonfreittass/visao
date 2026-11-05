@@ -39,6 +39,27 @@ Tudo depende do consentimento de memória. `DELETE /memory` apaga também as dua
 exportação as inclui. Na aba Estudos dá para desfazer ou apagar cada uma; apagar uma memória isolada
 não muda o perfil, então um fato errado se corrige dizendo a ele ou apagando a anotação.
 
+### Obedecer às regras
+
+Só escrever a regra no prompt não bastou: com "não termine toda resposta com pergunta" no fim do
+prompt, 7 de 8 respostas ainda terminavam em pergunta. Por isso, quando há regras, a resposta pronta
+passa por uma conferência curta antes de ser gravada (`_obey_rules` em
+`core/conversation/service.py`, `model_usage.purpose = "rule_check"`). O mesmo modelo rápido devolve
+`{"obeys": true}` ou `{"obeys": false, "rewrite": "..."}`, e só o texto final vira mensagem.
+
+Ela nunca derruba o turno: erro do modelo, JSON ruim, resposta cortada, reescrita vazia, orçamento
+esgotado ou mais de 4 s mantêm a resposta original, e o motivo fica em `outcome`/`error_kind`.
+Respostas de menos de 40 caracteres sem pergunta e respostas cortadas não passam por ela.
+
+A reescrita não pode acrescentar nada, e isso é conferido em código: link, número, nome ou ação em
+primeira pessoa ("pesquisei", "li") que não estavam na resposta fazem ela ser recusada, assim como
+crescer demais, virar outra resposta ou transformar pergunta em afirmação ("o churrasco rolou?"
+virando "o churrasco rolou."). Nomes vindos das regras ou da sua mensagem são aceitos. Com a mente
+desligada ou sem consentimento de memória não há regras, logo não há conferência.
+
+Um pedido explícito na mensagem vence a regra. A conferência custa em geral 0,5 a 1 s a mais, e ela
+ainda erra: `model_usage` com `purpose = "rule_check"` mostra quantas foram reescritas ou recusadas.
+
 ## Puxar conversa
 
 `core/mind/initiative.py` grava uma mensagem real no chat (`messages.origin = "initiative"`); a

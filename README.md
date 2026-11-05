@@ -91,6 +91,17 @@ npm --prefix apps/web run dev
 Abra http://localhost:5173. A demonstração dos estados da bolha fica em
 http://localhost:5173/?orb=demo.
 
+### Primeiro acesso e celular
+
+Depois do login, quem ainda não concluiu vê três passos, todos puláveis e mostrados uma vez só: como
+ele funciona, quatro perguntas opcionais e as permissões. As respostas entram nas anotações
+permanentes (`GET` e `POST /onboarding`, em `apps/api/routes/onboarding.py`), depois do que já estiver
+escrito, só com a memória ligada e sem passar pelo modelo. O que não couber no limite é recusado com
+a quantidade a cortar, sem guardar nada pela metade. Veja, desfaça ou apague na aba Estudos.
+
+Para instalar no celular, abra o endereço HTTPS no navegador e use "Adicionar à tela de início". O
+app é um PWA sem modo offline: precisa de conexão, e não há service worker.
+
 ### Worker (iniciativas aprovadas)
 
 ```bash
