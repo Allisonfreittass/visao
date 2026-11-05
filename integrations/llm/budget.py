@@ -6,6 +6,7 @@ never hold a database lock during model I/O. Unknown consumption is not refunded
 
 import hashlib
 import json
+import logging
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -23,6 +24,8 @@ from sqlalchemy.orm import Session
 
 from infrastructure.database.models import SystemFlag
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse
+
+logger = logging.getLogger(__name__)
 
 LEDGER = "llm_budget_v1"
 DIMENSIONS = {"input", "output", "cache", "audio", "tools", "routing", "platform"}
@@ -70,7 +73,7 @@ class BudgetLimits:
     calls_per_hour: int = 10
     input_tokens_per_day: int = 60_000
     output_tokens_per_day: int = 15_000
-    input_tokens_per_call: int = 32_768
+    input_tokens_per_call: int = 80_000
     output_tokens_per_call: int = 4096
     concurrency: int = 1
     failure_threshold: int = 3
@@ -83,6 +86,8 @@ class BudgetLimits:
 
 
 def _deny(reason: str) -> LLMError:
+    # Callers only surface the kind; without this the actual reason is invisible in production.
+    logger.warning(f"llm admission denied: {reason}", extra={"event": "llm_budget_denied"})
     return LLMError("budget_denied", reason)
 
 

@@ -67,8 +67,10 @@ def test_blocked_thread_does_not_call_model_or_notify(db, block):
     elif block == "paused":
         set_paused(db, True, actor_user_id=owner.id, reason="teste")
     elif block == "quiet":
-        owner.timezone, owner.quiet_start, owner.quiet_end = "UTC", "00:00", "23:59"
-        now = now.replace(hour=12)
+        # A window around `now`: moving `now` instead would depend on the hour the test runs.
+        owner.timezone = "UTC"
+        owner.quiet_start = f"{(now - timedelta(hours=1)):%H:%M}"
+        owner.quiet_end = f"{(now + timedelta(hours=1)):%H:%M}"
         db.commit()
     elif block == "budget":
         budget = _budget(llm_calls_per_day=0)

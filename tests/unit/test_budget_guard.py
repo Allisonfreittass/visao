@@ -353,3 +353,15 @@ def test_factory_wraps_every_endpoint_and_disables_hidden_http_retries(factory, 
         provider.complete(PROMPT, max_output_tokens=512)
     assert seen == ["/chat/completions"]
     assert ledger(factory)["calls"] == 1
+
+
+def test_longest_allowed_conversation_fits_the_per_call_limit(factory):
+    settings = Settings(_env_file=None)
+    system = "s" * 12_000  # system prompt with memories, mind and per-turn context
+    history = "á" * settings.llm_context_char_budget  # accents take two bytes
+    prompt = [ChatMessage(role="system", content=system), ChatMessage(role="user", content=history)]
+    limits = BudgetLimits(
+        input_tokens_per_call=settings.llm_budget_input_tokens_per_call,
+        input_tokens_per_day=1_000_000,
+    )
+    assert make_guard(factory, limits=limits).reserve(fake(), ENDPOINT, prompt, 512)

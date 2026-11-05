@@ -51,7 +51,8 @@ class Settings(BaseSettings):
     llm_budget_calls_per_hour: int = Field(default=10, ge=1)
     llm_budget_input_tokens_per_day: int = Field(default=60_000, ge=1)
     llm_budget_output_tokens_per_day: int = Field(default=15_000, ge=1)
-    llm_budget_input_tokens_per_call: int = Field(default=32_768, ge=1)
+    # Measured in bytes: must fit llm_context_char_budget plus the system prompt, accents included.
+    llm_budget_input_tokens_per_call: int = Field(default=80_000, ge=1)
     llm_budget_output_tokens_per_call: int = Field(default=4096, ge=1)
     llm_budget_concurrency: int = Field(default=1, ge=1)
 
