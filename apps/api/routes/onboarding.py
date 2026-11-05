@@ -8,7 +8,7 @@ they never carry the text.
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import IntegrityError
 
@@ -103,6 +103,16 @@ def read_onboarding(db: DbSession, user: CurrentUser, settings: AppSettings) -> 
             for kind, limit in notes.LIMITS.items()
         },
     )
+
+
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+def restart_onboarding(db: DbSession, user: CurrentUser) -> None:
+    """Asks again, e.g. after skipping by accident. The notes stay; new answers add to them."""
+    flag = db.get(SystemFlag, _flag_name(user.id))
+    if flag is not None:
+        db.delete(flag)
+        record_audit(db, "onboarding.restarted", "success", actor_user_id=user.id)
+    db.commit()
 
 
 @router.post("")

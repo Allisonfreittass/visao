@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     llm_fallback_model: str | None = None
     llm_fallback_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_fallback_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
+    # A second reserve, same shape: free tiers run out, so more than one is worth keeping.
+    llm_fallback2_provider_name: str | None = None
+    llm_fallback2_base_url: str | None = None
+    llm_fallback2_api_key: SecretStr | None = None
+    llm_fallback2_model: str | None = None
+    llm_fallback2_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
+    llm_fallback2_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_max_output_tokens: int = Field(default=1024, ge=1)
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
@@ -118,6 +125,12 @@ class Settings(BaseSettings):
         "llm_fallback_model",
         "llm_fallback_price_input_per_mtok",
         "llm_fallback_price_output_per_mtok",
+        "llm_fallback2_provider_name",
+        "llm_fallback2_base_url",
+        "llm_fallback2_api_key",
+        "llm_fallback2_model",
+        "llm_fallback2_price_input_per_mtok",
+        "llm_fallback2_price_output_per_mtok",
         mode="before",
     )
     @classmethod

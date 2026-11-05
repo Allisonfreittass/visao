@@ -13,7 +13,7 @@
     "run_worker_first": ["/api/*", "/internal/*"]
   },
   "ratelimits": [{ "name": "LOGIN_LIMITER", "namespace_id": "91827461", "simple": { "limit": 8, "period": 60 } }],
-  "triggers": { "crons": ["*/15 * * * *"] },
+  "triggers": { "crons": [] },
   "containers": [{
     "class_name": "VisaoBackend",
     "scheduling_policy": "durable_object",

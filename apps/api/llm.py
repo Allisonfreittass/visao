@@ -31,16 +31,19 @@ def missing_llm_settings(settings: Settings) -> list[str]:
     )
 
 
-def missing_fallback_settings(settings: Settings) -> list[str]:
+def missing_fallback_settings(settings: Settings, slot: str = "fallback") -> list[str]:
     return _missing(
-        "FALLBACK_",
+        f"{slot.upper()}_",
         {
-            "PROVIDER_NAME": settings.llm_fallback_provider_name,
-            "BASE_URL": settings.llm_fallback_base_url,
-            "API_KEY": settings.llm_fallback_api_key,
-            "MODEL": settings.llm_fallback_model,
-            "PRICE_INPUT_PER_MTOK": settings.llm_fallback_price_input_per_mtok,
-            "PRICE_OUTPUT_PER_MTOK": settings.llm_fallback_price_output_per_mtok,
+            name: getattr(settings, f"llm_{slot}_{name.lower()}")
+            for name in (
+                "PROVIDER_NAME",
+                "BASE_URL",
+                "API_KEY",
+                "MODEL",
+                "PRICE_INPUT_PER_MTOK",
+                "PRICE_OUTPUT_PER_MTOK",
+            )
         },
     )
 
@@ -130,5 +133,25 @@ def build_llm_provider(
         settings.llm_fallback_price_output_per_mtok,
         settings.llm_fallback_fast_extra_body if fast else None,
     )
-    fallback = GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard)
-    return FallbackLLMProvider([primary, fallback])
+    chain = [
+        primary,
+        GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard),
+    ]
+    missing = missing_fallback_settings(settings, "fallback2")
+    if missing and len(missing) < 6:
+        logger.warning(
+            "second LLM fallback ignored, missing: " + ", ".join(missing),
+            extra={"event": "llm_fallback_incomplete"},
+        )
+    elif not missing:
+        second = _openai_compatible(
+            settings,
+            settings.llm_fallback2_provider_name,
+            settings.llm_fallback2_base_url,
+            settings.llm_fallback2_api_key,
+            settings.llm_fallback2_model,
+            settings.llm_fallback2_price_input_per_mtok,
+            settings.llm_fallback2_price_output_per_mtok,
+        )
+        chain.append(GuardedLLMProvider(second, settings.llm_fallback2_base_url, budget_guard))
+    return FallbackLLMProvider(chain)

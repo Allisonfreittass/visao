@@ -11,7 +11,22 @@ for port in 8000 5173; do
   fi
 done
 
-.venv/bin/alembic upgrade head
+# Migrations change the database in place: automatic only for the local SQLite file. A shared
+# database is migrated by the deploy, never by someone starting the app on a laptop.
+if grep -Eq '^VISION_DATABASE_URL=postgres' .env 2>/dev/null; then
+  head=$(.venv/bin/alembic heads 2>/dev/null | awk 'NR==1{print $1}')
+  current=$(.venv/bin/alembic current 2>/dev/null | awk 'NR==1{print $1}')
+  if [ -z "$current" ]; then
+    echo "Não consegui ler o banco compartilhado: confira VISION_DATABASE_URL no .env." >&2
+    exit 1
+  fi
+  if [ "$current" != "$head" ]; then
+    echo "Banco compartilhado em $current, código em $head: publique antes de subir." >&2
+    exit 1
+  fi
+else
+  .venv/bin/alembic upgrade head
+fi
 
 pids=""
 kill_tree() {

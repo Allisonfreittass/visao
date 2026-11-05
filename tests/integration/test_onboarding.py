@@ -212,3 +212,15 @@ def test_an_unknown_answer_is_refused(client: TestClient, db: Session):
 
     assert response.status_code == 422
     assert client.get("/onboarding", headers=headers).json()["completed"] is False
+
+
+def test_it_can_be_asked_again_after_skipping_and_keeps_the_notes(client: TestClient, db: Session):
+    headers = login(client, db)
+    consent(client, headers)
+    client.post("/onboarding", json={"answers": {"who": "Dev"}}, headers=headers)
+    assert client.delete("/onboarding", headers=headers).status_code == 204
+    assert client.get("/onboarding", headers=headers).json()["completed"] is False
+    assert note_count(db) == 1
+    client.post("/onboarding", json={"answers": {"work": "Tecnologia"}}, headers=headers)
+    assert "Dev" in notes.current(db, owner(db).id, notes.PROFILE)
+    assert "Tecnologia" in notes.current(db, owner(db).id, notes.PROFILE)

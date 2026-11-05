@@ -345,6 +345,10 @@ export class Api {
     });
   }
 
+  restartOnboarding(): Promise<void> {
+    return this.request("/onboarding", { method: "DELETE" });
+  }
+
   skipOnboarding(): Promise<OnboardingResult> {
     return this.request("/onboarding", {
       method: "POST",

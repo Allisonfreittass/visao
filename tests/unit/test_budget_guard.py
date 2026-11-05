@@ -365,3 +365,39 @@ def test_longest_allowed_conversation_fits_the_per_call_limit(factory):
         input_tokens_per_day=1_000_000,
     )
     assert make_guard(factory, limits=limits).reserve(fake(), ENDPOINT, prompt, 512)
+
+
+def test_second_fallback_joins_the_chain_only_when_complete(factory):
+    def fields(**extra):
+        base = {
+            f"llm_{prefix}{name}": value
+            for prefix in ("", "fallback_")
+            for name, value in {
+                "provider_name": f"p{prefix}",
+                "base_url": "https://example.com/v1",
+                "api_key": "x",
+                "model": "m",
+                "price_input_per_mtok": Decimal(0),
+                "price_output_per_mtok": Decimal(0),
+            }.items()
+        }
+        return Settings(_env_file=None, **base, **extra)
+
+    chain = build_llm_provider(fields(), budget_guard=make_guard(factory))
+    assert len(chain._providers) == 2
+    partial = build_llm_provider(
+        fields(llm_fallback2_provider_name="groq"), budget_guard=make_guard(factory)
+    )
+    assert len(partial._providers) == 2
+    full = build_llm_provider(
+        fields(
+            llm_fallback2_provider_name="groq",
+            llm_fallback2_base_url="https://api.groq.com/openai/v1",
+            llm_fallback2_api_key="x",
+            llm_fallback2_model="m",
+            llm_fallback2_price_input_per_mtok=Decimal(0),
+            llm_fallback2_price_output_per_mtok=Decimal(0),
+        ),
+        budget_guard=make_guard(factory),
+    )
+    assert len(full._providers) == 3

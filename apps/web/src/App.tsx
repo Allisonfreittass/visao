@@ -586,7 +586,13 @@ export function App() {
                   setComposerFocus((value) => value + 1);
                 }}
               />
-              {workspaceView === "study" && <MindPanel api={api} onError={handleError} />}
+              {workspaceView === "study" && <MindPanel
+                api={api}
+                onError={handleError}
+                onRestartOnboarding={() => {
+                  api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
+                }}
+              />}
               {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
               {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
               {notice && <p className="note first-run-notice" role="status">{notice}{" "}<button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button></p>}

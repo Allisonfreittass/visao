@@ -50,7 +50,9 @@ def research_followup_handler(
     return handle
 
 
-def autonomy_budget(settings: Settings) -> AutonomyBudget:
+def autonomy_budget(
+    settings: Settings, review_provider: LLMProvider | None = None
+) -> AutonomyBudget:
     return AutonomyBudget(
         llm_calls_per_day=settings.autonomy_llm_calls_per_day,
         tokens_per_day=settings.autonomy_tokens_per_day,
@@ -64,6 +66,7 @@ def autonomy_budget(settings: Settings) -> AutonomyBudget:
         mind=MindConfig(
             think_every=timedelta(minutes=settings.mind_think_minutes),
             initiatives_per_day=settings.mind_initiatives_per_day,
+            review_provider=review_provider,
         )
         if settings.mind_enabled
         else None,
@@ -71,11 +74,17 @@ def autonomy_budget(settings: Settings) -> AutonomyBudget:
 
 
 def cycle_handler(
-    settings: Settings, provider: LLMProvider | None, search: SearchProvider
+    settings: Settings,
+    provider: LLMProvider | None,
+    search: SearchProvider,
+    review_provider: LLMProvider | None = None,
 ) -> Handler:
     def handle(session: Session, job: ScheduledJob) -> HandlerResult:
         report = run_cycle(
-            session, provider=provider, search=search, budget=autonomy_budget(settings)
+            session,
+            provider=provider,
+            search=search,
+            budget=autonomy_budget(settings, review_provider),
         )
         return HandlerResult(
             "done",
@@ -135,10 +144,12 @@ def name_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
 
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
+    # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
+    fast = build_llm_provider(settings, fast=True)
     search = OpenWebSearch() if settings.mind_enabled else WikipediaSearch()
     return {
         "research_followup": research_followup_handler(settings, provider, search),
-        "cognitive_cycle": cycle_handler(settings, provider, search),
+        "cognitive_cycle": cycle_handler(settings, provider, search, fast),
         "name_deliberation": name_handler(settings, provider),
-        "mind_review": review_handler(settings, provider),
+        "mind_review": review_handler(settings, fast),
     }

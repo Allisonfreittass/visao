@@ -66,6 +66,7 @@ class MindConfig:
     think_every: timedelta
     initiatives_per_day: int
     quiet_factor: int = 3
+    review_provider: LLMProvider | None = None  # reviews want a short JSON, not long reasoning
 
 
 @dataclass(frozen=True)

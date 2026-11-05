@@ -12,7 +12,11 @@ const DELIVERY: Record<string, string> = {
 };
 
 /** What the agent is thinking, what it cares about and how it describes itself right now. */
-export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
+export function MindPanel({ api, onError, onRestartOnboarding }: {
+  api: Api;
+  onError: (e: unknown) => void;
+  onRestartOnboarding: () => void;
+}) {
   const [mind, setMind] = useState<Mind | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   useEffect(() => {
@@ -54,6 +58,7 @@ export function MindPanel({ api, onError }: { api: Api; onError: (e: unknown) =>
     <section className="mind-panel">
       {failure && <p className="error" role="alert">{failure}</p>}
       {!mind.enabled && <p className="note">A mente está desligada nesta instalação: estas anotações ficam guardadas, mas não entram nas respostas dele.</p>}
+      <p className="note"><button type="button" className="link-button" onClick={onRestartOnboarding}>Refazer as perguntas iniciais</button></p>
       {note("profile", "O que ele sabe sobre você", "Ainda não anotou nada: isso aparece depois de algumas conversas.")}
       {note("rules", "O que aprendeu com as suas correções", "Nenhuma correção ainda. Diga quando ele errar: vira regra na hora.")}
       {mind.enabled && <>

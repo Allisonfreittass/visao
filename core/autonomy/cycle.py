@@ -162,7 +162,11 @@ def run_cycle(
         for owner in session.scalars(select(User).where(User.is_active.is_(True))).all():
             if room() and idle_review_due(session, owner, now):
                 reviewed = review_once(
-                    session, owner=owner, provider=provider, budget=budget, now=now
+                    session,
+                    owner=owner,
+                    provider=budget.mind.review_provider or provider,
+                    budget=budget,
+                    now=now,
                 )
                 report.actions.append(
                     _record(
