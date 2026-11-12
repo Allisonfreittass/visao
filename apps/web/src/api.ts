@@ -31,8 +31,18 @@ export interface MindNote {
   updated_at: string | null;
 }
 
+export interface Tendency {
+  name: string;
+  value: number;
+  level: string;
+  why: string;
+}
+
 export interface Mind {
   enabled: boolean;
+  /** Computed from what happened between you; tendencies, never claimed as feelings. */
+  temperament: { states: Tendency[]; traits: Tendency[]; avoids: Tendency[] };
+  questions: { question: string; status: "waiting" | "asked" | "answered"; answer: string }[];
   self_text: string;
   interests: { topic: string; why: string; strength: number }[];
   thoughts: { content: string; created_at: string; ask_owner: string; wanted_to_say: string; delivery: string | null }[];

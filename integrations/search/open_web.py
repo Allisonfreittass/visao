@@ -4,6 +4,7 @@ page. Each source failing alone is not a failure; results are mixed so none crow
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from xml.etree.ElementTree import ParseError  # noqa: S405 (exception type only)
 
@@ -111,11 +112,20 @@ class OpenWebSearch:
 
     def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
         per_source, failures = [], []
-        for source in self._sources:
+
+        def one(source: SearchProvider) -> list[SearchResult] | SearchError:
             try:
-                per_source.append(source.search(query, max_results=2))
+                return source.search(query, max_results=2)
             except SearchError as exc:
-                failures.append(exc)
+                return exc
+
+        # In parallel: in a conversation the slowest source sets the wait, not their sum.
+        with ThreadPoolExecutor(max_workers=len(self._sources)) as pool:
+            for outcome in pool.map(one, self._sources):
+                if isinstance(outcome, SearchError):
+                    failures.append(outcome)
+                else:
+                    per_source.append(outcome)
         if failures and len(failures) == len(self._sources):
             raise failures[0]
         mixed, seen = [], set()

@@ -63,12 +63,17 @@ termos se um dia isso for oferecido a outras pessoas.
   mesma conversa, com aviso push se o app estiver fechado.
 - Mac: `arm/visao_braco.py` (só biblioteca padrão do Python) e `arm/instalar-mac.sh`, que deixa o
   braço rodando pelo `launchd` e reiniciando sozinho.
-- Interface: seção Mac nas preferências (parear, ver tarefas, aprovar/recusar).
+- Interface: página Mac (parear, ver tarefas) e Pendências (aprovar/recusar).
+- O Visão propõe sozinho (2026-11-12): um pensamento pode sugerir uma tarefa
+  (`propose_mac` em `core/mind/think.py`). Ela nasce `proposed`, avisa no celular e só roda depois
+  do seu sim. Limites no código: só projetos que o Mac liberou, nada com a autonomia pausada, uma
+  proposta esperando por vez, no mínimo 8 h entre propostas, no máximo 2 por dia (1 com confiança
+  baixa, nenhuma com cautela alta; veja Temperamento em [MIND.md](MIND.md)).
 
 ## Próximas fases
 
-1. **O Visão propõe.** Na conversa, quando o pedido é trabalho no Mac, ele monta a tarefa e ela
-   chega para aprovação, em vez de você escrever `/mac`.
+1. **Propor na conversa.** Quando o seu pedido no chat é trabalho no Mac, ele monta a tarefa e
+   ela chega para aprovação, sem você escrever `/mac` (hoje ele já propõe pelo pensamento).
 2. **Aprovação por ferramenta.** `--permission-prompt-tool` manda cada pedido de permissão fora
    da lista para o celular, em vez de negar.
 3. **Seus assuntos:** email, agenda e arquivos, cada um como integração com permissão própria,

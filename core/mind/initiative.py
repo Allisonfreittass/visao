@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from core.identity.genesis import get_identity
 from core.initiatives import push
 from core.initiatives.notify import deliver_after
+from core.mind import questions
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import Conversation, Message, Notification, User
 
@@ -125,6 +126,7 @@ def post(session: Session, owner: User, text: str, now: datetime, per_day: int) 
     if conversation is None:
         return Delivery(False, "no_identity")
     message = open_in_chat(session, conversation, text, now)
+    questions.notice_assistant_text(session, owner.id, text, message.id, now)
     session.add(
         Notification(
             owner_user_id=owner.id,

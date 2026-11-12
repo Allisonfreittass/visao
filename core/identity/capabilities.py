@@ -7,10 +7,11 @@ assistant self-descriptions. This manifest is the single source of truth for sel
 
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.policies.autonomy import is_paused
-from infrastructure.database.models import User
+from infrastructure.database.models import ArmDevice, User
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,8 @@ class Capabilities:
     autonomous_study: bool = False
     code_evolution: bool = False
     mind: bool = False
+    read_links: bool = False
+    mac_projects: tuple[str, ...] = ()
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -38,6 +41,17 @@ class Capabilities:
             items.append("detectar lacunas de informação e decidir perguntar, pesquisar ou adiar")
         if self.research_source:
             items.append(f"pesquisar fatos públicos em {self.research_source}, citando fontes")
+        if self.read_links:
+            items.append(
+                "abrir os links que o interlocutor manda (páginas públicas e repositórios do "
+                "GitHub) e comentar o conteúdo lido"
+            )
+        if self.mac_projects:
+            items.append(
+                "pedir trabalho ao Claude Code no Mac do interlocutor, só nos projetos "
+                + ", ".join(self.mac_projects)
+                + "; o que eu proponho só roda depois da aprovação dele"
+            )
         if self.name_deliberation:
             items.append("deliberar sobre o próprio nome pessoal (decidir, adiar ou recusar)")
         if self.reflection:
@@ -82,7 +96,13 @@ class Capabilities:
             missing.append("memória entre conversas (desligada para este interlocutor)")
         if not self.research_source:
             missing.append("pesquisa na internet")
-        missing.append("acesso a arquivos, contas, mensagens ou dispositivos do interlocutor")
+        if self.mac_projects:
+            missing.append(
+                "arquivos fora dos projetos liberados no Mac, contas, email, agenda e mensagens"
+                " do interlocutor"
+            )
+        else:
+            missing.append("acesso a arquivos, contas, mensagens ou dispositivos do interlocutor")
         return missing
 
 
@@ -93,6 +113,8 @@ class CapabilityInputs:
     mind_enabled: bool = False
     tts_approved_voices: str = ""
     stt_model: str = ""
+    web_search: bool = False
+    read_links: bool = False
 
 
 def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) -> Capabilities:
@@ -100,7 +122,11 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
     return Capabilities(
         memory=bool(owner.memory_consent),
         curiosity=inputs.curiosity_enabled,
-        research_source="Wikipédia em português" if inputs.curiosity_enabled else None,
+        research_source=(
+            ("a web aberta e a Wikipédia" if inputs.web_search else "Wikipédia e arXiv")
+            if inputs.curiosity_enabled
+            else None
+        ),
         voice_out=bool(inputs.tts_approved_voices.strip()),
         voice_in=bool(inputs.stt_model.strip()),
         auto_research=bool(permissions.get("auto_research")),
@@ -108,4 +134,17 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         autonomous_study=bool(permissions.get("auto_study")),
         code_evolution=inputs.code_autonomy_enabled,
         mind=inputs.mind_enabled,
+        read_links=inputs.read_links,
+        mac_projects=tuple(
+            sorted(
+                {
+                    p
+                    for d in session.scalars(
+                        select(ArmDevice).where(ArmDevice.owner_user_id == owner.id)
+                    )
+                    for p in (d.projects or [])
+                    if isinstance(p, str)
+                }
+            )
+        ),
     )

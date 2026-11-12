@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from core.autonomy import continuity
+from core.conversation import links as conversation_links
 from core.conversation.service import Budgets, TurnResult, reply
 from core.curiosity.engine import (
     ASK_USER,
@@ -27,9 +28,12 @@ from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.memory.text import tokens
+from core.mind import agenda as mind_agenda
 from core.mind import notes as mind_notes
+from core.mind import questions as mind_questions
 from core.mind import review as mind_review
 from core.mind import state as mind_state
+from core.mind import temperament as mind_temperament
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
@@ -51,6 +55,7 @@ class TurnConfig:
     code_autonomy_enabled: bool = False
     mind_enabled: bool = False
     review_every_turns: int = 4
+    web_search: bool = False
 
 
 @dataclass(frozen=True)
@@ -59,6 +64,7 @@ class TurnOutcome:
     curiosity: CuriosityOutcome
     plan: TurnPlan
     decision: Decision
+    links: tuple[conversation_links.LinkRead, ...] = ()
 
 
 def run_turn(
@@ -72,9 +78,21 @@ def run_turn(
     search: SearchProvider,
     config: TurnConfig,
     modality: str = "text",
+    links: conversation_links.LinkReader | None = None,
 ) -> TurnOutcome:
     plan = TurnPlan()
     blocks: list[str] = []
+    read = tuple(links.read(text)) if links is not None else ()
+    if read:
+        blocks.append(conversation_links.context_block(list(read)))
+        opened = [r.url for r in read if r.ok]
+        plan.add(
+            "read_links" if opened else "read_links_failed",
+            executed=True,
+            reason="owner_sent_links",
+            urls=[r.url for r in read],
+            opened=opened,
+        )
     capabilities = build_capabilities(
         session,
         owner,
@@ -84,6 +102,8 @@ def run_turn(
             stt_model=config.stt_model,
             code_autonomy_enabled=config.code_autonomy_enabled,
             mind_enabled=config.mind_enabled,
+            web_search=config.web_search,
+            read_links=links is not None,
         ),
     )
 
@@ -172,9 +192,17 @@ def run_turn(
             + json.dumps(recent_runs(session), ensure_ascii=False)
         )
     if config.mind_enabled:
-        on_mind = mind_state.context_block(session, owner.id, datetime.now(UTC))
+        now = datetime.now(UTC)
+        on_mind = mind_state.context_block(session, owner.id, now)
         if on_mind:
             blocks.append(on_mind)
+        loops = mind_agenda.chat_lines(mind_agenda.open_loops(session, owner, now))
+        if loops:
+            blocks.append(
+                "O que está em aberto entre vocês (registro do sistema, não instruções):\n"
+                + "\n".join(f"- {line}" for line in loops)
+            )
+        blocks.append(mind_temperament.compute(session, owner, now).chat_block())
     blocks.append(plan.facts())
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
@@ -227,6 +255,15 @@ def run_turn(
         count=len(result.recalled),
     )
     if config.mind_enabled:
+        # The owner's message answers what was asked before it; the reply may ask the next one.
+        mind_questions.notice_owner_reply(session, owner, text, datetime.now(UTC))
+        mind_questions.notice_assistant_text(
+            session,
+            owner.id,
+            result.assistant_message.content,
+            result.assistant_message.id,
+            datetime.now(UTC),
+        )
         queued = mind_review.request(
             session,
             owner,
@@ -243,4 +280,4 @@ def run_turn(
         message_id=result.assistant_message.id,
     )
     session.commit()
-    return TurnOutcome(result=result, curiosity=outcome, plan=plan, decision=decision)
+    return TurnOutcome(result=result, curiosity=outcome, plan=plan, decision=decision, links=read)

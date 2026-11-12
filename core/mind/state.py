@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.memory.text import fold
+from core.mind import questions
 from infrastructure.database.models import Interest, SelfVersion, StudyEntry, Thought
 
 SEED_SELF = """Quero entender as coisas até o fundo, e principalmente entender a pessoa com quem \
@@ -171,7 +172,10 @@ def context_block(session: Session, owner_id: uuid.UUID, now: datetime) -> str:
     for item in findings:
         claims = "; ".join(f"{f['claim']} ({', '.join(f['urls'])})" for f in item["findings"])
         lines.append(f'Você estudou "{item["topic"]}": {claims}')
-    question = open_question(session, owner_id, now)
-    if question:
-        lines.append(f"Pergunta que você quer fazer quando couber: {question}")
+    queued = questions.next_to_ask(session, owner_id, now)
+    if queued:
+        lines.append(f"Pergunta que você quer fazer quando couber (uma vez só): {queued.text}")
+    asked = [q for q in questions.for_context(session, owner_id, now) if q["status"] != "waiting"]
+    if asked:
+        lines.append("Já perguntou, não repita: " + " | ".join(q["question"] for q in asked[:5]))
     return "\n".join(lines) if len(lines) > 1 else ""

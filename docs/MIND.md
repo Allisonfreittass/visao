@@ -88,12 +88,65 @@ regra nova: se ele não pode falar no chat, não avisa. Tocar no aviso abre a co
 - Quem envia é o processo que roda a mente: hoje o worker local. Com ele parado, não há abertura
   nem aviso.
 
+## O que ficou em aberto
+
+Um modelo só existe durante uma chamada: entre uma e outra ele é o que aparece no contexto. Por
+isso cada rodada de pensamento e cada resposta recebem o que está em aberto entre vocês
+(`core/mind/agenda.py`): o que o Mac está rodando, o que terminou nas últimas 24 h (e se você já
+falou depois disso), o que espera o seu sim e as últimas mensagens que ele puxou, cada uma marcada
+como respondida ou não (resposta em até 24 h). "Te aviso quando terminar" deixou de ser só texto.
+
+## Perguntas com memória
+
+O que ele quer perguntar vira uma fila curta (`owner_questions`, migração `0018`,
+`core/mind/questions.py`): no máximo 3 esperando, cada uma some depois de 3 dias sem caber na
+conversa, e nada parecido com o que já foi perguntado nos últimos 30 dias entra de novo. Quando a
+resposta ou uma abertura faz a pergunta, ela fica "perguntei"; a sua mensagem seguinte é guardada
+como resposta, só com consentimento de memória, e apaga junto com a memória (`DELETE /memory`).
+
+## Temperamento
+
+Ninguém sabe se um sistema assim sente alguma coisa, então ele nunca diz que sente. O que ele tem
+são tendências calculadas em código do que aconteceu, cada uma com o motivo
+(`core/mind/temperament.py`), e elas mudam o que ele faz:
+
+| Estado | Sobe quando | Efeito |
+|---|---|---|
+| reserva | as últimas mensagens que ele puxou ficaram sem resposta | fala menos, não cobra |
+| cautela | você corrigiu (frases de correção, avaliação negativa) ou uma tarefa no Mac falhou, em 72 h | confere mais; com cautela alta, nenhuma proposta no Mac |
+| confiança | tarefas no Mac deram certo, propostas dele foram aprovadas, elogios, em 7 dias | sugere o próximo passo; baixa, no máximo 1 proposta por dia |
+| vontade | você conversou bastante nos últimos 2 dias | aprofunda |
+
+Os traços (curiosidade, humildade, cuidado, franqueza) andam pouco, com os mesmos sinais de 30
+dias. Arrogância e egoísmo aparecem só como o que ele evita. Humildade não é concordar com tudo: o
+prompt pede que ele discorde quando achar que você está errado. Na conversa, ele pode falar de como
+está como tendência ("fiquei mais cauteloso com isso desde ontem"), nunca como algo vivido. Tudo
+aparece no Caderno.
+
 ## Internet
 
-Wikipédia pt e en, arXiv e páginas via Hacker News (`integrations/search/open_web.py`), todas APIs
-públicas gratuitas. Como roda na sua máquina, `integrations/search/fetch.py` só abre HTTPS em
-endereços públicos, revalidados em cada redirecionamento: uma página nunca alcança `localhost` nem
-a sua rede. O que vem da web entra como dado, e ele não tem ferramenta além de falar com você.
+**No estudo, em segundo plano:** Wikipédia pt e en, arXiv e páginas via Hacker News
+(`integrations/search/open_web.py`), todas APIs públicas gratuitas, consultadas em paralelo.
+
+**Na conversa:**
+- **Links que você manda** são abertos antes da resposta (`core/conversation/links.py`, até 2 por
+  mensagem). Um repositório do GitHub é lido pela API (`integrations/github/reader.py`): descrição,
+  linguagens, últimos commits, a lista de arquivos, o README, até 3 arquivos de configuração e o
+  arquivo do link, se for um. Públicos funcionam sem chave (60 leituras por hora); com
+  `VISION_GITHUB_TOKEN` (só leitura) abrem também os privados. Outras páginas passam pelo mesmo
+  leitor seguro do estudo. O que não abriu é dito como não aberto, e ele não pode fingir que leu.
+- **Pesquisa:** quando a curiosidade decide pesquisar um fato público, a busca vai para a web
+  aberta pelo Tavily (`VISION_TAVILY_API_KEY`, plano grátis de 1000 buscas por mês) junto com a
+  Wikipédia; sem a chave, Wikipédia e arXiv. As fontes aparecem embaixo da resposta.
+
+A busca da própria Anthropic ficou de fora de propósito: ela devolve páginas de tamanho
+imprevisível dentro da chamada, e o razão de gastos congela tudo quando uma chamada passa do que
+reservou. Aqui o tamanho de cada página e de cada resultado é limitado no código.
+
+Como roda no servidor, `integrations/search/fetch.py` só abre HTTPS em endereços públicos,
+revalidados em cada redirecionamento: uma página nunca alcança `localhost`, a rede interna nem o
+endereço de metadados da nuvem. O que vem da web entra como dado, num bloco que manda ignorar
+qualquer ordem escrita dentro dele.
 
 ## Velocidade
 

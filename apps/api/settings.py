@@ -112,6 +112,12 @@ class Settings(BaseSettings):
     webpush_public_key: str | None = None
     webpush_private_key: SecretStr | None = None
     webpush_subject: str | None = None  # https URL of the app or mailto: contact (VAPID "sub")
+    # Optional read-only GitHub token: opens the owner's private repositories when a link to one
+    # is sent, and raises the API limit from 60 to 5000 reads an hour.
+    github_token: SecretStr | None = None
+    # Optional: web search in the conversation through Tavily (free plan: 1000 searches a month).
+    # Without it, research in the conversation uses Wikipedia and arXiv.
+    tavily_api_key: SecretStr | None = None
     autonomy_llm_calls_per_day: int = Field(default=20, ge=0)
     autonomy_tokens_per_day: int = Field(default=60_000, ge=0)
     autonomy_max_actions_per_cycle: int = Field(default=3, ge=0)
@@ -145,6 +151,8 @@ class Settings(BaseSettings):
         "webpush_public_key",
         "webpush_private_key",
         "webpush_subject",
+        "github_token",
+        "tavily_api_key",
         mode="before",
     )
     @classmethod

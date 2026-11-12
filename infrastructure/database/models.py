@@ -743,3 +743,26 @@ class ArmTask(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OwnerQuestion(Base):
+    """Something the agent wants to ask the owner: asked once, at a fitting moment, and kept with
+    the answer so it never asks the same thing twice (core/mind/questions.py)."""
+
+    __tablename__ = "owner_questions"
+    __table_args__ = (Index("ix_owner_questions_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    text: Mapped[str] = mapped_column(Text)
+    # waiting | asked | answered | dropped
+    status: Mapped[str] = mapped_column(String(16), default="waiting")
+    asked_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    answer: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -1,13 +1,14 @@
 """A window into the agent's inner state, and the owner's undo for its self-description."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession
-from core.mind import notes, state
+from core.mind import notes, questions, state
+from core.mind import temperament as temper
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import SelfVersion
 
@@ -42,6 +43,25 @@ class NoteOut(BaseModel):
     updated_at: datetime | None = None
 
 
+class TendencyOut(BaseModel):
+    name: str
+    value: float
+    level: str
+    why: str
+
+
+class TemperamentOut(BaseModel):
+    states: list[TendencyOut]
+    traits: list[TendencyOut]
+    avoids: list[TendencyOut]
+
+
+class QuestionOut(BaseModel):
+    question: str
+    status: str
+    answer: str = ""
+
+
 class MindOut(BaseModel):
     enabled: bool
     self_text: str
@@ -50,6 +70,8 @@ class MindOut(BaseModel):
     self_history: list[SelfVersionOut]
     profile: NoteOut
     rules: NoteOut
+    temperament: TemperamentOut
+    questions: list[QuestionOut]
 
 
 class RevertIn(BaseModel):
@@ -68,9 +90,15 @@ def _note(db: DbSession, user_id, kind: str) -> NoteOut:
     )
 
 
+def _tendency(t: temper.Tendency) -> TendencyOut:
+    return TendencyOut(name=t.name, value=t.value, level=t.level, why=t.why)
+
+
 @router.get("")
 def read_mind(db: DbSession, user: CurrentUser, settings: AppSettings) -> MindOut:
     history = db.scalars(select(SelfVersion).order_by(SelfVersion.version.desc()).limit(10))
+    now = datetime.now(UTC)
+    mood = temper.compute(db, user, now)
     return MindOut(
         enabled=settings.mind_enabled,
         self_text=state.current_self(db),
@@ -96,6 +124,12 @@ def read_mind(db: DbSession, user: CurrentUser, settings: AppSettings) -> MindOu
         ],
         profile=_note(db, user.id, notes.PROFILE),
         rules=_note(db, user.id, notes.RULES),
+        temperament=TemperamentOut(
+            states=[_tendency(t) for t in mood.states],
+            traits=[_tendency(t) for t in mood.traits],
+            avoids=[TendencyOut(name=n, value=0, level="evita", why=w) for n, w in temper.AVOIDS],
+        ),
+        questions=[QuestionOut(**q) for q in questions.for_context(db, user.id, now)],
     )
 
 

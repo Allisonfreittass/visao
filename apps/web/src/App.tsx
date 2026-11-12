@@ -99,7 +99,10 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [view, setView] = useState<WorkspaceView>("conversation");
+  // A notification about Mac work opens the list of what waits for a yes (`/?mac=1`).
+  const [view, setView] = useState<WorkspaceView>(() =>
+    new URLSearchParams(window.location.search).get("mac") ? "inbox" : "conversation",
+  );
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
@@ -138,7 +141,9 @@ export function App() {
     // A tap on a notification while the app is open: jump to that conversation.
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type !== "visao.open") return;
-      const id = new URL(event.data.url, window.location.origin).searchParams.get("c");
+      const params = new URL(event.data.url, window.location.origin).searchParams;
+      if (params.get("mac")) setView("inbox");
+      const id = params.get("c");
       if (id) {
         setView("conversation");
         setCurrent(id);

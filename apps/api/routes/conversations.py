@@ -10,10 +10,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
+from apps.api.links import get_link_reader
 from apps.api.llm import get_llm_provider, missing_llm_settings
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
+from core.conversation.links import LinkReader
 from core.conversation.service import (
     BudgetExceededError,
     Budgets,
@@ -165,6 +167,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         code_autonomy_enabled=settings.code_autonomy_enabled,
         mind_enabled=settings.mind_enabled,
         review_every_turns=settings.mind_review_turns,
+        web_search=settings.tavily_api_key is not None,
     )
 
 
@@ -343,6 +346,7 @@ def send_message(
     settings: AppSettings,
     provider: OptionalProvider,
     search: Annotated[SearchProvider, Depends(get_search_provider)],
+    links: Annotated[LinkReader, Depends(get_link_reader)],
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
@@ -365,6 +369,7 @@ def send_message(
             search=search,
             config=turn_config(settings),
             modality=body.modality,
+            links=links,
         )
         result, outcome = turn.result, turn.curiosity
     except BudgetExceededError as exc:
@@ -395,7 +400,12 @@ def send_message(
         )
         if gap is not None
         else None,
-        sources=[SourceOut(title=s.title, url=s.url, source=s.source) for s in outcome.sources],
+        sources=[SourceOut(title=s.title, url=s.url, source=s.source) for s in outcome.sources]
+        + [
+            SourceOut(title=r.title, url=r.url, source="GitHub" if r.kind == "github" else "link")
+            for r in turn.links
+            if r.ok
+        ],
         user_message=_message_out(result.user_message),
         assistant_message=_message_out(result.assistant_message),
         usage=UsageOut(

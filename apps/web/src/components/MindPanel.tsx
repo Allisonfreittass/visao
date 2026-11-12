@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ApiError, utcDate, type Api, type Mind } from "../api";
+import { ApiError, utcDate, type Api, type Mind, type Tendency } from "../api";
 
 const DELIVERY: Record<string, string> = {
   sent: "mandou",
@@ -10,6 +10,21 @@ const DELIVERY: Record<string, string> = {
   daily_limit: "guardou: limite do dia",
   paused: "guardou: autonomia pausada",
 };
+
+const QUESTION: Record<string, string> = { waiting: "quero perguntar", asked: "perguntei", answered: "respondida" };
+
+function Meter({ item, showWhy }: { item: Tendency; showWhy?: boolean }) {
+  return (
+    <li className="tendency">
+      <span className="tendency-name">{item.name}</span>
+      <span className="tendency-bar" role="meter" aria-valuemin={0} aria-valuemax={1} aria-valuenow={item.value} aria-label={`${item.name}: ${item.level}`}>
+        <span style={{ width: `${Math.round(item.value * 100)}%` }} />
+      </span>
+      <span className="tendency-level">{item.level}</span>
+      {showWhy && <span className="note tendency-why">{item.why}</span>}
+    </li>
+  );
+}
 
 /** What the agent is thinking, what it cares about and how it describes itself right now. */
 export function MindPanel({ api, onError }: {
@@ -60,6 +75,22 @@ export function MindPanel({ api, onError }: {
       {note("profile", "O que ele sabe sobre você", "Ainda não anotou nada: isso aparece depois de algumas conversas.")}
       {note("rules", "O que aprendeu com as suas correções", "Nenhuma correção ainda. Diga quando ele errar: vira regra na hora.")}
       {mind.enabled && <>
+      <article className="study-entry">
+        <h3>Temperamento</h3>
+        <p className="note">Tendências que eu calculo do que acontece entre a gente. Mudam o que eu faço, não são sentimentos.</p>
+        <h4>Agora</h4>
+        <ul className="tendencies">{mind.temperament.states.map((t) => <Meter key={t.name} item={t} showWhy />)}</ul>
+        <h4>Jeito de ser</h4>
+        <ul className="tendencies">{mind.temperament.traits.map((t) => <Meter key={t.name} item={t} />)}</ul>
+        <p className="note">Evito {mind.temperament.avoids.map((a) => `${a.name} (${a.why})`).join(" e ")}.</p>
+      </article>
+      {mind.questions.length > 0 && <article className="study-entry">
+        <h3>O que quero te perguntar</h3>
+        <ul className="questions">{mind.questions.map((q) => <li key={q.question}>
+          <span className="rotulo">{QUESTION[q.status] ?? q.status}</span> {q.question}
+          {q.answer && <p className="note">Você disse: {q.answer}</p>}
+        </li>)}</ul>
+      </article>}
       <article className="study-entry">
         <h3>Como ele se descreve agora</h3>
         <p>{mind.self_text}</p>

@@ -353,3 +353,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 @media (max-width: 560px) {
   .composer-note { display: none; }
 }
+
+/* Temperament in the notebook: a name, a thin bar, the level and why. */
+.tendencies, .questions { list-style: none; margin: 0; padding: 0 !important; display: grid; gap: 10px; }
+.tendency { display: grid; grid-template-columns: 96px minmax(0, 1fr) 48px; gap: 4px 12px; align-items: center; margin: 0 !important; }
+.tendency-name { font-size: 14px; }
+.tendency-bar { height: 4px; border-radius: 2px; background: var(--linha-forte); overflow: hidden; }
+.tendency-bar span { display: block; height: 100%; background: var(--estanho); }
+.tendency-level { font: 400 11px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-fraca); text-align: right; }
+.tendency-why { grid-column: 2 / -1; font-size: 13px; }
+.questions li { margin: 0 !important; font-size: 15px; }
+.questions .rotulo { margin-right: 8px; }
