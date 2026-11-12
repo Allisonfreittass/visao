@@ -113,6 +113,8 @@ export interface Goal {
 
 export interface AppNotification {
   id: string;
+  /** "initiative" also lands in the chat as a message; the rest only lives here. */
+  kind: string;
   title: string;
   body: string;
   created_at: string;

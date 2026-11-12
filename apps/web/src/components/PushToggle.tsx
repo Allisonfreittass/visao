@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Api, PushState } from "../api";
 import { currentSubscription, pushSupport, subscribe, unsubscribe } from "../push";
+import { Setting } from "./Setting";
 
 interface PushToggleProps {
   api: Api;
@@ -59,19 +60,20 @@ export function PushToggle({ api, onError }: PushToggleProps) {
     : !server.enabled
       ? "Os avisos ainda não foram configurados no servidor (chaves VAPID)."
       : support === "needs-install"
-        ? "No iPhone, os avisos só funcionam com o app na tela de início: Compartilhar → Adicionar à Tela de Início."
+        ? "No iPhone, só com o app na tela de início: Compartilhar, depois Adicionar à Tela de Início."
         : support === "unsupported"
           ? "Este navegador não recebe avisos."
           : null;
 
   return (
-    <div className="preference">
-      <label className="memory-toggle">
-        <input type="checkbox" checked={on} onChange={toggle} disabled={busy || reason !== null} />
-        Avisos com o app fechado
-      </label>
-      <p className="note">{reason ?? note ?? "Quando eu puxar conversa, aviso neste aparelho. Respeito o seu horário de silêncio."}</p>
-      {on && !reason && <button type="button" className="link-button" onClick={test} disabled={busy}>Mandar um teste</button>}
-    </div>
+    <Setting
+      title="Avisos neste aparelho"
+      description={reason ?? note ?? "Te chamo mesmo com o app fechado. Respeito o seu horário de silêncio."}
+      checked={on}
+      disabled={busy || reason !== null}
+      onChange={() => void toggle()}
+    >
+      {on && !reason && <button type="button" className="link-button" onClick={() => void test()} disabled={busy}>Mandar um teste</button>}
+    </Setting>
   );
 }

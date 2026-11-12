@@ -75,7 +75,7 @@ assinou (`core/initiatives/push.py`, tabela `push_subscriptions`, migração `00
 regra nova: se ele não pode falar no chat, não avisa. Tocar no aviso abre a conversa certa
 (`/?c=<id>`).
 
-- Opt-in por aparelho, em Preferências → "Avisos com o app fechado". No iPhone, só com o app na
+- Opt-in por aparelho, em Ajustes → "Avisos neste aparelho". No iPhone, só com o app na
   tela de início (iOS 16.4+).
 - Chaves VAPID: `python -m apps.api.cli webpush-keys`, depois `VISION_WEBPUSH_PUBLIC_KEY`,
   `VISION_WEBPUSH_PRIVATE_KEY` e `VISION_WEBPUSH_SUBJECT` (URL https do app ou `mailto:`). Sem as

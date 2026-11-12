@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Api,
   ApiError,
+  utcDate,
   type Conversation,
   type Message,
   type OnboardingStatus,
@@ -13,11 +14,16 @@ import { CallView } from "./components/CallView";
 import { ChatView } from "./components/ChatView";
 import { Login } from "./components/Login";
 import { MindPanel } from "./components/MindPanel";
-import { NotificationFeed } from "./components/NotificationFeed";
+import { InboxView } from "./components/InboxView";
+import { MacView } from "./components/MacView";
 import { Onboarding } from "./components/Onboarding";
-import { Sidebar, type WorkspaceView } from "./components/Sidebar";
+import { type CallControls, Presence, PresencePanel } from "./components/Presence";
+import { Rail, type WorkspaceView } from "./components/Rail";
+import { SettingsView } from "./components/SettingsView";
 import { StudyPanel } from "./components/StudyPanel";
+import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
+import { dayLabel } from "./labels";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
 import { parseMacCommand } from "./arm";
@@ -69,19 +75,6 @@ function useDemoLevel(active: boolean): number {
 function requestedConversation(): string | null {
   return new URLSearchParams(window.location.search).get("c");
 }
-
-const HEADINGS: Record<WorkspaceView, { kicker: string; title: [string, string]; lede: string }> = {
-  conversation: {
-    kicker: "Conversa",
-    title: ["Me conta o que ", "está na sua cabeça."],
-    lede: "Código, ideias ou só um dia comprido. Pode escrever ou me ligar.",
-  },
-  study: {
-    kicker: "Caderno",
-    title: ["O que eu fiz ", "enquanto você não estava."],
-    lede: "O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.",
-  },
-};
 
 export function App() {
   const api = useMemo(() => {
@@ -135,6 +128,10 @@ export function App() {
     onTranscript: (text, timing) => sendRef.current(text, timing),
     onError: setError,
   });
+
+  const firstRun = loggedIn && !demo && onboarding !== "done";
+  const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
+  const pending = usePending(api, ready, handleError, ready && view === "conversation");
 
   useEffect(() => {
     void registerWorker();
@@ -365,28 +362,39 @@ export function App() {
               ? "LISTENING"
               : "IDLE";
   const agentName = status?.identity?.chosen_name ?? null;
-  const firstRun = loggedIn && !demo && onboarding !== "done";
-  const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
-  const heading = HEADINGS[view];
   const callHint = voice.listenerKind
     ? null
     : voice.deviceCouldListen
-      ? "Para ligar, permita ouvir pelo navegador nas preferências."
+      ? "Para ligar daqui, ligue Ouvir pelo navegador."
       : "Este navegador não consegue me ouvir. Dá para escrever.";
+
+  const call: CallControls = {
+    state: orbState,
+    level: voice.level,
+    levelActive: voice.speaking || voice.inCall,
+    canCall: voice.listenerKind !== null && online,
+    speaking: voice.speaking,
+    hint: callHint,
+    onCall: () => { setError(null); void voice.startCall(); },
+    onStopSpeaking: voice.stopSpeaking,
+    onOpenSettings: () => showView("settings"),
+  };
+  const currentConversation = conversations.find((c) => c.id === current);
+  const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
     <div className="app">
-      <header className="topbar">
+      <header className={`topbar ${ready ? "topbar--app" : ""}`}>
+        {ready && (
+          <button type="button" className="rs-botao rs-botao--compacto menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
+            Menu{pending.count > 0 && <span className="rail-badge" aria-label={`${pending.count} esperando você`}>{pending.count}</span>}
+          </button>
+        )}
         <a className="brand" href="/" aria-label="Visão, início">Visão</a>
         <span className="identity" title={status?.identity?.internal_id}>
           {agentName ?? <em>sem nome ainda</em>}
         </span>
-        {ready && (
-          <button type="button" className="rs-botao rs-botao--compacto menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
-            Menu
-          </button>
-        )}
-        {loggedIn && !demo && (
+        {loggedIn && !demo && !ready && (
           <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
         )}
       </header>
@@ -408,77 +416,122 @@ export function App() {
         </main>
       )}
 
-      {!firstRun && (
+      {!firstRun && ready && (
         <div className="layout">
-          {ready && (
-            <Sidebar
-              api={api}
-              open={menuOpen}
-              view={view}
-              conversations={conversations}
-              current={current}
-              busy={preparing || sending}
-              preparing={preparing}
-              online={online}
-              memoryEnabled={memoryEnabled}
-              speakReplies={speakReplies}
-              canSpeak={voice.speakerKind !== null}
-              speakerKind={voice.speakerKind}
-              deviceListening={deviceListening}
-              deviceCouldListen={voice.deviceCouldListen}
-              serverListening={voice.listenerKind === "server"}
-              onView={showView}
-              onNewConversation={() => void newConversation()}
-              onSelect={(id) => { setCurrent(id); showView("conversation"); }}
-              onToggleMemory={() => void toggleMemory()}
-              onToggleSpeak={toggleSpeak}
-              onToggleDeviceListening={toggleDeviceListening}
-              onError={handleError}
-            />
-          )}
+          <Rail
+            open={menuOpen}
+            view={view}
+            conversations={conversations}
+            current={current}
+            busy={preparing || sending}
+            preparing={preparing}
+            online={online}
+            pendingCount={pending.count}
+            macOnline={macOnline}
+            onView={showView}
+            onNewConversation={() => void newConversation()}
+            onSelect={(id) => { setCurrent(id); showView("conversation"); }}
+          />
+          {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
 
-          <main className={`main ${!loggedIn || demo ? "auth-main rs-luz-indireta" : ""}`}>
-            <div className={ready ? "workspace-top" : "entrance"}>
-            {ready && (
-              <div className="workspace-heading">
-                <span className="rotulo">{heading.kicker}</span>
-                <h1>{heading.title[0]}<em>{heading.title[1]}</em></h1>
-                <p className="lede">{heading.lede}</p>
-              </div>
+          <main className="main">
+            {notice && (
+              <p className="note first-run-notice" role="status">
+                {notice}{" "}
+                <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
+              </p>
             )}
+            {view === "inbox" && (
+              <InboxView
+                pending={pending}
+                current={current}
+                onReplied={(conversationId) => {
+                  setView("conversation");
+                  setCurrent(conversationId);
+                  api.messages(conversationId).then(setMessages).catch(handleError);
+                  setComposerFocus((value) => value + 1);
+                }}
+              />
+            )}
+            {view === "study" && (
+              <section className="page page--caderno" aria-labelledby="study-title">
+                <header className="page-head">
+                  <span className="rotulo">Caderno</span>
+                  <h1 id="study-title">O que eu fiz <em>enquanto você não estava.</em></h1>
+                  <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
+                </header>
+                <MindPanel api={api} onError={handleError} />
+                <StudyPanel api={api} onError={handleError} />
+              </section>
+            )}
+            {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
+            {view === "settings" && (
+              <SettingsView
+                api={api}
+                memoryEnabled={memoryEnabled}
+                onToggleMemory={() => void toggleMemory()}
+                speakReplies={speakReplies}
+                canSpeak={voice.speakerKind !== null}
+                speakerKind={voice.speakerKind}
+                onToggleSpeak={toggleSpeak}
+                deviceListening={deviceListening}
+                deviceCouldListen={voice.deviceCouldListen}
+                serverListening={voice.listenerKind === "server"}
+                onToggleDeviceListening={toggleDeviceListening}
+                onRestartOnboarding={() => {
+                  api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
+                }}
+                onLogout={logout}
+                onError={handleError}
+              />
+            )}
+            <ChatView
+              hidden={view !== "conversation"}
+              header={
+                <div className="chat-head">
+                  <div className="chat-head-text">
+                    <span className="rotulo">{currentConversation ? dayLabel(utcDate(currentConversation.created_at)) : "Conversa nova"}</span>
+                    {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
+                    {latency && (
+                      <p className="latency">
+                        Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta {Math.round(latency.llmMs)} ms
+                        {latency.ttsFirstAudioMs !== null && ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
+                        {latency.totalMs !== null && ` · fim da fala → voz ${Math.round(latency.totalMs)} ms`}
+                      </p>
+                    )}
+                  </div>
+                  <Presence call={call} compact />
+                </div>
+              }
+              focusRequest={composerFocus}
+              agentName={agentName}
+              messages={messages}
+              sending={sending || preparing}
+              error={voice.inCall ? null : error}
+              onSend={(text) => void send(text)}
+              onFeedback={sendFeedback}
+            />
+            {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
+          </main>
 
-            {(!ready || view === "conversation") && (
+          <PresencePanel api={api} call={call} pending={pending} onOpen={showView} />
+        </div>
+      )}
+
+      {!firstRun && !ready && (
+        <div className="layout">
+          <main className="main auth-main rs-luz-indireta">
+            <div className="entrance">
               <div className="presence">
                 <div className="orb-wrap">
-                  <Orb
-                    state={orbState}
-                    size={ready ? 84 : 240}
-                    level={demoLevel}
-                    getLevel={voice.speaking || voice.inCall ? voice.level : undefined}
-                  />
+                  <Orb state={orbState} size={240} level={demoLevel} getLevel={voice.speaking || voice.inCall ? voice.level : undefined} />
                 </div>
                 <div className="presence-copy">
                   <p className="rotulo state-label">{STATE_LABELS[orbState]}</p>
-                  {!ready && !demo && <p className="lede">Eu nasci sem nome e venho decidindo quem sou. Entre para conversar.</p>}
-                  {ready && (
-                    <div className="call-start">
-                      <button
-                        type="button"
-                        className="rs-botao rs-botao--principal"
-                        onClick={() => { setError(null); void voice.startCall(); }}
-                        disabled={!voice.listenerKind || !online}
-                      >
-                        Ligar
-                      </button>
-                      {voice.speaking && <button type="button" className="rs-botao" onClick={voice.stopSpeaking}>Parar de falar</button>}
-                      {callHint && <span className="note">{callHint}</span>}
-                    </div>
-                  )}
+                  {!demo && <p className="lede">Eu nasci sem nome e venho decidindo quem sou. Entre para conversar.</p>}
                 </div>
               </div>
-            )}
             </div>
-
             {demo ? (
               <div className="demo">
                 {DEMO_STATES.map((s) => (
@@ -500,54 +553,6 @@ export function App() {
                 <i aria-hidden="true">!</i><b>Aviso</b>
                 <p>Ainda não nasci: rode <code>python -m apps.api.cli genesis</code> no servidor.</p>
               </div>
-            ) : ready ? (
-              <>
-                {latency && (
-                  <p className="latency">
-                    Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta {Math.round(latency.llmMs)} ms
-                    {latency.ttsFirstAudioMs !== null && ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
-                    {latency.totalMs !== null && ` · fim da fala → voz ${Math.round(latency.totalMs)} ms`}
-                  </p>
-                )}
-                <NotificationFeed
-                  api={api}
-                  current={current}
-                  onError={handleError}
-                  onReply={(conversationId) => {
-                    setView("conversation");
-                    setCurrent(conversationId);
-                    api.messages(conversationId).then(setMessages).catch(handleError);
-                    setComposerFocus((value) => value + 1);
-                  }}
-                />
-                {view === "study" && (
-                  <MindPanel
-                    api={api}
-                    onError={handleError}
-                    onRestartOnboarding={() => {
-                      api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
-                    }}
-                  />
-                )}
-                {view === "study" && <StudyPanel api={api} onError={handleError} />}
-                {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
-                {notice && (
-                  <p className="note first-run-notice" role="status">
-                    {notice}{" "}
-                    <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
-                  </p>
-                )}
-                <ChatView
-                  hidden={view !== "conversation"}
-                  focusRequest={composerFocus}
-                  agentName={agentName}
-                  messages={messages}
-                  sending={sending || preparing}
-                  error={voice.inCall ? null : error}
-                  onSend={(text) => void send(text)}
-                  onFeedback={sendFeedback}
-                />
-              </>
             ) : null}
           </main>
         </div>

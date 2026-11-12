@@ -60,8 +60,9 @@ export function AccountPanel({ api }: AccountPanelProps) {
   }
 
   return (
-    <div className="preference account">
-      <span className="memory-toggle">Conta</span>
+    <div className="setting setting--conta">
+      <div className="setting-text">
+      <span className="setting-title">Login</span>
       <p className="note">{email ?? "…"}</p>
       {mode === null && (
         <div className="account-actions">
@@ -101,6 +102,7 @@ export function AccountPanel({ api }: AccountPanelProps) {
         </form>
       )}
       {message && <p className={message.ok ? "note" : "error"} role="status">{message.ok ? "✓ " : "× "}{message.text}</p>}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,12 @@
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
 import { utcDate, type Message } from "../api";
 import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
 
 interface ChatViewProps {
+  /** The slim bar above the messages: which conversation, and the call on smaller screens. */
+  header?: ReactNode;
   messages: Message[];
   agentName?: string | null;
   hidden?: boolean;
@@ -16,7 +18,7 @@ interface ChatViewProps {
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ messages, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
+export function ChatView({ header, messages, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,16 +50,17 @@ export function ChatView({ messages, agentName, hidden, focusRequest, sending, e
 
   return (
     <section className="chat" hidden={hidden}>
+      {header}
       <div className="messages" aria-live="polite">
         {messages.length === 0 && !sending && (
           <div className="empty-conversation">
             <span className="rotulo">Conversa nova</span>
             <h2>Por onde a gente <em>começa?</em></h2>
-            <p>Um bug, uma ideia pela metade, um plano. Cole o código direto aqui.</p>
+            <p>Um bug, uma ideia pela metade, um plano. Pode escrever, colar código ou me ligar.</p>
           </div>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className={`bubble ${m.role}`}>
+        {messages.map((m, i) => (
+          <div key={m.id} className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}`}>
             <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
             <MessageContent text={m.content} />
             {m.sources && m.sources.length > 0 && (
@@ -102,7 +105,7 @@ export function ChatView({ messages, agentName, hidden, focusRequest, sending, e
           <span aria-hidden="true">→</span>
         </button>
       </form>
-      <p className="composer-note">Enter envia · Shift + Enter quebra a linha</p>
+      <p className="composer-note">Enter envia · Shift + Enter quebra a linha · <code>/mac projeto</code> pede ao Mac</p>
     </section>
   );
 }
