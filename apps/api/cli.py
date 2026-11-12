@@ -164,8 +164,10 @@ def main(argv: list[str] | None = None) -> int:
         "google-connect",
         help="conecta o seu Gmail e Google Agenda ao Visão (rode no seu computador)",
     )
-    google.add_argument(
-        "--client-file", required=True, help="JSON do cliente 'App para computador'"
+    source = google.add_mutually_exclusive_group(required=True)
+    source.add_argument("--client-file", help="JSON do cliente 'App para computador'")
+    source.add_argument(
+        "--client-id", help="ID do cliente (a chave secreta é pedida no terminal, sem aparecer)"
     )
     google.add_argument(
         "--server",
@@ -179,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("diga o endereço do Visão com --server https://...")
         from apps.api import google_connect
 
-        return google_connect.run(args.client_file, args.server)
+        return google_connect.run(args.client_file, args.server, client_id=args.client_id)
 
     if args.command in ("set-password", "set-email"):
         with get_sessionmaker()() as session:

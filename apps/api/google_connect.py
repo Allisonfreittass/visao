@@ -67,8 +67,14 @@ def _wait_for_code(state: str) -> tuple[http.server.HTTPServer, int, threading.E
     return server, server.server_address[1], done, got
 
 
-def run(client_file: str, server_url: str) -> int:
-    client_id, client_secret = _client(Path(client_file).expanduser())
+def run(client_file: str | None, server_url: str, *, client_id: str | None = None) -> int:
+    if client_id:
+        client_secret = getpass.getpass("Chave secreta do cliente (não aparece na tela): ").strip()
+        if not client_secret:
+            print("Sem a chave secreta não dá para conectar.", file=sys.stderr)
+            return 1
+    else:
+        client_id, client_secret = _client(Path(client_file or "").expanduser())
     server_url = server_url.rstrip("/")
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=")
@@ -114,9 +120,24 @@ def run(client_file: str, server_url: str) -> int:
         },
         timeout=15,
     )
-    refresh = tokens.json().get("refresh_token") if tokens.status_code == 200 else None
+    try:
+        answer = tokens.json()
+    except ValueError:
+        answer = {}
+    refresh = answer.get("refresh_token") if tokens.status_code == 200 else None
     if not refresh:
-        print("O Google não devolveu a autorização de longo prazo. Rode de novo.", file=sys.stderr)
+        reason = (
+            answer.get("error_description") or answer.get("error") or f"HTTP {tokens.status_code}"
+        )
+        hint = {
+            "invalid_client": "a chave secreta não confere com o cliente (ou a chave nova ainda "
+            "não entrou em vigor: espere uns minutos)",
+            "invalid_grant": "o código do login expirou ou já foi usado: rode de novo",
+        }.get(answer.get("error", ""), "")
+        print(
+            f"O Google recusou a troca: {reason}." + (f" Provável: {hint}." if hint else ""),
+            file=sys.stderr,
+        )
         return 1
     granted = set((tokens.json().get("scope") or "").split())
     missing = [s.rsplit("/", 1)[-1] for s in SCOPES if s not in granted]

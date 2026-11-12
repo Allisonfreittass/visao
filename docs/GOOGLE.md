@@ -44,6 +44,9 @@ mostra o destinatário, o assunto e o texto inteiro, ou o título, a hora e os c
    ```bash
    .venv/bin/python -m apps.api.cli google-connect --client-file ~/Downloads/client_secret_*.json --server https://<o-endereço-do-visão>
    ```
+   Sem o JSON (o Google só deixa baixar na hora em que o cliente é criado), use
+   `--client-id <id do cliente>`: a chave secreta é pedida no terminal, sem aparecer. Uma chave
+   nova se gera no painel do cliente, em *Add secret*, e pode levar alguns minutos para valer.
    O navegador abre o login do Google. Marque as três permissões e, de volta no terminal, entre
    com o email e a senha do Visão. Pronto: aparece "Conectado" em Ajustes › Google.
 
