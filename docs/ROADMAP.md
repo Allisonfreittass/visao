@@ -13,6 +13,7 @@ executados de verdade. "Passou" significa que o comando rodou e o resultado est�
 | 5. Metas e iniciativas | scheduler, ciclo de metas, notificações, aprovações | iniciativa útil disparada por evento real e dentro das permissões | **implementada** (evento real ponta a ponta; aviso útil verificado com lacuna semeada) |
 | 6. Reflexão e comportamento | lições revisáveis, métricas de estilo, comparação longitudinal | mudanças observáveis, atribuíveis e reversíveis | **concluída** (−69% palavras após retorno, revertido volta à linha de base) |
 | 9. Auditoria cognitiva e curiosidade autônoma | auditoria experimental, manifesto de capacidades, camada de decisão, deliberação de nome, continuidade, ciclo autônomo com orçamento | sem negar autonomia operacional nem transferir o nome; age sem mensagem dentro de permissões; comparação A/B/C | **implementada** ([curiosity_evaluation.md](research/curiosity_evaluation.md)); nome ainda adiado, uso real contínuo pendente |
+| 10. Presença | nuvem (Cloudflare + PostgreSQL compartilhado), mente entre conversas, ligação por voz no celular, avisos com o app fechado | consegue puxar conversa e ser ouvido com o app fechado, dentro das mesmas regras de silêncio, pausa e limite | **implementada** (Web Push e ligação com voz do aparelho em 2026-11-12); aceite pendente: aviso real no iPhone instalado e chaves VAPID na nuvem |
 | 7. Pesquisa avançada | fine-tuning, TTS próprio, continual learning | só após baselines e datasets | não iniciada |
 
 ## Fase 0: o que está feito e o que falta
@@ -78,31 +79,38 @@ guardou os 4 fatos certos, barrou terceiro e saúde, e respondeu corretamente nu
 
 ## Próximo incremento proposto
 
-As fases de construção (0–6) e a auditoria da Fase 9 estão feitas. A Fase 7 (fine-tuning, TTS treinado, aprendizado
-contínuo) só começa com baselines e datasets de uso real (master prompt §20).
+Feito desde a última revisão: implantação no Cloudflare (Workers + Containers, PostgreSQL
+compartilhado), mente ligada no worker local, ligação por voz e Web Push.
 
-Próximo passo recomendado: **implantação** no Lightsail + Cloudflare (HTTPS), que destrava:
-teste da voz no iPhone, avisos push, worker 24 h e uso contínuo para as métricas da seção 19 ainda
-sem medição (calibração, consistência entre sessões, custo em 7 dias, comparação D × C). Requer
-acesso à instância, auditoria do que já roda nela e aprovação explícita.
+Próximo passo recomendado: **uso real contínuo** para as métricas da seção 19 ainda sem medição
+(calibração, consistência entre sessões, custo em 7 dias, comparação D × C), com:
 
-Pendências: teste de voz com microfone real; caso real completo de iniciativa com aviso; revisão de
-memórias substituídas; trechos além da introdução e consulta pelo título exato na pesquisa; rota
-para metas criadas pelo usuário.
+1. chaves VAPID nos segredos da nuvem e o teste de aviso no iPhone com o app na tela de início;
+2. ligação com microfone real no iPhone (voz do aparelho) e no desktop (voz própria);
+3. decidir onde a mente roda: hoje só no worker local (o cron da nuvem foi removido em 1a33bc0),
+   então com o Mac desligado ele não puxa conversa;
+4. sessão por aparelho com token de renovação, para o app instalado não pedir login a cada dia
+   (hoje o token dura no máximo 24 h, `VISION_ACCESS_TOKEN_TTL_MINUTES`).
 
-## Visual da interface (entra no início da Fase 2)
+Pendências antigas: revisão de memórias substituídas; trechos além da introdução e consulta pelo
+título exato na pesquisa; rota para metas criadas pelo usuário.
 
-Decidido em 2026-10-31: **bolha de partículas laranja**, minimalista, como representação do
-estado do sistema, não como rosto ou personagem. Cada estado da seção 12 vira um comportamento:
+## Visual da interface
+
+Decidido em 2026-10-31 e revisto em 2026-11-12: uma **bolha de partículas** minimalista como
+representação do estado do sistema, não como rosto ou personagem. Desde a marca Rastros, as
+partículas são `estanho` (metal frio) e o único calor é um núcleo `lanterna`, que acende mais
+quando ele fala ou escuta e apaga quando desconecta. Tokens e componentes em
+`apps/web/src/rastros/`, gerados do guia da marca.
 
 | Estado | Bolha |
 |---|---|
-| `IDLE` | pulsação lenta |
+| `IDLE` | pulsação lenta, núcleo baixo |
 | `LISTENING` | reage à amplitude do microfone |
 | `THINKING` | partículas em rotação/turbulência |
-| `SPEAKING` | acompanha a amplitude do áudio gerado |
+| `SPEAKING` | acompanha a amplitude do áudio gerado, núcleo mais forte |
 | `INTERRUPTED` | contração rápida |
-| `DISCONNECTED` | cinza, parada |
+| `DISCONNECTED` | cinza, parada, núcleo apagado |
 
-Inspiração declarada: assistentes de ficção em geral. Restrição do master prompt: nada de marca,
-nome ou imagem da Marvel (sem "Jarvis", sem HUD copiado); visual próprio.
+Restrição do master prompt mantida: nada de marca, nome ou imagem da Marvel (sem "Jarvis", sem
+HUD copiado); visual próprio.

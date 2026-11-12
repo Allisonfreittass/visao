@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
+from core.autonomy.budget import complete_json, has_room
 from core.evolution.guard import validate_patch, validate_snapshot
 from core.policies.autonomy import is_paused
-from core.study.service import _complete, _room
 from infrastructure.database.models import StudyEntry, SystemFlag
 from integrations.llm.base import ChatMessage, LLMError
 
@@ -69,7 +69,7 @@ def propose(db, *, provider, budget, base_sha, files, now=None):
     validate_snapshot(files)
     if is_paused(db):
         return {"status": "paused"}
-    if not _room(db, budget, now):
+    if not has_room(db, budget, now):
         return {"status": "budget"}
     run_id = now.date().isoformat()
     flag = SystemFlag(
@@ -94,7 +94,7 @@ def propose(db, *, provider, budget, base_sha, files, now=None):
         )
     ).all()
     try:
-        data = _complete(
+        data = complete_json(
             db,
             provider,
             "code_proposal",

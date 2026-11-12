@@ -7,6 +7,26 @@
 > Latência mediana medida: ~4,1 s do fim da fala ao primeiro áudio. Falta o teste humano com
 > microfone real e no iPhone (HTTPS).
 
+## Ligação (2026-11-12)
+
+O botão **Ligar** abre uma tela só de conversa: a bolha grande, o estado, a última troca e
+**Desligar** (Esc também desliga). Durante a ligação as respostas sempre saem em voz, as aberturas
+que ele faz por conta própria também são faladas, e a tela fica acesa (Wake Lock, onde o
+navegador permite). Esconder a página encerra a ligação: nada escuta em segundo plano.
+
+O motor é escolhido sozinho, nesta ordem (`apps/web/src/hooks/useVoice.ts`):
+
+| | Voz própria (servidor) | Voz do aparelho (navegador) |
+|---|---|---|
+| Fala | Kokoro, voz escolhida por ele | `speechSynthesis`, voz pt-BR local de preferência |
+| Escuta | VAD no navegador + faster-whisper | `SpeechRecognition` contínuo |
+| Interromper | falando por cima (barge-in) | botão Interromper; a escuta pausa enquanto ele fala, porque o reconhecimento do aparelho não cancela eco |
+| Quando | `VISION_TTS_APPROVED_VOICES` / `VISION_STT_MODEL` configurados | sem modelos no servidor (a nuvem) |
+
+A escuta do aparelho fica desligada até você ligar "Ouvir pelo navegador" nas preferências: o
+Chrome manda o áudio para o Google e o Safari para a Apple. A fala do aparelho roda no aparelho.
+Código não é lido em voz alta: ele diz que deixou o código na tela (`speech/speakable.ts`).
+
 ## Restrições do master prompt
 
 - Sem ElevenLabs, sem extrair modelos proprietários, sem copiar vozes sem autorização.
@@ -21,7 +41,7 @@
 ## Interface (2a, feito)
 
 - `apps/web`: React + TypeScript (Vite), mobile-first, tema escuro.
-- **Bolha de partículas laranja** (`src/orb/`): ~940 partículas em duas camadas, rotação,
+- **Bolha de partículas** em `estanho` com núcleo `lanterna` (marca Rastros; `src/orb/`): ~940 partículas em duas camadas, rotação,
   respiração e turbulência por estado, transições suaves independentes de taxa de quadros,
   `prefers-reduced-motion` respeitado. Estados:
 

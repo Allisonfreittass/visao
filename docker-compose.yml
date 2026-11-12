@@ -1,3 +1,24 @@
+# Local stack: PostgreSQL (pgvector), API and worker.
+#
+# Configuration comes from .env (copy .env.example): every VISION_* variable there reaches the
+# api and the worker, so a new Settings field needs no change here. .env is optional (CI has
+# none and passes VISION_SECRET_KEY and POSTGRES_PASSWORD from its environment); `env_file`
+# with `required: false` needs Docker Compose >= 2.24.
+#
+# The keys under `environment:` win over .env: the containers always use the db service below,
+# even when .env points VISION_DATABASE_URL at a shared database for `npm start`.
+
+x-vision-app: &vision-app
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    VISION_ENVIRONMENT: ${VISION_ENVIRONMENT:-development}
+    VISION_SECRET_KEY: ${VISION_SECRET_KEY:?defina VISION_SECRET_KEY no .env}
+    VISION_DATABASE_URL: postgresql+psycopg://vision:${POSTGRES_PASSWORD}@db:5432/vision
+  restart: unless-stopped
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -18,68 +39,16 @@ services:
     restart: unless-stopped
 
   api:
-    build: .
-    environment:
-      VISION_ENVIRONMENT: ${VISION_ENVIRONMENT:-development}
-      VISION_SECRET_KEY: ${VISION_SECRET_KEY:?defina VISION_SECRET_KEY no .env}
-      VISION_DATABASE_URL: postgresql+psycopg://vision:${POSTGRES_PASSWORD}@db:5432/vision
-      VISION_LOG_LEVEL: ${VISION_LOG_LEVEL:-INFO}
-      VISION_LLM_PROVIDER_NAME: ${VISION_LLM_PROVIDER_NAME:-}
-      VISION_LLM_BASE_URL: ${VISION_LLM_BASE_URL:-}
-      VISION_LLM_API_KEY: ${VISION_LLM_API_KEY:-}
-      VISION_LLM_MODEL: ${VISION_LLM_MODEL:-}
-      VISION_LLM_PRICE_INPUT_PER_MTOK: ${VISION_LLM_PRICE_INPUT_PER_MTOK:-}
-      VISION_LLM_PRICE_OUTPUT_PER_MTOK: ${VISION_LLM_PRICE_OUTPUT_PER_MTOK:-}
-      VISION_LLM_FALLBACK_PROVIDER_NAME: ${VISION_LLM_FALLBACK_PROVIDER_NAME:-}
-      VISION_LLM_FALLBACK_BASE_URL: ${VISION_LLM_FALLBACK_BASE_URL:-}
-      VISION_LLM_FALLBACK_API_KEY: ${VISION_LLM_FALLBACK_API_KEY:-}
-      VISION_LLM_FALLBACK_MODEL: ${VISION_LLM_FALLBACK_MODEL:-}
-      VISION_LLM_FALLBACK_PRICE_INPUT_PER_MTOK: ${VISION_LLM_FALLBACK_PRICE_INPUT_PER_MTOK:-}
-      VISION_LLM_FALLBACK_PRICE_OUTPUT_PER_MTOK: ${VISION_LLM_FALLBACK_PRICE_OUTPUT_PER_MTOK:-}
-      VISION_LLM_CURATION_MAX_OUTPUT_TOKENS: ${VISION_LLM_CURATION_MAX_OUTPUT_TOKENS:-4096}
-      VISION_LLM_DAILY_BUDGET_USD: ${VISION_LLM_DAILY_BUDGET_USD:-1.50}
-      VISION_LLM_CONVERSATION_BUDGET_USD: ${VISION_LLM_CONVERSATION_BUDGET_USD:-0.30}
-      VISION_CURIOSITY_ENABLED: ${VISION_CURIOSITY_ENABLED:-false}
-      VISION_RESEARCH_PER_DAY: ${VISION_RESEARCH_PER_DAY:-20}
-      VISION_AUTONOMY_CYCLE_MINUTES: ${VISION_AUTONOMY_CYCLE_MINUTES:-60}
-      VISION_AUTONOMY_LLM_CALLS_PER_DAY: ${VISION_AUTONOMY_LLM_CALLS_PER_DAY:-20}
-      VISION_AUTONOMY_TOKENS_PER_DAY: ${VISION_AUTONOMY_TOKENS_PER_DAY:-60000}
-      VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE: ${VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE:-3}
-      VISION_AUTONOMY_MAX_SECONDS: ${VISION_AUTONOMY_MAX_SECONDS:-120}
+    <<: *vision-app
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
 
   worker:
-    build: .
+    <<: *vision-app
     command: ["python", "-m", "apps.worker.main"]
-    environment:
-      VISION_ENVIRONMENT: ${VISION_ENVIRONMENT:-development}
-      VISION_SECRET_KEY: ${VISION_SECRET_KEY:?defina VISION_SECRET_KEY no .env}
-      VISION_DATABASE_URL: postgresql+psycopg://vision:${POSTGRES_PASSWORD}@db:5432/vision
-      VISION_LOG_LEVEL: ${VISION_LOG_LEVEL:-INFO}
-      VISION_LLM_PROVIDER_NAME: ${VISION_LLM_PROVIDER_NAME:-}
-      VISION_LLM_BASE_URL: ${VISION_LLM_BASE_URL:-}
-      VISION_LLM_API_KEY: ${VISION_LLM_API_KEY:-}
-      VISION_LLM_MODEL: ${VISION_LLM_MODEL:-}
-      VISION_LLM_PRICE_INPUT_PER_MTOK: ${VISION_LLM_PRICE_INPUT_PER_MTOK:-}
-      VISION_LLM_PRICE_OUTPUT_PER_MTOK: ${VISION_LLM_PRICE_OUTPUT_PER_MTOK:-}
-      VISION_LLM_FALLBACK_PROVIDER_NAME: ${VISION_LLM_FALLBACK_PROVIDER_NAME:-}
-      VISION_LLM_FALLBACK_BASE_URL: ${VISION_LLM_FALLBACK_BASE_URL:-}
-      VISION_LLM_FALLBACK_API_KEY: ${VISION_LLM_FALLBACK_API_KEY:-}
-      VISION_LLM_FALLBACK_MODEL: ${VISION_LLM_FALLBACK_MODEL:-}
-      VISION_LLM_FALLBACK_PRICE_INPUT_PER_MTOK: ${VISION_LLM_FALLBACK_PRICE_INPUT_PER_MTOK:-}
-      VISION_LLM_FALLBACK_PRICE_OUTPUT_PER_MTOK: ${VISION_LLM_FALLBACK_PRICE_OUTPUT_PER_MTOK:-}
-      VISION_CURIOSITY_ENABLED: ${VISION_CURIOSITY_ENABLED:-false}
-      VISION_RESEARCH_PER_DAY: ${VISION_RESEARCH_PER_DAY:-20}
-      VISION_AUTONOMY_CYCLE_MINUTES: ${VISION_AUTONOMY_CYCLE_MINUTES:-60}
-      VISION_AUTONOMY_LLM_CALLS_PER_DAY: ${VISION_AUTONOMY_LLM_CALLS_PER_DAY:-20}
-      VISION_AUTONOMY_TOKENS_PER_DAY: ${VISION_AUTONOMY_TOKENS_PER_DAY:-60000}
-      VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE: ${VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE:-3}
-      VISION_AUTONOMY_MAX_SECONDS: ${VISION_AUTONOMY_MAX_SECONDS:-120}
     # The image's HEALTHCHECK probes the API port; the worker reports health by heartbeat instead.
     healthcheck:
       test: ["CMD", "python", "-m", "apps.worker.health"]
@@ -90,7 +59,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-    restart: unless-stopped
 
 volumes:
   pgdata:

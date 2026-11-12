@@ -36,7 +36,13 @@ def create_access_token(user_id: uuid.UUID, settings: Settings) -> str:
 
 def decode_access_token(token: str, settings: Settings) -> uuid.UUID | None:
     try:
-        claims = jwt.decode(token, settings.secret_key, algorithms=[_ALGORITHM])
+        # Pinned algorithm (no "none", no key confusion) and mandatory expiry and subject.
+        claims = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[_ALGORITHM],
+            options={"require": ["exp", "sub"], "verify_exp": True, "verify_signature": True},
+        )
         return uuid.UUID(claims["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         return None

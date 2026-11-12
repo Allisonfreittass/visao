@@ -1,148 +1,121 @@
-# VISÃO
+# Visão
 
-Pesquisa experimental pessoal sobre arquitetura cognitiva persistente: memória autobiográfica,
-curadoria de memória, busca orientada por incerteza, reflexão e metas persistentes em torno de
-um LLM substituível.
+English · [Português](README.pt-BR.md)
 
-> **VISÃO é o codinome do projeto e da infraestrutura, não o nome do agente.** O agente nasce
-> sem nome pessoal (`chosen_name = null`). O sistema não alega consciência, sentimentos ou vida.
+**Trace · Introspection.** *An agent that is born without a name and decides who it is.*
 
-## Estado atual
+![The conversation screen: a code answer with a copy button, the orb and the Call button](docs/assets/conversa.webp)
 
-**Fases 0–6 e 9 construídas.** Concluídas: 0, 1, 3, 4 e 6; implementadas com pendências de uso real:
-2 (voz) e 5 (iniciativas). Avaliações em [docs/EVALUATION.md](docs/EVALUATION.md).
+I built Visão to be the friend I can call. It helps me with code and ideas, it remembers only what
+I let it remember, and it starts the conversation on its own when it has something worth saying.
 
-- Identidade mínima (UUID, nome `null`) e conversa via LLM substituível (qualquer endpoint
-  compatível com OpenAI), com orçamento e custo registrados.
-- Memória curada entre conversas, opt-in por usuário ([docs/MEMORY.md](docs/MEMORY.md)).
-- Interface web com a bolha de estados e voz: fala com a voz escolhida pelo próprio agente e
-  escuta pelo microfone ([docs/VOICE.md](docs/VOICE.md)). Falta o teste com microfone real e no
-  iPhone.
-- Curiosidade: detecta lacunas, pergunta o que é pessoal e pesquisa fatos públicos na Wikipédia
-  citando fontes ([docs/CURIOSITY.md](docs/CURIOSITY.md)).
-- Iniciativas: perguntas sem resposta podem virar metas que só rodam com aprovação, num worker
-  separado ([docs/AUTONOMY.md](docs/AUTONOMY.md)).
-- Adaptação: o jeito de responder se ajusta ao seu retorno de forma versionada e reversível
-  ([docs/IDENTITY.md](docs/IDENTITY.md)).
-- Fase 9: a resposta parte do que o sistema de fato pode fazer (manifesto de capacidades) e do que
-  fez no turno (camada de decisão). O sistema delibera sobre o próprio nome, retoma dúvidas entre
-  sessões e roda um ciclo autônomo com orçamento ([auditoria](docs/research/cognitive_audit.md),
-  [avaliação](docs/research/curiosity_evaluation.md)).
+Underneath, it is a research project on persistent cognitive architecture around a swappable LLM.
+The model only exists for the length of one call; everything that makes it continue lives in
+code around it: memory, interests, reflection, goals, a budget. It does not claim to be
+conscious, to feel or to be alive, and the prompt rules that say so sit outside anything it can
+rewrite.
 
-Veja [docs/ROADMAP.md](docs/ROADMAP.md).
+## What it does
 
-Para conversar, preencha as variáveis `VISION_LLM_*` do `.env` (veja `.env.example`). Sem todas
-elas, inclusive os preços, a API responde 503 em vez de inventar uma resposta.
+| | Status |
+|---|---|
+| **Call it.** Hands-free voice call that keeps the screen on, with barge-in. Self-hosted voice (Kokoro TTS, faster-whisper STT) when the models are installed; the device's own speech as an opt-in fallback, so a call also works from the phone on the cloud build. | built; real-mic test on iPhone pending |
+| **It speaks first.** It thinks between conversations, keeps interests that decay without new input, and opens a chat when it has something to say. It respects quiet hours, the global pause, "you are mid-conversation", two unanswered openings and a daily cap. Web Push lets the opening reach a closed app. | built |
+| **Code and ideas.** Complete code in fenced blocks with language and copy, read aloud as "the code is on screen". It asks for exactly the context it is missing. | built |
+| **Autobiographical memory**, curated by a deterministic policy, opt-in per person, with provenance, export and delete. Health, religion, politics, finances and third parties stay out. | built (benchmark: curated 8/8, passive 6/8, none 1/8) |
+| **Curiosity with sources.** It asks what is personal and researches only public facts (Wikipedia, arXiv, Hacker News), always citing. | built |
+| **Goals with approval.** Unanswered questions can become goals that run in a separate worker only after I approve them. | built |
+| **Versioned, reversible adaptation.** The way it answers moves with feedback; every change is a version I can revert. | built (−69% words after feedback; revert returns to baseline) |
+| **Budget per call.** A fail-closed ledger reserves tokens before every model call, on every path. | built |
 
-## Execução local
+![A call: the orb listening, the last exchange and the hang-up button](docs/assets/ligacao.webp)
 
-### Tudo de uma vez (uso no dia a dia, sem Docker)
+## Architecture
 
-```bash
-npm start
+```mermaid
+flowchart TB
+  web["Web / PWA<br/>chat · call · notebook"] -->|HTTPS| edge["Cloudflare Worker<br/>assets · login rate limit"]
+  edge --> api["FastAPI<br/>apps/api"]
+  worker["Worker<br/>apps/worker"] --> core
+  api --> core["Cognitive core<br/>core/*"]
+  core --> memory["Memory<br/>curated, opt-in"]
+  core --> mind["Mind<br/>think · study · open a chat"]
+  core --> decision["Decision layer<br/>capability manifest"]
+  core --> gate["Policies<br/>pause · approvals · quiet hours"]
+  gate --> integrations["Integrations<br/>LLM · search · voice · Web Push"]
+  integrations --> ledger["Cost ledger<br/>fail-closed"]
+  core --> db[("PostgreSQL<br/>audit trail · RLS")]
 ```
 
-Aplica as migrações e sobe API (8000), worker e interface (http://localhost:5173) no mesmo
-terminal, com a saída prefixada por `[api]`, `[worker]` e `[web]`. Ctrl+C para os três; se um
-deles cair, os outros param junto. Requer o `.venv` e o `npm --prefix apps/web install` abaixo.
+The full picture, with each module's contract, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### Com Docker (caminho oficial)
+## Engineering decisions worth a look
 
-```bash
-cp .env.example .env        # edite VISION_SECRET_KEY e POSTGRES_PASSWORD
-docker compose up --build
-```
+- **No model call without a reservation.** [`integrations/llm/budget.py`](integrations/llm/budget.py)
+  reserves tokens under a row lock (`SELECT … FOR UPDATE` on PostgreSQL, `BEGIN IMMEDIATE` on
+  SQLite) before every call. A missing price disables the provider, and a cost reported by a
+  provider freezes the ledger. A timed-out call stays charged and blocks only its own provider,
+  so the fallback still answers.
+- **Truth rules it cannot edit.** It can rewrite how it describes itself (versioned, rate-limited),
+  but the rules against invented actions, sources and memories live in
+  [`core/identity/system_prompt.py`](core/identity/system_prompt.py), outside that text.
+- **Corrections are enforced, not hoped for.** Writing a rule in the prompt did not hold: 7 of 8
+  replies broke it. Each reply is now checked against the owner's rules, and a rewrite is
+  rejected if it adds a link, number, name or claimed action.
+- **The web never reaches my machine.** [`integrations/search/fetch.py`](integrations/search/fetch.py)
+  resolves a host once, refuses private addresses and connects to that exact IP (no DNS
+  rebinding). Web Push only ever posts to known browser push services.
+- **Bounded self-modification.** An optional daily job lets it propose a change to one style
+  file. The change is AST-whitelisted, tested in a container with no network or credentials,
+  and only ships through the same CI as everything else ([docs/CODE_EVOLUTION.md](docs/CODE_EVOLUTION.md)).
+- **Measured, not claimed.** Every phase has an acceptance criterion and a recorded run in
+  [docs/research-log/](docs/research-log/); numbers in this README come from there.
 
-- API: http://127.0.0.1:8000 (`/health`, `/ready`, `/docs`)
-- PostgreSQL fica acessível apenas em `127.0.0.1:5432`.
+## Run it
 
-Criar o usuário inicial e executar o genesis (idempotente):
-
-```bash
-docker compose exec api python -m apps.api.cli create-user --email voce@exemplo.com
-```
-
-```bash
-docker compose exec api python -m apps.api.cli genesis
-```
-
-### Sem Docker (desenvolvimento)
-
-Requer Python 3.12+.
-
-```bash
-python3.12 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-VISION_DATABASE_URL=sqlite:///./dev.db .venv/bin/alembic upgrade head
-VISION_DATABASE_URL=sqlite:///./dev.db .venv/bin/uvicorn apps.api.main:app --reload
-```
-
-SQLite serve só para desenvolvimento e testes unitários; o banco de referência é PostgreSQL.
-
-### Interface web (desenvolvimento)
-
-Requer Node.js 22+. Com a API rodando em `127.0.0.1:8000`:
+Requires Python 3.12, Node 22 and, for the Docker path, Docker Compose 2.24+.
 
 ```bash
-npm --prefix apps/web install
-npm --prefix apps/web run dev
+make setup                 # .venv + Python and web dependencies
+cp .env.example .env       # fill VISION_SECRET_KEY and the VISION_LLM_* block
+make start                 # migrations, API :8000, worker and web :5173
 ```
 
-Abra http://localhost:5173. A demonstração dos estados da bolha fica em
-http://localhost:5173/?orb=demo.
-
-### Primeiro acesso e celular
-
-Depois do login, quem ainda não concluiu vê três passos, todos puláveis e mostrados uma vez só: como
-ele funciona, quatro perguntas opcionais e as permissões. As respostas entram nas anotações
-permanentes (`GET` e `POST /onboarding`, em `apps/api/routes/onboarding.py`), depois do que já estiver
-escrito, só com a memória ligada e sem passar pelo modelo. O que não couber no limite é recusado com
-a quantidade a cortar, sem guardar nada pela metade. Veja, desfaça ou apague na aba Estudos.
-
-Para instalar no celular, abra o endereço HTTPS no navegador e use "Adicionar à tela de início". O
-app é um PWA sem modo offline: precisa de conexão, e não há service worker.
-
-### Worker (iniciativas aprovadas)
+Create the first user and run genesis (idempotent):
 
 ```bash
-.venv/bin/python -m apps.worker.main
+.venv/bin/python -m apps.api.cli create-user --email you@example.com
+.venv/bin/python -m apps.api.cli genesis
 ```
 
-No Docker Compose ele sobe como serviço `worker`.
+Or with Docker (PostgreSQL + API + worker): `docker compose up --build`.
 
-### Voz (opcional)
+Without every `VISION_LLM_*` value, prices included, the API answers 503 instead of making up a
+reply. To let it reach your phone, generate the Web Push keys with
+`python -m apps.api.cli webpush-keys` and set the three `VISION_WEBPUSH_*` variables.
+
+## Tests and CI
 
 ```bash
-.venv/bin/pip install -e ".[tts,stt]"
+make check                 # ruff, format, typecheck, pytest (SQLite) and vitest
+make db-test               # the PostgreSQL-only tests in a throwaway pgvector container
 ```
 
-Baixe os modelos para `models/tts/` (links e tamanhos em
-[docs/research-log/2026-10-31-fase-2b-tts.md](docs/research-log/2026-10-31-fase-2b-tts.md)),
-defina `VISION_TTS_APPROVED_VOICES` no `.env` e deixe o agente decidir:
+CI runs lint, the Python suite against SQLite and PostgreSQL, the web and Worker tests, and a
+`docker compose up` smoke test. A green `main` deploys to Cloudflare. Every action is pinned to
+a commit SHA.
 
-```bash
-.venv/bin/python -m apps.api.cli voice-deliberation
-```
+## Status
 
-### Testes
+Phases 0–6 and 9 are built, and so is the cloud presence (mind, call, Web Push). Phase 7
+(fine-tuning, its own trained TTS, continual learning) starts only after baselines from real use.
+Details in [docs/ROADMAP.md](docs/ROADMAP.md); evaluations in [docs/EVALUATION.md](docs/EVALUATION.md).
 
-```bash
-.venv/bin/pytest                                   # unitários + API (SQLite em memória)
-VISION_TEST_DATABASE_URL=postgresql+psycopg://... .venv/bin/pytest -m postgres
-.venv/bin/ruff check .
-```
+The design docs, ADRs and research log in [docs/](docs/) are written in Portuguese.
 
-## Documentação
+## Stack
 
-- [Arquitetura](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Genesis](docs/GENESIS.md)
-- [Nome autônomo](docs/AUTONOMOUS_NAMING.md)
-- [Curiosidade](docs/CURIOSITY.md)
-- [Autonomia e ciclo autônomo](docs/AUTONOMY.md)
-- [Mente: pensar, estudar e puxar conversa](docs/MIND.md)
-- [Fase 9: auditoria, plano e avaliação](docs/research/)
-- [Seleção de modelos](docs/MODEL_SELECTION.md)
-- [Custos e limites](docs/COSTS.md)
-- [Decisões (ADRs)](docs/decisions/)
-- [Diário de pesquisa](docs/research-log/)
+`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Cloudflare Workers + Containers · Docker`
+
+Visão is the project's codename, not the agent's name. The agent's name is still `null`: it is
+deciding.

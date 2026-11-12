@@ -188,8 +188,14 @@ class BudgetGuard:
             if circuit.get("probe"):
                 raise _deny("provider circuit probe is already in flight")
             limits = self.limits
+            # Calls still in flight are capped globally. An uncertain ("unknown") call stays
+            # charged and blocks only its own endpoint/model: a timed-out primary must not
+            # keep the fallback locked out for the whole stale window.
+            in_flight = sum(1 for item in active.values() if item.get("state") == "active")
+            same_key = sum(1 for item in active.values() if item.get("key") == key)
             if (
-                len(active) >= limits.concurrency
+                in_flight >= limits.concurrency
+                or same_key >= limits.concurrency
                 or state["calls"] >= limits.calls_per_day
                 or state["hourly_calls"] >= limits.calls_per_hour
                 or state["input"] + input_tokens > limits.input_tokens_per_day

@@ -11,6 +11,7 @@ import time
 import uuid
 from datetime import UTC, datetime
 
+from apps.api.push import configure_push
 from apps.api.settings import get_settings
 from apps.worker.handlers import build_handlers
 from apps.worker.health import beat
@@ -27,6 +28,7 @@ IDLE_SLEEP_SECONDS = 5.0
 def main() -> int:
     settings = get_settings()
     configure_logging(settings.log_level)
+    configure_push(settings)
     worker_id = f"{socket.gethostname()}:{uuid.uuid4().hex[:8]}"
     factory = get_sessionmaker()
     handlers = build_handlers(settings)

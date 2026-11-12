@@ -2,7 +2,10 @@ import { useEffect, useRef } from "react";
 
 import {
   type OrbState,
+  ESTANHO_HUE,
+  LANTERNA_HUE,
   STATE_PARAMS,
+  coreIntensity,
   hash01,
   lerpParams,
   organicSphere,
@@ -74,11 +77,20 @@ export function Orb({ state, level = 0, getLevel, size = 280 }: OrbProps) {
       const baseRadius = size * 0.33;
       ctx.clearRect(0, 0, size, size);
 
-      const glow = ctx.createRadialGradient(center, center, 0, center, center, baseRadius * 1.5);
-      glow.addColorStop(0, `hsla(28, ${100 * params.saturation}%, 55%, ${0.22 * params.brightness})`);
-      glow.addColorStop(1, "hsla(28, 100%, 50%, 0)");
-      ctx.fillStyle = glow;
+      // Cold mist around the cloud, then the lanterna: the single warm light at its heart.
+      const mist = ctx.createRadialGradient(center, center, 0, center, center, baseRadius * 1.5);
+      mist.addColorStop(0, `hsla(${ESTANHO_HUE}, 12%, 70%, ${0.1 * params.brightness})`);
+      mist.addColorStop(1, `hsla(${ESTANHO_HUE}, 12%, 70%, 0)`);
+      ctx.fillStyle = mist;
       ctx.fillRect(0, 0, size, size);
+      const core = coreIntensity(params, level);
+      if (core > 0) {
+        const light = ctx.createRadialGradient(center, center, 0, center, center, baseRadius * 0.7);
+        light.addColorStop(0, `hsla(${LANTERNA_HUE}, 72%, 56%, ${0.55 * core})`);
+        light.addColorStop(1, `hsla(${LANTERNA_HUE}, 72%, 56%, 0)`);
+        ctx.fillStyle = light;
+        ctx.fillRect(0, 0, size, size);
+      }
 
       const cosA = Math.cos(angle);
       const sinA = Math.sin(angle);
@@ -103,6 +115,15 @@ export function Orb({ state, level = 0, getLevel, size = 280 }: OrbProps) {
         ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
+      if (core > 0) {
+        ctx.shadowColor = `hsla(${LANTERNA_HUE}, 72%, 56%, 0.6)`;
+        ctx.shadowBlur = size * 0.05;
+        ctx.fillStyle = `hsla(${LANTERNA_HUE}, 72%, 56%, ${0.45 + 0.55 * core})`;
+        ctx.beginPath();
+        ctx.arc(center, center, Math.max(2, size * 0.022), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
       frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);

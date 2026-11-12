@@ -202,3 +202,21 @@ def test_status_reports_listening(client: TestClient, db: Session, loaded) -> No
     headers = _login(client, db)
     _enable_stt(client)
     assert client.get("/voice/status", headers=headers).json()["listening"] is True
+
+
+def test_stt_caps_chunked_uploads_without_content_length(
+    client: TestClient, db: Session, stt: FakeSTT
+) -> None:
+    headers = {**_login(client, db), "Content-Type": "audio/wav"}
+    _enable_stt(client, stt_max_bytes=20_000)
+
+    def chunks():
+        # A generator body is sent chunked, with no Content-Length header.
+        for _ in range(100):
+            yield b"x" * 5_000
+
+    response = client.post("/voice/stt", headers=headers, content=chunks())
+    assert response.status_code == 413
+    assert stt.received == []
+    ok = client.post("/voice/stt", headers=headers, content=iter([b"RIFF", b"....fake"]))
+    assert ok.status_code == 200 and stt.received == [b"RIFF....fake"]

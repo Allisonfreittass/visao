@@ -161,11 +161,15 @@ async def transcribe(
     # Refuse oversized uploads before reading them into memory.
     if declared and declared.isdigit() and int(declared) > settings.stt_max_bytes:
         raise too_large
-    audio = await request.body()
+    # Chunked uploads carry no length: stop reading as soon as the cap is passed.
+    buffer = bytearray()
+    async for chunk in request.stream():
+        buffer.extend(chunk)
+        if len(buffer) > settings.stt_max_bytes:
+            raise too_large
+    audio = bytes(buffer)
     if not audio:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Áudio vazio")
-    if len(audio) > settings.stt_max_bytes:
-        raise too_large
     try:
         engine = loader(settings.stt_model, settings.stt_models_dir)
         # CPU-bound (~0.3-1 s): off the event loop so other requests keep flowing.

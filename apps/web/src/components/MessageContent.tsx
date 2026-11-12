@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 /** A small, escaped subset of Markdown. HTML and executable URL schemes stay plain text. */
 function inline(text: string): ReactNode[] {
@@ -11,11 +11,38 @@ function inline(text: string): ReactNode[] {
   });
 }
 
+/** A code block with its language and a copy button: the part of a reply meant to be used. */
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <figure className="code-block">
+      <figcaption>
+        <span>{language || "código"}</span>
+        <button type="button" className="link-button" onClick={copy} aria-live="polite">
+          {copied ? "✓ Copiado" : "Copiar"}
+        </button>
+      </figcaption>
+      <pre><code>{code}</code></pre>
+    </figure>
+  );
+}
+
 export function MessageContent({ text }: { text: string }) {
-  return <div className="message-content">{text.split(/(```[\s\S]*?```)/g).map((part, i) => {
+  // An unclosed fence (a reply cut short) still renders as code, not as a stray ```.
+  return <div className="message-content">{text.split(/(```[\s\S]*?(?:```|$))/g).map((part, i) => {
     if (part.startsWith("```")) {
-      const code = part.replace(/^```[^\n]*\n?/, "").replace(/```$/, "");
-      return <pre key={i}><code>{code}</code></pre>;
+      const language = (part.match(/^```([\w+#.-]*)/)?.[1] ?? "").toLowerCase();
+      const code = part.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "");
+      return <CodeBlock key={i} language={language} code={code} />;
     }
     return part.split(/\n\s*\n/).filter(Boolean).map((block, j) => {
       const lines = block.split("\n");

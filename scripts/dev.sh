@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 # Starts API, worker and web together for local use; Ctrl+C stops all three.
-# Usage: npm start   (or: scripts/dev.sh). Written for macOS's bash 3.2.
+# Usage: npm start   (or: scripts/dev.sh). Written for macOS's bash 3.2; also runs on Linux.
 set -eo pipefail
 cd "$(dirname "$0")/.."
 
+# lsof ships with macOS; minimal Linux installs may only have ss, or neither (then bash's
+# /dev/tcp: a successful connection means something is listening).
+port_in_use() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+  elif command -v ss >/dev/null 2>&1; then
+    ss -Hltn "sport = :$1" 2>/dev/null | grep -q .
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+  fi
+}
+
 for port in 8000 5173; do
-  if lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
+  if port_in_use "$port"; then
     echo "Porta $port já está em uso. Feche o processo que a usa e rode de novo." >&2
     exit 1
   fi
@@ -46,10 +58,12 @@ stop() {
 trap stop INT TERM EXIT
 
 # Each process's output is prefixed with its name; $! is the process itself, not the prefixer.
+# Line-buffered prefixing: BSD sed spells it -l, GNU sed -u (where -l means line length).
+if sed --version >/dev/null 2>&1; then line_buffered=-u; else line_buffered=-l; fi
 run() {
   local name=$1
   shift
-  "$@" > >(sed -l "s/^/[$name] /") 2>&1 &
+  "$@" > >(sed "$line_buffered" "s/^/[$name] /") 2>&1 &
   pids="$pids $!"
 }
 

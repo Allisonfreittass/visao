@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Api, ApiError } from "./api";
+import { keyBytes } from "./push";
 
 function fakeFetch(responses: Array<{ status: number; body?: unknown }>) {
   const calls: Array<{ url: string; init: RequestInit }> = [];
@@ -71,5 +72,11 @@ describe("Api", () => {
     const { impl, calls } = fakeFetch([{ status: 200, body: [] }]);
     await new Api("/api", impl).messages("a/b");
     expect(calls[0].url).toBe("/api/conversations/a%2Fb/messages");
+  });
+});
+
+describe("push keys", () => {
+  it("decodes a base64url VAPID key without padding", () => {
+    expect(Array.from(keyBytes("AQID_-8"))).toEqual([1, 2, 3, 255, 239]);
   });
 });

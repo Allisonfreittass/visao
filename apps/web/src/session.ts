@@ -1,20 +1,22 @@
-// Per-tab convenience only: the token survives a reload of this tab, nothing more.
-// Storage can be unavailable (private mode, blocked site data), so every access is guarded.
+// The token lives in this tab only, unless the owner asks to stay signed in on this device
+// (the installed app on a phone, opened from a notification). Storage can be unavailable
+// (private mode, blocked site data), so every access is guarded.
 
 const KEY = "visao.token";
 
 export function loadToken(): string | null {
   try {
-    return sessionStorage.getItem(KEY);
+    return sessionStorage.getItem(KEY) ?? localStorage.getItem(KEY);
   } catch {
     return null;
   }
 }
 
-export function saveToken(token: string | null): void {
+export function saveToken(token: string | null, remember = false): void {
   try {
-    if (token) sessionStorage.setItem(KEY, token);
-    else sessionStorage.removeItem(KEY);
+    sessionStorage.removeItem(KEY);
+    localStorage.removeItem(KEY);
+    if (token) (remember ? localStorage : sessionStorage).setItem(KEY, token);
   } catch {
     // Without storage the user simply logs in again after a reload.
   }

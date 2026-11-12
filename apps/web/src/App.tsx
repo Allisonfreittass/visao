@@ -3,25 +3,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Api,
   ApiError,
-  utcDate,
   type Conversation,
   type Message,
   type OnboardingStatus,
   type SystemStatus,
   type VoiceStatus,
 } from "./api";
+import { CallView } from "./components/CallView";
 import { ChatView } from "./components/ChatView";
-import { InitiativesPanel } from "./components/InitiativesPanel";
-import { MindPanel } from "./components/MindPanel";
-import { StudyPanel } from "./components/StudyPanel";
-import { NotificationFeed } from "./components/NotificationFeed";
 import { Login } from "./components/Login";
+import { MindPanel } from "./components/MindPanel";
+import { NotificationFeed } from "./components/NotificationFeed";
 import { Onboarding } from "./components/Onboarding";
+import { Sidebar, type WorkspaceView } from "./components/Sidebar";
+import { StudyPanel } from "./components/StudyPanel";
+import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
+import { registerWorker } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
-import { Speaker } from "./speech/speaker";
-import { Microphone, type Utterance } from "./voice/microphone";
 
 interface TurnLatency {
   sttMs: number;
@@ -33,24 +33,13 @@ interface TurnLatency {
 
 const HEALTH_INTERVAL_MS = 15_000;
 const INITIATIVE_POLL_MS = 15_000;
-const DEMO_STATES: OrbState[] = [
-  "IDLE",
-  "LISTENING",
-  "THINKING",
-  "SPEAKING",
-  "INTERRUPTED",
-  "DISCONNECTED",
-];
+const DEMO_STATES: OrbState[] = ["IDLE", "LISTENING", "THINKING", "SPEAKING", "INTERRUPTED", "DISCONNECTED"];
 
 function useHealth(api: Api): boolean {
   const [online, setOnline] = useState(true);
   useEffect(() => {
     let alive = true;
-    const check = () =>
-      api.health().then(
-        () => alive && setOnline(true),
-        () => alive && setOnline(false),
-      );
+    const check = () => api.health().then(() => alive && setOnline(true), () => alive && setOnline(false));
     check();
     const id = setInterval(check, HEALTH_INTERVAL_MS);
     return () => {
@@ -75,13 +64,30 @@ function useDemoLevel(active: boolean): number {
   return active ? level : 0;
 }
 
+/** A conversation id the app was opened with: from a push notification (`/?c=<id>`). */
+function requestedConversation(): string | null {
+  return new URLSearchParams(window.location.search).get("c");
+}
+
+const HEADINGS: Record<WorkspaceView, { kicker: string; title: [string, string]; lede: string }> = {
+  conversation: {
+    kicker: "Conversa",
+    title: ["Me conta o que ", "está na sua cabeça."],
+    lede: "Código, ideias ou só um dia comprido. Pode escrever ou me ligar.",
+  },
+  study: {
+    kicker: "Caderno",
+    title: ["O que eu fiz ", "enquanto você não estava."],
+    lede: "O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.",
+  },
+};
+
 export function App() {
   const api = useMemo(() => {
     const instance = new Api();
     instance.setToken(loadToken());
     return instance;
   }, []);
-  const speaker = useMemo(() => new Speaker(api), [api]);
   const online = useHealth(api);
   const demo = new URLSearchParams(window.location.search).get("orb") === "demo";
 
@@ -89,33 +95,27 @@ export function App() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [memoryEnabled, setMemoryEnabled] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
+  const [current, setCurrent] = useState<string | null>(requestedConversation);
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
   const [composerFocus, setComposerFocus] = useState(0);
-  const sendingRef = useRef(false);
-  const messagesRef = useRef<Message[]>([]);
-  const speakRef = useRef<((text: string) => void) | null>(null);
-  sendingRef.current = sending;
-  messagesRef.current = messages;
   const [preparing, setPreparing] = useState(false);
   const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | "checking" | "done">("checking");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [workspaceView, setWorkspaceView] = useState<"conversation" | "study">("conversation");
-  const [voice, setVoice] = useState<VoiceStatus | null>(null);
+  const [view, setView] = useState<WorkspaceView>("conversation");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
-  const [speaking, setSpeaking] = useState(false);
-  const [interrupted, setInterrupted] = useState(false);
-  const [voiceSession, setVoiceSession] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
+  const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
   const [latency, setLatency] = useState<TurnLatency | null>(null);
-  const micRef = useRef<Microphone | null>(null);
-  const busyRef = useRef(false);
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
   const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
+  const sendingRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
+  sendingRef.current = sending;
+  messagesRef.current = messages;
 
   const handleError = useCallback((e: unknown) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -126,15 +126,39 @@ export function App() {
     setError(e instanceof Error ? e.message : String(e));
   }, []);
 
+  const sendRef = useRef<(text: string, spoken?: SpokenTiming) => Promise<void>>(async () => undefined);
+  const voice = useVoice({
+    api,
+    status: voiceStatus,
+    deviceListening,
+    onTranscript: (text, timing) => sendRef.current(text, timing),
+    onError: setError,
+  });
+
+  useEffect(() => {
+    void registerWorker();
+    // A tap on a notification while the app is open: jump to that conversation.
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "visao.open") return;
+      const id = new URL(event.data.url, window.location.origin).searchParams.get("c");
+      if (id) {
+        setView("conversation");
+        setCurrent(id);
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+  }, []);
+
   useEffect(() => {
     if (!loggedIn) return;
-    api.voiceStatus().then(setVoice, () => setVoice(null));
+    api.voiceStatus().then(setVoiceStatus, () => setVoiceStatus(null));
     Promise.all([api.status(), api.memorySettings(), api.listConversations()])
       .then(([s, memory, list]) => {
         setStatus(s);
         setMemoryEnabled(memory.enabled);
         setConversations(list);
-        if (list.length > 0) setCurrent((c) => c ?? list[0].id);
+        setCurrent((c) => (c && list.some((x) => x.id === c) ? c : list[0]?.id ?? null));
       })
       .catch(handleError);
   }, [api, loggedIn, handleError]);
@@ -162,14 +186,18 @@ export function App() {
   }, [api, loggedIn, demo]);
 
   useEffect(() => {
-    if (!current) {
+    if (!current || !loggedIn) {
       setMessages([]);
       return;
     }
     api.messages(current).then(setMessages).catch(handleError);
-  }, [api, current, handleError]);
+  }, [api, current, loggedIn, handleError]);
 
-  // The agent can speak first: pick up what it said on its own, and say it aloud if replies are.
+  const speakAloud = speakReplies || voice.inCall;
+  const speakRef = useRef<((text: string) => void) | null>(null);
+  speakRef.current = speakAloud && voice.speakerKind ? (text) => voice.speak(text) : null;
+
+  // It can speak first: pick up what it said on its own, and say it aloud in a call.
   useEffect(() => {
     if (!current || !loggedIn || demo) return;
     let alive = true;
@@ -190,20 +218,26 @@ export function App() {
   function checkMemoryPreparation(conversation: Conversation) {
     setMemoryWarning(
       conversation.memory_status === "failed" || conversation.memory_status === "unavailable"
-        ? "A memória anterior não pôde ser preparada. Você pode conversar, mas alguns detalhes podem faltar."
+        ? "Não consegui preparar a memória desta vez. Dá para conversar, mas posso esquecer detalhes."
         : null,
     );
+  }
+
+  async function openConversation(): Promise<string> {
+    const conversation = await api.createConversation();
+    checkMemoryPreparation(conversation);
+    setConversations((list) => [conversation, ...list]);
+    setCurrent(conversation.id);
+    return conversation.id;
   }
 
   async function newConversation() {
     if (preparing || sending) return;
     setError(null);
     setPreparing(true);
+    setView("conversation");
     try {
-      const conversation = await api.createConversation();
-      checkMemoryPreparation(conversation);
-      setConversations((list) => [conversation, ...list]);
-      setCurrent(conversation.id);
+      await openConversation();
       setMenuOpen(false);
     } catch (e) {
       handleError(e);
@@ -212,69 +246,26 @@ export function App() {
     }
   }
 
-  function stopSpeaking() {
-    if (!speaker.speaking) return;
-    speaker.stop();
-    setSpeaking(false);
-    setInterrupted(true);
-    setTimeout(() => setInterrupted(false), 700);
-  }
-
-  speakRef.current = speakReplies && voice?.enabled ? (text) => speak(text) : null;
-
-  function speak(text: string, onFirstAudio?: (ms: number) => void) {
-    setSpeaking(true);
-    speaker
-      .speak(text, (ms) => {
-        onFirstAudio?.(ms);
-      })
-      .catch((e) => setError(`Voz indisponível (${e instanceof Error ? e.message : e}); a resposta segue em texto.`))
-      .finally(() => setSpeaking(false));
-  }
-
-  async function send(
-    text: string,
-    spoken?: { endedAt: number; sttMs: number },
-  ): Promise<void> {
+  async function send(text: string, spoken?: SpokenTiming): Promise<void> {
     setError(null);
-    // Barge-in by text: a new message cuts whatever is being spoken.
-    stopSpeaking();
-    // In a voice session replies are always spoken; otherwise it follows the toggle.
-    const willSpeak = (spoken !== undefined || speakReplies) && voice?.enabled === true;
-    // Audio must be unlocked inside the user gesture, before any await.
-    if (willSpeak) speaker.unlock();
+    voice.stopSpeaking(); // barge-in by text
+    const willSpeak = (spoken !== undefined || speakAloud) && voice.speakerKind !== null;
+    if (willSpeak) voice.unlock(); // inside the gesture, before any await
     let conversationId = current;
     setSending(true);
     try {
-      if (!conversationId) {
-        const conversation = await api.createConversation();
-        checkMemoryPreparation(conversation);
-        setConversations((list) => [conversation, ...list]);
-        setCurrent(conversation.id);
-        conversationId = conversation.id;
-      }
+      conversationId ??= await openConversation();
       const llmStarted = performance.now();
       const turn = await api.send(conversationId, text, spoken ? "voice" : "text");
       const llmMs = performance.now() - llmStarted;
-      setMessages((list) => [
-        ...list,
-        turn.user_message,
-        { ...turn.assistant_message, sources: turn.sources },
-      ]);
-      if (spoken) {
-        setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
-      }
+      setMessages((list) => [...list, turn.user_message, { ...turn.assistant_message, sources: turn.sources }]);
+      if (spoken) setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
       if (willSpeak) {
         const ttsStarted = performance.now();
-        speak(turn.assistant_message.content, () => {
+        voice.speak(turn.assistant_message.content, () => {
           if (!spoken) return;
           const now = performance.now();
-          const measured = {
-            sttMs: spoken.sttMs,
-            llmMs,
-            ttsFirstAudioMs: now - ttsStarted,
-            totalMs: now - spoken.endedAt,
-          };
+          const measured = { sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: now - ttsStarted, totalMs: now - spoken.endedAt };
           setLatency(measured);
           console.info("visao.turn_latency", JSON.stringify(measured));
         });
@@ -287,76 +278,12 @@ export function App() {
       setSending(false);
     }
   }
+  sendRef.current = send;
 
-  async function onUtterance(utterance: Utterance) {
-    // One turn at a time: speech that arrives while a turn is in flight is dropped.
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setTranscribing(true);
-    try {
-      const transcript = await api.stt(utterance.wav);
-      const sttMs = performance.now() - utterance.endedAt;
-      setTranscribing(false);
-      const text = transcript.text.trim();
-      if (text.length < 2) return; // noise or a cough, not a turn
-      await send(text, { endedAt: utterance.endedAt, sttMs });
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setTranscribing(false);
-      busyRef.current = false;
-    }
-  }
-
-  function endVoiceSession() {
-    micRef.current?.stop();
-    micRef.current = null;
-    setVoiceSession(false);
-  }
-
-  async function startVoiceSession() {
-    setError(null);
-    speaker.unlock(); // inside the click: lets replies play
-    const microphone = new Microphone({
-      agentSpeaking: () => speaker.speaking,
-      // Barge-in by voice: starting to talk cuts the agent off.
-      onSpeechStart: () => stopSpeaking(),
-      onUtterance: (u) => void onUtterance(u),
-    });
-    try {
-      await microphone.start();
-      micRef.current = microphone;
-      setVoiceSession(true);
-    } catch (e) {
-      microphone.stop();
-      setError(
-        `Microfone indisponível (${e instanceof Error ? e.message : e}). A conversa continua por texto.`,
-      );
-    }
-  }
-
-  // No listening in the background: hiding the page ends the voice session.
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") endVoiceSession();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      micRef.current?.stop();
-    };
-  }, []);
-
-  async function sendFeedback(
-    messageId: string,
-    rating: 1 | -1,
-    tags: string[],
-  ): Promise<string | null> {
+  async function sendFeedback(messageId: string, rating: 1 | -1, tags: string[]): Promise<string | null> {
     try {
       const result = await api.feedback(messageId, rating, tags);
-      return result.state_changed
-        ? "Obrigado. Ajustei a comunicação com base no seu retorno."
-        : "Obrigado.";
+      return result.state_changed ? "Valeu. Ajustei meu jeito de responder." : "Valeu.";
     } catch (e) {
       handleError(e);
       return null;
@@ -375,13 +302,19 @@ export function App() {
     const next = !speakReplies;
     setSpeakReplies(next);
     savePreference("speak", next ? "1" : "0");
-    if (next) speaker.unlock();
-    else stopSpeaking();
+    if (next) voice.unlock();
+    else voice.stopSpeaking();
+  }
+
+  function toggleDeviceListening() {
+    const next = !deviceListening;
+    setDeviceListening(next);
+    savePreference("device-listening", next ? "1" : "0");
   }
 
   function logout() {
-    endVoiceSession();
-    stopSpeaking();
+    voice.endCall();
+    voice.stopSpeaking();
     api.setToken(null);
     saveToken(null);
     setLoggedIn(false);
@@ -389,38 +322,48 @@ export function App() {
     setCurrent(null);
   }
 
+  function showView(next: WorkspaceView) {
+    setView(next);
+    setMenuOpen(false);
+  }
+
   const orbState: OrbState = demo
     ? demoState
     : !online
       ? "DISCONNECTED"
-      : sending || transcribing
+      : sending || voice.transcribing
         ? "THINKING"
-        : interrupted
+        : voice.interrupted
           ? "INTERRUPTED"
-          : speaking
+          : voice.speaking
             ? "SPEAKING"
-            : voiceSession
+            : voice.inCall
               ? "LISTENING"
               : "IDLE";
   const agentName = status?.identity?.chosen_name ?? null;
   const firstRun = loggedIn && !demo && onboarding !== "done";
+  const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
+  const heading = HEADINGS[view];
+  const callHint = voice.listenerKind
+    ? null
+    : voice.deviceCouldListen
+      ? "Para ligar, permita ouvir pelo navegador nas preferências."
+      : "Este navegador não consegue me ouvir. Dá para escrever.";
 
   return (
     <div className="app">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="VISÃO, início"><span className="brand-mark">◉</span><span>VISÃO<span className="brand-dot">.</span></span></a>
-        {loggedIn && !demo && !firstRun && (
-          <button className="ghost menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
+        <a className="brand" href="/" aria-label="Visão, início">Visão</a>
+        <span className="identity" title={status?.identity?.internal_id}>
+          {agentName ?? <em>sem nome ainda</em>}
+        </span>
+        {ready && (
+          <button type="button" className="rs-botao rs-botao--compacto menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
             Menu
           </button>
         )}
-        <span className="identity" title={status?.identity?.internal_id}>
-          <span className="identity-dot" />{agentName ?? "Identidade em construção"}
-        </span>
         {loggedIn && !demo && (
-          <button className="ghost" onClick={logout}>
-            Sair
-          </button>
+          <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
         )}
       </header>
 
@@ -440,177 +383,165 @@ export function App() {
           )}
         </main>
       )}
-      {!firstRun && <div className="layout">
-        {loggedIn && !demo && (
-          <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
-            <p className="sidebar-label">SEU ESPAÇO</p>
-            <nav className="workspace-nav" aria-label="Navegação principal">
-              <button className={workspaceView === "conversation" ? "nav-active" : "ghost"} onClick={() => { setWorkspaceView("conversation"); setMenuOpen(false); }}><span>↗</span> Conversa</button>
-              <button className={workspaceView === "study" ? "nav-active" : "ghost"} onClick={() => { setWorkspaceView("study"); setMenuOpen(false); }}><span>⌘</span> Caderno de estudos</button>
-            </nav>
-            <button className="new-conversation" onClick={() => { setWorkspaceView("conversation"); void newConversation(); }} disabled={preparing || sending}>
-              {preparing ? "Preparando memórias…" : "Nova conversa"}
-            </button>
-            <p className="sidebar-label history-label">CONVERSAS RECENTES</p>
-            <ul className="conversation-list">
-              {conversations.map((c) => (
-                <li key={c.id}>
-                  <button
-                    className={c.id === current ? "active" : "ghost"}
-                    onClick={() => {
-                      setCurrent(c.id);
-                      setWorkspaceView("conversation");
-                      setMenuOpen(false);
-                    }}
-                  >
-                    {utcDate(c.created_at).toLocaleString("pt-BR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <details className="preferences"><summary>Preferências e autonomia <span>+</span></summary><div className="preferences-content">
-            <InitiativesPanel api={api} onError={handleError} />
-            <label className="memory-toggle">
-              <input type="checkbox" checked={memoryEnabled} onChange={toggleMemory} />
-              Memória entre conversas
-            </label>
-            <p className="note">
-              Guarda informações selecionadas para dar continuidade às próximas conversas.
-            </p>
-            <label className="memory-toggle">
-              <input
-                type="checkbox"
-                checked={speakReplies}
-                onChange={toggleSpeak}
-                disabled={!voice?.enabled}
-              />
-              Falar respostas
-            </label>
-            <p className="note">
-              {!voice?.enabled
-                ? "A voz está indisponível neste momento."
-                : "Quando ligada, as respostas também são lidas em voz alta."}
 
-            </p>
-            </div></details>
-            <div className="sidebar-bottom"><span className="status-dot" /> {online ? "Conectado" : "Sem conexão"}<span>Projeto experimental</span></div>
-          </aside>
-        )}
-
-        <main className={`main ${!loggedIn ? "auth-main" : ""}`}>
-          {loggedIn && !demo && <>
-            <div className="workspace-heading"><div><span className="eyebrow">{workspaceView === "conversation" ? "PRESENÇA & CONTINUIDADE" : "CURIOSIDADE EM MOVIMENTO"}</span><h1>{workspaceView === "conversation" ? "Toda ideia pode ser um começo." : "Um caderno em construção."}</h1><p>{workspaceView === "conversation" ? "Um espaço para conversar, explorar e retomar." : "Perguntas escolhidas, fontes consultadas e caminhos que continuam."}</p></div></div>
-            <nav className="workspace-tabs" aria-label="Área de trabalho"><button className={workspaceView === "conversation" ? "selected" : "ghost"} onClick={() => setWorkspaceView("conversation")}>Conversa</button><button className={workspaceView === "study" ? "selected" : "ghost"} onClick={() => setWorkspaceView("study")}>Estudos</button></nav>
-          </>}
-          <div className={`presence ${workspaceView === "study" && loggedIn ? "study-presence" : ""}`}>
-          <div className="orb-wrap">
-            <Orb
-              state={orbState}
-              size={loggedIn && !demo ? 100 : 240}
-              level={demoLevel}
-              getLevel={
-                speaking
-                  ? () => speaker.level()
-                  : voiceSession
-                    ? () => micRef.current?.level() ?? 0
-                    : undefined
-              }
-            />
-          </div>
-          <div className="presence-copy"><p className="state-label">{STATE_LABELS[orbState]}</p><span>{orbState === "IDLE" ? "Por aqui, quando quiser continuar." : orbState === "THINKING" ? "Preparando uma resposta para você." : orbState === "DISCONNECTED" ? "Tentando restabelecer a conexão." : "Acompanhe a conversa no seu ritmo."}</span></div>
-          </div>
-
-          {demo ? (
-            <div className="demo">
-              {DEMO_STATES.map((s) => (
-                <button
-                  key={s}
-                  className={s === demoState ? "active" : "ghost"}
-                  onClick={() => setDemoState(s)}
-                >
-                  {STATE_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          ) : !loggedIn ? (
-            <Login
+      {!firstRun && (
+        <div className="layout">
+          {ready && (
+            <Sidebar
               api={api}
-              onLoggedIn={(token) => {
-                saveToken(token);
-                setLoggedIn(true);
-              }}
+              open={menuOpen}
+              view={view}
+              conversations={conversations}
+              current={current}
+              busy={preparing || sending}
+              preparing={preparing}
+              online={online}
+              memoryEnabled={memoryEnabled}
+              speakReplies={speakReplies}
+              canSpeak={voice.speakerKind !== null}
+              speakerKind={voice.speakerKind}
+              deviceListening={deviceListening}
+              deviceCouldListen={voice.deviceCouldListen}
+              serverListening={voice.listenerKind === "server"}
+              onView={showView}
+              onNewConversation={() => void newConversation()}
+              onSelect={(id) => { setCurrent(id); showView("conversation"); }}
+              onToggleMemory={() => void toggleMemory()}
+              onToggleSpeak={toggleSpeak}
+              onToggleDeviceListening={toggleDeviceListening}
+              onError={handleError}
             />
-          ) : status && !status.genesis_completed ? (
-            <p className="error">
-              Genesis ainda não foi executado. Rode <code>python -m apps.api.cli genesis</code>.
-            </p>
-          ) : (
-            <>
-              {(workspaceView === "conversation" || voiceSession) && <div className="voice-bar">
-                {voice?.listening && voice.enabled && (
-                  <button
-                    className={voiceSession ? "active" : "ghost"}
-                    onClick={voiceSession ? endVoiceSession : () => void startVoiceSession()}
-                    aria-pressed={voiceSession}
-                  >
-                    {voiceSession ? "Encerrar conversa por voz" : "Conversa por voz"}
-                  </button>
-                )}
-                {speaking && (
-                  <button className="ghost stop" onClick={stopSpeaking}>
-                    Parar de falar
-                  </button>
-                )}
-              </div>}
-              {latency && (
-                <p className="latency">
-                  Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta{" "}
-                  {Math.round(latency.llmMs)} ms
-                  {latency.ttsFirstAudioMs !== null &&
-                    ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
-                  {latency.totalMs !== null &&
-                    ` · total fim da fala → voz ${Math.round(latency.totalMs)} ms`}
-                </p>
-              )}
-              <NotificationFeed
-                api={api}
-                current={current}
-                onError={handleError}
-                onReply={(conversationId) => {
-                  setWorkspaceView("conversation");
-                  setCurrent(conversationId);
-                  api.messages(conversationId).then(setMessages).catch(handleError);
-                  setComposerFocus((value) => value + 1);
-                }}
-              />
-              {workspaceView === "study" && <MindPanel
-                api={api}
-                onError={handleError}
-                onRestartOnboarding={() => {
-                  api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
-                }}
-              />}
-              {workspaceView === "study" && <StudyPanel api={api} onError={handleError} />}
-              {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
-              {notice && <p className="note first-run-notice" role="status">{notice}{" "}<button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button></p>}
-              <ChatView
-                hidden={workspaceView !== "conversation"}
-                focusRequest={composerFocus}
-                agentName={agentName}
-                messages={messages}
-                sending={sending || preparing}
-                error={error}
-                onSend={send}
-                onFeedback={sendFeedback}
-              />
-            </>
           )}
-        </main>
-      </div>}
-      <footer className="footer">VISÃO <span>·</span> Um projeto em descoberta</footer>
+
+          <main className={`main ${!loggedIn || demo ? "auth-main rs-luz-indireta" : ""}`}>
+            <div className={ready ? "workspace-top" : "entrance"}>
+            {ready && (
+              <div className="workspace-heading">
+                <span className="rotulo">{heading.kicker}</span>
+                <h1>{heading.title[0]}<em>{heading.title[1]}</em></h1>
+                <p className="lede">{heading.lede}</p>
+              </div>
+            )}
+
+            {(!ready || view === "conversation") && (
+              <div className="presence">
+                <div className="orb-wrap">
+                  <Orb
+                    state={orbState}
+                    size={ready ? 84 : 240}
+                    level={demoLevel}
+                    getLevel={voice.speaking || voice.inCall ? voice.level : undefined}
+                  />
+                </div>
+                <div className="presence-copy">
+                  <p className="rotulo state-label">{STATE_LABELS[orbState]}</p>
+                  {!ready && !demo && <p className="lede">Eu nasci sem nome e venho decidindo quem sou. Entre para conversar.</p>}
+                  {ready && (
+                    <div className="call-start">
+                      <button
+                        type="button"
+                        className="rs-botao rs-botao--principal"
+                        onClick={() => { setError(null); void voice.startCall(); }}
+                        disabled={!voice.listenerKind || !online}
+                      >
+                        Ligar
+                      </button>
+                      {voice.speaking && <button type="button" className="rs-botao" onClick={voice.stopSpeaking}>Parar de falar</button>}
+                      {callHint && <span className="note">{callHint}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            </div>
+
+            {demo ? (
+              <div className="demo">
+                {DEMO_STATES.map((s) => (
+                  <button key={s} type="button" className="rs-botao rs-botao--compacto" aria-pressed={s === demoState} onClick={() => setDemoState(s)}>
+                    {STATE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            ) : !loggedIn ? (
+              <Login
+                api={api}
+                onLoggedIn={(token, remember) => {
+                  saveToken(token, remember);
+                  setLoggedIn(true);
+                }}
+              />
+            ) : status && !status.genesis_completed ? (
+              <div className="rs-mensagem rs-mensagem--aviso" role="alert">
+                <i aria-hidden="true">!</i><b>Aviso</b>
+                <p>Ainda não nasci: rode <code>python -m apps.api.cli genesis</code> no servidor.</p>
+              </div>
+            ) : ready ? (
+              <>
+                {latency && (
+                  <p className="latency">
+                    Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta {Math.round(latency.llmMs)} ms
+                    {latency.ttsFirstAudioMs !== null && ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
+                    {latency.totalMs !== null && ` · fim da fala → voz ${Math.round(latency.totalMs)} ms`}
+                  </p>
+                )}
+                <NotificationFeed
+                  api={api}
+                  current={current}
+                  onError={handleError}
+                  onReply={(conversationId) => {
+                    setView("conversation");
+                    setCurrent(conversationId);
+                    api.messages(conversationId).then(setMessages).catch(handleError);
+                    setComposerFocus((value) => value + 1);
+                  }}
+                />
+                {view === "study" && (
+                  <MindPanel
+                    api={api}
+                    onError={handleError}
+                    onRestartOnboarding={() => {
+                      api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
+                    }}
+                  />
+                )}
+                {view === "study" && <StudyPanel api={api} onError={handleError} />}
+                {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
+                {notice && (
+                  <p className="note first-run-notice" role="status">
+                    {notice}{" "}
+                    <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
+                  </p>
+                )}
+                <ChatView
+                  hidden={view !== "conversation"}
+                  focusRequest={composerFocus}
+                  agentName={agentName}
+                  messages={messages}
+                  sending={sending || preparing}
+                  error={voice.inCall ? null : error}
+                  onSend={(text) => void send(text)}
+                  onFeedback={sendFeedback}
+                />
+              </>
+            ) : null}
+          </main>
+        </div>
+      )}
+
+      {voice.inCall && (
+        <CallView
+          agentName={agentName}
+          state={orbState}
+          level={voice.level}
+          messages={messages}
+          engine={voice.listenerKind}
+          speaking={voice.speaking}
+          error={error}
+          onInterrupt={voice.stopSpeaking}
+          onHangUp={voice.endCall}
+        />
+      )}
     </div>
   );
 }

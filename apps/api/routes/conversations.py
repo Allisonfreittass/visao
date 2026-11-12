@@ -13,6 +13,7 @@ from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.llm import get_llm_provider, missing_llm_settings
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
+from apps.worker.handlers import autonomy_room
 from core.conversation.service import (
     BudgetExceededError,
     Budgets,
@@ -28,7 +29,7 @@ from core.memory.curator import (
     latest_uncurated_conversation,
 )
 from core.policies.autonomy import is_paused
-from core.reflection.reflect import reflect
+from core.reflection.reflect import ReflectionResult, reflect
 from infrastructure.database.models import Conversation, Message, User
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
@@ -231,6 +232,12 @@ def _reflect_previous(
             )
             if owner is None or previous is None:
                 return
+            if not autonomy_room(session, settings):
+                logger.info(
+                    "background reflection deferred: autonomy budget",
+                    extra={"event": "reflection_budget"},
+                )
+                return
             reflect(
                 session,
                 conversation=previous,
@@ -253,6 +260,9 @@ def reflect_now(
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM não configurado")
+    # Reflection is recorded as the agent's own spending, so it obeys the autonomy budget.
+    if not autonomy_room(db, settings):
+        return ReflectionResult(skipped_reason="autonomy_budget").__dict__
     try:
         result = reflect(
             db,

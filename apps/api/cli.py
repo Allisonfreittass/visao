@@ -103,7 +103,20 @@ def main(argv: list[str] | None = None) -> int:
         "voice-deliberation",
         help="apresenta ao agente as vozes aprovadas; ele escolhe, adia ou recusa",
     )
+    sub.add_parser(
+        "webpush-keys",
+        help="gera o par VAPID dos avisos push (cole no .env ou nos segredos da nuvem)",
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "webpush-keys":
+        from integrations.push.webpush import generate_vapid_keys
+
+        public, private = generate_vapid_keys()
+        print(f"VISION_WEBPUSH_PUBLIC_KEY={public}")
+        print(f"VISION_WEBPUSH_PRIVATE_KEY={private}")
+        print("VISION_WEBPUSH_SUBJECT=https://endereco-do-app (ou mailto:contato)")
+        return 0
 
     if args.command == "voice-deliberation":
         return _voice_deliberation()

@@ -667,3 +667,25 @@ class OwnerNote(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     origin: Mapped[str] = mapped_column(String(16), default="review")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PushSubscription(Base):
+    """A browser that agreed to receive the agent's openings with the app closed (Web Push).
+
+    The endpoint is the push service's URL for that browser; p256dh and auth are its public
+    encryption keys, so the payload is end-to-end encrypted and the push service cannot read it.
+    """
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    endpoint: Mapped[str] = mapped_column(Text, unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(255))
+    user_agent: Mapped[str] = mapped_column(String(255), default="")
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -3,10 +3,13 @@ en), arXiv for research, and Hacker News to reach what people are writing now, r
 page. Each source failing alone is not a failure; results are mixed so none crowds out the rest.
 """
 
-import xml.etree.ElementTree as ET  # noqa: S405 (fixed arXiv host, size-bounded response)
+import json
 from datetime import UTC, datetime
+from xml.etree.ElementTree import ParseError  # noqa: S405 (exception type only)
 
 import httpx
+from defusedxml import DefusedXmlException
+from defusedxml.ElementTree import fromstring as parse_xml
 
 from integrations.search.base import SearchError, SearchProvider, SearchResult
 from integrations.search.fetch import default_client, is_public_url, read_page
@@ -16,16 +19,23 @@ ATOM = "{http://www.w3.org/2005/Atom}"
 MAX_RESPONSE_BYTES = 2_000_000
 
 
-def _get(client: httpx.Client, url: str, params: dict, source: str) -> httpx.Response:
+def _get(client: httpx.Client, url: str, params: dict, source: str) -> bytes:
+    """The response body, read in chunks and abandoned as soon as it passes the size cap."""
     try:
-        response = client.get(url, params=params)
+        with client.stream("GET", url, params=params) as response:
+            if response.status_code != 200:
+                raise SearchError(f"http_{response.status_code}", f"{source} returned an error")
+            declared = response.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES:
+                raise SearchError("too_large", f"{source} response too large")
+            body = bytearray()
+            for chunk in response.iter_bytes():
+                body.extend(chunk)
+                if len(body) > MAX_RESPONSE_BYTES:
+                    raise SearchError("too_large", f"{source} response too large")
+            return bytes(body)
     except httpx.HTTPError as exc:
         raise SearchError("network", f"{source}: {type(exc).__name__}") from exc
-    if response.status_code != 200:
-        raise SearchError(f"http_{response.status_code}", f"{source} returned an error")
-    if len(response.content) > MAX_RESPONSE_BYTES:
-        raise SearchError("too_large", f"{source} response too large")
-    return response
 
 
 class ArxivSearch:
@@ -35,15 +45,15 @@ class ArxivSearch:
         self._client = client or default_client(15.0)
 
     def search(self, query: str, max_results: int = 3) -> list[SearchResult]:
-        response = _get(
+        body = _get(
             self._client,
             "https://export.arxiv.org/api/query",
             {"search_query": f"all:{query}", "max_results": str(max_results)},
             "arXiv",
         )
         try:
-            root = ET.fromstring(response.text)  # noqa: S314
-        except ET.ParseError as exc:
+            root = parse_xml(body)
+        except (ParseError, DefusedXmlException) as exc:
             raise SearchError("bad_response", "invalid arXiv feed") from exc
         now = datetime.now(UTC)
         results = []
@@ -63,15 +73,15 @@ class HackerNewsSearch:
         self._client = client or default_client()
 
     def search(self, query: str, max_results: int = 3) -> list[SearchResult]:
-        response = _get(
+        body = _get(
             self._client,
             "https://hn.algolia.com/api/v1/search",
             {"query": query, "tags": "story", "hitsPerPage": str(max_results * 2)},
             "Hacker News",
         )
         try:
-            hits = response.json().get("hits", [])
-        except ValueError as exc:
+            hits = json.loads(body).get("hits", [])
+        except (ValueError, AttributeError) as exc:
             raise SearchError("bad_response", "invalid Hacker News JSON") from exc
         now = datetime.now(UTC)
         results = []

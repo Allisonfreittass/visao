@@ -27,3 +27,14 @@ describe("UTC timestamps", () => {
     expect(utcDate("2026-10-31T14:39:00Z").getTime()).toBe(Date.UTC(2026, 9, 31, 14, 39));
   });
 });
+
+describe("code blocks", () => {
+  it("label the language, offer a copy button and survive a reply cut mid-block", () => {
+    const html = renderToStaticMarkup(<MessageContent text={"Assim:\n\n```TypeScript\nconst a = 1;\n```\n\nE o resto:\n\n```py\nprint(1)"} />);
+    expect(html).toContain("<span>typescript</span>");
+    expect(html).toContain("Copiar");
+    expect(html).toContain("<pre><code>const a = 1;</code></pre>");
+    expect(html).toContain("<pre><code>print(1)</code></pre>");
+    expect(html).not.toContain("```");
+  });
+});

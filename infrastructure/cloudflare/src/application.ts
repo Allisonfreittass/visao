@@ -9,7 +9,7 @@ export interface Env {
 }
 
 // Forward only application configuration, not arbitrary Cloudflare bindings or credentials.
-const APP_KEYS = [
+export const APP_KEYS = [
   "VISION_BUILD_SHA", "VISION_CODE_AUTONOMY_ENABLED", "VISION_CODE_AUTONOMY_KEY",
   "VISION_DATABASE_URL", "VISION_DATABASE_SCHEMA", "VISION_SECRET_KEY", "VISION_CLOUD_TICK_KEY",
   "VISION_LLM_PROVIDER_NAME", "VISION_LLM_BASE_URL", "VISION_LLM_API_KEY", "VISION_LLM_MODEL",
@@ -28,6 +28,16 @@ const APP_KEYS = [
   "VISION_AUTONOMY_CYCLE_MINUTES", "VISION_AUTONOMY_LLM_CALLS_PER_DAY",
   "VISION_AUTONOMY_TOKENS_PER_DAY", "VISION_AUTONOMY_MAX_ACTIONS_PER_CYCLE",
   "VISION_AUTONOMY_MAX_SECONDS", "VISION_LOG_LEVEL",
+  "VISION_ENVIRONMENT", "VISION_ACCESS_TOKEN_TTL_MINUTES",
+  "VISION_LLM_TRUST_ZERO_PRICE", "VISION_LLM_FAST_EXTRA_BODY",
+  "VISION_LLM_FALLBACK_FAST_EXTRA_BODY", "VISION_LLM_FALLBACK2_FAST_EXTRA_BODY",
+  "VISION_LLM_FALLBACK2_PROVIDER_NAME", "VISION_LLM_FALLBACK2_BASE_URL", "VISION_LLM_FALLBACK2_API_KEY",
+  "VISION_LLM_FALLBACK2_MODEL", "VISION_LLM_FALLBACK2_PRICE_INPUT_PER_MTOK",
+  "VISION_LLM_FALLBACK2_PRICE_OUTPUT_PER_MTOK",
+  "VISION_MIND_ENABLED", "VISION_MIND_THINK_MINUTES", "VISION_MIND_REVIEW_TURNS",
+  "VISION_MIND_INITIATIVES_PER_DAY", "VISION_STUDY_INTERVAL_MINUTES", "VISION_RESEARCH_MAX_RESULTS",
+  "VISION_TTS_APPROVED_VOICES", "VISION_TTS_MAX_CHARS", "VISION_STT_MODEL", "VISION_STT_MAX_BYTES",
+  "VISION_WEBPUSH_PUBLIC_KEY", "VISION_WEBPUSH_PRIVATE_KEY", "VISION_WEBPUSH_SUBJECT",
 ] as const;
 
 export function appEnvironment(env: Env): Record<string, string> {
@@ -43,9 +53,10 @@ export function appEnvironment(env: Env): Record<string, string> {
     const value = env[key];
     if (typeof value === "string" && value) values[key] = value;
   }
-  // Self-hosted voice models are not included in this small text-and-study deployment.
-  return { ...values, VISION_ENVIRONMENT: "production", VISION_STT_MODEL: "",
-    VISION_TTS_APPROVED_VOICES: "", PYTHONDONTWRITEBYTECODE: "1" };
+  // Self-hosted voice models are not included in this small text-and-study deployment, so voice
+  // stays off unless configured; the edge is always a production deployment.
+  return { VISION_STT_MODEL: "", VISION_TTS_APPROVED_VOICES: "", ...values,
+    VISION_ENVIRONMENT: "production", PYTHONDONTWRITEBYTECODE: "1" };
 }
 
 export const handler = {

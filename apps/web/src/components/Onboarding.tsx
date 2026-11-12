@@ -152,7 +152,7 @@ export function Onboarding({ api, status, onMemoryChange, onError, onDone }: Pro
   return (
     <section className="onboarding" aria-labelledby="onboarding-title">
       <div className="onboarding-top">
-        <span className="eyebrow">PASSO {step} DE 3</span>
+        <span className="rotulo">Passo {step} de 3</span>
         <button type="button" className="ghost" onClick={() => void skipAll()} disabled={busy}>
           {wrote ? "Descartar e pular tudo" : "Pular tudo"}
         </button>

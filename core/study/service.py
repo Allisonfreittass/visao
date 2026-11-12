@@ -9,14 +9,14 @@ import json
 import re
 import time
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from core.autonomy.cycle import AutonomyBudget, _budget_left, usage_today
+from core.autonomy.budget import AutonomyBudget, complete_json, has_room
 from core.initiatives.notify import notify
 from core.memory import policy
 from core.memory.text import fold, overlap, tokens
@@ -28,12 +28,11 @@ from core.study.strategy import candidate_queries
 from infrastructure.database.models import (
     KnowledgeGap,
     MemoryRecord,
-    ModelUsage,
     StudyEntry,
     User,
 )
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
-from integrations.search.base import SearchError, SearchProvider
+from integrations.search.base import SearchError, SearchProvider, SearchResult
 
 INTERVAL = timedelta(hours=6)
 RETRY_INTERVAL = timedelta(hours=1)
@@ -120,17 +119,6 @@ def _allowed(session: Session, owner: User) -> bool:
     return enabled(owner) and not is_paused(session)
 
 
-def _json(text: str) -> dict:
-    # Tolerate a JSON code fence, but never silently extract a partial object.
-    cleaned = text.strip()
-    if cleaned.startswith("```json") and cleaned.endswith("```"):
-        cleaned = cleaned[7:-3].strip()
-    data = json.loads(cleaned)
-    if not isinstance(data, dict):
-        raise ValueError("invalid_schema")
-    return data
-
-
 def _text(data: dict, key: str, maximum: int) -> str:
     value = data.get(key, "")
     if not isinstance(value, str) or len(value) > maximum:
@@ -146,50 +134,6 @@ def _public(data: dict, text: str) -> bool:
         and not any(pattern.search(text) for pattern in policy._SECRETS)
         and not re.search(r"https?://|www\.", text, re.IGNORECASE)
     )
-
-
-def _room(session: Session, budget: AutonomyBudget, now: datetime, calls: int = 1) -> bool:
-    used, _ = usage_today(session, now)
-    spent = session.scalar(
-        select(func.coalesce(func.sum(ModelUsage.cost_usd), 0)).where(
-            ModelUsage.created_at >= now.replace(hour=0, minute=0, second=0, microsecond=0)
-        )
-    )
-    return (
-        used + calls <= budget.llm_calls_per_day
-        and _budget_left(session, budget, now)
-        and Decimal(str(spent)) < budget.daily_usd
-    )
-
-
-def _complete(session, provider, purpose, prompt, budget, now):
-    if not _room(session, budget, now):
-        raise ValueError("autonomy_budget")
-    usage = ModelUsage(
-        purpose=purpose, provider=provider.name, model=provider.model, outcome="pending"
-    )
-    session.add(usage)
-    session.commit()  # a crash/failed call still counts toward the call limit
-    try:
-        response = provider.complete(prompt, max_output_tokens=budget.max_output_tokens)
-    except LLMError as exc:
-        usage.outcome, usage.error_kind = "error", exc.kind[:50]
-        session.commit()
-        raise
-    usage.provider, usage.model = response.provider, response.model
-    usage.input_tokens, usage.output_tokens = response.input_tokens, response.output_tokens
-    usage.cost_usd, usage.latency_ms = response.cost_usd, response.latency_ms
-    try:
-        if response.finish_reason == "length":
-            raise ValueError("truncated_output")
-        data = _json(response.text)
-    except ValueError:
-        usage.outcome = "bad_output"
-        session.commit()
-        raise ValueError("invalid_model_output") from None
-    usage.outcome = "success"
-    session.commit()
-    return data
 
 
 def _seeds(session: Session, owner: User, entries: list[StudyEntry]) -> list[dict]:
@@ -251,8 +195,111 @@ def study_once(
     budget: AutonomyBudget,
     now: datetime,
 ) -> StudyEntry | None:
+    """Run one study round for ``owner``, or return None when no round is due or allowed.
+
+    The round goes plan -> read -> review, and every early exit is recorded on the entry
+    (status and outcome_reason) so the notebook shows what was tried and why it stopped.
+    """
     started = time.monotonic()
-    if not _allowed(session, owner) or not _room(session, budget, now, calls=2):
+    claimed = _claim_round(session, owner, budget, now)
+    if claimed is None:
+        return None
+    entry, entries, retry = claimed
+    study = _Round(
+        session=session,
+        owner=owner,
+        provider=provider,
+        search=search,
+        budget=budget,
+        now=now,
+        started=started,
+        entry=entry,
+        entries=entries,
+        retry=retry,
+    )
+    try:
+        plan = _plan_question(study)
+        _check_still_allowed(study, over_budget="SKIPPED")
+        sources = _read_sources(study, plan)
+        _check_still_allowed(study, over_budget="INCONCLUSIVE")
+        review = _review_sources(study, plan.question, sources)
+        return _record_review(study, plan, sources, review)
+    except _Stop as stop:
+        return study.finish(stop.status, stop.reason)
+    except (LLMError, SearchError) as exc:
+        return study.finish("FAILED", f"provider_{exc.kind}"[:64])
+    except (ValueError, TypeError):
+        return study.finish("FAILED", "invalid_model_output")
+
+
+class _Stop(Exception):
+    """Ends a round early; the status and reason are recorded on its entry."""
+
+    def __init__(self, status: str, reason: str) -> None:
+        super().__init__(reason)
+        self.status, self.reason = status, reason
+
+
+@dataclass
+class _Round:
+    """A study round in progress: its entry, its context and the clock it must finish within."""
+
+    session: Session
+    owner: User
+    provider: LLMProvider
+    search: SearchProvider
+    budget: AutonomyBudget
+    now: datetime
+    started: float  # time.monotonic() when the round began
+    entry: StudyEntry
+    entries: list[StudyEntry]  # the owner's latest rounds before this one, newest first
+    retry: StudyEntry | None  # the inconclusive round this one retries, if any
+    retry_context: dict | None = field(init=False)  # what the plan and search see of it
+
+    def __post_init__(self) -> None:
+        self.retry_context = (
+            {
+                "question": self.retry.question,
+                "outcome_reason": self.retry.outcome_reason,
+                "previous_queries": self.retry.evidence.get(
+                    "search_queries", [self.retry.search_query]
+                ),
+            }
+            if self.retry
+            else None
+        )
+
+    @property
+    def max_sources(self) -> int:
+        return 5 if self.budget.open_web else 3
+
+    def out_of_time(self) -> bool:
+        return time.monotonic() - self.started >= self.budget.max_seconds
+
+    def finish(self, status: str, reason: str) -> StudyEntry:
+        self.entry.status, self.entry.outcome_reason = status, reason
+        self.entry.finished_at = datetime.now(UTC)
+        self.session.commit()
+        return self.entry
+
+
+@dataclass(frozen=True)
+class _Plan:
+    topic: str
+    question: str
+    query: str
+    rationale: str
+    seed_refs: list[str]
+
+
+def _claim_round(
+    session: Session, owner: User, budget: AutonomyBudget, now: datetime
+) -> tuple[StudyEntry, list[StudyEntry], StudyEntry | None] | None:
+    """Insert this window's PLANNING entry, if a round is due, allowed and not already taken.
+
+    Returns the new entry, the owner's latest entries before it and the round being retried.
+    """
+    if not _allowed(session, owner) or not has_room(session, budget, now, calls=2):
         return None
     entries = list(
         session.scalars(
@@ -287,208 +334,239 @@ def study_once(
     except IntegrityError:
         session.rollback()
         return None
+    return entry, entries, retry
 
-    def finish(status: str, reason: str) -> StudyEntry:
-        entry.status, entry.outcome_reason = status, reason
-        entry.finished_at = datetime.now(UTC)
-        session.commit()
-        return entry
 
-    try:
-        seeds = _seeds(session, owner, entries)
-        retry_context = None
-        if retry:
-            retry_context = {
-                "question": retry.question,
-                "outcome_reason": retry.outcome_reason,
-                "previous_queries": retry.evidence.get("search_queries", [retry.search_query]),
-            }
-        instructions = OPEN_WEB_PLAN_INSTRUCTIONS if budget.open_web else PLAN_INSTRUCTIONS
-        if retry:
-            instructions += (
-                "\nEsta é a única retomada de uma pesquisa inconclusiva. Priorize retry.question, "
-                "que será preservada pelo sistema. Reformule a busca para responder a essa mesma "
-                "questão. Use query e topic enciclopédicos em português, diferentes das consultas "
-                "anteriores; não escolha outro assunto nem invente resultados."
-            )
-        plan = _complete(
-            session,
-            provider,
-            PURPOSE_PLAN,
-            [
-                ChatMessage(role="system", content=instructions),
-                ChatMessage(
-                    role="user",
-                    content=json.dumps(
-                        {
-                            "seeds": seeds,
-                            "retry": retry_context,
-                            "previous_questions": [e.question for e in entries if e.question],
-                        },
-                        ensure_ascii=False,
-                    ),
-                ),
-            ],
-            budget,
-            now,
+def _plan_question(study: _Round) -> _Plan:
+    """First model call: pick a question from the seeds and record it on the entry."""
+    seeds = _seeds(study.session, study.owner, study.entries)
+    data = complete_json(
+        study.session,
+        study.provider,
+        PURPOSE_PLAN,
+        _plan_prompt(study, seeds),
+        study.budget,
+        study.now,
+    )
+    plan = _validated_plan(study, data, seeds)
+    entry = study.entry
+    entry.topic, entry.question = plan.topic, plan.question
+    entry.search_query, entry.rationale, entry.seed_refs = (
+        plan.query,
+        plan.rationale,
+        plan.seed_refs,
+    )
+    for previous in study.entries:
+        if f"study:{previous.id}" in plan.seed_refs:
+            entry.previous_entry_id = previous.id
+            break
+    return plan
+
+
+def _plan_prompt(study: _Round, seeds: list[dict]) -> list[ChatMessage]:
+    instructions = OPEN_WEB_PLAN_INSTRUCTIONS if study.budget.open_web else PLAN_INSTRUCTIONS
+    if study.retry:
+        instructions += (
+            "\nEsta é a única retomada de uma pesquisa inconclusiva. Priorize retry.question, "
+            "que será preservada pelo sistema. Reformule a busca para responder a essa mesma "
+            "questão. Use query e topic enciclopédicos em português, diferentes das consultas "
+            "anteriores; não escolha outro assunto nem invente resultados."
         )
-        if plan.get("study") is not True:
-            return finish("SKIPPED", "no_useful_question")
-        topic, question = _text(plan, "topic", 200), _text(plan, "question", 500)
-        if retry:
-            question = retry.question
-        query, rationale = _text(plan, "query", 200), _text(plan, "rationale", 600)
-        if not all([topic, question, query, rationale]) or not _public(
-            plan, " ".join([topic, question, query, rationale])
-        ):
-            return finish("SKIPPED", "not_public_topic")
-        if not retry and any(fold(question) == fold(e.question) for e in entries):
-            return finish("SKIPPED", "repeated_question")
-        refs = plan.get("seed_refs", [])
-        valid = {s["ref"] for s in seeds}
-        if not isinstance(refs, list) or any(
-            not isinstance(r, str) or r not in valid for r in refs
-        ):
-            return finish("SKIPPED", "invalid_seed_reference")
-        if budget.open_web and not refs and not retry:
-            return finish("SKIPPED", "no_seed")
-        if retry:
-            refs = list(dict.fromkeys([f"study:{retry.id}", *refs]))
-        entry.topic, entry.question = topic, question
-        entry.search_query, entry.rationale, entry.seed_refs = query, rationale, refs
-        for previous in entries:
-            if f"study:{previous.id}" in refs:
-                entry.previous_entry_id = previous.id
-                break
-        if not _allowed(session, owner):
-            return finish("SKIPPED", "permission_revoked")
-        if time.monotonic() - started >= budget.max_seconds or not _room(session, budget, now):
-            return finish("SKIPPED", "cycle_budget")
-        entry.status = "READING"
-        entry.evidence = {"sources": [], "search_queries": []}
-        session.commit()
-        results = []
-        # A long or overly specific query can miss an encyclopedic title. Try the topic
-        # once, without another model call, and charge both attempts to the shared quota.
-        previous_queries = (
-            {fold(q) for q in retry_context["previous_queries"] if isinstance(q, str)}
-            if retry_context
-            else set()
-        )
-        candidates = [q for q in candidate_queries(query, topic) if fold(q) not in previous_queries]
-        if not candidates:
-            return finish("SKIPPED", "repeated_query")
-        for candidate in candidates:
-            if searches_today(session, owner.id, now) >= budget.research_per_day:
-                break
-            if not _allowed(session, owner) or time.monotonic() - started >= budget.max_seconds:
-                break
-            entry.evidence = {
-                **entry.evidence,
-                "search_queries": [
-                    *entry.evidence["search_queries"],
-                    candidate,
-                ],
-            }
-            session.commit()
-            results = search.search(candidate, max_results=5 if budget.open_web else 3)
-            if results:
-                break
-        sources = []
-        for source in results[: 5 if budget.open_web else 3]:
-            # Only approved public encyclopedic URLs, including when a custom adapter is used.
-            allowed = "https://" if budget.open_web else "https://pt.wikipedia.org/wiki/"
-            if not source.url.startswith(allowed):
-                continue
-            if source.url in {s["url"] for s in sources}:
-                continue
-            sources.append(
+    return [
+        ChatMessage(role="system", content=instructions),
+        ChatMessage(
+            role="user",
+            content=json.dumps(
                 {
-                    "id": len(sources) + 1,
-                    "url": source.url,
-                    "title": source.title[:300],
-                    "excerpt": source.snippet[:1800],
-                    "retrieved_at": source.retrieved_at.isoformat(),
-                }
-            )
-        entry.evidence = {**entry.evidence, "sources": sources}
-        session.commit()
-        if not sources:
-            return finish("INCONCLUSIVE", "no_sources")
-        if not _allowed(session, owner):
-            return finish("SKIPPED", "permission_revoked")
-        if time.monotonic() - started >= budget.max_seconds or not _room(session, budget, now):
-            return finish("INCONCLUSIVE", "cycle_budget")
-        review = _complete(
-            session,
-            provider,
-            PURPOSE_REVIEW,
-            [
-                ChatMessage(role="system", content=REVIEW_INSTRUCTIONS),
-                ChatMessage(
-                    role="user",
-                    content=json.dumps(
-                        {"question": question, "sources": sources}, ensure_ascii=False
-                    ),
-                ),
-            ],
-            budget,
-            now,
-        )
-        findings = []
-        raw_findings = review.get("findings", [])
-        if not isinstance(raw_findings, list):
-            raise ValueError("invalid_findings")
-        for finding in raw_findings[:3]:
-            if not isinstance(finding, dict):
-                continue
-            claim = _text(finding, "claim", 600)
-            citations = finding.get("sources", [])
-            if not claim or not isinstance(citations, list) or not citations:
-                continue
-            if any(type(i) is not int or i < 1 or i > len(sources) for i in citations):
-                continue
-            findings.append({"claim": claim, "sources": sorted(set(citations))})
-        uncertain = _text(review, "uncertain", 1000)
-        next_question, next_query = (
-            _text(review, "next_question", 500),
-            _text(review, "next_query", 200),
-        )
-        if not _public(
-            review,
-            " ".join([f["claim"] for f in findings] + [uncertain, next_question, next_query]),
-        ):
-            return finish("SKIPPED", "unsafe_review")
-        if not _allowed(session, owner):
-            return finish("SKIPPED", "permission_revoked")
+                    "seeds": seeds,
+                    "retry": study.retry_context,
+                    "previous_questions": [e.question for e in study.entries if e.question],
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+
+
+def _validated_plan(study: _Round, data: dict, seeds: list[dict]) -> _Plan:
+    retry = study.retry
+    if data.get("study") is not True:
+        raise _Stop("SKIPPED", "no_useful_question")
+    topic, question = _text(data, "topic", 200), _text(data, "question", 500)
+    if retry:
+        question = retry.question  # a retry answers the same question with a new search
+    query, rationale = _text(data, "query", 200), _text(data, "rationale", 600)
+    if not all([topic, question, query, rationale]) or not _public(
+        data, " ".join([topic, question, query, rationale])
+    ):
+        raise _Stop("SKIPPED", "not_public_topic")
+    if not retry and any(fold(question) == fold(e.question) for e in study.entries):
+        raise _Stop("SKIPPED", "repeated_question")
+    refs = data.get("seed_refs", [])
+    valid = {s["ref"] for s in seeds}
+    if not isinstance(refs, list) or any(not isinstance(r, str) or r not in valid for r in refs):
+        raise _Stop("SKIPPED", "invalid_seed_reference")
+    if study.budget.open_web and not refs and not retry:
+        raise _Stop("SKIPPED", "no_seed")
+    if retry:
+        refs = list(dict.fromkeys([f"study:{retry.id}", *refs]))
+    return _Plan(topic=topic, question=question, query=query, rationale=rationale, seed_refs=refs)
+
+
+def _check_still_allowed(study: _Round, *, over_budget: str) -> None:
+    """Between steps: the owner may have revoked permission, and time or budget may be gone."""
+    if not _allowed(study.session, study.owner):
+        raise _Stop("SKIPPED", "permission_revoked")
+    if study.out_of_time() or not has_room(study.session, study.budget, study.now):
+        raise _Stop(over_budget, "cycle_budget")
+
+
+def _read_sources(study: _Round, plan: _Plan) -> list[dict]:
+    """Search public sources and keep only approved, distinct ones on the entry."""
+    entry = study.entry
+    entry.status = "READING"
+    entry.evidence = {"sources": [], "search_queries": []}
+    study.session.commit()
+    sources = _approved_sources(_search(study, plan), study.budget.open_web, study.max_sources)
+    entry.evidence = {**entry.evidence, "sources": sources}
+    study.session.commit()
+    if not sources:
+        raise _Stop("INCONCLUSIVE", "no_sources")
+    return sources
+
+
+def _search(study: _Round, plan: _Plan) -> list[SearchResult]:
+    # A long or overly specific query can miss an encyclopedic title. Try the topic
+    # once, without another model call, and charge both attempts to the shared quota.
+    session, owner, budget, entry = study.session, study.owner, study.budget, study.entry
+    previous_queries = (
+        {fold(q) for q in study.retry_context["previous_queries"] if isinstance(q, str)}
+        if study.retry_context
+        else set()
+    )
+    candidates = [
+        q for q in candidate_queries(plan.query, plan.topic) if fold(q) not in previous_queries
+    ]
+    if not candidates:
+        raise _Stop("SKIPPED", "repeated_query")
+    results: list[SearchResult] = []
+    for candidate in candidates:
+        if searches_today(session, owner.id, study.now) >= budget.research_per_day:
+            break
+        if not _allowed(session, owner) or study.out_of_time():
+            break
         entry.evidence = {
-            "search_queries": entry.evidence.get("search_queries", [query]),
-            "sources": sources,
-            "findings": findings,
-            "uncertain": uncertain,
-            "next_question": next_question,
-            "next_query": next_query,
+            **entry.evidence,
+            "search_queries": [*entry.evidence["search_queries"], candidate],
         }
-        status = "READY" if findings else "INCONCLUSIVE"
-        finish(status, "evidence_recorded" if findings else "sources_do_not_answer")
-        if findings and review.get("worth_sharing") is True:
-            notify(
-                session,
-                owner=owner,
-                kind="autonomous_study",
-                title=f"Estudei: {topic}",
-                body=(
-                    f"{question}\n\n{findings[0]['claim']}\n"
-                    f"{sources[findings[0]['sources'][0] - 1]['url']}"
-                ),
-                now=now,
-            )
-            session.commit()
-        return entry
-    except (LLMError, SearchError) as exc:
-        return finish("FAILED", f"provider_{exc.kind}"[:64])
-    except (ValueError, TypeError):
-        return finish("FAILED", "invalid_model_output")
+        session.commit()
+        results = study.search.search(candidate, max_results=study.max_sources)
+        if results:
+            break
+    return results
+
+
+def _approved_sources(results: list[SearchResult], open_web: bool, limit: int) -> list[dict]:
+    """Numbered excerpts from approved public URLs only, even when a custom adapter is used."""
+    allowed = "https://" if open_web else "https://pt.wikipedia.org/wiki/"
+    sources: list[dict] = []
+    for source in results[:limit]:
+        if not source.url.startswith(allowed):
+            continue
+        if source.url in {s["url"] for s in sources}:
+            continue
+        sources.append(
+            {
+                "id": len(sources) + 1,
+                "url": source.url,
+                "title": source.title[:300],
+                "excerpt": source.snippet[:1800],
+                "retrieved_at": source.retrieved_at.isoformat(),
+            }
+        )
+    return sources
+
+
+def _review_sources(study: _Round, question: str, sources: list[dict]) -> dict:
+    """Second model call: what the excerpts actually support, and what to ask next."""
+    return complete_json(
+        study.session,
+        study.provider,
+        PURPOSE_REVIEW,
+        [
+            ChatMessage(role="system", content=REVIEW_INSTRUCTIONS),
+            ChatMessage(
+                role="user",
+                content=json.dumps({"question": question, "sources": sources}, ensure_ascii=False),
+            ),
+        ],
+        study.budget,
+        study.now,
+    )
+
+
+def _cited_findings(review: dict, source_count: int) -> list[dict]:
+    """Up to three findings, each citing at least one existing source number."""
+    raw_findings = review.get("findings", [])
+    if not isinstance(raw_findings, list):
+        raise ValueError("invalid_findings")
+    findings = []
+    for finding in raw_findings[:3]:
+        if not isinstance(finding, dict):
+            continue
+        claim = _text(finding, "claim", 600)
+        citations = finding.get("sources", [])
+        if not claim or not isinstance(citations, list) or not citations:
+            continue
+        if any(type(i) is not int or i < 1 or i > source_count for i in citations):
+            continue
+        findings.append({"claim": claim, "sources": sorted(set(citations))})
+    return findings
+
+
+def _record_review(study: _Round, plan: _Plan, sources: list[dict], review: dict) -> StudyEntry:
+    """Keep the cited findings and the next question; tell the owner if it is worth it."""
+    findings = _cited_findings(review, len(sources))
+    uncertain = _text(review, "uncertain", 1000)
+    next_question, next_query = (
+        _text(review, "next_question", 500),
+        _text(review, "next_query", 200),
+    )
+    if not _public(
+        review,
+        " ".join([f["claim"] for f in findings] + [uncertain, next_question, next_query]),
+    ):
+        raise _Stop("SKIPPED", "unsafe_review")
+    if not _allowed(study.session, study.owner):
+        raise _Stop("SKIPPED", "permission_revoked")
+    entry = study.entry
+    entry.evidence = {
+        "search_queries": entry.evidence.get("search_queries", [plan.query]),
+        "sources": sources,
+        "findings": findings,
+        "uncertain": uncertain,
+        "next_question": next_question,
+        "next_query": next_query,
+    }
+    status = "READY" if findings else "INCONCLUSIVE"
+    study.finish(status, "evidence_recorded" if findings else "sources_do_not_answer")
+    if findings and review.get("worth_sharing") is True:
+        _share_finding(study, plan, sources, findings[0])
+    return entry
+
+
+def _share_finding(study: _Round, plan: _Plan, sources: list[dict], finding: dict) -> None:
+    notify(
+        study.session,
+        owner=study.owner,
+        kind="autonomous_study",
+        title=f"Estudei: {plan.topic}",
+        body=(
+            f"{plan.question}\n\n{finding['claim']}\n{sources[finding['sources'][0] - 1]['url']}"
+        ),
+        now=study.now,
+    )
+    study.session.commit()
 
 
 def related_context(session: Session, owner_id: uuid.UUID, text: str) -> str | None:

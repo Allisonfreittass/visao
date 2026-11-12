@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     # Merged into conversation requests only, e.g. to turn the model's reasoning off.
     llm_fast_extra_body: dict[str, Any] = Field(default_factory=dict)
     llm_fallback_fast_extra_body: dict[str, Any] = Field(default_factory=dict)
+    llm_fallback2_fast_extra_body: dict[str, Any] = Field(default_factory=dict)
     llm_budget_calls_per_day: int = Field(default=30, ge=1)
     llm_budget_calls_per_hour: int = Field(default=10, ge=1)
     llm_budget_input_tokens_per_day: int = Field(default=60_000, ge=1)
@@ -70,7 +71,8 @@ class Settings(BaseSettings):
     llm_fallback2_model: str | None = None
     llm_fallback2_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_fallback2_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
-    llm_max_output_tokens: int = Field(default=1024, ge=1)
+    # Room for a complete code answer; brevity comes from the prompt, not from cutting replies.
+    llm_max_output_tokens: int = Field(default=2048, ge=1)
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
 
@@ -101,6 +103,11 @@ class Settings(BaseSettings):
     mind_review_turns: int = Field(default=4, ge=1)
     mind_initiatives_per_day: int = Field(default=6, ge=0)
     study_interval_minutes: int = Field(default=360, ge=10)
+    # Web Push (docs/MIND.md): lets an opening reach the phone with the app closed. Off unless all
+    # three are set; generate the pair with `python -m apps.api.cli webpush-keys`.
+    webpush_public_key: str | None = None
+    webpush_private_key: SecretStr | None = None
+    webpush_subject: str | None = None  # https URL of the app or mailto: contact (VAPID "sub")
     autonomy_llm_calls_per_day: int = Field(default=20, ge=0)
     autonomy_tokens_per_day: int = Field(default=60_000, ge=0)
     autonomy_max_actions_per_cycle: int = Field(default=3, ge=0)
@@ -131,6 +138,9 @@ class Settings(BaseSettings):
         "llm_fallback2_model",
         "llm_fallback2_price_input_per_mtok",
         "llm_fallback2_price_output_per_mtok",
+        "webpush_public_key",
+        "webpush_private_key",
+        "webpush_subject",
         mode="before",
     )
     @classmethod

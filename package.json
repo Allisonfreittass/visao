@@ -2,6 +2,11 @@
   "name": "visao",
   "private": true,
   "scripts": {
-    "start": "scripts/dev.sh"
+    "start": "scripts/dev.sh",
+    "setup": "make setup",
+    "test": "make test",
+    "lint": "make lint",
+    "check": "make check",
+    "db-test": "make db-test"
   }
 }

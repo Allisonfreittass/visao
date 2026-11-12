@@ -152,6 +152,7 @@ def build_llm_provider(
             settings.llm_fallback2_model,
             settings.llm_fallback2_price_input_per_mtok,
             settings.llm_fallback2_price_output_per_mtok,
+            settings.llm_fallback2_fast_extra_body if fast else None,
         )
         chain.append(GuardedLLMProvider(second, settings.llm_fallback2_base_url, budget_guard))
     return FallbackLLMProvider(chain)

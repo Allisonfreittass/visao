@@ -19,7 +19,7 @@ from apps.worker.runner import run_once
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.goals.followup import SUMMARY_INSTRUCTIONS
 from core.identity.genesis import run_genesis
-from infrastructure.database.models import Goal, KnowledgeGap, Notification
+from infrastructure.database.models import Goal, KnowledgeGap, Notification, ScheduledJob
 from integrations.llm.base import ChatMessage
 from integrations.search.base import SearchResult
 from tests.fakes import FakeLLMProvider
@@ -215,3 +215,26 @@ def test_quiet_hours_settings_are_validated(client, db, world) -> None:
         json={"quiet_start": "25:00", "quiet_end": "07:30", "timezone": "Marte/Base"},
     )
     assert bad.status_code == 422
+
+
+def test_followup_waits_when_the_autonomy_budget_is_spent(client, db, world) -> None:
+    run_genesis(db)
+    headers = _login(client, db)
+    goal_id = _inconclusive_turn(client, headers)["curiosity"]["proposed_goal_id"]
+    client.post(f"/goals/{goal_id}/approve", headers=headers)
+    world["search"].results = [CANBERRA]
+    llm = FakeLLMProvider()
+    spent = {
+        "research_followup": research_followup_handler(
+            Settings(autonomy_llm_calls_per_day=0), llm, world["search"]
+        )
+    }
+
+    assert run_once(world["factory"], spent, "w") == "deferred"
+
+    job = db.scalars(select(ScheduledJob)).one()
+    db.refresh(job)
+    assert job.status == "PENDING" and job.last_error == "autonomy_budget"
+    assert client.get("/goals", headers=headers).json()[0]["status"] == "APPROVED"
+    assert client.get("/notifications", headers=headers).json() == []
+    assert llm.prompts == []

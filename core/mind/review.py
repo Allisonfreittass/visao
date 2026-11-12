@@ -14,10 +14,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.autonomy.budget import complete_json, has_room
 from core.memory import policy
 from core.mind import notes
 from core.policies.autonomy import is_paused
-from core.study.service import _complete, _room
 from infrastructure.database.models import Conversation, Message, User
 from infrastructure.jobs import queue
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
@@ -177,7 +177,7 @@ def review_once(
     pending = _pending(session, owner)
     if not any(m.role == "user" for m in pending):
         return ReviewReport("nothing_new")
-    if not _room(session, budget, now):
+    if not has_room(session, budget, now):
         return ReviewReport("autonomy_budget")
     conversation = [
         {"n": n, "who": "pessoa" if m.role == "user" else "você", "text": m.content[:1200]}
@@ -192,7 +192,7 @@ def review_once(
         "conversation": conversation,
     }
     try:
-        data = _complete(
+        data = complete_json(
             session,
             provider,
             PURPOSE,

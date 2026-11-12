@@ -52,3 +52,42 @@ def test_production_refuses_default_secret() -> None:
     with pytest.raises(ValidationError):
         Settings(environment="production", secret_key="short")
     Settings(environment="production", secret_key="x" * 32)
+
+
+def test_token_without_expiry_is_rejected() -> None:
+    import jwt
+
+    settings = Settings(secret_key="k" * 40)
+    token = jwt.encode({"sub": str(uuid.uuid4())}, settings.secret_key, algorithm="HS256")
+    assert decode_access_token(token, settings) is None
+
+
+def test_token_without_subject_is_rejected() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    import jwt
+
+    settings = Settings(secret_key="k" * 40)
+    exp = datetime.now(UTC) + timedelta(minutes=5)
+    token = jwt.encode({"exp": exp}, settings.secret_key, algorithm="HS256")
+    assert decode_access_token(token, settings) is None
+
+
+def test_unsigned_or_other_algorithm_token_is_rejected() -> None:
+    import base64
+    import json
+    from datetime import UTC, datetime, timedelta
+
+    import jwt
+
+    settings = Settings(secret_key="k" * 40)
+
+    def b64(data: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b"=").decode()
+
+    exp = int((datetime.now(UTC) + timedelta(minutes=5)).timestamp())
+    claims = {"sub": str(uuid.uuid4()), "exp": exp}
+    unsigned = f"{b64({'alg': 'none', 'typ': 'JWT'})}.{b64(claims)}."
+    assert decode_access_token(unsigned, settings) is None
+    hs512 = jwt.encode(claims, settings.secret_key, algorithm="HS512")
+    assert decode_access_token(hs512, settings) is None

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from apps.api.push import configure_push
 from apps.api.routes import (
     auth,
     behavior,
@@ -13,6 +14,7 @@ from apps.api.routes import (
     memory,
     mind,
     onboarding,
+    push,
     study,
     system,
     voice,
@@ -24,6 +26,7 @@ from infrastructure.observability.logging import configure_logging
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    configure_push(settings)
     app = FastAPI(title="VISÃO API", version="0.0.1")
     app.include_router(health.router)
     app.include_router(auth.router)
@@ -37,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(cognition.router)
     app.include_router(mind.router)
     app.include_router(onboarding.router)
+    app.include_router(push.router)
     app.include_router(study.router)
     app.include_router(cloud.router)
     app.include_router(evolution.router)

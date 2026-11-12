@@ -149,3 +149,10 @@ def test_unchanged_name_is_rejected(db: Session) -> None:
     record_naming_decision(db, identity, _decision(name="Igual"))
     with pytest.raises(ValueError):
         record_naming_decision(db, identity, _decision(name=" Igual "))
+
+
+def test_the_prompt_asks_for_complete_code_in_fenced_blocks():
+    from core.identity.system_prompt import VOICE_RULES
+
+    code_rule = next(rule for rule in VOICE_RULES if "código" in rule)
+    assert "```" in code_rule and "completo" in code_rule

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from apps.api.llm import build_llm_provider
 from apps.api.settings import Settings
 from apps.worker.runner import Handler, HandlerResult
+from core.autonomy.budget import has_room
 from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
@@ -29,6 +30,9 @@ def research_followup_handler(
             raise RuntimeError("LLM not configured")
         goal = session.get(Goal, uuid.UUID(job.payload["goal_id"]))
         owner_id = goal.owner_user_id if goal else None
+        # The summary is an autonomous model call: it shares the agent's own daily budget.
+        if goal is not None and not autonomy_room(session, settings):
+            return HandlerResult("defer", defer_until=_tomorrow(), reason="autonomy_budget")
         budget_left = owner_id is None or (
             research_count_today(session, owner_id) < settings.research_per_day
         )
@@ -48,6 +52,15 @@ def research_followup_handler(
         )
 
     return handle
+
+
+def _tomorrow() -> datetime:
+    return (datetime.now(UTC) + timedelta(days=1)).replace(hour=9, minute=0, second=0)
+
+
+def autonomy_room(session: Session, settings: Settings, calls: int = 1) -> bool:
+    """``calls`` more autonomous model calls fit today's autonomy and USD budgets."""
+    return has_room(session, autonomy_budget(settings), datetime.now(UTC), calls)
 
 
 def autonomy_budget(

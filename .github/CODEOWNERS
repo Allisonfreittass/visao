@@ -1,0 +1,9 @@
+# Every change needs the owner's review. The explicit paths govern what runs unattended (CI/CD,
+# the self-evolution loop) and what the model may spend: they stay owner-reviewed even if the
+# catch-all line is ever widened to more people.
+*                               @Allisonfreittass
+
+/.github/                       @Allisonfreittass
+/core/evolution/                @Allisonfreittass
+/infrastructure/evolution/      @Allisonfreittass
+/integrations/llm/budget.py     @Allisonfreittass

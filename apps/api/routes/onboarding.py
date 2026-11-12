@@ -26,10 +26,11 @@ NOTE_NAMES = {notes.PROFILE: "suas respostas sobre você", notes.RULES: "o jeito
 class Answers(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    who: str = ""
-    work: str = ""
-    goal: str = ""
-    tone: str = ""
+    # No answer can be longer than the note it goes into; refused early, never truncated.
+    who: str = Field(default="", max_length=notes.LIMITS[notes.PROFILE])
+    work: str = Field(default="", max_length=notes.LIMITS[notes.PROFILE])
+    goal: str = Field(default="", max_length=notes.LIMITS[notes.PROFILE])
+    tone: str = Field(default="", max_length=notes.LIMITS[notes.RULES])
 
 
 class FinishIn(BaseModel):

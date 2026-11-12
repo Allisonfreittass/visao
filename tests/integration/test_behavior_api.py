@@ -134,3 +134,28 @@ def test_reflection_endpoint_and_lessons(client, db, llm) -> None:
     retire = client.post(f"/lessons/{lessons[0]['id']}/retire", headers=headers)
     assert retire.status_code == 204
     assert client.get("/lessons", headers=headers).json()[0]["status"] == "RETIRED"
+
+
+def test_reflection_respects_the_autonomy_budget(client, db, llm) -> None:
+    from apps.api.settings import Settings, get_settings
+    from infrastructure.database.models import Conversation
+
+    run_genesis(db)
+    headers = _login(client, db)
+    client.app.dependency_overrides[get_settings] = lambda: Settings(autonomy_llm_calls_per_day=0)
+    first = client.post("/conversations", headers=headers).json()["id"]
+    turn = _reply(client, headers, first)
+    client.post(
+        f"/messages/{turn['assistant_message']['id']}/feedback",
+        headers=headers,
+        json={"rating": -1, "tags": ["faltou fonte"]},
+    )
+    calls = len(llm.prompts)
+
+    result = client.post(f"/conversations/{first}/reflect", headers=headers).json()
+    assert result["skipped_reason"] == "autonomy_budget" and result["created"] == 0
+    # Opening a new conversation schedules a background reflection on the previous one.
+    client.post("/conversations", headers=headers)
+    assert len(llm.prompts) == calls
+    db.expire_all()
+    assert db.get(Conversation, __import__("uuid").UUID(first)).last_reflected_at is None

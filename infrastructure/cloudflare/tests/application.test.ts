@@ -1,5 +1,26 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { appEnvironment, handler, type Env } from "../src/application";
+import { APP_KEYS, appEnvironment, handler, type Env } from "../src/application";
+
+// JSONC: drop // and /* */ comments outside strings, then trailing commas.
+function parseJsonc(text: string): Record<string, unknown> {
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      out += text.slice(i, j + 1);
+      i = j;
+    } else if (c === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i++;
+      out += "\n";
+    } else if (c === "/" && text[i + 1] === "*") {
+      i = text.indexOf("*/", i + 2) + 1;
+    } else out += c;
+  }
+  return JSON.parse(out.replace(/,(\s*[}\]])/g, "$1"));
+}
 
 function env() {
   const backend = { fetch: vi.fn(async () => new Response('{"ok":true}')) };
@@ -72,5 +93,24 @@ describe("Cloudflare edge routing", () => {
       VISION_LLM_BUDGET_CONCURRENCY: "1",
     };
     expect(appEnvironment({ ...value, ...budget })).toMatchObject(budget);
+  });
+  it("forwards every VISION_* variable that wrangler.jsonc configures", () => {
+    const config = parseJsonc(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+    const vars = Object.keys(config.vars as Record<string, string>).filter((k) => k.startsWith("VISION_"));
+    expect(vars.length).toBeGreaterThan(10);
+    expect(vars.filter((key) => !(APP_KEYS as readonly string[]).includes(key))).toEqual([]);
+  });
+  it("forwards model, fallback and inner-life settings while pinning production", () => {
+    const { value } = env();
+    const extra = {
+      VISION_LLM_TRUST_ZERO_PRICE: "true", VISION_LLM_FAST_EXTRA_BODY: '{"reasoning":{"enabled":false}}',
+      VISION_LLM_FALLBACK2_MODEL: "m2", VISION_MIND_ENABLED: "true", VISION_STUDY_INTERVAL_MINUTES: "360",
+      VISION_WEBPUSH_SUBJECT: "mailto:owner@example.com",
+    };
+    const config = appEnvironment({ ...value, ...extra, VISION_ENVIRONMENT: "development" } as Env);
+    expect(config).toMatchObject(extra);
+    expect(config.VISION_ENVIRONMENT).toBe("production");
+    expect(config.VISION_STT_MODEL).toBe("");
+    expect(config.VISION_TTS_APPROVED_VOICES).toBe("");
   });
 });

@@ -401,3 +401,52 @@ def test_second_fallback_joins_the_chain_only_when_complete(factory):
         budget_guard=make_guard(factory),
     )
     assert len(full._providers) == 3
+
+
+@pytest.mark.parametrize("kind", ["timeout", "network"])
+def test_timed_out_primary_does_not_lock_out_the_fallback(factory, kind):
+    primary, backup = fake(fail_with=kind), fake(model="backup")
+    guard = make_guard(factory, grants=[grant(), grant(model="backup")])
+    chain = FallbackLLMProvider(
+        [GuardedLLMProvider(primary, ENDPOINT, guard), GuardedLLMProvider(backup, ENDPOINT, guard)]
+    )
+    assert chain.complete(PROMPT, max_output_tokens=512).model == "backup"
+    state = ledger(factory)
+    # The uncertain primary call stays charged and keeps holding its own slot.
+    assert state["calls"] == 2
+    assert [item["state"] for item in state["active"].values()] == ["unknown"]
+    with pytest.raises(LLMError, match="quota"):
+        guard.reserve(fake(), ENDPOINT, PROMPT, 512)
+
+
+def test_in_flight_calls_are_still_capped_across_providers(factory):
+    guard = make_guard(factory, grants=[grant(), grant(model="backup")])
+    guard.reserve(fake(), ENDPOINT, PROMPT, 512)
+    with pytest.raises(LLMError, match="quota"):
+        guard.reserve(fake(model="backup"), ENDPOINT, PROMPT, 512)
+
+
+def test_every_fallback_slot_receives_its_fast_extra_body(factory):
+    base = {
+        f"llm_{prefix}{name}": value
+        for prefix in ("", "fallback_", "fallback2_")
+        for name, value in {
+            "provider_name": f"p{prefix}",
+            "base_url": "https://example.com/v1",
+            "api_key": "x",
+            "model": "m",
+            "price_input_per_mtok": Decimal(0),
+            "price_output_per_mtok": Decimal(0),
+        }.items()
+    }
+    settings = Settings(
+        _env_file=None,
+        **base,
+        llm_fast_extra_body={"a": 1},
+        llm_fallback_fast_extra_body={"b": 2},
+        llm_fallback2_fast_extra_body={"c": 3},
+    )
+    fast = build_llm_provider(settings, budget_guard=make_guard(factory), fast=True)
+    assert [p._provider._extra_body for p in fast._providers] == [{"a": 1}, {"b": 2}, {"c": 3}]
+    slow = build_llm_provider(settings, budget_guard=make_guard(factory))
+    assert [p._provider._extra_body for p in slow._providers] == [{}, {}, {}]

@@ -1,0 +1,73 @@
+/* Rastros: componentes (Botao, Chip, Status, Mensagem, Campo, Moldura, Leque, Atmosfera).
+   Copiado do pacote da marca, prefixo rs-. Depende de tokens.css. */
+.rs-pilha { display: flex; flex-wrap: wrap; gap: var(--espaco-2); align-items: center; }
+
+/* Botão */
+.rs-botao { display: inline-flex; align-items: center; gap: var(--espaco-2); height: 44px; padding: 0 20px; border-radius: var(--raio-pilula);
+  border: 1px solid var(--borda); background: transparent; color: var(--tinta); font: 500 14px/1 var(--font-sans); text-decoration: none; cursor: pointer;
+  transition: border-color .2s, background .2s, box-shadow .2s; }
+.rs-botao:hover { border-color: var(--tinta-suave); }
+.rs-botao:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.rs-botao--principal { background: var(--tinta); color: var(--sobre-tinta); border-color: var(--tinta); }
+.rs-botao--principal:hover { box-shadow: 0 0 30px var(--lanterna-luz); }
+.rs-botao--compacto { height: 32px; padding: 0 13px; font: 400 11.5px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-suave); }
+.rs-botao[aria-pressed="true"] { color: var(--tinta); border-color: var(--estanho); }
+.rs-botao:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Chip */
+.rs-chip { display: inline-flex; align-items: center; padding: 8px var(--espaco-3); border: 1px solid var(--linha-forte); border-radius: var(--raio-pilula);
+  font: 400 12.5px/1 var(--font-sans); color: var(--tinta-suave); }
+
+/* Status */
+.rs-status { display: inline-flex; align-items: center; gap: 10px; font: 400 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-fraca); }
+.rs-ponto { width: 7px; height: 7px; border-radius: 50%; background: var(--lanterna); box-shadow: var(--brilho-lanterna); animation: rs-pulso 2.6s ease-in-out infinite; flex: none; }
+@keyframes rs-pulso { 50% { opacity: .3; } }
+
+/* Mensagem de estado */
+.rs-mensagem { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; padding: 14px 16px; border: 1px solid var(--linha-forte); border-radius: var(--raio-1); background: var(--fundo-elevado); }
+.rs-mensagem b { font: 500 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; }
+.rs-mensagem p { grid-column: 2; margin: 0; font: 400 15px/1.55 var(--font-sans); color: var(--tinta-suave); }
+.rs-mensagem i { font-style: normal; font: 500 14px/1.5 var(--font-mono); }
+.rs-mensagem--sucesso b, .rs-mensagem--sucesso i { color: var(--sucesso); }
+.rs-mensagem--aviso b, .rs-mensagem--aviso i { color: var(--aviso); }
+.rs-mensagem--erro b, .rs-mensagem--erro i { color: var(--erro); }
+.rs-mensagem--info b, .rs-mensagem--info i { color: var(--estanho); }
+
+/* Campo */
+.rs-campo { display: grid; gap: 8px; }
+.rs-campo label { font: 400 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-fraca); }
+.rs-campo input, .rs-campo textarea { height: 44px; padding: 0 var(--espaco-4); border: 1px solid var(--borda); border-radius: var(--raio-1); background: var(--fundo);
+  color: var(--tinta); font: 400 16px/1.4 var(--font-sans); transition: border-color .2s, box-shadow .2s; }
+.rs-campo textarea { height: auto; min-height: 96px; padding: 12px var(--espaco-4); resize: vertical; }
+.rs-campo input::placeholder, .rs-campo textarea::placeholder { color: var(--tinta-fraca); }
+.rs-campo input:focus-visible, .rs-campo textarea:focus-visible { outline: none; border-color: var(--estanho); box-shadow: var(--anel-foco); }
+.rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--tinta-fraca); }
+.rs-campo[data-estado="erro"] input { border-color: var(--erro); }
+.rs-campo[data-estado="erro"] small { color: var(--erro); }
+
+/* Moldura Deco */
+.rs-moldura { position: relative; border: 1px solid var(--estanho-linha); padding: 8px; background: linear-gradient(180deg, var(--fundo-elevado), var(--fundo)); }
+.rs-moldura::before { content: ""; position: absolute; inset: 8px; border: 1px solid var(--linha); pointer-events: none; }
+.rs-moldura > .rs-canto { position: absolute; width: 26px; height: 26px; border: 1px solid var(--estanho); }
+.rs-canto--se { top: -5px; left: -5px; border-right: 0 !important; border-bottom: 0 !important; }
+.rs-canto--sd { top: -5px; right: -5px; border-left: 0 !important; border-bottom: 0 !important; }
+.rs-canto--ie { bottom: -5px; left: -5px; border-right: 0 !important; border-top: 0 !important; }
+.rs-canto--id { bottom: -5px; right: -5px; border-left: 0 !important; border-top: 0 !important; }
+.rs-moldura-corpo { position: relative; padding: var(--espaco-7); }
+
+/* Leque (ornamento Art Deco) */
+.rs-leque { display: block; width: 46px; height: auto; color: var(--estanho); }
+
+/* Atmosfera */
+.rs-grao::before { content: ""; position: fixed; inset: 0; z-index: var(--camada-grao); pointer-events: none; opacity: var(--opacidade-grao);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+[data-theme="neblina"] .rs-grao::before, [data-theme="neblina"].rs-grao::before { opacity: calc(var(--opacidade-grao) * .6); mix-blend-mode: multiply; filter: invert(1); }
+.rs-nevoa { position: absolute; left: -30%; width: 160%; height: 200px; pointer-events: none; filter: blur(30px); opacity: var(--opacidade-nevoa);
+  background: radial-gradient(ellipse 30% 50% at 20% 50%, var(--linha-forte), transparent 70%), radial-gradient(ellipse 25% 45% at 60% 55%, var(--linha-forte), transparent 70%), radial-gradient(ellipse 30% 50% at 92% 45%, var(--linha-forte), transparent 70%);
+  animation: rs-deriva 60s linear infinite alternate; }
+@keyframes rs-deriva { from { transform: translateX(-8%); } to { transform: translateX(8%); } }
+.rs-luz-indireta { position: relative; overflow: hidden; }
+.rs-luz-indireta::before { content: ""; position: absolute; left: 50%; bottom: -160px; width: min(1100px, 160%); height: 560px; transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(ellipse at 50% 100%, var(--lanterna-luz), transparent 70%); }
+.rs-linha-sinal { display: block; width: 100%; height: 90px; }
+@media (prefers-reduced-motion: reduce) { .rs-ponto, .rs-nevoa { animation: none; } }

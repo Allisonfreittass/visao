@@ -66,6 +66,17 @@ export interface VoiceStatus {
   source: "chosen" | "system_default" | "none";
 }
 
+export interface PushState {
+  enabled: boolean;
+  public_key: string | null;
+  subscriptions: number;
+}
+
+export interface PushSubscriptionBody {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -311,6 +322,30 @@ export class Api {
       signal,
     });
     return response.arrayBuffer();
+  }
+
+  pushState(): Promise<PushState> {
+    return this.request("/push");
+  }
+
+  subscribePush(subscription: PushSubscriptionBody): Promise<void> {
+    return this.request("/push/subscriptions", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  unsubscribePush(endpoint: string): Promise<void> {
+    return this.request("/push/subscriptions", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  testPush(): Promise<{ sent: number }> {
+    return this.request("/push/test", { method: "POST" });
   }
 
   mind(): Promise<Mind> {

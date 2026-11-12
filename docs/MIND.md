@@ -68,6 +68,26 @@ quieto no horário silencioso, com a autonomia pausada e enquanto você está co
 para depois de 2 aberturas sem resposta até você responder, e manda no máximo
 `VISION_MIND_INITIATIVES_PER_DAY` por dia. O que ele quis dizer e não pôde fica no pensamento.
 
+### Com o app fechado (Web Push)
+
+Uma abertura que passou por todas essas regras também vai como aviso para os aparelhos que você
+assinou (`core/initiatives/push.py`, tabela `push_subscriptions`, migração `0015`). Nada de
+regra nova: se ele não pode falar no chat, não avisa. Tocar no aviso abre a conversa certa
+(`/?c=<id>`).
+
+- Opt-in por aparelho, em Preferências → "Avisos com o app fechado". No iPhone, só com o app na
+  tela de início (iOS 16.4+).
+- Chaves VAPID: `python -m apps.api.cli webpush-keys`, depois `VISION_WEBPUSH_PUBLIC_KEY`,
+  `VISION_WEBPUSH_PRIVATE_KEY` e `VISION_WEBPUSH_SUBJECT` (URL https do app ou `mailto:`). Sem as
+  três, os avisos ficam desligados e o resto funciona igual.
+- O conteúdo vai cifrado para as chaves do navegador (aes128gcm): o serviço de push só entrega.
+  O servidor só envia para os serviços de push conhecidos (Google, Mozilla, Apple, Microsoft),
+  nunca para um endereço digitado.
+- Aparelho que o serviço diz não existir mais (404/410) é esquecido; um que falha 5 vezes seguidas
+  também. Falha no aviso nunca impede a mensagem no chat.
+- Quem envia é o processo que roda a mente: hoje o worker local. Com ele parado, não há abertura
+  nem aviso.
+
 ## Internet
 
 Wikipédia pt e en, arXiv e páginas via Hacker News (`integrations/search/open_web.py`), todas APIs

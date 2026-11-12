@@ -1,0 +1,16 @@
+# CI's ruff checks before each commit, with the project's own ruff from .venv (make setup).
+# Fixes what ruff can fix; review the changes and commit again. Install once with:
+#   pip install pre-commit && pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: .venv/bin/ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: .venv/bin/ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]

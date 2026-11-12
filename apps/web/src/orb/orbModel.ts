@@ -152,12 +152,23 @@ export function particleRadius(params: OrbParams, seed: number, time: number, le
   return params.radiusScale * (1 + breath + noise + audio);
 }
 
-/** Orange (hue 28) fading to gray as saturation drops; depth 0 (back) .. 1 (front). */
+/** Rastros `estanho` (cold tin, hue 184) fading to plain gray as saturation drops;
+ * depth 0 (back) .. 1 (front). The only warmth is the lanterna core, drawn separately. */
+export const ESTANHO_HUE = 184;
+export const LANTERNA_HUE = 3;
+
 export function particleColor(params: OrbParams, depth: number): string {
-  const saturation = Math.round(100 * params.saturation);
-  const lightness = Math.round(Math.min(90, (38 + 30 * depth) * params.brightness));
-  const alpha = (0.25 + 0.75 * depth).toFixed(3);
-  return `hsla(28, ${saturation}%, ${lightness}%, ${alpha})`;
+  const saturation = Math.round(14 * params.saturation);
+  const lightness = Math.round(Math.min(86, (34 + 38 * depth) * params.brightness));
+  const alpha = (0.22 + 0.7 * depth).toFixed(3);
+  return `hsla(${ESTANHO_HUE}, ${saturation}%, ${lightness}%, ${alpha})`;
+}
+
+/** Strength 0..1 of the lanterna core: the one warm light, brighter while it talks or listens. */
+export function coreIntensity(params: OrbParams, level: number): number {
+  if (params.saturation === 0) return 0; // disconnected: the light is off
+  const audio = Math.max(0, Math.min(level, 1));
+  return Math.min(1, 0.35 * params.brightness + 0.55 * audio * params.levelGain * 2.5);
 }
 
 /** Slows everything down for users who asked the OS for reduced motion. */

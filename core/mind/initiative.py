@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.identity.genesis import get_identity
+from core.initiatives import push
 from core.initiatives.notify import deliver_after
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import Conversation, Message, Notification, User
@@ -135,4 +136,13 @@ def post(session: Session, owner: User, text: str, now: datetime, per_day: int) 
         )
     )
     session.flush()
+    identity = get_identity(session)
+    push.send_to_owner(
+        session,
+        owner.id,
+        title=(identity.chosen_name if identity and identity.chosen_name else "Puxou conversa"),
+        body=text,
+        url=f"/?c={conversation.id}",
+        now=now,
+    )
     return Delivery(True, "sent", message)

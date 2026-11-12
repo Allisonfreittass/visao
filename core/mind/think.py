@@ -14,9 +14,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.autonomy.budget import complete_json, has_room
 from core.memory import policy
 from core.mind import initiative, notes, state
-from core.study.service import _complete, _room
 from infrastructure.database.models import (
     Conversation,
     MemoryRecord,
@@ -182,7 +182,7 @@ def think_once(
     now = now or datetime.now(UTC)
     if not _due(session, owner, config, now):
         return ThinkReport(None, "not_due")
-    if not _room(session, budget, now):
+    if not has_room(session, budget, now):
         return ThinkReport(None, "autonomy_budget")
     last_spoke = initiative.last_owner_message_at(session, owner)
     profile, rules = notes.for_prompt(session, owner)
@@ -206,7 +206,7 @@ def think_once(
         is None,
     }
     try:
-        data = _complete(
+        data = complete_json(
             session,
             provider,
             PURPOSE,

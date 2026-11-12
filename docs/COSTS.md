@@ -1,5 +1,13 @@
 # Custos e limites
 
+> **Como é aplicado hoje (2026-11-12).** Só provedores de preço zero são admitidos: com evidência
+> de gratuidade (`VISION_LLM_FREE_GRANTS`, com validade) ou com `VISION_LLM_TRUST_ZERO_PRICE` em
+> uso pessoal. Preço diferente de zero é recusado, e custo informado pelo provedor congela o razão
+> (`integrations/llm/budget.py`). O limite real é de **chamadas e tokens** (`VISION_LLM_BUDGET_*`,
+> por dia, por hora, por chamada e de concorrência), reservado antes de cada chamada. Os tetos em
+> US$ abaixo continuam no código e nos testes, mas com preço zero ficam sempre em US$ 0: servem de
+> relatório até existir um provedor pago aprovado.
+
 > Valores **propostos**, não medidos. Nenhum custo foi observado ainda. Atualizar com dados
 > reais de `model_usage` a partir da Fase 1.
 

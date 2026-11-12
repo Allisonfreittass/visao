@@ -16,6 +16,9 @@ dependencies = [
     "pyjwt>=2.10",
     "python-multipart>=0.0.18",
     "httpx>=0.28",
+    "pywebpush>=2.0",
+    # arXiv feeds are parsed without entity expansion or external references.
+    "defusedxml>=0.7",
 ]
 
 [project.optional-dependencies]

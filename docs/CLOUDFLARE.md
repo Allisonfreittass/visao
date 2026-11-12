@@ -37,12 +37,17 @@ Requer Docker com build linux/amd64, Node 22+, Workers Paid e PostgreSQL.
 2. `npm --prefix infrastructure/cloudflare ci`.
 3. Configure segredos em um JSON privado fora do Git. Inclua
    `VISION_DATABASE_URL` (SQLAlchemy psycopg, TLS), `VISION_SECRET_KEY`,
-   `VISION_CLOUD_TICK_KEY` (32+ caracteres), credenciais dos modelos e seus limites.
+   `VISION_CLOUD_TICK_KEY` (32+ caracteres), credenciais dos modelos e seus limites e, para os
+   avisos com o app fechado, `VISION_WEBPUSH_PUBLIC_KEY`, `VISION_WEBPUSH_PRIVATE_KEY` e
+   `VISION_WEBPUSH_SUBJECT` (`python -m apps.api.cli webpush-keys`).
    Preserve `VISION_SECRET_KEY` e os hashes de senha durante uma transferência.
 4. Na pasta `infrastructure/cloudflare`, execute
    `npm run deploy -- --secrets-file /caminho/privado/segredos.json`.
 
-As variáveis públicas ficam em `wrangler.jsonc`. A conexão deve usar o login
+As variáveis públicas ficam em `wrangler.jsonc`. O Worker só repassa ao Container as chaves
+listadas em `APP_KEYS` (`src/application.ts`); um teste falha se alguma variável do
+`wrangler.jsonc` ou campo de `Settings` ficar de fora, como aconteceu com
+`VISION_LLM_TRUST_ZERO_PRICE` até 2026-11-12. A conexão deve usar o login
 dedicado ao backend e `VISION_DATABASE_SCHEMA=visao`. As migrações executam na
 inicialização. O schema não concede acesso a anon/authenticated, e as tabelas
 habilitam RLS. O backend continua responsável pelo isolamento entre usuários com

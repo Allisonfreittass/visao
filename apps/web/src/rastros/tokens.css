@@ -1,0 +1,76 @@
+/* Rastros, versão 1: gerado de tokens.json do guia da marca. Não edite à mão. */
+:root {
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 24px;
+  --espaco-6: 32px;
+  --espaco-7: 44px;
+  --espaco-8: 64px;
+  --espaco-9: 96px;
+  --espaco-10: 128px;
+  --raio-0: 0px;
+  --raio-1: 3px;
+  --raio-2: 6px;
+  --raio-pilula: 999px;
+  --camada-conteudo: 1;
+  --camada-chuva: 40;
+  --camada-grao: 50;
+  --camada-sobreposicao: 60;
+  --opacidade-grao: 0.07;
+  --opacidade-nevoa: 0.55;
+}
+:root, [data-theme="noite"] {
+  color-scheme: dark;
+  --fundo: #090E10;
+  --fundo-elevado: #0E1619;
+  --fundo-hover: #142024;
+  --tinta: #E6E9E6;
+  --tinta-suave: #A9B4B2;
+  --tinta-fraca: #7E8B8A;
+  --linha: rgba(214,228,226,0.09);
+  --linha-forte: rgba(214,228,226,0.22);
+  --borda: #5F6E6F;
+  --estanho: #A9BCBD;
+  --estanho-linha: rgba(169,188,189,0.34);
+  --lanterna: #E0483F;
+  --lanterna-brilho: rgba(224,72,63,0.55);
+  --lanterna-luz: rgba(224,72,63,0.16);
+  --sobre-lanterna: #090E10;
+  --sobre-tinta: var(--fundo);
+  --sucesso: #5CC2C9;
+  --aviso: #E3A857;
+  --erro: #FF7A6E;
+  --brilho-lanterna: 0 0 8px 1px rgba(224,72,63,0.6);
+  --anel-foco: 0 0 0 2px #090E10, 0 0 0 4px #A9BCBD;
+  --elevacao: 0 24px 60px -20px rgba(0,0,0,0.65);
+}
+[data-theme="neblina"] {
+  color-scheme: light;
+  --fundo: #E9EDEC;
+  --fundo-elevado: #F3F5F4;
+  --fundo-hover: #DCE2E1;
+  --tinta: #0E1619;
+  --tinta-suave: #3D4A4B;
+  --tinta-fraca: #546163;
+  --linha: rgba(14,22,25,0.10);
+  --linha-forte: rgba(14,22,25,0.22);
+  --borda: #6E7C7D;
+  --estanho: #4F6366;
+  --estanho-linha: rgba(79,99,102,0.40);
+  --lanterna: #B3342B;
+  --lanterna-brilho: rgba(179,52,43,0.30);
+  --lanterna-luz: rgba(179,52,43,0.08);
+  --sobre-lanterna: #FFFFFF;
+  --sobre-tinta: var(--fundo);
+  --sucesso: #1B6A70;
+  --aviso: #7E520F;
+  --erro: #9E2A21;
+  --brilho-lanterna: 0 0 6px 1px rgba(179,52,43,0.35);
+  --anel-foco: 0 0 0 2px #E9EDEC, 0 0 0 4px #4F6366;
+  --elevacao: 0 24px 60px -24px rgba(14,22,25,0.28);
+}

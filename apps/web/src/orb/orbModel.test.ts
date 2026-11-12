@@ -6,6 +6,7 @@ import {
   hash01,
   organicSphere,
   lerpParams,
+  coreIntensity,
   particleColor,
   particleRadius,
   reducedMotion,
@@ -54,8 +55,10 @@ describe("orb model", () => {
   it("is still and gray when disconnected", () => {
     const p = STATE_PARAMS.DISCONNECTED;
     expect(particleRadius(p, 1, 0.3, 1)).toBe(particleRadius(p, 2, 9.1, 0));
-    expect(particleColor(p, 1)).toMatch(/^hsla\(28, 0%,/);
-    expect(particleColor(STATE_PARAMS.IDLE, 1)).toMatch(/^hsla\(28, 100%,/);
+    expect(particleColor(p, 1)).toMatch(/^hsla\(184, 0%,/);
+    expect(particleColor(STATE_PARAMS.IDLE, 1)).toMatch(/^hsla\(184, 14%,/);
+    expect(coreIntensity(p, 1)).toBe(0);
+    expect(coreIntensity(STATE_PARAMS.SPEAKING, 1)).toBeGreaterThan(coreIntensity(STATE_PARAMS.SPEAKING, 0));
   });
 
   it("calms motion for reduced-motion users", () => {

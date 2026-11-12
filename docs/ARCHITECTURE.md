@@ -22,11 +22,11 @@ Web/iPhone (sessão de voz e texto)
   |       |        |
 Memória  Metas   Curiosidade                 core/memory, core/goals, core/curiosity
   |       |        |
-  +--- Planejamento --+                      core/planning
+  +--- Decisão e ciclo autônomo --+         core/decision, core/autonomy, core/mind
           |
    Policy/Approval Gate                      core/policies
           |
-   Ferramentas / Busca / MCP                 integrations/*
+   LLM / Busca / Voz / Web Push              integrations/*
           |
      Observação
           |

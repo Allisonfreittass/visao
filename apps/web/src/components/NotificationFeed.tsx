@@ -44,7 +44,7 @@ export function NotificationFeed({ api, current, onError, onReply }: {
   const unread = notifications.filter((item) => !item.read_at);
   if (!unread.length) return null;
   return (
-    <section className="notification-feed" aria-label="Iniciativas do VISÃO" aria-live="polite">
+    <section className="notification-feed" aria-label="O que ele trouxe por conta própria" aria-live="polite">
       {unread.map((item) => (
         <div className="card" key={item.id}>
           <strong>{item.title}</strong>

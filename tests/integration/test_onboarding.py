@@ -224,3 +224,13 @@ def test_it_can_be_asked_again_after_skipping_and_keeps_the_notes(client: TestCl
     client.post("/onboarding", json={"answers": {"work": "Tecnologia"}}, headers=headers)
     assert "Dev" in notes.current(db, owner(db).id, notes.PROFILE)
     assert "Tecnologia" in notes.current(db, owner(db).id, notes.PROFILE)
+
+
+def test_oversized_answers_are_refused_by_the_schema(client: TestClient, db: Session):
+    headers = login(client, db)
+    consent(client, headers)
+
+    response = client.post("/onboarding", headers=headers, json={"answers": {"tone": "y" * 5000}})
+
+    assert response.status_code == 422
+    assert note_count(db) == 0
