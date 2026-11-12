@@ -30,6 +30,10 @@ _DESCRIBE = {
         " disponível. Há um mecanismo de aviso do resultado, inclusive adiamento ou recusa,"
         " sujeito aos horários de silêncio, à pausa de autonomia e ao limite de avisos"
     ),
+    "mac_proposed": (
+        "um pedido ao Mac foi montado a partir desta mensagem e espera a aprovação da pessoa;"
+        " nada rodou ainda"
+    ),
     "read_links": "os links que a pessoa mandou foram abertos agora; o conteúdo está acima",
     "read_links_failed": "tentei abrir os links que a pessoa mandou e não consegui (motivo acima)",
     "name_deliberation_recent": "o nome já foi deliberado recentemente; não houve nova deliberação",

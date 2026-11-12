@@ -132,6 +132,7 @@ def propose(
     prompt: str,
     *,
     conversation_id: uuid.UUID | None = None,
+    notify: bool = True,
 ) -> ArmTask:
     """The agent suggests work; it waits for the owner and tells them it is waiting."""
     project, prompt = _validated(project, prompt)
@@ -147,6 +148,8 @@ def propose(
     )
     session.add(task)
     session.flush()
+    if not notify:
+        return task
     push.send_to_owner(
         session,
         owner_id,

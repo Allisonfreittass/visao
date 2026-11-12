@@ -69,14 +69,17 @@ termos se um dia isso for oferecido a outras pessoas.
   do seu sim. Limites no código: só projetos que o Mac liberou, nada com a autonomia pausada, uma
   proposta esperando por vez, no mínimo 8 h entre propostas, no máximo 2 por dia (1 com confiança
   baixa, nenhuma com cautela alta; veja Temperamento em [MIND.md](MIND.md)).
+- Pedido em linguagem normal (2026-11-12): "roda os testes do visao" vira uma tarefa esperando um
+  toque numa barra logo acima do campo de escrever (`core/arm/intent.py`), sem `/mac`. Uma
+  conferência em código vem antes (a mensagem precisa citar um projeto liberado ou o Mac e ter um
+  verbo de ação); só então uma chamada curta extrai o projeto e o pedido. Como foi ele que
+  interpretou, a tarefa nasce `proposed` e nada roda antes do seu sim.
 
 ## Próximas fases
 
-1. **Propor na conversa.** Quando o seu pedido no chat é trabalho no Mac, ele monta a tarefa e
-   ela chega para aprovação, sem você escrever `/mac` (hoje ele já propõe pelo pensamento).
-2. **Aprovação por ferramenta.** `--permission-prompt-tool` manda cada pedido de permissão fora
+1. **Aprovação por ferramenta.** `--permission-prompt-tool` manda cada pedido de permissão fora
    da lista para o celular, em vez de negar.
-3. **Seus assuntos:** email, agenda e arquivos, cada um como integração com permissão própria,
+2. **Seus assuntos:** email, agenda e arquivos, cada um como integração com permissão própria,
    leitura antes de escrita, e o mesmo portão de aprovação para qualquer coisa que envie, apague
    ou pague.
-4. **Isolamento mais forte:** braço num usuário macOS só dele, ou o Claude Code no sandbox.
+3. **Isolamento mais forte:** braço num usuário macOS só dele, ou o Claude Code no sandbox.

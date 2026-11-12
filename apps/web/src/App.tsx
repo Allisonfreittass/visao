@@ -285,6 +285,7 @@ export function App() {
       const turn = await api.send(conversationId, text, spoken ? "voice" : "text");
       const llmMs = performance.now() - llmStarted;
       setMessages((list) => [...list, turn.user_message, { ...turn.assistant_message, sources: turn.sources }]);
+      pending.refresh(); // a request for the Mac may be waiting for a tap now
       if (spoken) setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
       if (willSpeak) {
         const ttsStarted = performance.now();
@@ -511,6 +512,8 @@ export function App() {
               focusRequest={composerFocus}
               agentName={agentName}
               messages={messages}
+              proposals={pending.armProposals.filter((t) => t.conversation_id === current)}
+              onDecide={(task, decision) => void pending.decideArm(task, decision)}
               sending={sending || preparing}
               error={voice.inCall ? null : error}
               onSend={(text) => void send(text)}

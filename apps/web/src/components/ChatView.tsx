@@ -1,6 +1,6 @@
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
-import { utcDate, type Message } from "../api";
+import { type ArmTask, utcDate, type Message } from "../api";
 import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
 
@@ -8,6 +8,9 @@ interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
   header?: ReactNode;
   messages: Message[];
+  /** Mac work it put together from this conversation, waiting for one tap. */
+  proposals?: ArmTask[];
+  onDecide?: (task: ArmTask, decision: "approve" | "reject") => void;
   agentName?: string | null;
   hidden?: boolean;
   /** Changes when something outside wants the person typing here, e.g. answering a notice. */
@@ -18,7 +21,7 @@ interface ChatViewProps {
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ header, messages, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
+export function ChatView({ header, messages, proposals = [], onDecide, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -86,6 +89,16 @@ export function ChatView({ header, messages, agentName, hidden, focusRequest, se
         <div ref={endRef} />
       </div>
       {error && <p className="error" role="alert">× {error}</p>}
+      {proposals.map((task) => (
+        <div key={task.id} className="ask-bar" role="group" aria-label={`Pedido ao Mac em ${task.project}, esperando você`}>
+          <span className="rotulo">Mac · {task.project}</span>
+          <span className="ask-bar-text">{task.prompt}</span>
+          <div className="row">
+            <button type="button" onClick={() => onDecide?.(task, "approve")}>Aprovar</button>
+            <button type="button" className="ghost" onClick={() => onDecide?.(task, "reject")}>Recusar</button>
+          </div>
+        </div>
+      ))}
       <form className="composer" onSubmit={submit}>
         <textarea
           ref={textareaRef}

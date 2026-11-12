@@ -364,3 +364,9 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .tendency-why { grid-column: 2 / -1; font-size: 13px; }
 .questions li { margin: 0 !important; font-size: 15px; }
 .questions .rotulo { margin-right: 8px; }
+
+/* Mac work waiting for one tap, right above where you type. */
+.ask-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--espaco-3); margin-bottom: var(--espaco-2); padding: 10px 12px 10px 14px; border: 1px solid var(--estanho-linha); border-radius: var(--raio-2); flex-shrink: 0; }
+.ask-bar .rotulo { color: var(--estanho); }
+.ask-bar-text { flex: 1 1 220px; min-width: 0; font-size: 14px; color: var(--tinta-suave); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ask-bar .row button { min-height: 32px; padding: 0 14px; font-size: 13px; }

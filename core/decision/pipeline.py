@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import links as conversation_links
 from core.conversation.service import Budgets, TurnResult, reply
@@ -106,6 +107,30 @@ def run_turn(
             read_links=links is not None,
         ),
     )
+    if capabilities.mac_projects:
+        wanted = mac_intent.detect(
+            session,
+            conversation=conversation,
+            text=text,
+            projects=list(capabilities.mac_projects),
+            provider=provider,
+            budgets=config.budgets,
+        )
+        task = mac_intent.propose(session, owner.id, wanted, conversation.id) if wanted else None
+        if task is not None:
+            plan.add(
+                "mac_proposed",
+                executed=True,
+                reason="owner_asked_in_plain_words",
+                task_id=str(task.id),
+                project=task.project,
+            )
+            blocks.append(
+                "Pedido ao Mac montado a partir desta mensagem, esperando o toque da pessoa (há um "
+                f"botão Aprovar logo abaixo da conversa): {task.project}: {task.prompt}. Diga em "
+                "uma frase o que vai pedir e que roda quando ela aprovar; não diga que já está "
+                "rodando."
+            )
 
     outcome = NO_OUTCOME
     if config.curiosity_enabled:
