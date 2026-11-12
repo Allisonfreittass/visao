@@ -40,8 +40,11 @@ def test_a_sent_repository_is_read_and_listed_as_a_source(client, db):
     llm, links = world(client, db, [REPO])
     headers = _login(client, db)
     _, body = _turn(client, headers, "o que acha disso? https://github.com/dono/projeto")
-    system = llm.prompts[-1][0].content
-    assert '<link url="https://github.com/dono/projeto">' in system and "README: oi" in system
+    system, message = llm.prompts[-1][0].content, llm.prompts[-1][-1]
+    # The page goes with the message itself, the last thing the model reads.
+    assert message.role == "user" and message.content.startswith("o que acha disso?")
+    assert '<link url="https://github.com/dono/projeto">' in message.content
+    assert "README: oi" in message.content and "<link" not in system
     assert "os links que a pessoa mandou foram abertos agora" in system
     assert "abrir os links que o interlocutor manda" in system
     assert {"title": "dono/projeto", "url": REPO.url, "source": "GitHub"} in body["sources"]
@@ -52,8 +55,8 @@ def test_a_link_that_did_not_open_is_said_and_not_claimed_as_read(client, db):
     llm, _ = world(client, db, [broken])
     headers = _login(client, db)
     _, body = _turn(client, headers, "vê https://quebrado.com")
-    system = llm.prompts[-1][0].content
-    assert "Não consegui abrir: a página não abriu" in system
+    system, message = llm.prompts[-1][0].content, llm.prompts[-1][-1].content
+    assert "Não consegui abrir: a página não abriu" in message
     assert "tentei abrir os links" in system and "foram abertos agora" not in system
     assert body["sources"] == []
 
@@ -62,7 +65,7 @@ def test_without_links_nothing_is_read_and_no_action_is_claimed(client, db):
     llm, links = world(client, db, [REPO])
     headers = _login(client, db)
     _turn(client, headers, "bom dia")
-    assert "<link" not in llm.prompts[-1][0].content
+    assert "<link" not in llm.prompts[-1][-1].content
     assert "nenhuma" in llm.prompts[-1][0].content.split("Ações executadas neste turno")[1][:40]
 
 
@@ -97,3 +100,18 @@ def test_a_message_with_a_link_does_not_trigger_research_on_its_words(client, db
     headers = _login(client, db)
     _turn(client, headers, "vê o que acha: https://github.com/dono/projeto")
     assert search.queries == []
+
+
+def test_the_page_wins_over_earlier_replies_that_said_it_could_not_open(client, db):
+    llm, _ = world(client, db, [REPO])
+    headers = _login(client, db)
+    conversation, _ = _turn(client, headers, "bom dia")
+    _turn(client, headers, "vê https://github.com/dono/projeto", conversation)
+    message = llm.prompts[-1][-1].content
+    assert "falha do leitor de páginas do sistema, já corrigida" in message
+    assert "[Anexo do sistema, não escrito pela pessoa]" in message
+    # Stored as the person wrote it: the attachment exists only in the prompt.
+    from infrastructure.database.models import Message
+
+    stored = db.query(Message).filter(Message.role == "user").order_by(Message.created_at).all()
+    assert stored[-1].content == "vê https://github.com/dono/projeto"

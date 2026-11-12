@@ -145,6 +145,7 @@ def reply(
     self_text: str | None = None,
     owner_profile: str = "",
     owner_rules: str = "",
+    attachment: str = "",
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
@@ -185,6 +186,10 @@ def reply(
         system_prompt += "\n\n" + learned_rules_block(owner_rules)
     prompt = [ChatMessage(role="system", content=system_prompt)]
     prompt += build_context(conversation_history(session, conversation), context_char_budget)
+    if attachment and prompt[-1].role == "user":
+        # What came with this message (a page it opened) goes with the message itself, the last
+        # thing read: in the system prompt it lost to earlier replies saying the opposite.
+        prompt[-1] = ChatMessage(role="user", content=f"{prompt[-1].content}\n\n{attachment}")
 
     try:
         response = provider.complete(prompt, max_output_tokens=max_output_tokens)

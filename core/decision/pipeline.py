@@ -258,10 +258,6 @@ def run_turn(
                 + "\n".join(f"- {line}" for line in loops)
             )
         blocks.append(mind_temperament.compute(session, owner, now).chat_block())
-    if read:
-        # Last, right before the facts: earlier in the context, an old "I couldn't open it" in the
-        # history or in its own thoughts won over the page that had just been read.
-        blocks.append(conversation_links.context_block(list(read)))
     blocks.append(plan.facts())
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
@@ -283,6 +279,7 @@ def run_turn(
         self_text=mind_state.current_self(session) if config.mind_enabled else None,
         owner_profile=owner_profile,
         owner_rules=owner_rules,
+        attachment=conversation_links.context_block(list(read)) if read else "",
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id
