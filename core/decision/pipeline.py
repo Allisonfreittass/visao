@@ -162,7 +162,9 @@ def run_turn(
                 )
 
     outcome = NO_OUTCOME
-    if config.curiosity_enabled:
+    # A message with a link is about that link: searching the web for its words found unrelated
+    # pages (a site named "nobievolua" brought up a blood pressure drug), so research waits.
+    if config.curiosity_enabled and not read:
         outcome = consider(
             session,
             conversation=conversation,

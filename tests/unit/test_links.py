@@ -107,11 +107,11 @@ def test_a_page_is_read_through_the_safe_reader(monkeypatch):
         calls.append(url)
         return "Texto da página"
 
-    monkeypatch.setattr(links, "read_page", fake_read)
+    monkeypatch.setattr(links, "read_page_rich", fake_read)
     [item] = LinkReader(github=reader(), client=httpx.Client()).read("vê https://exemplo.com/post")
     assert item.ok and item.text == "Texto da página" and calls == ["https://exemplo.com/post"]
 
-    monkeypatch.setattr(links, "read_page", lambda url, client, max_chars: None)
+    monkeypatch.setattr(links, "read_page_rich", lambda url, client, max_chars: None)
     [item] = LinkReader(github=reader(), client=httpx.Client()).read("https://exemplo.com/post")
     assert not item.ok and "não abriu" in item.failure
 
@@ -164,3 +164,48 @@ def test_web_search_errors_are_search_errors():
     with pytest.raises(SearchError) as limited:
         tavily(status=429).search("x", 3)
     assert limited.value.kind == "rate_limited"
+
+
+SPA = """<!doctype html><html lang="pt-BR"><head>
+<meta name="description"
+  content="Rede social de evolução pessoal. Evoluir fica melhor quando é junto." />
+<title>Nobi</title><script type="module" crossorigin src="/assets/index-54YNwNRZ.js"></script>
+</head><body><div id="root"></div></body></html>"""
+BUNDLE = r"""var a="forceFrameRate takes a positive int",b="react.forward_ref",
+c="change click focusin focusout",d="Cada objetivo com a sua sequência",
+e=`Pequenos passos, todo dia, do seu jeito.`,f="assets/Legal-Ui.js",
+g="Treino, leitura, estudo, hábitos ou projetos.";"""
+
+
+def test_a_javascript_app_is_read_through_its_description_and_the_copy_in_its_code(monkeypatch):
+    from integrations.search import fetch
+
+    pages = {
+        "https://nobi.exemplo/": (SPA, "https://nobi.exemplo/", "text/html; charset=utf-8"),
+        "https://nobi.exemplo/assets/index-54YNwNRZ.js": (BUNDLE, "x", "application/javascript"),
+    }
+    monkeypatch.setattr(fetch, "_fetch", lambda url, client, kinds, max_bytes=0: pages.get(url))
+    text = fetch.read_page_rich("https://nobi.exemplo/", httpx.Client())
+    assert "Título: Nobi" in text and "Rede social de evolução pessoal" in text
+    assert "montado por JavaScript" in text
+    assert "Cada objetivo com a sua sequência" in text and "Pequenos passos, todo dia" in text
+    assert "Treino, leitura, estudo" in text
+    assert "forceFrameRate" not in text and "react.forward_ref" not in text
+    assert "focusin" not in text and "Legal-Ui" not in text
+
+
+def test_a_script_on_another_site_is_never_fetched(monkeypatch):
+    from integrations.search import fetch
+
+    page = SPA.replace('src="/assets/index-54YNwNRZ.js"', 'src="https://cdn.outro.com/app.js"')
+    calls = []
+
+    def fake(url, client, kinds, max_bytes=0):
+        calls.append(url)
+        return (
+            (page, "https://nobi.exemplo/", "text/html") if url == "https://nobi.exemplo/" else None
+        )
+
+    monkeypatch.setattr(fetch, "_fetch", fake)
+    text = fetch.read_page_rich("https://nobi.exemplo/", httpx.Client())
+    assert calls == ["https://nobi.exemplo/"] and "Não consegui ler os textos do app" in text

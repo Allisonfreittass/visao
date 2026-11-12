@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import httpx
 
 from integrations.github.reader import GitHubError, GitHubReader, parse
-from integrations.search.fetch import default_client, read_page
+from integrations.search.fetch import default_client, read_page_rich
 
 MAX_LINKS = 2
 MAX_PAGE_CHARS = 6000
@@ -69,7 +69,7 @@ class LinkReader:
                     else ""
                 )
                 return LinkRead(url, "github", failure=f"{exc}{hint}")
-        text = read_page(url, self._client, max_chars=MAX_PAGE_CHARS)
+        text = read_page_rich(url, self._client, max_chars=MAX_PAGE_CHARS)
         if not text:
             return LinkRead(
                 url,

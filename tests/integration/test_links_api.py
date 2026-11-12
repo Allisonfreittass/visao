@@ -84,3 +84,16 @@ def test_with_a_paired_mac_it_knows_it_can_work_there_and_only_with_approval(cli
     system = llm.prompts[-1][0].content
     assert "Claude Code no Mac do interlocutor, só nos projetos mercado, visao" in system
     assert "arquivos fora dos projetos liberados no Mac" in system
+
+
+def test_a_message_with_a_link_does_not_trigger_research_on_its_words(client, db):
+    from apps.api.search import get_search_provider
+    from tests.integration.test_curiosity_api import FakeSearch
+
+    llm, _ = world(client, db, [REPO])
+    search = FakeSearch()
+    client.app.dependency_overrides[get_search_provider] = lambda: search
+    client.app.dependency_overrides[get_settings] = lambda: Settings(curiosity_enabled=True)
+    headers = _login(client, db)
+    _turn(client, headers, "vê o que acha: https://github.com/dono/projeto")
+    assert search.queries == []
