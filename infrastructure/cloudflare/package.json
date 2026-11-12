@@ -1,6 +1,7 @@
 {
   "name": "visao-cloudflare",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",

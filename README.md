@@ -118,5 +118,11 @@ The design docs, ADRs and research log in [docs/](docs/) are written in Portugue
 
 `Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Docker · Caddy · AWS Lightsail`
 
+## License
+
+Code under the [MIT License](LICENSE). The Rastros brand (name, marks and visual identity) is not
+covered by it: forks keep the code and drop the brand. Fonts come from Google Fonts under their own
+licenses (OFL).
+
 Visão is the project's codename, not the agent's name. The agent's name is still `null`: it is
 deciding.

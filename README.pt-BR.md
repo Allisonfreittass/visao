@@ -157,5 +157,11 @@ Detalhes em [docs/ROADMAP.md](docs/ROADMAP.md); avaliações em [docs/EVALUATION
 
 `Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Docker · Caddy · AWS Lightsail`
 
+## Licença
+
+Código sob a [licença MIT](LICENSE). A marca Rastros (nome, sinais e identidade visual) fica de
+fora dela: quem fizer um fork leva o código, não a marca. As fontes vêm do Google Fonts, cada uma
+com a própria licença (OFL).
+
 Visão é o codinome do projeto, não o nome do agente. O nome dele continua `null`: ele está
 decidindo.
