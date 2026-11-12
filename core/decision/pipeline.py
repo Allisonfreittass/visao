@@ -88,7 +88,6 @@ def run_turn(
     blocks: list[str] = []
     read = tuple(links.read(text)) if links is not None else ()
     if read:
-        blocks.append(conversation_links.context_block(list(read)))
         opened = [r.url for r in read if r.ok]
         plan.add(
             "read_links" if opened else "read_links_failed",
@@ -259,6 +258,10 @@ def run_turn(
                 + "\n".join(f"- {line}" for line in loops)
             )
         blocks.append(mind_temperament.compute(session, owner, now).chat_block())
+    if read:
+        # Last, right before the facts: earlier in the context, an old "I couldn't open it" in the
+        # history or in its own thoughts won over the page that had just been read.
+        blocks.append(conversation_links.context_block(list(read)))
     blocks.append(plan.facts())
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
