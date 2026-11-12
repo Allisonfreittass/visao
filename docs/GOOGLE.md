@@ -49,6 +49,9 @@ mostra o destinatário, o assunto e o texto inteiro, ou o título, a hora e os c
 
 Depois disso o JSON pode ir para o gerenciador de senhas. O servidor já tem o que precisa.
 
+Para publicar o app (passo 3), o Google pede página inicial e política de privacidade públicas: use
+o repositório e [PRIVACIDADE.md](PRIVACIDADE.md), com `github.com` como domínio autorizado.
+
 ## Desfazer
 
 Ajustes › Google › **Desconectar** apaga a conexão do banco, revoga o acesso no Google e recusa o
