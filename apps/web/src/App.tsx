@@ -386,6 +386,7 @@ export function App() {
     onOpenSettings: () => showView("settings"),
   };
   const currentConversation = conversations.find((c) => c.id === current);
+  const reload = () => { if (current) api.messages(current).then(setMessages).catch(handleError); };
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
@@ -512,8 +513,27 @@ export function App() {
               focusRequest={composerFocus}
               agentName={agentName}
               messages={messages}
-              proposals={pending.armProposals.filter((t) => t.conversation_id === current)}
-              onDecide={(task, decision) => void pending.decideArm(task, decision)}
+              asks={[
+                ...pending.armProposals
+                  .filter((t) => t.conversation_id === current)
+                  .map((t) => ({
+                    id: t.id,
+                    label: `Mac · ${t.project}`,
+                    text: t.prompt,
+                    onApprove: () => void pending.decideArm(t, "approve"),
+                    onReject: () => void pending.decideArm(t, "reject"),
+                  })),
+                ...pending.googleActions
+                  .filter((a) => a.conversation_id === current)
+                  .map((a) => ({
+                    id: a.id,
+                    label: a.kind === "send_email" ? "Email" : "Agenda",
+                    text: a.summary,
+                    detail: a.kind === "send_email" ? a.payload.body : undefined,
+                    onApprove: () => void pending.decideGoogle(a, "approve").then(reload),
+                    onReject: () => void pending.decideGoogle(a, "reject"),
+                  })),
+              ]}
               sending={sending || preparing}
               error={voice.inCall ? null : error}
               onSend={(text) => void send(text)}

@@ -19,6 +19,8 @@ dependencies = [
     "httpx>=0.28",
     "pywebpush>=2.0",
     "anthropic>=2.8",
+    # The Google connection is kept encrypted (core/google/account.py).
+    "cryptography>=44",
     # arXiv feeds are parsed without entity expansion or external references.
     "defusedxml>=0.7",
 ]

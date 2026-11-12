@@ -79,6 +79,7 @@ export function PresencePanel({ api, call, pending, onOpen }: PanelProps) {
   const mac = pending.devices[0];
   const waiting = [
     ...pending.armProposals.map((t) => ({ key: t.id, title: `${t.prompt}`, where: t.project, approve: () => pending.decideArm(t, "approve"), reject: () => pending.decideArm(t, "reject") })),
+    ...pending.googleActions.map((a) => ({ key: a.id, title: a.summary, where: a.kind === "send_email" ? "email" : "agenda", approve: () => pending.decideGoogle(a, "approve"), reject: () => pending.decideGoogle(a, "reject") })),
     ...pending.goals.map((g) => ({ key: g.id, title: g.title, where: null, approve: () => pending.decideGoal(g, "approve"), reject: () => pending.decideGoal(g, "reject") })),
   ];
   return (

@@ -112,6 +112,28 @@ export interface PushSubscriptionBody {
   keys: { p256dh: string; auth: string };
 }
 
+export interface GoogleAction {
+  id: string;
+  kind: "send_email" | "create_event";
+  summary: string;
+  payload: {
+    to?: string; subject?: string; body?: string;
+    title?: string; start?: string; end?: string; location?: string; attendees?: string[];
+  };
+  status: string;
+  result: string;
+  conversation_id: string | null;
+  created_at: string;
+}
+
+export interface GoogleState {
+  connected: boolean;
+  email: string;
+  background: boolean;
+  problem: string;
+  pending: GoogleAction[];
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -415,6 +437,30 @@ export class Api {
 
   decideArm(id: string, decision: "approve" | "reject"): Promise<ArmTask> {
     return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}`, { method: "POST" });
+  }
+
+  google(): Promise<GoogleState> {
+    return this.request("/google");
+  }
+
+  googleDisconnect(): Promise<void> {
+    return this.request("/google", { method: "DELETE" });
+  }
+
+  googleBackground(enabled: boolean): Promise<GoogleState> {
+    return this.request("/google/background", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  googleActions(): Promise<GoogleAction[]> {
+    return this.request("/google/actions");
+  }
+
+  decideGoogle(id: string, decision: "approve" | "reject"): Promise<GoogleAction> {
+    return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}`, { method: "POST" });
   }
 
   pushState(): Promise<PushState> {

@@ -11,6 +11,7 @@ from apps.api.routes import (
     curiosity,
     evolution,
     goals,
+    google,
     health,
     memory,
     mind,
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(cloud.router)
     app.include_router(evolution.router)
     app.include_router(arm.router)
+    app.include_router(google.router)
     return app
 
 

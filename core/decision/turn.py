@@ -34,6 +34,11 @@ _DESCRIBE = {
         "um pedido ao Mac foi montado a partir desta mensagem e espera a aprovação da pessoa;"
         " nada rodou ainda"
     ),
+    "google_read": "o Gmail e/ou a Agenda da pessoa foram consultados agora; os dados estão acima",
+    "google_proposed": (
+        "um email ou evento foi preparado e espera a aprovação da pessoa; nada foi enviado nem"
+        " marcado ainda"
+    ),
     "read_links": "os links que a pessoa mandou foram abertos agora; o conteúdo está acima",
     "read_links_failed": "tentei abrir os links que a pessoa mandou e não consegui (motivo acima)",
     "name_deliberation_recent": "o nome já foi deliberado recentemente; não houve nova deliberação",

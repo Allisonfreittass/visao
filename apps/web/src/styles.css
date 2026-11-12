@@ -370,3 +370,6 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .ask-bar .rotulo { color: var(--estanho); }
 .ask-bar-text { flex: 1 1 220px; min-width: 0; font-size: 14px; color: var(--tinta-suave); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .ask-bar .row button { min-height: 32px; padding: 0 14px; font-size: 13px; }
+.ask-bar-detail { flex-basis: 100%; margin: 0; max-height: 160px; overflow-y: auto; padding: 8px 10px; border-radius: var(--raio-1); background: var(--fundo-elevado); font-size: 14px; color: var(--tinta); }
+.google-body { max-height: 200px; overflow-y: auto; padding: 8px 10px; border-radius: var(--raio-1); background: var(--fundo-elevado); color: var(--tinta); }
+.setting-text code { font-size: 12px; overflow-wrap: anywhere; }

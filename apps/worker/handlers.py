@@ -80,6 +80,7 @@ def autonomy_budget(
             think_every=timedelta(minutes=settings.mind_think_minutes),
             initiatives_per_day=settings.mind_initiatives_per_day,
             review_provider=review_provider,
+            google_secret=settings.secret_key,
         )
         if settings.mind_enabled
         else None,

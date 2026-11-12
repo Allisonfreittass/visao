@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import links as conversation_links
-from core.conversation.service import Budgets, TurnResult, reply
+from core.conversation.service import Budgets, TurnResult, conversation_history, reply
 from core.curiosity.engine import (
     ASK_USER,
     DEFER,
@@ -25,6 +25,7 @@ from core.curiosity.engine import (
     consider,
 )
 from core.decision.turn import TurnPlan
+from core.google import assist as google_assist
 from core.identity import name_deliberation
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
@@ -57,6 +58,8 @@ class TurnConfig:
     mind_enabled: bool = False
     review_every_turns: int = 4
     web_search: bool = False
+    # VISION_SECRET_KEY, to open the owner's Google connection (docs/GOOGLE.md); None: no Google.
+    google_secret: str | None = None
 
 
 @dataclass(frozen=True)
@@ -131,6 +134,32 @@ def run_turn(
                 "uma frase o que vai pedir e que roda quando ela aprovar; não diga que já está "
                 "rodando."
             )
+
+    if config.google_secret:
+        recent = "\n".join(
+            f"{m.role}: {m.content[:300]}" for m in conversation_history(session, conversation)[-6:]
+        )
+        helped = google_assist.run(
+            session,
+            owner=owner,
+            conversation=conversation,
+            text=text,
+            recent=recent,
+            provider=provider,
+            budgets=config.budgets,
+            secret_key=config.google_secret,
+        )
+        if helped is not None:
+            blocks.append(helped.block)
+            if helped.read:
+                plan.add("google_read", executed=True, reason="owner_asked", sources=helped.read)
+            if helped.proposed:
+                plan.add(
+                    "google_proposed",
+                    executed=True,
+                    reason="owner_asked",
+                    action_ids=[str(a.id) for a in helped.proposed],
+                )
 
     outcome = NO_OUTCOME
     if config.curiosity_enabled:

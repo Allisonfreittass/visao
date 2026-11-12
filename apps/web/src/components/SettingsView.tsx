@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Api } from "../api";
 import { AccountPanel } from "./AccountPanel";
+import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
 
@@ -96,6 +97,11 @@ export function SettingsView(props: SettingsViewProps) {
             disabled={autoResearch === null || paused === true}
             onChange={() => void toggleAutoResearch()}
           />
+        </section>
+
+        <section className="settings-group" aria-labelledby="g-google">
+          <h2 id="g-google" className="rotulo">Google</h2>
+          <GoogleSettings api={api} onError={onError} />
         </section>
 
         <section className="settings-group" aria-labelledby="g-memoria">

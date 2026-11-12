@@ -766,3 +766,44 @@ class OwnerQuestion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class GoogleAccount(Base):
+    """The owner's Google connection (docs/GOOGLE.md). The OAuth client and refresh token are kept
+    encrypted with a key derived from VISION_SECRET_KEY; nothing here is readable without it."""
+
+    __tablename__ = "google_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), unique=True
+    )
+    email: Mapped[str] = mapped_column(String(320))
+    secret: Mapped[str] = mapped_column(Text)
+    scopes: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    # Whether the mind may look at upcoming events and unread subjects on its own.
+    background: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_error: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GoogleAction(Base):
+    """Something to send or schedule for the owner. Only proposed: it runs when they approve."""
+
+    __tablename__ = "google_actions"
+    __table_args__ = (Index("ix_google_actions_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))  # send_email | create_event
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # proposed | done | failed | rejected
+    status: Mapped[str] = mapped_column(String(16), default="proposed")
+    result: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

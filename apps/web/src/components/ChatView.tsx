@@ -1,6 +1,16 @@
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 
-import { type ArmTask, utcDate, type Message } from "../api";
+import { utcDate, type Message } from "../api";
+
+/** Something waiting for one tap, right above where you type. */
+export interface Ask {
+  id: string;
+  label: string;
+  text: string;
+  detail?: string;
+  onApprove: () => void;
+  onReject: () => void;
+}
 import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
 
@@ -8,9 +18,8 @@ interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
   header?: ReactNode;
   messages: Message[];
-  /** Mac work it put together from this conversation, waiting for one tap. */
-  proposals?: ArmTask[];
-  onDecide?: (task: ArmTask, decision: "approve" | "reject") => void;
+  /** What it put together from this conversation (Mac work, an email, an event). */
+  asks?: Ask[];
   agentName?: string | null;
   hidden?: boolean;
   /** Changes when something outside wants the person typing here, e.g. answering a notice. */
@@ -21,7 +30,7 @@ interface ChatViewProps {
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
 }
 
-export function ChatView({ header, messages, proposals = [], onDecide, agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
+export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, error, onSend, onFeedback }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -64,7 +73,7 @@ export function ChatView({ header, messages, proposals = [], onDecide, agentName
         )}
         {messages.map((m, i) => (
           <div key={m.id} className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}`}>
-            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
+            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
             <MessageContent text={m.content} />
             {m.sources && m.sources.length > 0 && (
               <ol className="sources" aria-label="Fontes pesquisadas">
@@ -89,13 +98,14 @@ export function ChatView({ header, messages, proposals = [], onDecide, agentName
         <div ref={endRef} />
       </div>
       {error && <p className="error" role="alert">× {error}</p>}
-      {proposals.map((task) => (
-        <div key={task.id} className="ask-bar" role="group" aria-label={`Pedido ao Mac em ${task.project}, esperando você`}>
-          <span className="rotulo">Mac · {task.project}</span>
-          <span className="ask-bar-text">{task.prompt}</span>
+      {asks.map((ask) => (
+        <div key={ask.id} className="ask-bar" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
+          <span className="rotulo">{ask.label}</span>
+          <span className="ask-bar-text">{ask.text}</span>
+          {ask.detail && <p className="ask-bar-detail pre">{ask.detail}</p>}
           <div className="row">
-            <button type="button" onClick={() => onDecide?.(task, "approve")}>Aprovar</button>
-            <button type="button" className="ghost" onClick={() => onDecide?.(task, "reject")}>Recusar</button>
+            <button type="button" onClick={ask.onApprove}>Aprovar</button>
+            <button type="button" className="ghost" onClick={ask.onReject}>Recusar</button>
           </div>
         </div>
       ))}

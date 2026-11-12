@@ -37,6 +37,26 @@ export function InboxView({ pending, current, onReplied }: InboxViewProps) {
             ))}
           </section>
         )}
+        {pending.googleActions.length > 0 && (
+          <section className="list-group">
+            <h2 className="rotulo">Email e agenda</h2>
+            {pending.googleActions.map((a) => (
+              <article className="list-item" key={a.id}>
+                <div className="list-item-text">
+                  <strong>{a.kind === "send_email" ? "Posso mandar este email?" : "Posso marcar isto?"}</strong>
+                  <p className="note">{a.summary}</p>
+                  {a.kind === "send_email" && a.payload.body && <p className="note pre google-body">{a.payload.body}</p>}
+                  {a.kind === "create_event" && a.payload.location && <p className="note">Local: {a.payload.location}</p>}
+                  <time className="panel-time">{dayLabel(utcDate(a.created_at))}</time>
+                </div>
+                <div className="row">
+                  <button type="button" onClick={() => void pending.decideGoogle(a, "approve")}>Aprovar</button>
+                  <button type="button" className="ghost" onClick={() => void pending.decideGoogle(a, "reject")}>Recusar</button>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
         {pending.goals.length > 0 && (
           <section className="list-group">
             <h2 className="rotulo">Metas que eu quero seguir</h2>

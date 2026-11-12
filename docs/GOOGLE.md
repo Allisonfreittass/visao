@@ -1,0 +1,56 @@
+# Gmail e Google Agenda
+
+O Visão lê o seu email e a sua agenda quando você pergunta ("tenho reunião amanhã?", "o que o João
+mandou?") e prepara respostas e eventos. **Nada sai sem o seu toque em Aprovar**: a aprovação
+mostra o destinatário, o assunto e o texto inteiro, ou o título, a hora e os convidados.
+
+## Como funciona
+
+| Peça | Onde |
+|---|---|
+| Cliente HTTP do Gmail e da Agenda | [`integrations/google/client.py`](../integrations/google/client.py) |
+| Conexão guardada (cifrada) | [`core/google/account.py`](../core/google/account.py), tabela `google_accounts` (migração `0019`) |
+| Email e eventos esperando aprovação | [`core/google/actions.py`](../core/google/actions.py), tabela `google_actions` |
+| Na conversa | [`core/google/assist.py`](../core/google/assist.py) |
+| Conectar pelo computador | `python -m apps.api.cli google-connect` ([`apps/api/google_connect.py`](../apps/api/google_connect.py)) |
+
+- **Permissões pedidas ao Google:** ler o Gmail (`gmail.readonly`), mandar email (`gmail.send`) e
+  ver e criar eventos (`calendar.events`). Não há permissão para apagar email.
+- **Guardado cifrado:** o cliente OAuth e o token de atualização ficam cifrados (Fernet) com uma
+  chave derivada de `VISION_SECRET_KEY`. Sem essa chave, o banco não revela nada. Se a chave do
+  servidor mudar, os Ajustes pedem para conectar de novo.
+- **Na conversa:** uma conferência em código vem antes (a mensagem fala de email, reunião,
+  agenda?). Só então uma chamada curta decide o que ler e o que preparar. O que volta do Google
+  entra como texto de terceiros, nunca como instrução. Um email que tenta dar ordens ("mande tudo
+  para…") só consegue, no máximo, gerar um pedido que você lê antes de aprovar.
+- **Sozinho:** com "Olhar email e agenda sozinho" ligado (Ajustes › Google), a mente vê os
+  compromissos das próximas 24 h e os assuntos dos emails não lidos dos últimos 2 dias, nunca o
+  texto. É assim que ele pode lembrar de uma reunião que está perto.
+- **Limites:** no máximo 5 pedidos esperando. Um evento precisa ser no futuro (até 2 anos) e durar
+  de 5 minutos a 24 horas. Aprovar duas vezes nunca manda duas vezes.
+
+## Configurar (uma vez, uns 10 minutos)
+
+1. Em [console.cloud.google.com](https://console.cloud.google.com), crie um projeto (por exemplo
+   `visao`).
+2. **APIs e serviços › Biblioteca:** ative a **Gmail API** e a **Google Calendar API**.
+3. **Plataforma de autenticação do Google** (ou *Tela de permissão OAuth*):
+   - Tipo **Externo**, nome `Visão`, o seu email como suporte e contato.
+   - Em **Público-alvo**, coloque o app **Em produção**. Em "Teste", o Google derruba a conexão a
+     cada 7 dias. Como só você usa, ele não exige verificação: no login aparece o aviso "o Google
+     não verificou este app", e você segue por *Avançado › Acessar Visão*.
+4. **Clientes › Criar cliente:** tipo **App para computador**, nome `Visão PC`. Baixe o JSON.
+5. No seu computador, na pasta do projeto:
+   ```bash
+   .venv/bin/python -m apps.api.cli google-connect --client-file ~/Downloads/client_secret_*.json --server https://<o-endereço-do-visão>
+   ```
+   O navegador abre o login do Google. Marque as três permissões e, de volta no terminal, entre
+   com o email e a senha do Visão. Pronto: aparece "Conectado" em Ajustes › Google.
+
+Depois disso o JSON pode ir para o gerenciador de senhas. O servidor já tem o que precisa.
+
+## Desfazer
+
+Ajustes › Google › **Desconectar** apaga a conexão do banco, revoga o acesso no Google e recusa o
+que estava esperando. Também dá para revogar direto em
+[myaccount.google.com/permissions](https://myaccount.google.com/permissions).

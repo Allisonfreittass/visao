@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Api, AppNotification, ArmDevice, ArmTask, Goal } from "../api";
+import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction } from "../api";
 
 const POLL_MS = 15_000;
 
 export interface Pending {
   /** Work the agent proposed for the Mac, waiting for a yes. */
   armProposals: ArmTask[];
+  /** Email to send or events to schedule, waiting for a yes. */
+  googleActions: GoogleAction[];
   goals: Goal[];
   /** Notices that live only here (an opening is already a message in the chat). */
   notices: AppNotification[];
@@ -17,6 +19,7 @@ export interface Pending {
   refresh: () => void;
   decideArm: (task: ArmTask, decision: "approve" | "reject") => Promise<void>;
   decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<void>;
+  decideGoogle: (action: GoogleAction, decision: "approve" | "reject") => Promise<void>;
   dismiss: (notice: AppNotification) => Promise<void>;
   reply: (notice: AppNotification, conversationId: string | null) => Promise<string | null>;
 }
@@ -31,17 +34,19 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [devices, setDevices] = useState<ArmDevice[]>([]);
   const [tasks, setTasks] = useState<ArmTask[]>([]);
+  const [google, setGoogle] = useState<GoogleAction[]>([]);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
   const refresh = useCallback(() => {
     if (!enabled) return;
-    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks()])
-      .then(([g, n, d, t]) => {
+    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions()])
+      .then(([g, n, d, t, o]) => {
         setGoals(g);
         setNotifications(n);
         setDevices(d);
         setTasks(t);
+        setGoogle(o);
       })
       .catch((e) => onErrorRef.current(e));
   }, [api, enabled]);
@@ -73,14 +78,16 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   const notices = unread.filter((n) => n.kind !== "initiative");
   return {
     armProposals,
+    googleActions: google,
     goals,
     notices,
     devices,
     tasks,
-    count: armProposals.length + goals.length + notices.length,
+    count: armProposals.length + google.length + goals.length + notices.length,
     refresh,
     decideArm: (task, decision) => act(() => api.decideArm(task.id, decision)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),
+    decideGoogle: (action, decision) => act(() => api.decideGoogle(action.id, decision)),
     dismiss: (notice) => act(() => api.markRead(notice.id)),
     reply: async (notice, conversationId) => {
       try {

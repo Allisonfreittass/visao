@@ -3,6 +3,7 @@
 import argparse
 import getpass
 import json
+import os
 import sys
 from datetime import UTC, datetime
 
@@ -159,7 +160,26 @@ def main(argv: list[str] | None = None) -> int:
         "webpush-keys",
         help="gera o par VAPID dos avisos push (cole no .env ou nos segredos da nuvem)",
     )
+    google = sub.add_parser(
+        "google-connect",
+        help="conecta o seu Gmail e Google Agenda ao Visão (rode no seu computador)",
+    )
+    google.add_argument(
+        "--client-file", required=True, help="JSON do cliente 'App para computador'"
+    )
+    google.add_argument(
+        "--server",
+        default=os.environ.get("VISAO_PUBLIC_URL", ""),
+        help="endereço do Visão (padrão: VISAO_PUBLIC_URL)",
+    )
     args = parser.parse_args(argv)
+
+    if args.command == "google-connect":
+        if not args.server:
+            parser.error("diga o endereço do Visão com --server https://...")
+        from apps.api import google_connect
+
+        return google_connect.run(args.client_file, args.server)
 
     if args.command in ("set-password", "set-email"):
         with get_sessionmaker()() as session:

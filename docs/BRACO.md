@@ -79,7 +79,6 @@ termos se um dia isso for oferecido a outras pessoas.
 
 1. **Aprovação por ferramenta.** `--permission-prompt-tool` manda cada pedido de permissão fora
    da lista para o celular, em vez de negar.
-2. **Seus assuntos:** email, agenda e arquivos, cada um como integração com permissão própria,
-   leitura antes de escrita, e o mesmo portão de aprovação para qualquer coisa que envie, apague
-   ou pague.
+2. **Seus assuntos:** email e agenda já estão feitos ([GOOGLE.md](GOOGLE.md)). Faltam arquivos
+   (Drive), com o mesmo portão de aprovação para qualquer coisa que envie, apague ou pague.
 3. **Isolamento mais forte:** braço num usuário macOS só dele, ou o Claude Code no sandbox.

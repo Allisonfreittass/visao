@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.policies.autonomy import is_paused
-from infrastructure.database.models import ArmDevice, User
+from infrastructure.database.models import ArmDevice, GoogleAccount, User
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,7 @@ class Capabilities:
     mind: bool = False
     read_links: bool = False
     mac_projects: tuple[str, ...] = ()
+    google: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -45,6 +46,11 @@ class Capabilities:
             items.append(
                 "abrir os links que o interlocutor manda (páginas públicas e repositórios do "
                 "GitHub) e comentar o conteúdo lido"
+            )
+        if self.google:
+            items.append(
+                "ler o Gmail e a Google Agenda do interlocutor quando ele pergunta, e preparar "
+                "emails e eventos que só saem depois da aprovação dele"
             )
         if self.mac_projects:
             items.append(
@@ -96,13 +102,13 @@ class Capabilities:
             missing.append("memória entre conversas (desligada para este interlocutor)")
         if not self.research_source:
             missing.append("pesquisa na internet")
-        if self.mac_projects:
-            missing.append(
-                "arquivos fora dos projetos liberados no Mac, contas, email, agenda e mensagens"
-                " do interlocutor"
-            )
-        else:
-            missing.append("acesso a arquivos, contas, mensagens ou dispositivos do interlocutor")
+        reach = ["arquivos fora dos projetos liberados no Mac" if self.mac_projects else "arquivos"]
+        reach.append(
+            "outras contas e mensagens" if self.google else "contas, email, agenda, mensagens"
+        )
+        if not self.mac_projects:
+            reach.append("dispositivos")
+        missing.append("acesso a " + ", ".join(reach) + " do interlocutor")
         return missing
 
 
@@ -135,6 +141,10 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         code_evolution=inputs.code_autonomy_enabled,
         mind=inputs.mind_enabled,
         read_links=inputs.read_links,
+        google=session.scalar(
+            select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
+        )
+        is not None,
         mac_projects=tuple(
             sorted(
                 {

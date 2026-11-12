@@ -168,6 +168,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         mind_enabled=settings.mind_enabled,
         review_every_turns=settings.mind_review_turns,
         web_search=settings.tavily_api_key is not None,
+        google_secret=settings.secret_key,
     )
 
 
