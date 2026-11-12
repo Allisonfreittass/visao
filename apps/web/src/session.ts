@@ -22,6 +22,15 @@ export function saveToken(token: string | null, remember = false): void {
   }
 }
 
+/** Whether the current token was saved to stay signed in on this device. */
+export function tokenRemembered(): boolean {
+  try {
+    return localStorage.getItem(KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 const PREFIX = "visao.pref.";
 
 export function loadPreference(name: string): string | null {

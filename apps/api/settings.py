@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60.0, gt=0)
     # Explicit operator-reviewed grants; zero configured prices alone do not authorize I/O.
     llm_max_paid_spend_usd: Decimal = Field(default=Decimal(0), ge=0, le=0)
+    # Paid providers (e.g. Claude): admitted only with both caps above zero, in USD, enforced by
+    # the ledger before each call (integrations/llm/budget.py). Zero = only free providers.
+    llm_paid_daily_usd: Decimal = Field(default=Decimal("0"), ge=0)
+    llm_paid_monthly_usd: Decimal = Field(default=Decimal("0"), ge=0)
     llm_free_grants: list[FreeEndpointGrant] = Field(default_factory=list, max_length=32)
     llm_trust_zero_price: bool = False  # local use; a reported cost still freezes the ledger
     # Merged into conversation requests only, e.g. to turn the model's reasoning off.

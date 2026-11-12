@@ -66,6 +66,31 @@ export interface VoiceStatus {
   source: "chosen" | "system_default" | "none";
 }
 
+export interface ArmDevice {
+  id: string;
+  name: string;
+  projects: string[];
+  version: string;
+  online: boolean;
+  last_seen_at: string | null;
+  token?: string;
+}
+
+export interface ArmTask {
+  id: string;
+  project: string;
+  prompt: string;
+  status: "proposed" | "approved" | "running" | "done" | "failed" | "rejected" | "cancelled";
+  requested_by: "owner" | "agent";
+  result: string;
+  error: string;
+  cost_usd: string | null;
+  claude_session_id: string | null;
+  conversation_id: string | null;
+  created_at: string;
+  finished_at: string | null;
+}
+
 export interface PushState {
   enabled: boolean;
   public_key: string | null;
@@ -322,6 +347,62 @@ export class Api {
       signal,
     });
     return response.arrayBuffer();
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<string> {
+    const data = await this.request<{ access_token: string }>("/auth/password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      headers: { "Content-Type": "application/json" },
+    });
+    this.token = data.access_token;
+    return data.access_token;
+  }
+
+  async changeEmail(currentPassword: string, newEmail: string): Promise<string> {
+    const data = await this.request<{ access_token: string }>("/auth/email", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_email: newEmail }),
+      headers: { "Content-Type": "application/json" },
+    });
+    this.token = data.access_token;
+    return data.access_token;
+  }
+
+  me(): Promise<{ email: string }> {
+    return this.request("/auth/me");
+  }
+
+  armDevices(): Promise<ArmDevice[]> {
+    return this.request("/arm/devices");
+  }
+
+  pairArm(name: string): Promise<ArmDevice> {
+    return this.request("/arm/devices", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  unpairArm(id: string): Promise<void> {
+    return this.request(`/arm/devices/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  armTasks(): Promise<ArmTask[]> {
+    return this.request("/arm/tasks");
+  }
+
+  askArm(project: string, prompt: string, conversationId: string | null): Promise<ArmTask> {
+    return this.request("/arm/tasks", {
+      method: "POST",
+      body: JSON.stringify({ project, prompt, conversation_id: conversationId }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  decideArm(id: string, decision: "approve" | "reject"): Promise<ArmTask> {
+    return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}`, { method: "POST" });
   }
 
   pushState(): Promise<PushState> {

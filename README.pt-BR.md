@@ -21,6 +21,7 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 | **Ligar.** Ligação por voz sem as mãos, com a tela acesa e interrupção por voz. Voz própria (Kokoro e faster-whisper) quando os modelos estão instalados; a voz do aparelho como reserva opcional, para a ligação funcionar no celular também na versão da nuvem. | feito; falta o teste com microfone real no iPhone |
 | **Ele fala primeiro.** Pensa entre as conversas, guarda interesses que enfraquecem sem estímulo novo e abre a conversa quando tem algo a dizer. Respeita o horário de silêncio, a pausa geral, a conversa em andamento, duas aberturas sem resposta e um limite por dia. Com Web Push, o aviso chega com o app fechado. | feito |
 | **Código e ideias.** Código completo em blocos com a linguagem e botão de copiar; em voz, diz que o código está na tela. Pede exatamente o contexto que falta. | feito |
+| **Trabalha no meu Mac.** `/mac <projeto> <pedido>` no chat manda o trabalho para um processo pequeno no Mac, que roda o Claude Code num projeto liberado, com uma lista fechada de ferramentas, e responde na conversa. Ele pode propor; só eu aprovo ([docs/BRACO.md](docs/BRACO.md)). | primeira versão feita |
 | **Memória autobiográfica** curada por uma política determinística, opt-in por pessoa, com proveniência, exportação e exclusão. Saúde, religião, política, finanças e terceiros ficam de fora. | feito (benchmark: curada 8/8, passiva 6/8, sem memória 1/8) |
 | **Curiosidade com fontes.** Pergunta o que é pessoal e pesquisa só fatos públicos (Wikipédia, arXiv, Hacker News), sempre citando. | feito |
 | **Metas com aprovação.** Perguntas sem resposta viram metas que rodam num worker separado, só depois que eu aprovo. | feito |
@@ -33,7 +34,7 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 
 ```mermaid
 flowchart TB
-  web["Web / PWA<br/>conversa · ligação · caderno"] -->|HTTPS| edge["Cloudflare Worker<br/>assets · limite de login"]
+  web["Web / PWA<br/>conversa · ligação · caderno"] -->|HTTPS| edge["Caddy<br/>TLS · web estático"]
   edge --> api["FastAPI<br/>apps/api"]
   worker["Worker<br/>apps/worker"] --> core
   api --> core["Núcleo cognitivo<br/>core/*"]
@@ -134,7 +135,7 @@ make db-test               # testes só de PostgreSQL num pgvector descartável
 ```
 
 O CI roda lint, a suíte Python contra SQLite e PostgreSQL, os testes do web e do Worker e um
-`docker compose up` de fumaça. Uma `main` verde publica no Cloudflare. Toda action está fixada
+`docker compose up` de fumaça. Uma `main` verde vai por SSH para o servidor Lightsail dele, e volta sozinha para a versão anterior se a nova não responder ([docs/LIGHTSAIL.md](docs/LIGHTSAIL.md)). Toda action está fixada
 por SHA.
 
 ## Estado
@@ -149,12 +150,12 @@ Detalhes em [docs/ROADMAP.md](docs/ROADMAP.md); avaliações em [docs/EVALUATION
 - [Genesis](docs/GENESIS.md) · [Nome autônomo](docs/AUTONOMOUS_NAMING.md) · [Identidade](docs/IDENTITY.md)
 - [Memória](docs/MEMORY.md) · [Curiosidade](docs/CURIOSITY.md) · [Estudo](docs/STUDY.md)
 - [Mente: pensar, estudar e puxar conversa](docs/MIND.md) · [Autonomia](docs/AUTONOMY.md)
-- [Voz](docs/VOICE.md) · [Nuvem](docs/CLOUDFLARE.md) · [Evolução de código](docs/CODE_EVOLUTION.md)
+- [Voz](docs/VOICE.md) · [Servidor (Lightsail)](docs/LIGHTSAIL.md) · [Cloudflare, histórico](docs/CLOUDFLARE.md) · [Evolução de código](docs/CODE_EVOLUTION.md)
 - [Seleção de modelos](docs/MODEL_SELECTION.md) · [Decisões (ADRs)](docs/decisions/) · [Diário de pesquisa](docs/research-log/)
 
 ## Pilha
 
-`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Cloudflare Workers + Containers · Docker`
+`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Docker · Caddy · AWS Lightsail`
 
 Visão é o codinome do projeto, não o nome do agente. O nome dele continua `null`: ele está
 decidindo.

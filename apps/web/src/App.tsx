@@ -20,6 +20,7 @@ import { StudyPanel } from "./components/StudyPanel";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
+import { parseMacCommand } from "./arm";
 import { registerWorker } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 
@@ -206,7 +207,8 @@ export function App() {
       api.messages(current).then((next) => {
         if (!alive || sendingRef.current) return;
         const known = new Set(messagesRef.current.map((m) => m.id));
-        const fresh = next.filter((m) => m.origin === "initiative" && !known.has(m.id));
+        // What it says on its own, and the arm's reports, are read aloud in a call.
+        const fresh = next.filter((m) => m.role === "assistant" && (m.origin === "initiative" || m.origin === "arm") && !known.has(m.id));
         if (next.length !== messagesRef.current.length) setMessages(next);
         const last = fresh[fresh.length - 1];
         if (last && known.size > 0 && speakRef.current) speakRef.current(last.content);
@@ -246,8 +248,30 @@ export function App() {
     }
   }
 
+  async function askMac(command: { project: string; prompt: string }): Promise<void> {
+    setSending(true);
+    try {
+      const conversationId = current ?? (await openConversation());
+      await api.askArm(command.project, command.prompt, conversationId);
+      setMessages(await api.messages(conversationId));
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function send(text: string, spoken?: SpokenTiming): Promise<void> {
     setError(null);
+    const mac = spoken ? null : parseMacCommand(text);
+    if (mac === "usage") {
+      setError("Use assim: /mac projeto o que fazer (ex.: /mac visao rode os testes).");
+      return;
+    }
+    if (mac) {
+      await askMac(mac);
+      return;
+    }
     voice.stopSpeaking(); // barge-in by text
     const willSpeak = (spoken !== undefined || speakAloud) && voice.speakerKind !== null;
     if (willSpeak) voice.unlock(); // inside the gesture, before any await

@@ -1,4 +1,7 @@
-# VISÃO na nuvem
+# VISÃO na nuvem (histórico)
+
+> Desde 2026-11-12 a produção roda no Lightsail ([LIGHTSAIL.md](LIGHTSAIL.md)). O caminho
+> abaixo continua no código (`VISAO_DEPLOY_TARGET=cloudflare`) e exige o plano Workers Paid.
 
 O frontend fica em Workers Assets. A API Python roda em um Container, acessado
 por um único Durable Object (`primary`). Memórias, identidade, conversas, estudos,

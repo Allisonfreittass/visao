@@ -1,12 +1,14 @@
 # Custos e limites
 
-> **Como é aplicado hoje (2026-11-12).** Só provedores de preço zero são admitidos: com evidência
-> de gratuidade (`VISION_LLM_FREE_GRANTS`, com validade) ou com `VISION_LLM_TRUST_ZERO_PRICE` em
-> uso pessoal. Preço diferente de zero é recusado, e custo informado pelo provedor congela o razão
-> (`integrations/llm/budget.py`). O limite real é de **chamadas e tokens** (`VISION_LLM_BUDGET_*`,
-> por dia, por hora, por chamada e de concorrência), reservado antes de cada chamada. Os tetos em
-> US$ abaixo continuam no código e nos testes, mas com preço zero ficam sempre em US$ 0: servem de
-> relatório até existir um provedor pago aprovado.
+> **Como é aplicado hoje (2026-11-12).** A produção usa o Claude Haiku 5.5 (US$ 0,10 / 0,50 por
+> milhão de tokens). Provedor pago só entra com os dois tetos acima de zero
+> (`VISION_LLM_PAID_DAILY_USD`, `VISION_LLM_PAID_MONTHLY_USD`; hoje US$ 0,50/dia e US$ 10/mês).
+> Antes de cada chamada o razão (`integrations/llm/budget.py`) reserva o pior caso (tokens de
+> entrada estimados e o máximo de saída, no preço configurado) e recusa se passar do teto; depois
+> acerta pelo custo real e devolve a sobra. Provedor que informa mais do que o reservado congela o
+> razão. Com os tetos em zero vale a regra antiga: só preço zero, com evidência ou
+> `VISION_LLM_TRUST_ZERO_PRICE`. Os limites de chamadas e tokens (`VISION_LLM_BUDGET_*`) valem
+> nos dois casos. Configure também o limite de gasto no console da Anthropic.
 
 > Valores **propostos**, não medidos. Nenhum custo foi observado ainda. Atualizar com dados
 > reais de `model_usage` a partir da Fase 1.

@@ -1,0 +1,70 @@
+# Visão em produção (Lightsail): API, worker e o Caddy (HTTPS automático + o web estático).
+# Fica em /opt/visao no servidor. Segredos em /etc/visao/app.env, fora do repositório
+# (modelo em deploy/app.env.example); a revisão ativa em /opt/visao/release.env, escrita por
+# activate.sh. O banco é o PostgreSQL de VISION_DATABASE_URL (hoje o Supabase).
+x-visao: &visao
+  image: visao:current
+  restart: unless-stopped
+  env_file:
+    - /etc/visao/app.env
+    - ./release.env
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  api:
+    <<: *visao
+    # Migra e sobe. --proxy-headers: o IP do visitante vem do X-Forwarded-For que o Caddy
+    # preenche (o Caddy descarta o que o visitante mandar), para o limite de login valer por IP.
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*
+    # Só para o próprio servidor (túnel SSH e testes); de fora, só pelo Caddy.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  # O worker roda 24 h aqui: é ele que pensa, estuda e puxa conversa. Não deixe outro worker
+  # (o do Mac) ligado no mesmo banco.
+  worker:
+    <<: *visao
+    command: ["python", "-m", "apps.worker.main"]
+    healthcheck:
+      test: ["CMD", "python", "-m", "apps.worker.health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    env_file: /etc/visao/caddy.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # releases/current é um link relativo para <sha>/web: o Caddy o segue a cada requisição,
+      # então trocar de release não exige recriar este container.
+      - ./releases:/srv/releases:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+# IPv6 on: the Supabase direct host (db.<ref>.supabase.co) has only an IPv6 address, and
+# Docker's default network is IPv4-only, so the API could not reach the database without it.
+networks:
+  default:
+    enable_ipv6: true
+
+volumes:
+  caddy_data:
+  caddy_config:

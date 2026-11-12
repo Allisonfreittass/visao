@@ -43,7 +43,9 @@ class FallbackLLMProvider:
             # A provider whose quota ran out is skipped for a while instead of wasting a call.
             if time.monotonic() < self._skip_until[index]:
                 continue
-            if provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0:
+            paid = provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0
+            # A priced provider only when its guard has spending caps (budget.py enforces them).
+            if paid and not getattr(provider, "admits_paid", False):
                 last_error = LLMError("budget_denied", "paid provider refused before dispatch")
                 continue
             try:

@@ -57,6 +57,8 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 
 /* Sidebar */
 .sidebar { display: none; width: 272px; flex: 0 0 272px; flex-direction: column; gap: var(--espaco-2); padding: var(--espaco-5) var(--espaco-5) var(--espaco-4) var(--espaco-6); border-right: 1px solid var(--linha); overflow-y: auto; }
+/* A long sidebar scrolls; its items never squash to fit. */
+.sidebar > * { flex-shrink: 0; }
 .workspace-nav { display: grid; gap: 2px; margin-bottom: var(--espaco-3); }
 .workspace-nav button, .conversation-list button { width: 100%; text-align: left; padding: 10px 12px; border: 0; border-radius: var(--raio-1); background: transparent; color: var(--tinta-suave); font: 500 14px/1.2 var(--font-sans); }
 .workspace-nav button:hover, .conversation-list button:hover { background: var(--fundo-hover); color: var(--tinta); }
@@ -75,6 +77,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .memory-toggle input { accent-color: var(--estanho); width: 16px; height: 16px; margin: 0; flex-shrink: 0; }
 .preference .note, .initiatives .note { font-size: 13px; }
 .initiatives { display: grid; gap: 6px; }
+.mac-panel .card { margin-top: var(--espaco-2); }
+.mac-pairing { display: grid; gap: var(--espaco-2); }
+.mac-token { display: block; padding: 8px 10px; border: 1px solid var(--linha-forte); border-radius: var(--raio-1); background: var(--fundo); overflow-wrap: anywhere; font-size: 12px; }
+.mac-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; color: var(--tinta-suave); }
+.mac-tasks .rotulo { margin-right: 6px; }
+.account-actions { display: flex; flex-wrap: wrap; gap: var(--espaco-3); align-items: center; }
+.account-form { display: grid; gap: var(--espaco-3); margin-top: var(--espaco-2); }
+.account-form .rs-campo input { width: 100%; }
 .initiatives h3 { font: 400 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--estanho); margin: 0 0 6px; }
 .sidebar-bottom { margin-top: auto; padding-top: var(--espaco-5); display: grid; gap: 4px; }
 .connection { font: 400 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; }

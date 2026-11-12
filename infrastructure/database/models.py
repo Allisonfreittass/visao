@@ -43,6 +43,10 @@ class User(Base):
         JSON, default=dict, server_default=text("'{}'")
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Set when the email or password changes: tokens issued before it stop working everywhere.
+    credentials_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class AuditLog(Base):
@@ -689,3 +693,53 @@ class PushSubscription(Base):
     failures: Mapped[int] = mapped_column(Integer, default=0)
     last_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ArmDevice(Base):
+    """A machine of the owner running the arm (docs/BRACO.md). Only the token's hash is kept."""
+
+    __tablename__ = "arm_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(64))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    # What the arm says it allows (its own config decides; this is for the interface).
+    projects: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    version: Mapped[str] = mapped_column(String(32), default="")
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ArmTask(Base):
+    """Work for the arm. Runs only after the owner approves it; the agent can only propose."""
+
+    __tablename__ = "arm_tasks"
+    __table_args__ = (Index("ix_arm_tasks_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("arm_devices.id", ondelete="SET NULL"), nullable=True
+    )
+    project: Mapped[str] = mapped_column(String(64))
+    prompt: Mapped[str] = mapped_column(Text)
+    # proposed | approved | running | done | failed | rejected | cancelled
+    status: Mapped[str] = mapped_column(String(16), default="approved")
+    requested_by: Mapped[str] = mapped_column(String(16), default="owner")  # owner | agent
+    resume_session: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    result: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(String(500), default="")
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    claude_session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

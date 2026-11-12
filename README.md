@@ -22,6 +22,7 @@ rewrite.
 | **Call it.** Hands-free voice call that keeps the screen on, with barge-in. Self-hosted voice (Kokoro TTS, faster-whisper STT) when the models are installed; the device's own speech as an opt-in fallback, so a call also works from the phone on the cloud build. | built; real-mic test on iPhone pending |
 | **It speaks first.** It thinks between conversations, keeps interests that decay without new input, and opens a chat when it has something to say. It respects quiet hours, the global pause, "you are mid-conversation", two unanswered openings and a daily cap. Web Push lets the opening reach a closed app. | built |
 | **Code and ideas.** Complete code in fenced blocks with language and copy, read aloud as "the code is on screen". It asks for exactly the context it is missing. | built |
+| **Works on your Mac.** `/mac <project> <request>` in the chat sends work to a small daemon on my Mac, which runs Claude Code in an allowlisted project with a fixed tool list and reports back in the conversation. The agent can propose work; only I can approve it ([docs/BRACO.md](docs/BRACO.md)). | first version built |
 | **Autobiographical memory**, curated by a deterministic policy, opt-in per person, with provenance, export and delete. Health, religion, politics, finances and third parties stay out. | built (benchmark: curated 8/8, passive 6/8, none 1/8) |
 | **Curiosity with sources.** It asks what is personal and researches only public facts (Wikipedia, arXiv, Hacker News), always citing. | built |
 | **Goals with approval.** Unanswered questions can become goals that run in a separate worker only after I approve them. | built |
@@ -34,7 +35,7 @@ rewrite.
 
 ```mermaid
 flowchart TB
-  web["Web / PWA<br/>chat · call · notebook"] -->|HTTPS| edge["Cloudflare Worker<br/>assets · login rate limit"]
+  web["Web / PWA<br/>chat · call · notebook"] -->|HTTPS| edge["Caddy<br/>TLS · static web"]
   edge --> api["FastAPI<br/>apps/api"]
   worker["Worker<br/>apps/worker"] --> core
   api --> core["Cognitive core<br/>core/*"]
@@ -102,7 +103,7 @@ make db-test               # the PostgreSQL-only tests in a throwaway pgvector c
 ```
 
 CI runs lint, the Python suite against SQLite and PostgreSQL, the web and Worker tests, and a
-`docker compose up` smoke test. A green `main` deploys to Cloudflare. Every action is pinned to
+`docker compose up` smoke test. A green `main` deploys to its own Lightsail server over SSH, and rolls back by itself if the new revision does not answer ([docs/LIGHTSAIL.md](docs/LIGHTSAIL.md)). Every action is pinned to
 a commit SHA.
 
 ## Status
@@ -115,7 +116,7 @@ The design docs, ADRs and research log in [docs/](docs/) are written in Portugue
 
 ## Stack
 
-`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Cloudflare Workers + Containers · Docker`
+`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Docker · Caddy · AWS Lightsail`
 
 Visão is the project's codename, not the agent's name. The agent's name is still `null`: it is
 deciding.

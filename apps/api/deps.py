@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.security import decode_access_token
+from apps.api.security import decode_access_claims, issued_before_change
 from apps.api.settings import Settings, get_settings
 from infrastructure.database.models import User
 from infrastructure.database.session import get_sessionmaker
@@ -38,11 +38,14 @@ def get_current_user(
         detail="Credenciais inválidas",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    user_id = decode_access_token(token, settings)
-    if user_id is None:
+    claims = decode_access_claims(token, settings)
+    if claims is None:
         raise unauthorized
+    user_id, issued_at = claims
     user = db.get(User, user_id)
     if user is None or not user.is_active:
+        raise unauthorized
+    if issued_before_change(issued_at, user.credentials_changed_at):
         raise unauthorized
     return user
 

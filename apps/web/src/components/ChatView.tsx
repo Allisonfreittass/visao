@@ -58,7 +58,7 @@ export function ChatView({ messages, agentName, hidden, focusRequest, sending, e
         )}
         {messages.map((m) => (
           <div key={m.id} className={`bubble ${m.role}`}>
-            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
+            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}<time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time></div>
             <MessageContent text={m.content} />
             {m.sources && m.sources.length > 0 && (
               <ol className="sources" aria-label="Fontes pesquisadas">

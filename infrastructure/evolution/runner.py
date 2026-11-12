@@ -13,7 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from core.evolution.guard import ALLOWED, digest, snapshot, validate_patch  # noqa: E402
 
-BASE_URL = "https://visao.auris-api.workers.dev/api"
+# Where the live app answers (repository variable VISAO_PUBLIC_URL in the workflows).
+PUBLIC_URL = os.environ.get("VISAO_PUBLIC_URL", "https://visao.auris-api.workers.dev").rstrip("/")
+BASE_URL = PUBLIC_URL + "/api"
 DATA = ROOT / ".code-run" / "proposal.json"
 
 

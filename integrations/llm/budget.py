@@ -100,10 +100,16 @@ class BudgetGuard:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         trust_zero_price: bool = False,
+        paid_daily_usd: Decimal = Decimal(0),
+        paid_monthly_usd: Decimal = Decimal(0),
     ) -> None:
         # Local use: a configured zero price is taken at its word. A provider reporting any cost
         # still freezes the ledger in finish(), so this cannot turn into spending.
         self.trust_zero_price = trust_zero_price
+        # A priced provider (e.g. Claude) is admitted only with both caps set. Each call reserves
+        # its worst-case cost up front; the reported tokens, at the configured price, settle it.
+        self.paid_daily_usd = Decimal(paid_daily_usd)
+        self.paid_monthly_usd = Decimal(paid_monthly_usd)
         self.factory = factory
         # Deep copies prevent mutation of a caller's prices dict after validation.
         self.grants = tuple(FreeEndpointGrant.model_validate(g.model_dump()) for g in grants)
@@ -130,9 +136,21 @@ class BudgetGuard:
             flag.updated_at = self.clock()
             db.commit()
 
+    @property
+    def admits_paid(self) -> bool:
+        return self.paid_daily_usd > 0 and self.paid_monthly_usd > 0
+
+    @staticmethod
+    def _paid(provider: LLMProvider) -> bool:
+        return provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0
+
     def _grant(self, provider: LLMProvider, endpoint: str, now: datetime) -> str:
-        if provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0:
-            raise _deny("paid or unknown provider price")
+        if self._paid(provider):
+            if not self.admits_paid:
+                raise _deny("paid or unknown provider price")
+            return hashlib.sha256(
+                json.dumps(["paid", provider.name, endpoint, provider.model]).encode()
+            ).hexdigest()
         for grant in self.grants:
             if (
                 grant.provider == provider.name
@@ -165,13 +183,18 @@ class BudgetGuard:
             raise _deny("output reservation exceeds per-call limit")
         if input_tokens > self.limits.input_tokens_per_call:
             raise _deny("input reservation exceeds per-call limit")
+        paid = self._paid(provider)
+        worst_case = provider.pricing.cost(input_tokens, output) if paid else Decimal(0)
         reservation = uuid.uuid4().hex
         with self._ledger() as state:
             if state.get("frozen"):
                 raise _deny("ledger frozen pending operator review")
             day, hour = now.date().isoformat(), now.strftime("%Y-%m-%dT%H")
             if state.get("day") != day:
-                state.update(day=day, calls=0, input=0, output=0)
+                state.update(day=day, calls=0, input=0, output=0, usd_day="0")
+            month = now.strftime("%Y-%m")
+            if state.get("month") != month:
+                state.update(month=month, usd_month="0")
             if state.get("hour") != hour:
                 state.update(hour=hour, hourly_calls=0)
             # A call that timed out, or died with its container, is still charged but cannot
@@ -202,6 +225,16 @@ class BudgetGuard:
                 or state["output"] + output > limits.output_tokens_per_day
             ):
                 raise _deny("reservation would exceed shared quota")
+            spent_day = Decimal(state.get("usd_day", "0"))
+            spent_month = Decimal(state.get("usd_month", "0"))
+            if paid and (
+                spent_day + worst_case > self.paid_daily_usd
+                or spent_month + worst_case > self.paid_monthly_usd
+            ):
+                raise _deny("reservation would exceed the paid spending cap")
+            if paid:
+                state["usd_day"] = str(spent_day + worst_case)
+                state["usd_month"] = str(spent_month + worst_case)
             state["calls"] += 1
             state["hourly_calls"] += 1
             state["input"] += input_tokens
@@ -217,6 +250,8 @@ class BudgetGuard:
                 "output": output,
                 "state": "active",
                 "created_at": now.isoformat(),
+                "month": state["month"],
+                **({"usd": str(worst_case)} if paid else {}),
             }
             state["active"] = active
         return reservation
@@ -235,8 +270,14 @@ class BudgetGuard:
             if response is not None:
                 circuit = {"failures": 0, "until": 0}
                 # Keep unused reservations charged; late/crashed/failed calls are not free retries.
+                reserved_usd = Decimal(item["usd"]) if "usd" in item else None
+                cost_ok = (
+                    0 <= response.cost_usd <= reserved_usd
+                    if reserved_usd is not None
+                    else response.cost_usd == 0
+                )
                 if (
-                    response.cost_usd != 0
+                    not cost_ok
                     or response.input_tokens < 0
                     or response.output_tokens < 0
                     or response.input_tokens > item["input"]
@@ -247,6 +288,13 @@ class BudgetGuard:
                 if state.get("day") == item["day"]:
                     state["input"] += max(0, response.input_tokens - item["input"])
                     state["output"] += max(0, response.output_tokens - item["output"])
+                if reserved_usd is not None and cost_ok:
+                    # Money follows the real call: the unused part of the worst case comes back.
+                    refund = reserved_usd - response.cost_usd
+                    if state.get("day") == item["day"]:
+                        state["usd_day"] = str(Decimal(state.get("usd_day", "0")) - refund)
+                    if state.get("month") == item.get("month"):
+                        state["usd_month"] = str(Decimal(state.get("usd_month", "0")) - refund)
                 del active[reservation]
             else:
                 circuit["failures"] = circuit.get("failures", 0) + 1
@@ -265,6 +313,7 @@ class GuardedLLMProvider:
     def __init__(self, provider: LLMProvider, endpoint: str, guard: BudgetGuard):
         self._provider, self._endpoint, self._guard = provider, endpoint, guard
         self.name, self.model, self.pricing = provider.name, provider.model, provider.pricing
+        self.admits_paid = guard.admits_paid
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
         try:

@@ -5,6 +5,7 @@ from functools import lru_cache
 from pydantic import SecretStr
 
 from apps.api.settings import Settings, get_settings
+from integrations.llm.anthropic_provider import AnthropicProvider
 from integrations.llm.base import LLMProvider, Pricing
 from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
 from integrations.llm.fallback import FallbackLLMProvider
@@ -54,6 +55,17 @@ def get_llm_provider() -> LLMProvider | None:
     return build_llm_provider(get_settings(), fast=True)
 
 
+def is_anthropic(name: str | None, base_url: str | None) -> bool:
+    return (name or "").lower() in {"anthropic", "claude"} or "api.anthropic.com" in (
+        base_url or ""
+    )
+
+
+# Background work (curation, review, study) keeps thinking but shallow: thinking tokens share
+# max_tokens with the answer, and a deep think would cut the JSON these steps return.
+ANTHROPIC_BACKGROUND = {"output_config": {"effort": "low"}}
+
+
 def _openai_compatible(
     settings: Settings,
     name: str | None,
@@ -63,9 +75,19 @@ def _openai_compatible(
     price_in: Decimal | None,
     price_out: Decimal | None,
     extra_body: dict | None = None,
-) -> OpenAICompatibleProvider:
+) -> LLMProvider:
     assert name and base_url and api_key and model
     assert price_in is not None and price_out is not None
+    if is_anthropic(name, base_url):
+        return AnthropicProvider(
+            name=name,
+            api_key=api_key.get_secret_value(),
+            model=model,
+            pricing=Pricing(input_per_mtok=price_in, output_per_mtok=price_out),
+            timeout_seconds=settings.llm_timeout_seconds,
+            extra_body=extra_body if extra_body is not None else ANTHROPIC_BACKGROUND,
+            base_url=None if "api.anthropic.com" in base_url else base_url,
+        )
     return OpenAICompatibleProvider(
         name=name,
         base_url=base_url,
@@ -102,6 +124,8 @@ def build_llm_provider(
                 concurrency=settings.llm_budget_concurrency,
             ),
             trust_zero_price=settings.llm_trust_zero_price,
+            paid_daily_usd=settings.llm_paid_daily_usd,
+            paid_monthly_usd=settings.llm_paid_monthly_usd,
         )
     primary_raw = _openai_compatible(
         settings,

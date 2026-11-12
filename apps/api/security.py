@@ -35,6 +35,12 @@ def create_access_token(user_id: uuid.UUID, settings: Settings) -> str:
 
 
 def decode_access_token(token: str, settings: Settings) -> uuid.UUID | None:
+    claims = decode_access_claims(token, settings)
+    return claims[0] if claims else None
+
+
+def decode_access_claims(token: str, settings: Settings) -> tuple[uuid.UUID, int] | None:
+    """(user id, issued-at in epoch seconds), or None for any invalid token."""
     try:
         # Pinned algorithm (no "none", no key confusion) and mandatory expiry and subject.
         claims = jwt.decode(
@@ -43,6 +49,15 @@ def decode_access_token(token: str, settings: Settings) -> uuid.UUID | None:
             algorithms=[_ALGORITHM],
             options={"require": ["exp", "sub"], "verify_exp": True, "verify_signature": True},
         )
-        return uuid.UUID(claims["sub"])
-    except (jwt.PyJWTError, KeyError, ValueError):
+        return uuid.UUID(claims["sub"]), int(claims.get("iat", 0))
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
         return None
+
+
+def issued_before_change(issued_at: int, changed_at: datetime | None) -> bool:
+    """A token older than the last credential change no longer counts."""
+    if changed_at is None:
+        return False
+    if changed_at.tzinfo is None:
+        changed_at = changed_at.replace(tzinfo=UTC)
+    return issued_at < int(changed_at.timestamp())

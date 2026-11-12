@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from apps.api.push import configure_push
 from apps.api.routes import (
+    arm,
     auth,
     behavior,
     cloud,
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(study.router)
     app.include_router(cloud.router)
     app.include_router(evolution.router)
+    app.include_router(arm.router)
     return app
 
 

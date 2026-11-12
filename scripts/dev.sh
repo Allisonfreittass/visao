@@ -25,7 +25,9 @@ done
 
 # Migrations change the database in place: automatic only for the local SQLite file. A shared
 # database is migrated by the deploy, never by someone starting the app on a laptop.
+shared_db=""
 if grep -Eq '^VISION_DATABASE_URL=postgres' .env 2>/dev/null; then
+  shared_db=1
   head=$(.venv/bin/alembic heads 2>/dev/null | awk 'NR==1{print $1}')
   current=$(.venv/bin/alembic current 2>/dev/null | awk 'NR==1{print $1}')
   if [ -z "$current" ]; then
@@ -68,7 +70,13 @@ run() {
 }
 
 run api .venv/bin/uvicorn apps.api.main:app --port 8000 --reload
-run worker .venv/bin/python -m apps.worker.main
+# The shared database already has its worker, on the server (docs/LIGHTSAIL.md): two workers
+# would think and speak twice. VISAO_LOCAL_WORKER=1 overrides it on purpose.
+if [ -z "$shared_db" ] || [ "${VISAO_LOCAL_WORKER:-}" = 1 ]; then
+  run worker .venv/bin/python -m apps.worker.main
+else
+  echo "Banco compartilhado: o worker do servidor cuida da mente; este não sobe."
+fi
 run web npm --prefix apps/web run dev
 
 echo "VISÃO: http://localhost:5173  (Ctrl+C para parar tudo)"

@@ -1,5 +1,7 @@
 import { type Api, type Conversation, utcDate } from "../api";
+import { AccountPanel } from "./AccountPanel";
 import { InitiativesPanel } from "./InitiativesPanel";
+import { MacPanel } from "./MacPanel";
 import { PushToggle } from "./PushToggle";
 
 export type WorkspaceView = "conversation" | "study";
@@ -58,6 +60,8 @@ export function Sidebar(props: SidebarProps) {
       <details className="preferences">
         <summary>Preferências e autonomia <span aria-hidden="true">+</span></summary>
         <div className="preferences-content">
+          <MacPanel api={api} onError={onError} />
+          <AccountPanel api={api} />
           <InitiativesPanel api={api} onError={onError} />
           <PushToggle api={api} onError={onError} />
           <div className="preference">

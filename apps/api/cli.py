@@ -4,6 +4,7 @@ import argparse
 import getpass
 import json
 import sys
+from datetime import UTC, datetime
 
 from email_validator import EmailNotValidError, validate_email
 from sqlalchemy import select
@@ -30,6 +31,50 @@ def create_user(session: Session, email: str, password: str) -> User:
     record_audit(session, "user.create", "success", actor_user_id=user.id, details={"via": "cli"})
     session.commit()
     return user
+
+
+def _user(session: Session, email: str) -> User:
+    normalized = email.strip().lower()
+    user = session.scalar(select(User).where(User.email == normalized))
+    if user is None:
+        raise ValueError("não existe usuário com esse email")
+    return user
+
+
+def set_password(session: Session, email: str, password: str) -> User:
+    """Replaces the password and signs out every session that used the old one."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"senha precisa ter pelo menos {MIN_PASSWORD_LENGTH} caracteres")
+    user = _user(session, email)
+    user.password_hash = hash_password(password)
+    user.credentials_changed_at = datetime.now(UTC)
+    record_audit(
+        session, "auth.password_change", "success", actor_user_id=user.id, details={"via": "cli"}
+    )
+    session.commit()
+    return user
+
+
+def set_email(session: Session, email: str, new_email: str) -> User:
+    normalized = validate_email(new_email, check_deliverability=False).normalized.lower()
+    user = _user(session, email)
+    if session.scalar(select(User).where(User.email == normalized, User.id != user.id)):
+        raise ValueError("já existe usuário com esse email")
+    user.email = normalized
+    user.credentials_changed_at = datetime.now(UTC)
+    record_audit(
+        session, "auth.email_change", "success", actor_user_id=user.id, details={"via": "cli"}
+    )
+    session.commit()
+    return user
+
+
+def _ask_password() -> str | None:
+    password = getpass.getpass("Senha: ")
+    if password != getpass.getpass("Confirme: "):
+        print("As senhas não conferem.", file=sys.stderr)
+        return None
+    return password
 
 
 def _describe(identity: AgentIdentity, record: IdentityVersion) -> str:
@@ -103,11 +148,35 @@ def main(argv: list[str] | None = None) -> int:
         "voice-deliberation",
         help="apresenta ao agente as vozes aprovadas; ele escolhe, adia ou recusa",
     )
+    change = sub.add_parser(
+        "set-password", help="troca a senha (pedida no terminal) e encerra os logins"
+    )
+    change.add_argument("--email", required=True)
+    rename = sub.add_parser("set-email", help="troca o email de login e encerra os logins")
+    rename.add_argument("--email", required=True, help="email atual")
+    rename.add_argument("--new", required=True, help="email novo")
     sub.add_parser(
         "webpush-keys",
         help="gera o par VAPID dos avisos push (cole no .env ou nos segredos da nuvem)",
     )
     args = parser.parse_args(argv)
+
+    if args.command in ("set-password", "set-email"):
+        with get_sessionmaker()() as session:
+            try:
+                if args.command == "set-email":
+                    set_email(session, args.email, args.new)
+                    print("Email trocado. Entre de novo com o email novo.")
+                    return 0
+                password = _ask_password()
+                if password is None:
+                    return 1
+                set_password(session, args.email, password)
+            except (ValueError, EmailNotValidError) as exc:
+                print(f"Erro: {exc}", file=sys.stderr)
+                return 1
+        print("Senha trocada. Todos os logins antigos foram encerrados.")
+        return 0
 
     if args.command == "webpush-keys":
         from integrations.push.webpush import generate_vapid_keys
@@ -139,9 +208,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "create-user":
-        password = getpass.getpass("Senha: ")
-        if password != getpass.getpass("Confirme: "):
-            print("As senhas não conferem.", file=sys.stderr)
+        password = _ask_password()
+        if password is None:
             return 1
         with get_sessionmaker()() as session:
             try:

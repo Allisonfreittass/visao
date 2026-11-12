@@ -4,16 +4,17 @@ import time
 import uuid
 from collections import deque
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession
-from apps.api.security import create_access_token, verify_password
+from apps.api.security import create_access_token, hash_password, verify_password
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import User
 
@@ -147,3 +148,78 @@ def login(
 @router.get("/me")
 def me(user: CurrentUser) -> UserResponse:
     return UserResponse(id=user.id, email=user.email, created_at=user.created_at)
+
+
+MIN_PASSWORD_LENGTH = 12
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=1024)
+    new_password: str = Field(max_length=1024)
+
+
+class EmailChange(BaseModel):
+    current_password: str = Field(max_length=1024)
+    new_email: str = Field(max_length=320)
+
+
+def _confirm_password(request: Request, db: DbSession, user: User, password: str) -> None:
+    """Changing credentials asks for the current password, under the same throttle as login."""
+    throttle = _login_throttle(request)
+    keys = _throttle_keys(request, user.email)
+    wait = throttle.retry_after(keys)
+    if wait is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas. Aguarde alguns minutos.",
+            headers={"Retry-After": str(wait)},
+        )
+    if not verify_password(password, user.password_hash):
+        throttle.failure(keys)
+        record_audit(db, "auth.credentials", "denied", actor_user_id=user.id)
+        db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Senha atual incorreta")
+    throttle.success(keys)
+
+
+def _fresh_token(db: DbSession, user: User, settings: AppSettings, action: str) -> TokenResponse:
+    # Every other session (phone, laptop, a leaked token) is signed out; this one continues.
+    user.credentials_changed_at = datetime.now(UTC)
+    record_audit(db, action, "success", actor_user_id=user.id)
+    db.commit()
+    return TokenResponse(
+        access_token=create_access_token(user.id, settings),
+        expires_in=settings.access_token_ttl_minutes * 60,
+    )
+
+
+@router.post("/password")
+def change_password(
+    body: PasswordChange, request: Request, user: CurrentUser, db: DbSession, settings: AppSettings
+) -> TokenResponse:
+    _confirm_password(request, db, user, body.current_password)
+    if len(body.new_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"A senha nova precisa de pelo menos {MIN_PASSWORD_LENGTH} caracteres",
+        )
+    if body.new_password == body.current_password:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "A senha nova é igual à atual")
+    user.password_hash = hash_password(body.new_password)
+    return _fresh_token(db, user, settings, "auth.password_change")
+
+
+@router.post("/email")
+def change_email(
+    body: EmailChange, request: Request, user: CurrentUser, db: DbSession, settings: AppSettings
+) -> TokenResponse:
+    _confirm_password(request, db, user, body.current_password)
+    try:
+        email = validate_email(body.new_email, check_deliverability=False).normalized.lower()
+    except EmailNotValidError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Email inválido") from exc
+    taken = db.scalar(select(User).where(User.email == email, User.id != user.id))
+    if taken is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esse email já está em uso")
+    user.email = email
+    return _fresh_token(db, user, settings, "auth.email_change")
