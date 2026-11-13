@@ -53,8 +53,9 @@ services:
     working_dir: /home/pwuser
     command: ["/bin/sh", "-c", "npx -y playwright@1.62.0 run-server --port 3000 --host 0.0.0.0"]
     networks: [browsing]
-    shm_size: 512m
-    mem_limit: 1g
+    # O servidor tem 2 GB e nenhum swap: o navegador nunca pode tirar a memória da API.
+    shm_size: 256m
+    mem_limit: 700m
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

@@ -36,7 +36,7 @@ Em produção, o Chromium roda no container `browser` do
 com `playwright run-server`): **sem segredos, sem banco e numa rede (`browsing`) só com a API**.
 Se uma página maliciosa explorar o Chromium, ela fica presa num container sem nada de valor. A
 API só conecta (`VISION_BROWSER_WS_URL=ws://browser:3000/`). A versão do container tem de ser a
-mesma do pacote `playwright` do `pyproject.toml`. O container usa até 1 GB de memória.
+mesma do pacote `playwright` do `pyproject.toml`. O container fica limitado a 700 MB de memória (o servidor tem 2 GB, sem swap).
 
 Localmente, `VISION_BROWSER_EXECUTABLE_PATH` aponta para um Chromium e a API o abre ela mesma.
 Sem nenhum dos dois, não há páginas ao vivo e ele não diz que consegue.
