@@ -128,6 +128,7 @@ def build_context(
     history: list[Message],
     char_budget: int,
     files: dict[uuid.UUID, list[Attachment]] | None = None,
+    redacted: dict[uuid.UUID, str] | None = None,
 ) -> list[ChatMessage]:
     """Most recent messages that fit the budget, oldest first. The latest one is always kept.
 
@@ -141,6 +142,10 @@ def build_context(
         if selected and used + len(message.content) > char_budget:
             break
         content, images = message.content, ()
+        if redacted and message.id in redacted:
+            # A reply of its own that denied something it really did: the model reads a note,
+            # the person still sees the reply (core/decision/record.py).
+            content = redacted[message.id]
         quoted = by_id.get(message.reply_to_id) if message.reply_to_id else None
         if quoted is not None:
             # She tapped Responder on an earlier message: say which, so "isso" has a referent.
@@ -238,6 +243,8 @@ def reply(
     if owner_rules:
         system_prompt += "\n\n" + learned_rules_block(owner_rules)
     prompt = [ChatMessage(role="system", content=system_prompt)]
+    from core.decision import record as deed_record
+
     history = conversation_history(session, conversation)
     prompt += build_context(
         history,
@@ -245,6 +252,7 @@ def reply(
         attachments.for_messages(
             session, [m.id for m in history[-attachments.RECENT_MESSAGES * 4 :]]
         ),
+        deed_record.false_denials(session, conversation, owner),
     )
     if attachment and prompt[-1].role == "user":
         # What came with this message (a page it opened) goes with the message itself, the last

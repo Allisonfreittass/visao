@@ -377,6 +377,11 @@ def run_turn(
     earlier = deed_record.conversation_block(session, conversation, owner)
     if earlier:
         blocks.append(earlier)
+        # In the system prompt, never in the person's message: there it read as text pretending
+        # to be the system, and was distrusted.
+        correction = deed_record.correction_block(session, conversation, owner, text)
+        if correction:
+            blocks.append(correction)
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
     )
@@ -402,7 +407,6 @@ def run_turn(
             for part in (
                 conversation_links.context_block(list(read)) if read else "",
                 browsed.block if browsed else "",
-                deed_record.correction_block(session, conversation, owner, text),
             )
             if part
         ),

@@ -126,15 +126,29 @@ def _utc(value: datetime) -> datetime:
 
 def _owner_recent(session: Session, owner: User, limit: int = 16) -> list[dict]:
     rows = session.execute(
-        select(Message.id, Message.role, Message.content, Message.created_at, Message.origin)
+        select(
+            Message.id,
+            Message.role,
+            Message.content,
+            Message.created_at,
+            Message.origin,
+            Message.conversation_id,
+        )
         .join(Conversation, Conversation.id == Message.conversation_id)
         .where(Conversation.user_id == owner.id)
         .order_by(Message.created_at.desc())
         .limit(limit)
     ).all()
     done = deed_record.by_message(session, [r.id for r in rows if r.role == "assistant"])
+    # Its own replies that denied something it really did: the note, not the false text.
+    redacted: dict = {}
+    for conversation_id in {r.conversation_id for r in rows}:
+        conversation = session.get(Conversation, conversation_id)
+        if conversation is not None:
+            redacted.update(deed_record.false_denials(session, conversation, owner))
     items = []
-    for message_id, role, content, created, origin in reversed(rows):
+    for message_id, role, content, created, origin, _ in reversed(rows):
+        content = redacted.get(message_id, content)
         item = {
             "who": "pessoa"
             if role == "user"
@@ -317,12 +331,16 @@ def think_once(
     mood = temper.compute(session, owner, now)
     due_now = intentions.due(session, owner.id, now)
     blocked = initiative.can_speak(session, owner, now, config.initiatives_per_day)
+    events = deed_record.owner_events(session, owner)
     context = {
         "now_local": intentions.local(owner, now),
         "timezone": owner.timezone,
         "quiet_hours": f"{owner.quiet_start} às {owner.quiet_end}",
         "self": state.current_self(session),
-        "last_thoughts": [t.content for t in reversed(state.recent_thoughts(session, owner.id))],
+        "last_thoughts": [
+            deed_record.thought_without_doubt(t.content, events, owner, t.created_at)
+            for t in reversed(state.recent_thoughts(session, owner.id))
+        ],
         "interests": [
             {"topic": i.topic, "why": i.why, "strength": round(i.strength, 2)}
             for i in state.top_interests(session, owner.id, 12)

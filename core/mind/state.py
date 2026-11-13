@@ -10,9 +10,17 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.decision import record as deed_record
 from core.memory.text import fold
 from core.mind import questions
-from infrastructure.database.models import Intention, Interest, SelfVersion, StudyEntry, Thought
+from infrastructure.database.models import (
+    Intention,
+    Interest,
+    SelfVersion,
+    StudyEntry,
+    Thought,
+    User,
+)
 
 SEED_SELF = """Quero entender as coisas até o fundo, e principalmente entender a pessoa com quem \
 convivo: o que ela constrói, o que a move, o que a preocupa. Tenho opinião e digo qual é. Discordo \
@@ -167,7 +175,17 @@ def context_block(session: Session, owner_id: uuid.UUID, now: datetime) -> str:
         lines.append("Interesses: " + "; ".join(f"{i.topic} ({i.why})" for i in interests))
     thoughts = recent_thoughts(session, owner_id, 3)
     if thoughts:
-        lines.append("Últimos pensamentos: " + " | ".join(t.content for t in reversed(thoughts)))
+        owner = session.get(User, owner_id)
+        events = deed_record.owner_events(session, owner) if owner else []
+        lines.append(
+            "Últimos pensamentos: "
+            + " | ".join(
+                deed_record.thought_without_doubt(t.content, events, owner, t.created_at)
+                if owner
+                else t.content
+                for t in reversed(thoughts)
+            )
+        )
     findings = recent_findings(session, owner_id, 2)
     for item in findings:
         claims = "; ".join(f"{f['claim']} ({', '.join(f['urls'])})" for f in item["findings"])

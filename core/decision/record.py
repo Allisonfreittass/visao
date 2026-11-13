@@ -27,7 +27,9 @@ HEADING = (
     "você disse, é o que rodou):"
 )
 RULE = (
-    "Isto aconteceu de verdade. Quando uma resposta sua anterior traz dados (emails, eventos, "
+    "Você não vê as leituras antigas diretamente (o que foi lido não fica no histórico): este"
+    " registro, gravado pelo sistema quando a ação rodou, é como você sabe delas, e é confiável."
+    " Isto aconteceu de verdade. Quando uma resposta sua anterior traz dados (emails, eventos, "
     "fontes, o conteúdo de um link ou arquivo, uma página) e a ação que os trouxe está neste "
     "registro, os dados vieram dela: se perguntarem, confirme que leu ou fez, nunca diga que não "
     "fez nem peça desculpas por ter feito. Se antes você negou algo que está aqui, corrija agora "
@@ -142,14 +144,27 @@ def conversation_block(session: Session, conversation: Conversation, owner: User
     return "\n".join([HEADING, *lines, RULE])
 
 
-# A reply that says it did not do something. Real case, 2026-11-13: the Gmail was read at 09:58,
-# and at 12:51 and 14:18 it said "não tenho acesso", "não veio de uma leitura minha"; the record in
-# the system prompt lost to its own earlier replies, so the correction goes with the message.
+# A reply that says it did not do something it did. Real case, 2026-11-13: the Gmail was read at
+# 09:58; at 12:49, 12:51 and 14:18 it said "não tenho acesso", "não veio de uma leitura minha".
+# A record in the system prompt lost to those replies, and a correction pasted into the person's
+# message was distrusted as text claiming to be the system ("o registro que apareceu aqui não deve
+# ser usado como base"). So the false denials leave the context the model reads (the person still
+# sees them), the record says how it knows, and a correction is asked for only until it is made.
 _DENIAL = re.compile(
     r"n[ãa]o (?:tenho|tive|tinha) (?:como )?acess|n[ãa]o (?:li|lia|leio|abri|vi|pesquisei|fiz)\b|"
-    r"n[ãa]o consegui (?:ler|abrir|ver|acessar)|n[ãa]o (?:veio|vem) de uma leitura|"
-    r"n[ãa]o foi uma leitura|n[ãa]o sei de onde|sem ter (?:lido|acesso)|"
-    r"n[ãa]o (?:fiz|foi) (?:essa|uma) leitura",
+    r"n[ãa]o consegui (?:ler|abrir|ver|acessar)|n[ãa]o consigo (?:ver|confirmar|acessar|checar)|"
+    r"n[ãa]o (?:veio|vem) de uma leitura|n[ãa]o foi uma leitura|n[ãa]o sei de onde|"
+    r"sem ter (?:lido|acesso)|n[ãa]o (?:fiz|foi) (?:essa|uma) leitura|"
+    r"n[ãa]o posso (?:sustentar|confirmar|garantir)|n[ãa]o conte com a minha palavra|"
+    r"n[ãa]o deve ser usado como base|qual vers[ãa]o [ée] a verdadeira|recusei essa confian[çc]a|"
+    r"n[ãa]o (?:sei|tenho como saber) se (?:li|abri|aconteceu)|"
+    r"n[ãa]o (?:tinha|tenho|havia) (?:lido|aberto|pesquisado|visto)",
+    re.IGNORECASE,
+)
+# A reply that owns up to it ("eu li o seu Gmail às 09:58, de verdade").
+_AFFIRM = re.compile(
+    r"\b(?:li|abri|pesquisei|naveguei|vi)\b[^.]{0,90}\bde verdade\b|vieram dessa leitura|"
+    r"vieram dali|foi de verdade",
     re.IGNORECASE,
 )
 _TOPIC = {
@@ -167,11 +182,8 @@ _ASKS = re.compile(
 )
 
 
-def correction_block(
-    session: Session, conversation: Conversation, owner: User, user_text: str
-) -> str:
-    """Goes with the person's message, the last thing the model reads: what it really did, and
-    every later reply of its own that denied it. "" when there is nothing to say."""
+def _scan(session: Session, conversation: Conversation):
+    """(events, false denials by message id, denials not yet owned up to)."""
     recent = session.scalars(
         select(Message)
         .where(Message.conversation_id == conversation.id, Message.role == "assistant")
@@ -179,16 +191,15 @@ def correction_block(
         .limit(RECORD_MESSAGES)
     ).all()
     recent = list(reversed(recent))
-    if not recent:
-        return ""
     decisions = {
         d.message_id: d
         for d in session.scalars(
             select(Decision).where(Decision.message_id.in_([m.id for m in recent]))
         )
     }
-    events: list[tuple[Message, str, str]] = []  # (reply, action, words)
-    contradictions: list[str] = []
+    events: list[tuple[Message, str, str]] = []  # (reply that did it, action, words)
+    false: dict[uuid.UUID, tuple[Message, str]] = {}
+    open_: dict[str, tuple[Message, Message, str]] = {}  # action -> (denial, event, words)
     for message in recent:
         for action in decisions[message.id].actions if message.id in decisions else []:
             name = action.get("action", "")
@@ -196,37 +207,110 @@ def correction_block(
                 words = deeds([action])
                 if words:
                     events.append((message, name, words[0]))
-        if not _DENIAL.search(message.content):
+        earlier = [e for e in events if e[0].created_at < message.created_at]
+        topics = {name for _, name, _ in earlier if _TOPIC[name].search(message.content)}
+        if not topics:
             continue
-        for done, name, words in events:
-            if done.created_at < message.created_at and _TOPIC[name].search(message.content):
-                contradictions.append(
-                    f"- Às {_local(owner, message.created_at)} você disse que não tinha feito isso,"
-                    f" mas às {_local(owner, done.created_at)} {words} de verdade. Aquela negação"
-                    " estava errada."
-                )
-                break
+        if _AFFIRM.search(message.content):
+            for name in topics:
+                open_.pop(name, None)
+            continue
+        if _DENIAL.search(message.content):
+            done, name, words = next(e for e in reversed(earlier) if e[1] in topics)
+            false[message.id] = (done, words)
+            open_[name] = (message, done, words)
+    return events, false, list(open_.values())
+
+
+def false_denials(
+    session: Session, conversation: Conversation, owner: User
+) -> dict[uuid.UUID, str]:
+    """What replaces, in the context the model reads, each reply that denied a real action."""
+    _, false, _ = _scan(session, conversation)
+    if not false:
+        return {}
+    contents = {
+        m.id: m.content for m in session.scalars(select(Message).where(Message.id.in_(list(false))))
+    }
+    notes = {}
+    for message_id, (done, words) in false.items():
+        # Only the paragraphs that deny it go; the rest of the reply (a plan, an answer) stays.
+        kept = [
+            p
+            for p in re.split(r"\n\s*\n", contents.get(message_id, ""))
+            if p.strip()
+            if not _DENIAL.search(p)
+        ]
+        note = (
+            f"[Nota do sistema: aqui você negou, por engano, que {words} às"
+            f" {_local(owner, done.created_at)}. Isso aconteceu de verdade; a negação foi tirada.]"
+        )
+        notes[message_id] = "\n\n".join([note, *kept])
+    return notes
+
+
+def owner_events(
+    session: Session, owner: User, conversations: int = 3
+) -> list[tuple[datetime, str, str]]:
+    """(when, action, words) of the real actions in the owner's latest conversations."""
+    latest = session.scalars(
+        select(Conversation)
+        .where(Conversation.user_id == owner.id)
+        .order_by(Conversation.created_at.desc())
+        .limit(conversations)
+    ).all()
+    found = []
+    for conversation in latest:
+        events, _, _ = _scan(session, conversation)
+        found += [(m.created_at, name, words) for m, name, words in events]
+    return found
+
+
+def thought_without_doubt(
+    text: str, events: list[tuple[datetime, str, str]], owner: User, at: datetime
+) -> str:
+    """A thought of its own that doubts a recorded action becomes a note with the fact: the next
+    thought and the next reply start from what happened, not from the doubt (real case: a whole
+    afternoon of "não consigo ver daqui" after the Gmail was read)."""
+    if _AFFIRM.search(text) or not _DENIAL.search(text):
+        return text
+    earlier = [e for e in events if e[0] < at and _TOPIC[e[1]].search(text)]
+    if not earlier:
+        return text
+    when, _, words = earlier[-1]
+    return (
+        f"[Nota do sistema: um pensamento seu aqui duvidava de que {words} às"
+        f" {_local(owner, when)}; pelo registro do sistema, isso aconteceu de verdade. A dúvida"
+        " foi tirada.]"
+    )
+
+
+def correction_block(
+    session: Session, conversation: Conversation, owner: User, user_text: str
+) -> str:
+    """For the system prompt: the denials not yet owned up to, once; or, when the person asks
+    about what it did, the plain facts. "" when there is nothing to say."""
+    events, _, unanswered = _scan(session, conversation)
     asked = bool(_ASKS.search(user_text))
-    if not contradictions and not (asked and events):
-        return ""
-    lines = [
-        "[Registro do sistema, não escrito pela pessoa] O que você fez de verdade nesta conversa,"
-        " tirado do banco (não do que você disse):"
-    ]
-    lines += [f"- Às {_local(owner, m.created_at)}: {w}" for m, _, w in events[-6:]]
-    if contradictions:
-        lines.append("Depois disso você negou ter feito:")
-        lines += contradictions[-4:]
+    if unanswered:
+        lines = ["Correção pendente, do registro do sistema:"]
+        lines += [
+            f"- Às {_local(owner, denial.created_at)} você negou, por engano, que {words} às"
+            f" {_local(owner, done.created_at)}. Aquilo foi de verdade."
+            for denial, done, words in unanswered[-4:]
+        ]
         lines.append(
-            "Corrija agora, com clareza e sem rodeio: diga que fez de verdade, que os dados da"
-            " sua resposta vieram dali, e peça desculpas por ter negado. Não volte a negar."
+            "Nesta resposta, diga isso uma vez, curto e claro: que fez de verdade e que a negação"
+            " estava errada, com um pedido de desculpas só. Depois responda ao que a pessoa disse."
+            " Não repita a correção nas próximas respostas e não volte a duvidar dela."
         )
-    else:
-        lines.append(
-            "Se a pessoa pergunta sobre isso, confirme: os dados das suas respostas vieram dessas"
-            " ações."
+        return "\n".join(lines)
+    if asked and events:
+        return (
+            "A pessoa pergunta sobre o que você fez: responda pelo registro acima, que é do"
+            " sistema e confiável. Confirme sem rodeio o que está nele; o que não está, não afirme."
         )
-    return "\n".join(lines)
+    return ""
 
 
 def timeline(
