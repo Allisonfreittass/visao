@@ -10,6 +10,7 @@ html, body, #root { height: 100%; margin: 0; }
 /* The page itself never moves: only the lists inside scroll, and only up and down (on iPhone the
    page used to bounce and slide sideways while scrolling the chat). */
 html, body { overflow: hidden; overscroll-behavior: none; }
+html { background: var(--fundo); }
 body {
   background: var(--fundo);
   color: var(--tinta);

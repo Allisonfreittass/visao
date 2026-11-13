@@ -34,6 +34,7 @@
   --pilula-ativa-tinta: #eef2f3;
   --raio-bolha: 20px;
   --ceu-fallback: linear-gradient(180deg, #e4e9eb 0%, #cfd8dd 45%, #1e2b33 100%);
+  --ceu-chao: #1e2b33;
 }
 
 [data-theme="ceu"][data-ceu="noite"] {
@@ -64,12 +65,17 @@
   --pilula-ativa: #f5f5f7;
   --pilula-ativa-tinta: #1d1d1f;
   --ceu-fallback: linear-gradient(180deg, #141c26 0%, #1d2833 45%, #070b0f 100%);
+  --ceu-chao: #070b0f;
 }
 
-[data-theme="ceu"] body { background: var(--ceu-fallback); }
+/* Under everything, the forest floor's color: if anything ever leaves a gap, it is not white. */
+html[data-theme="ceu"] { background: var(--ceu-chao); }
+[data-theme="ceu"] body { background: var(--ceu-fallback); min-height: 100lvh; }
 
 /* The sky sits behind everything; the app floats on it. */
-.sky { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; display: block; pointer-events: none; }
+/* The whole screen, home-bar area included: 100vh stops short of it on iPhone with
+   viewport-fit=cover, which left a white strip under the message box. */
+.sky { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: auto; height: auto; min-height: 100lvh; z-index: 0; display: block; pointer-events: none; }
 .app--ceu { position: relative; max-width: none; }
 .app--ceu > :not(.sky) { position: relative; z-index: 1; }
 .app--ceu::before { display: none; }
