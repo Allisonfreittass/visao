@@ -1,0 +1,201 @@
+import Foundation
+import Observation
+
+/// One conversation on screen: what you sent shows at once, what you write while it answers waits
+/// (dimmed) and goes as one message after the reply, and the turn in flight says what it is doing.
+/// Same rules as `send` in apps/web/src/App.tsx.
+@MainActor
+@Observable
+public final class ChatStore {
+    public private(set) var conversationId: String?
+    public private(set) var messages: [Message] = []
+    public private(set) var sending = false
+    /// What the turn in flight is doing now; nil reads "Pensando".
+    public private(set) var liveStep: ProgressStep?
+    public private(set) var liveSteps: [ProgressStep] = []
+    public var error: String?
+    public private(set) var loading = false
+    /// Set by the screen from the scene phase: progress is only asked for while you look, so the
+    /// server notices a locked phone and also sends the reply as a notification (docs/STATUS.md).
+    public var isVisible = true
+    /// Called when a conversation is created by the first message (the list adds it).
+    public var onConversationCreated: ((Conversation) -> Void)?
+    /// Called with every API error, so a 401 can send the app back to the login screen.
+    public var onError: ((Error) -> Void)?
+
+    private let api: APIClient
+    private let progressInterval: Duration
+    private var queue: [Queued] = []
+    private var turnTask: Task<Turn, Error>?
+    private var watchTask: Task<Void, Never>?
+    private var counter = 0
+
+    struct Queued {
+        let id: String
+        let text: String
+        let replyTo: Message?
+    }
+
+    public init(api: APIClient, conversationId: String?, progressInterval: Duration = .milliseconds(900)) {
+        self.api = api
+        self.conversationId = conversationId
+        self.progressInterval = progressInterval
+    }
+
+    public func load() async {
+        guard let conversationId else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            let stored = try await api.messages(conversationId: conversationId)
+            messages = merge(stored: stored)
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Picks up what it said on its own while you were away, keeping what was never sent.
+    public func refresh() async {
+        guard let conversationId, !sending else { return }
+        guard let stored = try? await api.messages(conversationId: conversationId), !sending else { return }
+        let next = merge(stored: stored)
+        if next.map(\.id) != messages.map(\.id) { messages = next }
+    }
+
+    private func merge(stored: [Message]) -> [Message] {
+        // Sources only come with the turn; keep them for replies received in this session.
+        let known = Dictionary(messages.map { ($0.id, $0.sources) }, uniquingKeysWith: { a, _ in a })
+        let withSources = stored.map { message -> Message in
+            var m = message
+            if let sources = known[m.id], !sources.isEmpty { m.sources = sources }
+            return m
+        }
+        return withSources + messages.filter { $0.local == .failed || $0.local == .queued || $0.local == .stopped }
+    }
+
+    public var canStop: Bool { sending && turnTask != nil }
+
+    /// Sends now, or queues it if a reply is still being written.
+    public func send(_ rawText: String, replyTo: Message? = nil) {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        error = nil
+        if sending {
+            counter += 1
+            let id = "queued-\(counter)"
+            queue.append(Queued(id: id, text: text, replyTo: replyTo))
+            messages.append(Message(id: id, role: .user, content: text, createdAt: Date(), replyTo: replyTo?.quoted, local: .queued))
+            return
+        }
+        Task { await run(text: text, replyTo: replyTo) }
+    }
+
+    /// Parar: tell the server, and stop waiting at once.
+    public func stop() {
+        guard let turnTask, let conversationId else { return }
+        let api = self.api
+        Task { try? await api.cancel(conversationId: conversationId) }
+        turnTask.cancel()
+    }
+
+    private func run(text: String, replyTo: Message?) async {
+        counter += 1
+        let localId = "local-\(counter)"
+        let optimistic = Message(id: localId, role: .user, content: text, createdAt: Date(), replyTo: replyTo?.quoted, local: .sending)
+        messages.append(optimistic)
+        sending = true
+        defer {
+            turnTask = nil
+            watchTask?.cancel()
+            watchTask = nil
+            liveStep = nil
+            liveSteps = []
+            sending = false
+            flushQueue()
+        }
+
+        let id: String
+        do {
+            id = try await ensureConversation()
+        } catch {
+            report(error)
+            mark(localId, .failed)
+            return
+        }
+        startWatching(id)
+        let api = self.api
+        let task = Task { try await api.send(conversationId: id, content: text, replyToId: replyTo?.id) }
+        turnTask = task
+        do {
+            let turn = try await task.value
+            var reply = turn.assistantMessage
+            reply.sources = turn.sources
+            let waiting = messages.filter { $0.local == .queued }
+            messages = messages.filter { $0.id != localId && $0.local != .queued } + [turn.userMessage, reply] + waiting
+        } catch {
+            let stopped = error is CancellationError || (error as? APIError)?.isStoppedByOwner == true
+            if !stopped { report(error) }
+            let state: Message.LocalState = stopped ? .stopped : .failed
+            mark(localId, state)
+            // The message may have been stored even if the reply failed: reload, keeping the one
+            // that never arrived visible so it is not silently lost.
+            if let stored = try? await api.messages(conversationId: id) {
+                let lastUser = stored.last(where: { $0.role == .user })
+                let arrived = lastUser.map { $0.content == text && $0.createdAt >= optimistic.createdAt.addingTimeInterval(-5) } ?? false
+                let waiting = messages.filter { $0.local == .queued }
+                var failed = optimistic
+                failed.local = state
+                messages = (arrived ? stored : stored + [failed]) + waiting
+            }
+        }
+    }
+
+    /// Everything written meanwhile goes as one message: one answer to all of it.
+    private func flushQueue() {
+        guard !queue.isEmpty else { return }
+        let batch = queue
+        queue = []
+        let ids = Set(batch.map(\.id))
+        messages.removeAll { ids.contains($0.id) }
+        let text = batch.map(\.text).joined(separator: "\n\n")
+        let replyTo = batch.first(where: { $0.replyTo != nil })?.replyTo
+        Task { await run(text: text, replyTo: replyTo) }
+    }
+
+    private func ensureConversation() async throws -> String {
+        if let conversationId { return conversationId }
+        let created = try await api.createConversation()
+        conversationId = created.id
+        if created.memoryUnavailable {
+            error = "Não consegui preparar a memória desta vez. Dá para conversar, mas posso esquecer detalhes."
+        }
+        onConversationCreated?(created)
+        return created.id
+    }
+
+    private func startWatching(_ id: String) {
+        let api = self.api
+        let interval = progressInterval
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if self?.isVisible == true, let progress = try? await api.progress(conversationId: id) {
+                    guard let self, !Task.isCancelled else { return }
+                    if progress.active, let last = progress.steps.last {
+                        self.liveStep = last
+                        self.liveSteps = progress.steps
+                    }
+                }
+                try? await Task.sleep(for: interval)
+            }
+        }
+    }
+
+    private func mark(_ id: String, _ state: Message.LocalState) {
+        if let index = messages.firstIndex(where: { $0.id == id }) { messages[index].local = state }
+    }
+
+    private func report(_ error: Error) {
+        self.error = (error as? LocalizedError)?.errorDescription ?? "Algo deu errado"
+        onError?(error)
+    }
+}

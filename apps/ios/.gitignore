@@ -1,0 +1,9 @@
+# Swift Package e Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# O que só vale para este Mac: bundle id, time, endereço do servidor (docs/APP_IOS.md)
+Config/Local.xcconfig
