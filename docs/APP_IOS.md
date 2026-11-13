@@ -10,6 +10,11 @@ do Caddy, em `/api`); nada no servidor muda por causa dele.
 | `apps/ios/Config/` | `Visao.xcconfig` (no git), `Local.xcconfig` (seu, fora do git) e o `Info.plist`. |
 | `apps/ios/Visao.xcodeproj` | O projeto do Xcode. |
 
+O app se chama **V.I.S.A.O.** na tela inicial, com o bundle id `io.github.allisonfreittass.visao`
+(em `Config/Visao.xcconfig`) e o ícone do PWA. O bundle id não precisa ser criado em lugar
+nenhum: com assinatura automática, o Xcode registra na Apple sozinho na primeira vez que roda no
+iPhone.
+
 iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem dependências de terceiros.
 
 ## Antes da primeira vez
@@ -24,8 +29,8 @@ iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem depend�
    Sem isso o `xcodebuild` e o simulador não carregam (`CoreSimulator.framework` não encontrado).
    Abrir o Xcode e aceitar a instalação de componentes faz o mesmo.
 
-2. **Entre com o seu Apple ID no Xcode**: Xcode → Settings → Accounts → +. Anote o *Team ID* do
-   "Personal Team".
+2. **Entre com o seu Apple ID no Xcode**: Xcode → Settings → Accounts → + → Apple ID. Isso cria
+   o seu "Personal Team", e o Team ID dele vai no `Local.xcconfig`.
 
 3. **Crie o seu `Local.xcconfig`:**
 
@@ -37,9 +42,7 @@ iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem depend�
 
    | Chave | O que é |
    |---|---|
-   | `VISAO_BUNDLE_ID` | Id único do app. Com Apple ID grátis, o Xcode recusa um id que outra pessoa já registrou. |
-   | `VISAO_DISPLAY_NAME` | O nome embaixo do ícone. |
-   | `VISAO_DEVELOPMENT_TEAM` | O Team ID do passo 2. |
+         | `VISAO_DEVELOPMENT_TEAM` | O Team ID do passo 2 (o do "Personal Team"). |
    | `VISAO_API_BASE_URL` | Onde a API responde. Produção: `https:/$()/seu-endereco/api`. API no Mac: `http:/$()/seu-mac.local:8000`. O `$()` é obrigatório: num `.xcconfig`, `//` começa um comentário. |
 
    O endereço também dá para trocar na tela de login, em "Servidor"; o que você digita ali fica

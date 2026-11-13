@@ -1,8 +1,8 @@
-// Configuração do app. Os valores que são seus (bundle id, time, servidor) ficam em
+// Configuração do app. O que é só deste Mac (time da Apple e endereço do servidor) fica em
 // Local.xcconfig, fora do git: copie Local.example.xcconfig e preencha (docs/APP_IOS.md).
 
-VISAO_BUNDLE_ID = com.example.visao
-VISAO_DISPLAY_NAME = Visao
+VISAO_BUNDLE_ID = io.github.allisonfreittass.visao
+VISAO_DISPLAY_NAME = V.I.S.A.O.
 VISAO_DEVELOPMENT_TEAM =
 // "//" começa comentário num xcconfig; $() no meio impede isso.
 VISAO_API_BASE_URL = https:/$()/visao.example.com/api

@@ -1,10 +1,6 @@
 // Copie para Local.xcconfig (que fica fora do git) e preencha.
 
-// Único na Apple: com Apple ID grátis o Xcode recusa um id já registrado por outra pessoa.
-VISAO_BUNDLE_ID = io.github.SEU-USUARIO.visao
-// O nome embaixo do ícone na tela inicial.
-VISAO_DISPLAY_NAME = Visão
-// Xcode → Settings → Accounts → seu Apple ID → Team ID (10 letras e números).
+// Xcode → Settings → Apple Accounts → seu Apple ID → Personal Team (10 letras e números).
 VISAO_DEVELOPMENT_TEAM = ABCDE12345
 // Onde a API responde. Produção (Caddy): https://seu-endereco/api
 // API rodando no Mac, na mesma rede: http:/$()/SEU-MAC.local:8000
