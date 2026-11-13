@@ -43,7 +43,7 @@ export function Rail(props: RailProps) {
       style={drag.offset ? { transform: `translateX(${-drag.offset}px)`, transition: "none" } : undefined}
       {...(props.open ? drag.handlers : {})}
     >
-      <a className="brand rail-brand" href="/" aria-label="Visão, início">Visão</a>
+      <a className="brand rail-brand" href="/" aria-label="V.I.S.A.O., início">V.I.S.A.O.</a>
       <nav className="rail-nav" aria-label="Seções">
         {NAV.map((item) => (
           <button key={item.view} type="button" aria-current={view === item.view ? "page" : undefined} onClick={() => onView(item.view)}>

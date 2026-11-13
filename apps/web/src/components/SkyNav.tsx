@@ -29,7 +29,7 @@ export function SkyNav({ wide, view, pendingCount, agentName, menuOpen, onMenu, 
         <button type="button" className="sky-round" onClick={onMenu} aria-expanded={menuOpen} aria-label="Conversas, Mac e mais">
           <Icon name="menu" size={20} />
         </button>
-        {wide && <span className="sky-brand" aria-hidden="true">Visão</span>}
+        {wide && <span className="sky-brand" aria-hidden="true">V.I.S.A.O.</span>}
       </div>
       <nav className="sky-tabs" aria-label="Seções">
         {TABS.filter((tab) => !(wide && tab.view === "inbox")).map((tab) => (

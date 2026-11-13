@@ -677,7 +677,7 @@ export function App() {
             Menu{pending.count > 0 && <span className="rail-badge" aria-label={`${pending.count} esperando você`}>{pending.count}</span>}
           </button>
         )}
-        <a className="brand" href="/" aria-label="Visão, início">Visão</a>
+        <a className="brand" href="/" aria-label="V.I.S.A.O., início">V.I.S.A.O.</a>
         <span className="identity" title={status?.identity?.internal_id}>
           {agentName ?? <em>sem nome ainda</em>}
         </span>
