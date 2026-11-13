@@ -2,16 +2,16 @@ import SwiftUI
 import UIKit
 import VisaoKit
 
-enum Theme {
-    static let userBubble = Color.accentColor.opacity(0.22)
-    static let assistantBubble = Color(uiColor: .secondarySystemBackground)
-}
-
+/// One message, as in the "Neblina" look of the web: what he says in a solid bubble on the left,
+/// what you say in glass on the right. Names and times stay out of the way; only "puxou
+/// conversa", "no Mac", "não foi enviada" and the like are shown.
 struct MessageRow: View {
     let message: Message
     let speaker: String
     let onReply: () -> Void
     let onQuoteTap: (String) -> Void
+    let onOpenPage: (Artifact) -> Void
+    @Environment(\.palette) private var palette
 
     /// Past this, letting go answers the message (as SwipeReply.tsx on the web).
     private let trigger: CGFloat = 56
@@ -24,17 +24,19 @@ struct MessageRow: View {
 
     var body: some View {
         HStack {
-            if isUser { Spacer(minLength: 40) }
+            if isUser { Spacer(minLength: 48) }
             bubble
             if !isUser { Spacer(minLength: 24) }
         }
         .background(alignment: .leading) {
             if offset > 0 {
                 Image(systemName: "arrowshape.turn.up.left.fill")
-                    .foregroundStyle(armed ? Color.accentColor : .secondary)
-                    .scaleEffect(armed ? 1.15 : 0.9)
+                    .foregroundStyle(armed ? palette.tinta : palette.tintaFraca)
+                    .frame(width: 32, height: 32)
+                    .glassCircle(palette, size: 32)
+                    .scaleEffect(armed ? 1.1 : 0.85)
                     .opacity(Double(min(offset / trigger, 1)))
-                    .offset(x: max(0, offset / 2 - 10))
+                    .offset(x: max(0, offset / 2 - 16))
                     .accessibilityHidden(true)
             }
         }
@@ -44,23 +46,33 @@ struct MessageRow: View {
 
     private var bubble: some View {
         VStack(alignment: .leading, spacing: 8) {
-            meta
+            if let tag = tag {
+                Text(tag.text)
+                    .font(Typo.text(.caption))
+                    .foregroundStyle(tag.isProblem ? palette.erro : palette.tintaSuave)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(palette.fundoHover, in: Capsule())
+            }
             if let quote = message.replyTo {
                 Button { onQuoteTap(quote.id) } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(quote.role == .assistant ? speaker : "Você")
-                            .font(.caption.weight(.semibold))
+                            .font(Typo.text(.caption, weight: .medium))
+                            .foregroundStyle(palette.estanho)
                         Text(quote.excerpt)
-                            .font(.caption)
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.tintaSuave)
                             .lineLimit(2)
-                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(8)
-                    .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(palette.fundoHover, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(alignment: .leading) {
-                        Rectangle().fill(Color.accentColor).frame(width: 3)
-                            .clipShape(RoundedRectangle(cornerRadius: 2))
+                        UnevenRoundedRectangle(topLeadingRadius: 12, bottomLeadingRadius: 12)
+                            .fill(palette.estanho)
+                            .frame(width: 3)
                     }
                 }
                 .buttonStyle(.plain)
@@ -68,59 +80,80 @@ struct MessageRow: View {
                 .accessibilityHint("Vai para a mensagem")
             }
             if !message.attachments.isEmpty {
-                AttachmentChips(attachments: message.attachments)
+                MessageAttachments(attachments: message.attachments)
             }
             if !message.content.isEmpty {
                 MarkdownView(text: message.content)
+            }
+            if let artifact = message.artifact {
+                ArtifactCard(artifact: artifact) { onOpenPage(artifact) }
+                    .padding(.horizontal, -6)
+                    .padding(.top, 4)
             }
             if !message.sources.isEmpty {
                 SourcesList(sources: message.sources)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isUser ? Theme.userBubble : Theme.assistantBubble, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .opacity(message.local == .sending || message.local == .queued ? 0.6 : 1)
+        .font(Typo.text(.body))
+        .foregroundStyle(isUser ? palette.tinta : palette.bolhaDeleTinta)
+        .padding(.horizontal, isUser ? 16 : 18)
+        .padding(.vertical, isUser ? 12 : 14)
+        .background(background)
+        .opacity(opacity)
         .offset(x: offset)
         .contextMenu {
             if canReply {
                 Button("Responder", systemImage: "arrowshape.turn.up.left", action: onReply)
             }
-            Button("Copiar", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }
+            if !message.content.isEmpty {
+                Button("Copiar", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }
+            }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(isUser ? "Você" : speaker): \(message.content)")
         .accessibilityAction(named: "Responder") { if canReply { onReply() } }
     }
 
-    private var meta: some View {
-        HStack(spacing: 6) {
-            Text(isUser ? "Você" : speaker).font(.caption.weight(.semibold))
-            if let tag = originTag {
-                Text(tag)
-                    .font(.caption2.weight(.medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1)
-                    .background(.quaternary, in: Capsule())
+    @ViewBuilder
+    private var background: some View {
+        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        if isUser {
+            Group {
+                if palette.usesGlass {
+                    shape.fill(.ultraThinMaterial).overlay(shape.fill(palette.bolhaSua))
+                } else {
+                    shape.fill(palette.bolhaSua)
+                }
             }
-            switch message.local {
-            case .failed: Text("não foi enviada").font(.caption).foregroundStyle(.red)
-            case .stopped: Text("parada").font(.caption).foregroundStyle(.orange)
-            case .queued: Text("na fila").font(.caption).foregroundStyle(.secondary)
-            case .sending, .none:
-                Text(message.createdAt, format: .dateTime.hour().minute())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .overlay(shape.strokeBorder(message.local == .failed ? palette.erro : palette.vidroBorda, lineWidth: 1))
+            .shadow(color: palette.sombra.opacity(0.5), radius: 7, y: 2)
+        } else {
+            shape.fill(palette.bolhaDele)
+                .overlay(shape.strokeBorder(palette.usesGlass ? .clear : palette.linha, lineWidth: 1))
+                .shadow(color: palette.sombra, radius: 11, y: 6)
         }
-        .foregroundStyle(.primary)
     }
 
-    private var originTag: String? {
+    private var opacity: Double {
+        switch message.local {
+        case .sending: 0.55
+        case .queued: 0.42
+        default: 1
+        }
+    }
+
+    private var tag: (text: String, isProblem: Bool)? {
+        switch message.local {
+        case .failed: return ("não foi enviada", true)
+        case .stopped: return ("parada", true)
+        case .queued: return ("na fila", false)
+        default: break
+        }
         switch message.origin {
-        case "initiative": "puxou conversa"
-        case "arm": "no Mac"
-        case "google": "no Google"
-        default: nil
+        case "initiative": return ("puxou conversa", false)
+        case "arm": return ("no Mac", false)
+        case "google": return ("no Google", false)
+        default: return nil
         }
     }
 
@@ -150,38 +183,26 @@ struct MessageRow: View {
     }
 }
 
-private struct AttachmentChips: View {
-    let attachments: [Attachment]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(attachments) { attachment in
-                Label(attachment.filename, systemImage: attachment.isImage ? "photo" : "doc.text")
-                    .font(.footnote)
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
 private struct SourcesList: View {
     let sources: [Source]
+    @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Fontes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Rotulo("Fontes")
             ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
                 if let url = URL(string: source.url), ["http", "https"].contains(url.scheme ?? "") {
                     Link(destination: url) {
-                        (Text("\(index + 1). \(source.title)")
-                            + Text(" · \(source.source)").foregroundColor(.secondary))
-                            .font(.footnote)
+                        (Text("\(index + 1). \(source.title)").underline(color: palette.linhaForte)
+                            + Text(" · \(source.source)").foregroundColor(palette.tintaFraca))
+                            .font(Typo.text(.footnote))
                             .multilineTextAlignment(.leading)
                     }
+                    .foregroundStyle(palette.tinta)
                 }
             }
         }
+        .padding(.top, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Fontes pesquisadas")
     }

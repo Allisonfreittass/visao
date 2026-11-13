@@ -4,6 +4,8 @@
 <dict>
 	<key>VisaoAPIBaseURL</key>
 	<string>$(VISAO_API_BASE_URL)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Para tirar uma foto e mandar na conversa.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

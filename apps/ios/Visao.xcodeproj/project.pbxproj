@@ -19,7 +19,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A1000000000000000000E001 /* Visao */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Visao; sourceTree = "<group>"; };
+		A1000000000000000000E001 /* Visao */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Visao;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */

@@ -6,7 +6,11 @@ import VisaoKit
 @MainActor
 @Observable
 final class Session {
-    private(set) var api: APIClient
+    private(set) var api: APIClient {
+        didSet { loader = AttachmentLoader(api: api) }
+    }
+    /// Photos and files of the messages, downloaded once per session.
+    private(set) var loader: AttachmentLoader
     private(set) var loggedIn: Bool
     /// The name it chose, or nil while it has none: the app never calls it "VISÃO".
     private(set) var agentName: String?
@@ -20,7 +24,9 @@ final class Session {
     init() {
         tokens = KeychainTokenStore(service: (Bundle.main.bundleIdentifier ?? "visao") + ".auth")
         let url = Session.savedServer ?? Session.configuredServer
-        api = APIClient(baseURL: url, tokens: tokens)
+        let client = APIClient(baseURL: url, tokens: tokens)
+        api = client
+        loader = AttachmentLoader(api: client)
         loggedIn = tokens.token != nil
     }
 
