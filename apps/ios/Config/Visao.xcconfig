@@ -1,0 +1,10 @@
+// Configuração do app. Os valores que são seus (bundle id, time, servidor) ficam em
+// Local.xcconfig, fora do git: copie Local.example.xcconfig e preencha (docs/APP_IOS.md).
+
+VISAO_BUNDLE_ID = com.example.visao
+VISAO_DISPLAY_NAME = Visao
+VISAO_DEVELOPMENT_TEAM =
+// "//" começa comentário num xcconfig; $() no meio impede isso.
+VISAO_API_BASE_URL = https:/$()/visao.example.com/api
+
+#include? "Local.xcconfig"
