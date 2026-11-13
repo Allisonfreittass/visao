@@ -27,7 +27,23 @@ A escuta do aparelho fica desligada até você ligar "Ouvir pelo navegador" nas 
 Chrome manda o áudio para o Google e o Safari para a Apple. A fala do aparelho roda no aparelho.
 Código não é lido em voz alta: ele diz que deixou o código na tela (`speech/speakable.ts`).
 
-## Restrições do master prompt
+## Aprovar por voz (2026-11-13)
+
+Numa ligação, quando ele prepara algo que precisa do seu sim (um email, um evento, um pedido ao
+Mac), ele termina de falar e lê em voz alta exatamente o que vai fazer: "Preparei um email para
+fulano, assunto tal. Para mandar, diga 'pode mandar'. Para cancelar, diga 'não'." O cartão
+também aparece grande na tela da ligação, com Aprovar e Recusar.
+
+- **Regras fixas, sem modelo** (`apps/web/src/voice/approval.ts`): aprovam "pode mandar", "pode
+  rodar", "pode marcar", "aprovo", "confirmo" e um "sim" curto e sozinho; recusam "não",
+  "cancela", "espera". Frase que mistura sim e não, ou longa ("sim, mas muda o assunto"), não
+  decide nada e segue como mensagem normal.
+- Só vale durante a ligação, para o pedido que ele acabou de ler, e por 3 minutos.
+- Ele só diz "pronto, mandei" depois que o servidor aceitou; se falhar, diz que ficou na tela.
+- O servidor registra no audit que a decisão foi por voz (`?via=voz`).
+- Desliga em Ajustes → "Aprovar por voz na ligação".
+
+
 
 - Sem ElevenLabs, sem extrair modelos proprietários, sem copiar vozes sem autorização.
 - `SpeechProvider`/`TTSService` próprios, com pesos abertos e licença adequada. "Serviço próprio

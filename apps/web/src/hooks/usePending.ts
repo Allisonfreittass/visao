@@ -17,10 +17,10 @@ export interface Pending {
   /** How many things wait for the owner right now. */
   count: number;
   refresh: () => void;
-  decideArm: (task: ArmTask, decision: "approve" | "reject") => Promise<void>;
-  decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<void>;
-  decideGoogle: (action: GoogleAction, decision: "approve" | "reject") => Promise<void>;
-  dismiss: (notice: AppNotification) => Promise<void>;
+  decideArm: (task: ArmTask, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
+  decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<boolean>;
+  decideGoogle: (action: GoogleAction, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
+  dismiss: (notice: AppNotification) => Promise<boolean>;
   reply: (notice: AppNotification, conversationId: string | null) => Promise<string | null>;
 }
 
@@ -65,13 +65,17 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     Promise.all(openings.map((n) => api.markRead(n.id))).then(refresh, () => undefined);
   }, [api, chatVisible, openings.map((n) => n.id).join(","), refresh]);
 
-  async function act(action: () => Promise<unknown>) {
+  /** True when the server accepted it: a spoken "pronto" must never follow a failure. */
+  async function act(action: () => Promise<unknown>): Promise<boolean> {
+    let ok = true;
     try {
       await action();
     } catch (e) {
+      ok = false;
       onErrorRef.current(e);
     }
     refresh();
+    return ok;
   }
 
   const armProposals = tasks.filter((t) => t.status === "proposed");
@@ -85,9 +89,9 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     tasks,
     count: armProposals.length + google.length + goals.length + notices.length,
     refresh,
-    decideArm: (task, decision) => act(() => api.decideArm(task.id, decision)),
+    decideArm: (task, decision, via) => act(() => api.decideArm(task.id, decision, via)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),
-    decideGoogle: (action, decision) => act(() => api.decideGoogle(action.id, decision)),
+    decideGoogle: (action, decision, via) => act(() => api.decideGoogle(action.id, decision, via)),
     dismiss: (notice) => act(() => api.markRead(notice.id)),
     reply: async (notice, conversationId) => {
       try {

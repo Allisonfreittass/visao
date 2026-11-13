@@ -15,6 +15,10 @@ interface CallViewProps {
   error: string | null;
   onInterrupt: () => void;
   onHangUp: () => void;
+  /** Something waiting for a yes (an email, an event, Mac work), shown big in the call. */
+  ask?: { label: string; text: string; detail?: string; onApprove: () => void; onReject: () => void } | null;
+  /** Whether a spoken "pode mandar" / "não" answers it. */
+  voiceApproval?: boolean;
 }
 
 function clock(ms: number): string {
@@ -32,7 +36,7 @@ const HINTS: Partial<Record<OrbState, string>> = {
 };
 
 /** A call: the whole screen is the conversation, hands free, the screen kept on. */
-export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp }: CallViewProps) {
+export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval }: CallViewProps) {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(started);
   useEffect(() => {
@@ -68,6 +72,18 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         {lastReply && <p><span>{agentName ?? "Ele"}</span>{speakableText(lastReply.content).slice(0, 280)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
       </div>
+      {ask && (
+        <section className="call-ask" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
+          <span className="call-ask-label">{ask.label}</span>
+          <p className="call-ask-text">{ask.text}</p>
+          {ask.detail && <p className="call-ask-detail">{ask.detail.slice(0, 280)}</p>}
+          <div className="call-ask-buttons">
+            <button type="button" className="call-ask-no" onClick={ask.onReject}>Recusar</button>
+            <button type="button" className="call-ask-yes" onClick={ask.onApprove}>Aprovar</button>
+          </div>
+          {voiceApproval && <p className="call-ask-voice">Ou diga “pode mandar” para aprovar, ou “não”.</p>}
+        </section>
+      )}
       <footer className="call-actions">
         {speaking && <button type="button" className="rs-botao" onClick={onInterrupt}>Interromper</button>}
         <button type="button" className="rs-botao rs-botao--principal call-hangup" onClick={onHangUp}>Desligar</button>

@@ -3,6 +3,7 @@ and approve or reject the email and events it prepared."""
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from apps.api.deps import AppSettings, CurrentUser, DbSession
 from core.google import account as accounts
 from core.google import actions
+from infrastructure.database.audit import record_audit
 from infrastructure.database.models import GoogleAction
 from integrations.google.client import Credentials, GoogleError
 
@@ -112,8 +114,14 @@ def list_actions(db: DbSession, user: CurrentUser) -> list[ActionOut]:
 
 @router.post("/actions/{action_id}/{decision}")
 def decide(
-    action_id: uuid.UUID, decision: str, db: DbSession, user: CurrentUser, settings: AppSettings
+    action_id: uuid.UUID,
+    decision: str,
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    via: Literal["toque", "voz"] = "toque",
 ) -> ActionOut:
+    """`via=voz`: said in a call after it read the action aloud (docs/VOICE.md); recorded."""
     try:
         if decision == "approve":
             action = actions.approve(db, user, action_id, settings.secret_key)
@@ -123,5 +131,12 @@ def decide(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "decisão desconhecida")
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "pedido não encontrado") from exc
+    record_audit(
+        db,
+        f"google.{decision}",
+        "success",
+        actor_user_id=user.id,
+        details={"via": via, "kind": action.kind},
+    )
     db.commit()
     return _action(action)

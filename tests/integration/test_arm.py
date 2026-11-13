@@ -209,3 +209,20 @@ def test_without_an_arm_the_prompt_says_nothing_about_it(db):
 
     owner = setup(db)
     assert service.work_record(db, owner.id) == ""
+
+
+def test_an_approval_said_in_a_call_is_recorded_as_by_voice(client, db, sender):
+    from sqlalchemy import select
+
+    from infrastructure.database.models import AuditLog
+
+    owner_user, owner = _owner_client(client, db)
+    _pair(client, owner)
+    task = service.propose(db, owner_user.id, "visao", "rode os testes")
+    db.commit()
+
+    approved = client.post(f"/arm/tasks/{task.id}/approve?via=voz", headers=owner)
+    assert approved.status_code == 200 and approved.json()["status"] == "approved"
+    log = db.scalars(select(AuditLog).where(AuditLog.action == "arm.approve")).all()[-1]
+    assert log.details == {"via": "voz"}
+    assert client.post(f"/arm/tasks/{task.id}/approve?via=grito", headers=owner).status_code == 422

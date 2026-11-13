@@ -594,8 +594,9 @@ export class Api {
     });
   }
 
-  decideArm(id: string, decision: "approve" | "reject"): Promise<ArmTask> {
-    return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}`, { method: "POST" });
+  /** `via: "voz"`: said in a call after it read the task aloud; the server records it. */
+  decideArm(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<ArmTask> {
+    return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
   }
 
   google(): Promise<GoogleState> {
@@ -618,8 +619,8 @@ export class Api {
     return this.request("/google/actions");
   }
 
-  decideGoogle(id: string, decision: "approve" | "reject"): Promise<GoogleAction> {
-    return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}`, { method: "POST" });
+  decideGoogle(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<GoogleAction> {
+    return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
   }
 
   pushState(): Promise<PushState> {

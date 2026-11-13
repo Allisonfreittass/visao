@@ -23,6 +23,8 @@ interface SettingsViewProps {
   onError: (e: unknown) => void;
   sky: boolean;
   onToggleSky: () => void;
+  voiceApproval: boolean;
+  onToggleVoiceApproval: () => void;
 }
 
 /** All the switches in one place, grouped by what they touch. */
@@ -80,6 +82,12 @@ export function SettingsView(props: SettingsViewProps) {
             checked={props.speakReplies}
             disabled={!props.canSpeak}
             onChange={props.onToggleSpeak}
+          />
+          <Setting
+            title="Aprovar por voz na ligação"
+            description="Numa ligação, eu leio em voz alta o email, o evento ou o pedido ao Mac e espero você dizer “pode mandar” (ou “não”). Fora da ligação, só com o toque."
+            checked={props.voiceApproval}
+            onChange={props.onToggleVoiceApproval}
           />
           {!props.serverListening && props.deviceCouldListen && (
             <Setting

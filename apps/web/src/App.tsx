@@ -15,7 +15,7 @@ import {
   type VoiceStatus,
 } from "./api";
 import { CallView } from "./components/CallView";
-import { ChatView } from "./components/ChatView";
+import { type Ask, ChatView } from "./components/ChatView";
 import { Login } from "./components/Login";
 import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
@@ -41,6 +41,7 @@ import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { Sky } from "./sky/Sky";
+import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, VOICE_ANSWER_MS } from "./voice/approval";
 import { MAX_FILES } from "./attachments";
 
 interface TurnLatency {
@@ -92,6 +93,11 @@ function useDemoLevel(active: boolean): number {
 function requestedConversation(): string | null {
   return new URLSearchParams(window.location.search).get("c");
 }
+
+type LiveAsk = Ask & {
+  spoken: SpokenAsk;
+  decide: (decision: "approve" | "reject", via: "toque" | "voz") => Promise<boolean>;
+};
 
 export function App() {
   const api = useMemo(() => {
@@ -160,11 +166,14 @@ export function App() {
   }, []);
 
   const sendRef = useRef<(text: string, spoken?: SpokenTiming, files?: Attachment[], replyTo?: Message | null) => Promise<void>>(async () => undefined);
+  const reloadRef = useRef<() => void>(() => undefined);
+  const heardRef = useRef<(text: string, spoken: SpokenTiming) => Promise<void>>(async () => undefined);
   const voice = useVoice({
     api,
     status: voiceStatus,
     deviceListening,
-    onTranscript: (text, timing) => sendRef.current(text, timing),
+    // In a call, a clear "pode mandar" or "não" answers the action it just read aloud.
+    onTranscript: (text, timing) => heardRef.current(text, timing),
     onError: setError,
   });
 
@@ -254,6 +263,70 @@ export function App() {
 
   // A page being written: ask about it until it is ready (only while you look, so the server
   // knows to notify you otherwise).
+  // What waits for a yes in this conversation: cards in the chat, and read aloud in a call.
+  const liveAsks: LiveAsk[] = [
+    ...pending.armProposals
+      .filter((t) => t.conversation_id === current)
+      .map((t) => ({
+        id: t.id,
+        label: `Mac · ${t.project}`,
+        text: t.prompt,
+        onApprove: () => void pending.decideArm(t, "approve"),
+        onReject: () => void pending.decideArm(t, "reject"),
+        spoken: spokenArm(t),
+        decide: (d: "approve" | "reject", via: "toque" | "voz") => pending.decideArm(t, d, via),
+      })),
+    ...pending.googleActions
+      .filter((a) => a.conversation_id === current)
+      .map((a) => ({
+        id: a.id,
+        label: a.kind === "send_email" ? "Email" : "Agenda",
+        text: a.summary,
+        detail: a.kind === "send_email" ? a.payload.body : undefined,
+        onApprove: () => void pending.decideGoogle(a, "approve").then(() => reloadRef.current()),
+        onReject: () => void pending.decideGoogle(a, "reject"),
+        spoken: spokenGoogle(a),
+        decide: (d: "approve" | "reject", via: "toque" | "voz") =>
+          pending.decideGoogle(a, d, via).then((ok) => {
+            if (ok && d === "approve") reloadRef.current();
+            return ok;
+          }),
+      })),
+  ];
+  const liveAsksRef = useRef(liveAsks);
+  liveAsksRef.current = liveAsks;
+  const askedRef = useRef<{ ask: LiveAsk; at: number } | null>(null);
+  const announcedRef = useRef(new Set<string>());
+  const [voiceApproval, setVoiceApproval] = useState(() => loadPreference("voice-approval") !== "0");
+  const askIds = liveAsks.map((a) => a.id).join(",");
+  // In a call, once it stops talking, it reads each new action aloud and waits for a yes.
+  useEffect(() => {
+    if (!voice.inCall) {
+      askedRef.current = null;
+      return;
+    }
+    if (!voiceApproval || sending || voice.speaking) return;
+    const next = liveAsksRef.current.find((a) => !announcedRef.current.has(a.id));
+    if (!next) return;
+    announcedRef.current.add(next.id);
+    askedRef.current = { ask: next, at: Date.now() };
+    voice.speak(next.spoken.question);
+  }, [voice.inCall, voice.speaking, voiceApproval, sending, askIds]);
+  heardRef.current = async (text, timing) => {
+    const asked = askedRef.current;
+    const stillWaiting = asked && liveAsksRef.current.some((a) => a.id === asked.ask.id);
+    if (asked && stillWaiting && voice.inCall && voiceApproval && Date.now() - asked.at < VOICE_ANSWER_MS) {
+      const verdict = heardVerdict(text);
+      if (verdict) {
+        askedRef.current = null;
+        const ok = await asked.ask.decide(verdict, "voz");
+        voice.speak(!ok ? "Não consegui agora. Ficou esperando você na tela." : verdict === "approve" ? asked.ask.spoken.done : "Tudo bem, não fiz.");
+        return;
+      }
+    }
+    await sendRef.current(text, timing);
+  };
+
   const pendingPages = messages.filter((m) => m.artifact?.status === "pending").map((m) => m.artifact!.id).join(",");
   useEffect(() => {
     if (!pendingPages) return;
@@ -581,6 +654,7 @@ export function App() {
   };
   const currentConversation = conversations.find((c) => c.id === current);
   const reload = () => { if (current) api.messages(current).then(setMessages).catch(handleError); };
+  reloadRef.current = reload;
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
@@ -723,6 +797,12 @@ export function App() {
                 onError={handleError}
                 sky={sky}
                 onToggleSky={toggleSky}
+                voiceApproval={voiceApproval}
+                onToggleVoiceApproval={() => {
+                  const next = !voiceApproval;
+                  setVoiceApproval(next);
+                  savePreference("voice-approval", next ? "1" : "0");
+                }}
               />
             )}
             <ChatView
@@ -750,27 +830,7 @@ export function App() {
               focusRequest={composerFocus}
               agentName={agentName}
               messages={messages}
-              asks={[
-                ...pending.armProposals
-                  .filter((t) => t.conversation_id === current)
-                  .map((t) => ({
-                    id: t.id,
-                    label: `Mac · ${t.project}`,
-                    text: t.prompt,
-                    onApprove: () => void pending.decideArm(t, "approve"),
-                    onReject: () => void pending.decideArm(t, "reject"),
-                  })),
-                ...pending.googleActions
-                  .filter((a) => a.conversation_id === current)
-                  .map((a) => ({
-                    id: a.id,
-                    label: a.kind === "send_email" ? "Email" : "Agenda",
-                    text: a.summary,
-                    detail: a.kind === "send_email" ? a.payload.body : undefined,
-                    onApprove: () => void pending.decideGoogle(a, "approve").then(reload),
-                    onReject: () => void pending.decideGoogle(a, "reject"),
-                  })),
-              ]}
+              asks={liveAsks}
               sending={sending || preparing}
               status={liveStep}
               onStop={stopTurn}
@@ -861,6 +921,8 @@ export function App() {
           error={error}
           onInterrupt={voice.stopSpeaking}
           onHangUp={voice.endCall}
+          ask={liveAsks[0] ?? null}
+          voiceApproval={voiceApproval}
         />
       )}
     </div>

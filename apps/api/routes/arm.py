@@ -6,7 +6,7 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -191,26 +191,33 @@ def ask(body: TaskIn, user: CurrentUser, db: DbSession) -> TaskOut:
     return _task_out(task)
 
 
-def _decide(action, task_id: uuid.UUID, user: CurrentUser, db: DbSession, name: str) -> TaskOut:
+def _decide(
+    action, task_id: uuid.UUID, user: CurrentUser, db: DbSession, name: str, via: str = "toque"
+) -> TaskOut:
     try:
         task = action(db, user.id, task_id)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarefa não encontrada") from exc
     except service.ArmError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
-    record_audit(db, f"arm.{name}", "success", actor_user_id=user.id)
+    record_audit(db, f"arm.{name}", "success", actor_user_id=user.id, details={"via": via})
     db.commit()
     return _task_out(task)
 
 
 @router.post("/tasks/{task_id}/approve", response_model=TaskOut)
-def approve(task_id: uuid.UUID, user: CurrentUser, db: DbSession) -> TaskOut:
-    return _decide(service.approve, task_id, user, db, "approve")
+def approve(
+    task_id: uuid.UUID, user: CurrentUser, db: DbSession, via: Literal["toque", "voz"] = "toque"
+) -> TaskOut:
+    """`via=voz`: said in a call after it read the task aloud (docs/VOICE.md); recorded."""
+    return _decide(service.approve, task_id, user, db, "approve", via)
 
 
 @router.post("/tasks/{task_id}/reject", response_model=TaskOut)
-def reject(task_id: uuid.UUID, user: CurrentUser, db: DbSession) -> TaskOut:
-    return _decide(service.reject, task_id, user, db, "reject")
+def reject(
+    task_id: uuid.UUID, user: CurrentUser, db: DbSession, via: Literal["toque", "voz"] = "toque"
+) -> TaskOut:
+    return _decide(service.reject, task_id, user, db, "reject", via)
 
 
 # --- machine side -------------------------------------------------------------------------
