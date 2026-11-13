@@ -2,11 +2,12 @@ import { type Conversation, utcDate } from "../api";
 import { dayLabel } from "../labels";
 import { Icon, type IconName } from "./Icon";
 
-export type WorkspaceView = "conversation" | "inbox" | "study" | "mac" | "settings";
+export type WorkspaceView = "conversation" | "inbox" | "projects" | "study" | "mac" | "settings";
 
 const NAV: { view: WorkspaceView; label: string; icon: IconName }[] = [
   { view: "conversation", label: "Conversa", icon: "chat" },
   { view: "inbox", label: "Pendências", icon: "inbox" },
+  { view: "projects", label: "Projetos", icon: "folder" },
   { view: "study", label: "Caderno", icon: "notebook" },
   { view: "mac", label: "Mac", icon: "laptop" },
   { view: "settings", label: "Ajustes", icon: "sliders" },

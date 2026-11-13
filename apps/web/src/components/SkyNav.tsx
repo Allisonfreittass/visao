@@ -6,7 +6,7 @@ import type { WorkspaceView } from "./Rail";
 const TABS: { view: WorkspaceView; label: string }[] = [
   { view: "inbox", label: "Início" },
   { view: "conversation", label: "Chat" },
-  { view: "study", label: "Caderno" },
+  { view: "projects", label: "Projetos" },
 ];
 
 interface SkyNavProps {

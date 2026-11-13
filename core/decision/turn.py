@@ -40,6 +40,10 @@ _DESCRIBE = {
         " marcado ainda"
     ),
     "read_links": "os links que a pessoa mandou foram abertos agora; o conteúdo está acima",
+    "browsed": (
+        "páginas abertas agora num navegador de verdade; o que elas mostram está acima, com as"
+        " que não abriram e o motivo"
+    ),
     "read_attachments": (
         "as fotos e arquivos que a pessoa mandou nesta mensagem estão nela, acima; fale só do"
         " que eles mostram"

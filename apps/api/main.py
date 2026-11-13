@@ -18,6 +18,7 @@ from apps.api.routes import (
     memory,
     mind,
     onboarding,
+    projects,
     push,
     study,
     system,
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
     app.include_router(conversations.router)
     app.include_router(attachments.router)
     app.include_router(artifacts.router)
+    app.include_router(projects.router)
     app.include_router(memory.router)
     app.include_router(voice.router)
     app.include_router(curiosity.router)

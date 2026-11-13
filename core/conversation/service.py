@@ -133,6 +133,7 @@ def build_context(
 
     Photos and file text go with the latest messages only; older ones just name their files."""
     files = files or {}
+    by_id = {m.id: m for m in history}
     allowance = attachments.ContextAllowance()
     selected: list[ChatMessage] = []
     used = 0
@@ -140,6 +141,12 @@ def build_context(
         if selected and used + len(message.content) > char_budget:
             break
         content, images = message.content, ()
+        quoted = by_id.get(message.reply_to_id) if message.reply_to_id else None
+        if quoted is not None:
+            # She tapped Responder on an earlier message: say which, so "isso" has a referent.
+            who = "sua" if quoted.role == "assistant" else "dela"
+            excerpt = " ".join(quoted.content.split())[:QUOTE_CHARS]
+            content = f"[Respondendo a esta mensagem {who}: «{excerpt}»]\n{content}"
         block, images = attachments.render(
             files.get(message.id, []), allowance, recent=position < attachments.RECENT_MESSAGES
         )
@@ -151,6 +158,7 @@ def build_context(
     return selected
 
 
+QUOTE_CHARS = 300
 # What a provider answers when the request itself is not acceptable (e.g. images to a text model).
 REJECTED_INPUT = {"http_400", "http_413", "http_415", "http_422"}
 NO_VISION_NOTE = (
@@ -186,10 +194,13 @@ def reply(
     owner_rules: str = "",
     attachment: str = "",
     files: list[Attachment] | None = None,
+    reply_to_id: uuid.UUID | None = None,
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
-    user_message = Message(conversation_id=conversation.id, role="user", content=user_text)
+    user_message = Message(
+        conversation_id=conversation.id, role="user", content=user_text, reply_to_id=reply_to_id
+    )
     session.add(user_message)
     session.flush()
     attachments.claim(files or [], user_message)
@@ -273,6 +284,10 @@ def reply(
         # reply stopped mid-sentence. Never present a cut reply as complete.
         usage.outcome = "truncated"
     session.add(usage)
+    if progress.cancelled():
+        # Parar while it was writing: the call is paid for and recorded, the reply is not kept.
+        session.commit()
+        raise progress.TurnCancelled()
     if not response.text.strip():
         session.commit()
         raise EmptyReplyError("provider returned an empty reply")

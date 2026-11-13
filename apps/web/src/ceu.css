@@ -152,8 +152,7 @@
 @keyframes orbe-pensa { 50% { transform: scale(1.6); opacity: .7; } }
 
 /* Ask bars and pages float as glass cards. */
-.app--ceu .ask-bar { border: 1px solid var(--vidro-borda); border-radius: 22px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--sombra-bolha); }
-.app--ceu .ask-bar .row button:first-child, .app--ceu .list-item .row button:first-child { background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); border-color: var(--pilula-ativa); }
+.app--ceu .list-item .row button:first-child { background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); border-color: var(--pilula-ativa); }
 .app--ceu .page { margin-top: 6px; padding: 28px 28px 8px; border: 1px solid var(--vidro-borda); border-radius: 32px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--elevacao); }
 .app--ceu .page-head { border-bottom-color: var(--linha); }
 .app--ceu .study-entry, .app--ceu .study-content > .memory-toggle, .app--ceu .onboarding-toggle { border-radius: 22px; background: var(--fundo-elevado); }
@@ -188,3 +187,8 @@
 .app--ceu .artifact-viewer { background: rgb(29 29 31 / .25); -webkit-backdrop-filter: blur(1.2rem); backdrop-filter: blur(1.2rem); padding: 12px; gap: 10px; }
 .app--ceu .artifact-viewer-bar { border: 1px solid var(--vidro-borda); border-radius: 22px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
 .app--ceu .artifact-viewer-frame { border-radius: 22px; box-shadow: var(--elevacao); }
+
+.app--ceu .composer-reply { margin: 2px 4px 0; border-radius: 16px; }
+.app--ceu .bubble-quote { border-radius: 12px; }
+.app--ceu .bubble-reply { border-color: var(--vidro-borda); background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
+@media (hover: none) { .app--ceu .bubble-reply { border-color: rgb(29 29 31 / .12); box-shadow: 0 2px 8px rgb(29 29 31 / .12); } }

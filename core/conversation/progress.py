@@ -39,6 +39,11 @@ class _Turn:
     steps: list[Step] = field(default_factory=list)
     finished: float | None = None
     last_seen: float | None = None
+    cancelled: bool = False
+
+
+class TurnCancelled(Exception):
+    """The owner tapped Parar: the turn stops at its next step."""
 
 
 _lock = threading.Lock()
@@ -82,11 +87,38 @@ def tracking(conversation_id: uuid.UUID) -> Iterator[None]:
                 turn.finished = time.monotonic()
 
 
+def cancel(conversation_id: uuid.UUID) -> bool:
+    """Asks the turn in flight to stop. False when nothing is running there."""
+    with _lock:
+        turn = _turns.get(conversation_id)
+        if turn is None or turn.finished:
+            return False
+        turn.cancelled = True
+        return True
+
+
+def cancelled() -> bool:
+    conversation_id = _current.get()
+    if conversation_id is None:
+        return False
+    with _lock:
+        turn = _turns.get(conversation_id)
+        return bool(turn and turn.cancelled)
+
+
+def checkpoint() -> None:
+    """Raises TurnCancelled when the owner asked this turn to stop."""
+    if cancelled():
+        raise TurnCancelled()
+
+
 def step(label: str, detail: str | None = None) -> None:
-    """Says what the turn starts doing now. Outside a tracked turn it does nothing."""
+    """Says what the turn starts doing now (and stops it there if the owner tapped Parar).
+    Outside a tracked turn it does nothing."""
     conversation_id = _current.get()
     if conversation_id is None:
         return
+    checkpoint()
     with _lock:
         turn = _turns.get(conversation_id)
         if turn is None or turn.finished:

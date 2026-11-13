@@ -120,3 +120,38 @@ def test_no_notification_while_watching_or_when_nobody_ever_watched(client, db, 
 def test_steps_outside_a_turn_are_ignored():
     progress.step("Pesquisando")  # no tracked turn on this thread
     assert progress._turns == {}
+
+
+def test_parar_while_it_writes_keeps_no_reply(client, db):
+    from infrastructure.database.models import Message
+
+    world(client, db, during=lambda conversation_id: progress.cancel(conversation_id))
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+
+    turn = client.post(
+        f"/conversations/{conversation}/messages", headers=headers, json={"content": "oi"}
+    )
+
+    assert turn.status_code == 409 and turn.json()["detail"] == "Parado por você"
+    roles = [m.role for m in db.query(Message).all()]
+    assert "assistant" not in roles
+
+
+def test_parar_with_nothing_running_says_so(client, db):
+    world(client, db)
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+    stopped = client.post(f"/conversations/{conversation}/cancel", headers=headers)
+    assert stopped.status_code == 200 and stopped.json() == {"cancelled": False}
+
+
+def test_a_step_after_parar_stops_the_turn():
+    import uuid as _uuid
+
+    conversation_id = _uuid.uuid4()
+    with progress.tracking(conversation_id):
+        progress.step("Pensando")
+        assert progress.cancel(conversation_id) is True
+        with pytest.raises(progress.TurnCancelled):
+            progress.step("Navegando por google.com")

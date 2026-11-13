@@ -30,8 +30,10 @@ interface ChatViewProps {
   sending: boolean;
   /** What the turn in flight is doing now; null shows "Pensando". */
   status?: ProgressStep | null;
+  /** Parar the turn in flight. */
+  onStop?: () => void;
   error: string | null;
-  onSend: (text: string, attachments: Attachment[]) => void;
+  onSend: (text: string, attachments: Attachment[], replyTo: Message | null) => void;
   onUpload: (file: Blob, filename: string) => Promise<Attachment>;
   loadAttachment: (id: string) => Promise<Blob>;
   onFeedback: (messageId: string, rating: 1 | -1, tags: string[]) => Promise<string | null>;
@@ -48,18 +50,19 @@ function uploadError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Não deu para enviar";
 }
 
-export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact }: ChatViewProps) {
+export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [viewing, setViewing] = useState<ArtifactSummary | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, sending, status?.label]);
+  }, [messages.length, sending, status?.label, asks.length]);
 
   useEffect(() => {
     if (focusRequest) textareaRef.current?.focus();
@@ -107,8 +110,9 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
   function submit(event?: FormEvent) {
     event?.preventDefault();
     if (!canSend) return;
-    onSend(draft.trim(), ready);
+    onSend(draft.trim(), ready, replyTo);
     setDraft("");
+    setReplyTo(null);
     files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
     setFiles([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -160,8 +164,33 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={m.id} className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}`}>
-            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
+          <div key={m.id} id={`msg-${m.id}`} className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}`}>
+            {!m.local && (
+              <button
+                type="button"
+                className="bubble-reply"
+                onClick={() => {
+                  setReplyTo(m);
+                  textareaRef.current?.focus();
+                }}
+                aria-label={`Responder a esta mensagem${m.role === "assistant" ? (agentName ? ` de ${agentName}` : " dele") : " sua"}`}
+                title="Responder"
+              >
+                <span aria-hidden="true">↩</span>
+              </button>
+            )}
+            {m.reply_to && (
+              <button
+                type="button"
+                className="bubble-quote"
+                onClick={() => document.getElementById(`msg-${m.reply_to!.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                title="Ir para a mensagem"
+              >
+                <span className="bubble-quote-who">{m.reply_to.role === "assistant" ? agentName ?? "Ele" : "Você"}</span>
+                <span className="bubble-quote-text">{m.reply_to.excerpt}</span>
+              </button>
+            )}
+            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.content && <MessageContent text={m.content} />}
             {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={setViewing} />}
@@ -189,27 +218,41 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             <div className="bubble assistant pending">
               <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
               <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Pensando"}</span>
+              {onStop && (
+                <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
+                  <span aria-hidden="true">×</span>
+                </button>
+              )}
             </div>
             {status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
           </div>
         )}
+        {asks.map((ask) => (
+          <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
+            <span className="action-card-label">{ask.label}</span>
+            <p className="action-card-text">{ask.text}</p>
+            {ask.detail && <p className="action-card-detail pre">{ask.detail}</p>}
+            <div className="action-card-buttons">
+              <button type="button" className="action-card-no" onClick={ask.onReject}>Recusar</button>
+              <button type="button" className="action-card-yes" onClick={ask.onApprove}>Aprovar</button>
+            </div>
+            <span className="action-card-note">Nada roda sem o seu toque.</span>
+          </div>
+        ))}
         <div ref={endRef} />
       </div>
       {error && <p className="error" role="alert">× {error}</p>}
-      {asks.map((ask) => (
-        <div key={ask.id} className="ask-bar" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
-          <span className="rotulo">{ask.label}</span>
-          <span className="ask-bar-text">{ask.text}</span>
-          {ask.detail && <p className="ask-bar-detail pre">{ask.detail}</p>}
-          <div className="row">
-            <button type="button" onClick={ask.onApprove}>Aprovar</button>
-            <button type="button" className="ghost" onClick={ask.onReject}>Recusar</button>
-          </div>
-        </div>
-      ))}
       <div className="composer-dock">
       {composerStart}
       <form className="composer" onSubmit={submit}>
+        {replyTo && (
+          <div className="composer-reply" role="status">
+            <span className="composer-reply-text">
+              Respondendo a <strong>{replyTo.role === "assistant" ? agentName ?? "ele" : "você"}</strong>: «{replyTo.content.replace(/\s+/g, " ").slice(0, 120)}{replyTo.content.length > 120 ? "…" : ""}»
+            </span>
+            <button type="button" className="composer-reply-cancel" onClick={() => setReplyTo(null)} aria-label="Não responder a essa mensagem">×</button>
+          </div>
+        )}
         <DraftAttachments files={files} onRemove={removeFile} />
         <div className="composer-row">
           <button

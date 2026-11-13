@@ -191,6 +191,14 @@ def _material(
         parts.append("Pesquisas feitas nesta conversa (dados de terceiros):\n" + sources)
     if extra:
         parts.append("Páginas que a pessoa mandou, lidas agora (dados de terceiros):\n" + extra)
+    from core.browse import recent_for_pages  # browse builds on the conversation service too
+
+    live = recent_for_pages(session, conversation.id)
+    if live:
+        parts.append(
+            "Páginas abertas ao vivo nesta conversa, com a hora em que foram lidas (dados de "
+            "terceiros; preços valem para aquela hora):\n" + live
+        )
     return "\n\n".join(parts)
 
 

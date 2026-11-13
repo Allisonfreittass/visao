@@ -60,8 +60,10 @@ export interface Message {
   attachments?: Attachment[];
   /** A page this reply said it would write. */
   artifact?: ArtifactSummary | null;
+  /** The earlier message this one answers (Responder). */
+  reply_to?: { id: string; role: Role; excerpt: string } | null;
   /** Shown before the server answered (only on this device); "queued" waits for the reply in flight. */
-  local?: "sending" | "queued" | "failed";
+  local?: "sending" | "queued" | "failed" | "stopped";
 }
 
 export interface MindNote {
@@ -95,6 +97,23 @@ export interface Conversation {
   id: string;
   created_at: string;
   memory_status?: string | null;
+  project_id?: string | null;
+}
+
+/** A subject with its conversations, pages and files (Projetos). */
+export interface Project {
+  id: string;
+  name: string;
+  created_at: string;
+  conversations: number;
+  pages: number;
+  files: number;
+}
+
+export interface ProjectDetail extends Project {
+  conversation_list: { id: string; created_at: string; title: string }[];
+  page_list: ArtifactSummary[];
+  file_list: Attachment[];
 }
 
 export interface Turn {
@@ -304,8 +323,45 @@ export class Api {
     return this.request("/conversations");
   }
 
-  createConversation(): Promise<Conversation> {
-    return this.request("/conversations", { method: "POST" });
+  createConversation(projectId?: string | null): Promise<Conversation> {
+    const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+    return this.request(`/conversations${query}`, { method: "POST" });
+  }
+
+  moveConversation(conversationId: string, projectId: string | null): Promise<Conversation> {
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/project`, {
+      method: "PUT",
+      body: JSON.stringify({ project_id: projectId }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  projects(): Promise<Project[]> {
+    return this.request("/projects");
+  }
+
+  project(id: string): Promise<ProjectDetail> {
+    return this.request(`/projects/${encodeURIComponent(id)}`);
+  }
+
+  createProject(name: string): Promise<Project> {
+    return this.request("/projects", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  renameProject(id: string, name: string): Promise<Project> {
+    return this.request(`/projects/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  deleteProject(id: string): Promise<void> {
+    return this.request(`/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   messages(conversationId: string): Promise<Message[]> {
@@ -317,10 +373,13 @@ export class Api {
     content: string,
     modality: "text" | "voice" = "text",
     attachmentIds: string[] = [],
+    replyToId: string | null = null,
+    signal?: AbortSignal,
   ): Promise<Turn> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content, modality, attachment_ids: attachmentIds }),
+      signal,
+      body: JSON.stringify({ content, modality, attachment_ids: attachmentIds, reply_to_id: replyToId }),
       headers: { "Content-Type": "application/json" },
     });
   }
@@ -340,6 +399,11 @@ export class Api {
   /** The page's full address, to open or share: anyone with it can see the page. */
   pageUrl(path: string): string {
     return new URL(`${this.baseUrl}${path}`, window.location.origin).toString();
+  }
+
+  /** Parar: the turn in flight stops at its next step. */
+  cancel(conversationId: string): Promise<{ cancelled: boolean }> {
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/cancel`, { method: "POST" });
   }
 
   progress(conversationId: string): Promise<TurnProgress> {

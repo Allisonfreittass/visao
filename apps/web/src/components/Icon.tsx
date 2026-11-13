@@ -7,6 +7,7 @@ const PATHS = {
   sliders: "M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4",
   plus: "M12 5v14M5 12h14",
   menu: "M4 7h16M4 12h16M4 17h10",
+  folder: "M3 6h6l2 2h10v11H3z",
   phone: "M6 3l3 1 1.5 4-2 1.5a11 11 0 0 0 6 6l1.5-2 4 1.5 1 3-2 2C11 20 4 13 4 5z",
 } as const;
 

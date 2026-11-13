@@ -25,6 +25,9 @@ dependencies = [
     "defusedxml>=0.7",
     # Text out of the PDFs the owner sends (core/conversation/attachments.py).
     "pypdf>=5.1",
+    # Client for the real browser that opens live pages (docs/NAVEGADOR.md); must match the
+    # version of the `browser` container in deploy/docker-compose.yml.
+    "playwright==1.62.0",
 ]
 
 [project.optional-dependencies]

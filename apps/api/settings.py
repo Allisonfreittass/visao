@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
     # A page it writes (docs/ARTEFATOS.md) is longer than a reply; still within the per-call cap.
     artifact_max_output_tokens: int = Field(default=4096, ge=256)
+    # A real browser for live pages (docs/NAVEGADOR.md): the address of the `browser` container
+    # (ws://browser:3000/) or, locally, a Chromium to launch. Neither set: no live pages.
+    browser_ws_url: str | None = None
+    browser_executable_path: str | None = None
+    browser_max_pages: int = Field(default=4, ge=1, le=8)
+    browser_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
 
     # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
     # human quality gate; which approved voice is the agent's own is the agent's decision.

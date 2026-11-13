@@ -55,7 +55,7 @@ def _google(action: dict[str, Any]) -> str:
 
 
 def _hosts(urls: list[str]) -> str:
-    return ", ".join(dict.fromkeys(urlsplit(u).hostname or u for u in urls))
+    return ", ".join(dict.fromkeys((urlsplit(u).hostname or u).removeprefix("www.") for u in urls))
 
 
 _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
@@ -64,6 +64,12 @@ _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
     "read_links": lambda a: "abriu e leu " + _hosts(a.get("opened") or a.get("urls") or []),
     "read_links_failed": lambda a: (
         "tentou abrir " + _hosts(a.get("urls") or []) + " e não conseguiu"
+    ),
+    "browsed": lambda a: (
+        "abriu num navegador de verdade "
+        + (_hosts(a.get("opened") or []) or "nenhuma página")
+        + (f" ({len(a['opened'])} página(s))" if a.get("opened") else "")
+        + (f"; não abriram: {len(a.get('failures') or [])}" if a.get("failures") else "")
     ),
     "read_attachments": lambda a: (
         "viu os anexos que a pessoa mandou"

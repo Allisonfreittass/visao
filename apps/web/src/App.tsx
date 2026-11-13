@@ -19,6 +19,7 @@ import { Login } from "./components/Login";
 import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
+import { ProjectsView } from "./components/ProjectsView";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls, Presence, PresencePanel } from "./components/Presence";
 import { Rail, type WorkspaceView } from "./components/Rail";
@@ -129,9 +130,10 @@ export function App() {
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
   const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
   const sendingRef = useRef(false);
-  const queueRef = useRef<{ id: string; text: string; files: Attachment[] }[]>([]);
+  const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
   // What the turn in flight is doing now, shown in place of "Pensando".
   const [liveStep, setLiveStep] = useState<ProgressStep | null>(null);
+  const turnRef = useRef<{ conversationId: string; controller: AbortController } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   sendingRef.current = sending;
   messagesRef.current = messages;
@@ -145,7 +147,7 @@ export function App() {
     setError(e instanceof Error ? e.message : String(e));
   }, []);
 
-  const sendRef = useRef<(text: string, spoken?: SpokenTiming, files?: Attachment[]) => Promise<void>>(async () => undefined);
+  const sendRef = useRef<(text: string, spoken?: SpokenTiming, files?: Attachment[], replyTo?: Message | null) => Promise<void>>(async () => undefined);
   const voice = useVoice({
     api,
     status: voiceStatus,
@@ -298,21 +300,21 @@ export function App() {
     );
   }
 
-  async function openConversation(): Promise<string> {
-    const conversation = await api.createConversation();
+  async function openConversation(projectId?: string | null): Promise<string> {
+    const conversation = await api.createConversation(projectId);
     checkMemoryPreparation(conversation);
     setConversations((list) => [conversation, ...list]);
     setCurrent(conversation.id);
     return conversation.id;
   }
 
-  async function newConversation() {
+  async function newConversation(projectId?: string) {
     if (preparing || sending) return;
     setError(null);
     setPreparing(true);
     setView("conversation");
     try {
-      await openConversation();
+      await openConversation(projectId);
       setMenuOpen(false);
     } catch (e) {
       handleError(e);
@@ -334,15 +336,16 @@ export function App() {
     }
   }
 
-  async function send(text: string, spoken?: SpokenTiming, files: Attachment[] = []): Promise<void> {
+  async function send(text: string, spoken?: SpokenTiming, files: Attachment[] = [], replyTo: Message | null = null): Promise<void> {
     setError(null);
+    const quote = replyTo ? { id: replyTo.id, role: replyTo.role, excerpt: replyTo.content.replace(/\s+/g, " ").slice(0, 160) } : null;
     if (sendingRef.current) {
       // Still answering: what you add now shows at once, dimmed, and goes with the next turn.
       const queuedId = `queued-${Date.now()}-${queueRef.current.length}`;
-      queueRef.current.push({ id: queuedId, text, files });
+      queueRef.current.push({ id: queuedId, text, files, replyTo });
       setMessages((list) => [
         ...list,
-        { id: queuedId, role: "user", content: text, created_at: new Date().toISOString(), attachments: files, local: "queued" },
+        { id: queuedId, role: "user", content: text, created_at: new Date().toISOString(), attachments: files, reply_to: quote, local: "queued" },
       ]);
       return;
     }
@@ -367,6 +370,7 @@ export function App() {
       content: text,
       created_at: new Date().toISOString(),
       attachments: files,
+      reply_to: quote,
       local: "sending",
     };
     setMessages((list) => [...list, optimistic]);
@@ -387,7 +391,9 @@ export function App() {
       look();
       watch = window.setInterval(look, PROGRESS_POLL_MS);
       const llmStarted = performance.now();
-      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id));
+      const controller = new AbortController();
+      turnRef.current = { conversationId, controller };
+      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal);
       const llmMs = performance.now() - llmStarted;
       setMessages((list) => [
         ...list.filter((m) => m.id !== localId && m.local !== "queued"),
@@ -409,8 +415,10 @@ export function App() {
         });
       }
     } catch (e) {
-      handleError(e);
-      setMessages((list) => list.map((m) => (m.id === localId ? { ...m, local: "failed" } : m)));
+      const stopped = (e instanceof DOMException && e.name === "AbortError") || (e instanceof ApiError && e.status === 409 && e.message === "Parado por você");
+      if (!stopped) handleError(e);
+      const mark: Message["local"] = stopped ? "stopped" : "failed";
+      setMessages((list) => list.map((m) => (m.id === localId ? { ...m, local: mark } : m)));
       // The user message may have been stored even if the reply failed: reload the transcript,
       // keeping the one that never arrived visible so it is not silently lost.
       if (conversationId) {
@@ -421,19 +429,28 @@ export function App() {
             const last = stored.filter((m) => m.role === "user").at(-1);
             const arrived = last !== undefined && last.content === text && utcDate(last.created_at) >= utcDate(optimistic.created_at);
             setMessages((list) => [
-              ...(arrived ? stored : [...stored, { ...optimistic, local: "failed" as const }]),
+              ...(arrived ? stored : [...stored, { ...optimistic, local: mark }]),
               ...list.filter((m) => m.local === "queued"),
             ]);
           })
           .catch(() => undefined);
       }
     } finally {
+      turnRef.current = null;
       clearInterval(watch);
       setLiveStep(null);
       setSending(false);
     }
   }
   sendRef.current = send;
+
+  /** Parar: tell the server, and stop waiting at once. */
+  function stopTurn() {
+    const turn = turnRef.current;
+    if (!turn) return;
+    api.cancel(turn.conversationId).catch(() => undefined);
+    turn.controller.abort();
+  }
 
   // When the reply arrives, everything written meanwhile goes as one message: one answer to all
   // of it, not one per line.
@@ -444,7 +461,7 @@ export function App() {
     setMessages((list) => list.filter((m) => !ids.has(m.id)));
     const text = batch.map((q) => q.text).filter(Boolean).join("\n\n");
     const files = batch.flatMap((q) => q.files).slice(0, MAX_FILES);
-    void sendRef.current?.(text, undefined, files);
+    void sendRef.current?.(text, undefined, files, batch.find((q) => q.replyTo)?.replyTo ?? null);
   }, [sending]);
 
   // A queue belongs to the conversation it was typed in.
@@ -622,6 +639,17 @@ export function App() {
                 }}
               />
             )}
+            {view === "projects" && (
+              <ProjectsView
+                api={api}
+                current={current}
+                currentProjectId={currentConversation?.project_id ?? null}
+                onOpenConversation={(id) => { setCurrent(id); showView("conversation"); }}
+                onNewConversation={(projectId) => void newConversation(projectId)}
+                onMoved={(id, projectId) => setConversations((list) => list.map((c) => (c.id === id ? { ...c, project_id: projectId } : c)))}
+                onError={handleError}
+              />
+            )}
             {view === "study" && (
               <section className="page page--caderno" aria-labelledby="study-title">
                 <header className="page-head">
@@ -704,8 +732,9 @@ export function App() {
               ]}
               sending={sending || preparing}
               status={liveStep}
+              onStop={stopTurn}
               error={voice.inCall ? null : error}
-              onSend={(text, files) => void send(text, undefined, files)}
+              onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}
               onUpload={(file, name) => api.uploadAttachment(file, name)}
               loadAttachment={loadAttachment}
               pageUrl={(path) => api.pageUrl(path)}

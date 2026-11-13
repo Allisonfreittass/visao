@@ -142,6 +142,19 @@ class IdentityVoiceEvent(Base):
     )
 
 
+class Project(Base):
+    """A subject the owner keeps conversations, pages and files under (Projetos)."""
+
+    __tablename__ = "projects"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Conversation(Base):
     """A conversation belongs to exactly one user; other users can never read it."""
 
@@ -161,6 +174,10 @@ class Conversation(Base):
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # The project it belongs to; deleting the project keeps the conversation.
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class Message(Base):
@@ -179,6 +196,10 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     # "turn" answers a message; "initiative" was started by the agent on its own.
     origin: Mapped[str] = mapped_column(String(16), default="turn", server_default="turn")
+    # The earlier message this one answers, when the owner tapped Responder on it.
+    reply_to_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
     model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
     )
@@ -212,7 +233,6 @@ class Attachment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
-
 class Artifact(Base):
     """A page it wrote for the owner (a trip plan, a comparison), served at a secret link with no
     scripts and an opaque origin (docs/ARTEFATOS.md)."""
@@ -242,6 +262,28 @@ class Artifact(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BrowseVisit(Base):
+    """A page it opened in a real browser for the owner, with what the page showed then
+    (docs/NAVEGADOR.md). Kept so a page it writes later can use it, with the time it was read."""
+
+    __tablename__ = "browse_visits"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    url: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    text: Mapped[str] = mapped_column(Text, default="", deferred=True)
+    failure: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
 
 class ModelUsage(Base):
     """One row per LLM call, successful or not. Source of truth for cost and budgets."""

@@ -24,6 +24,8 @@ services:
     # Só para o próprio servidor (túnel SSH e testes); de fora, só pelo Caddy.
     ports:
       - "127.0.0.1:8000:8000"
+    # `browsing`: a rede onde só ela fala com o navegador.
+    networks: [default, browsing]
 
   # O worker roda 24 h aqui: é ele que pensa, estuda e puxa conversa. Não deixe outro worker
   # (o do Mac) ligado no mesmo banco.
@@ -39,6 +41,23 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  # O navegador de verdade das páginas ao vivo (docs/NAVEGADOR.md). Sem segredos, sem banco e
+  # numa rede só com a API: uma página maliciosa que escape do Chromium não acha nada de valor.
+  # A versão tem de ser a mesma do pacote playwright do pyproject.toml.
+  browser:
+    image: mcr.microsoft.com/playwright:v1.62.0-noble
+    restart: unless-stopped
+    init: true
+    user: pwuser
+    working_dir: /home/pwuser
+    command: ["/bin/sh", "-c", "npx -y playwright@1.62.0 run-server --port 3000 --host 0.0.0.0"]
+    networks: [browsing]
+    shm_size: 512m
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   caddy:
     image: caddy:2
@@ -64,6 +83,7 @@ services:
 networks:
   default:
     enable_ipv6: true
+  browsing:
 
 volumes:
   caddy_data:

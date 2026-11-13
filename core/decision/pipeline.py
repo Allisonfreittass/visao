@@ -6,12 +6,14 @@ applies: trivial turns skip curiosity, continuity costs no model call, name deli
 for the worker instead of delaying the reply.
 """
 
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
+from core import browse, projects
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import links as conversation_links
@@ -51,6 +53,7 @@ from infrastructure.database.models import (
     User,
 )
 from infrastructure.jobs import queue
+from integrations.browser.base import Browser, Visit
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
 
@@ -73,6 +76,8 @@ class TurnConfig:
     web_search: bool = False
     # VISION_SECRET_KEY, to open the owner's Google connection (docs/GOOGLE.md); None: no Google.
     google_secret: str | None = None
+    # Live pages per turn (docs/NAVEGADOR.md); the browser itself comes with run_turn.
+    browse_max_pages: int = 4
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,7 @@ class TurnOutcome:
     plan: TurnPlan
     decision: Decision
     links: tuple[conversation_links.LinkRead, ...] = ()
+    browsed: tuple[Visit, ...] = ()
 
 
 def run_turn(
@@ -97,6 +103,8 @@ def run_turn(
     modality: str = "text",
     links: conversation_links.LinkReader | None = None,
     files: list[Attachment] | None = None,
+    browser: Browser | None = None,
+    reply_to_id: uuid.UUID | None = None,
 ) -> TurnOutcome:
     plan = TurnPlan()
     blocks: list[str] = []
@@ -145,6 +153,7 @@ def run_turn(
             read_links=links is not None,
             attachments=True,
             pages=True,
+            browser=browser is not None,
         ),
     )
     if capabilities.mac_projects:
@@ -216,10 +225,38 @@ def run_turn(
                     action_ids=[str(a.id) for a in helped.proposed],
                 )
 
+    browsed = None
+    if browser is not None and not read:
+        browsed = browse.run(
+            session,
+            owner=owner,
+            conversation=conversation,
+            text=text,
+            recent="\n".join(
+                f"{m.role}: {m.content[:300]}"
+                for m in conversation_history(session, conversation)[-6:]
+            ),
+            provider=provider,
+            budgets=config.budgets,
+            browser=browser,
+            search=search,
+            max_pages=config.browse_max_pages,
+        )
+        if browsed is not None:
+            plan.add(
+                "browsed",
+                executed=True,
+                reason="owner_asked_live_data",
+                urls=[v.final_url or v.url for v in browsed.visits],
+                opened=[v.final_url or v.url for v in browsed.opened],
+                failures=[v.failure for v in browsed.visits if not v.ok],
+            )
+
     outcome = NO_OUTCOME
     # A message with a link is about that link: searching the web for its words found unrelated
     # pages (a site named "nobievolua" brought up a blood pressure drug), so research waits.
-    if config.curiosity_enabled and not read:
+    # Pages read live answer it already: a generic search on top only adds noise.
+    if config.curiosity_enabled and not read and not (browsed and browsed.opened):
         outcome = consider(
             session,
             conversation=conversation,
@@ -333,6 +370,9 @@ def run_turn(
         )
     )
     blocks.append(plan.facts())
+    in_project = projects.context_block(session, conversation)
+    if in_project:
+        blocks.append(in_project)
     # Earlier turns' real actions: without them it once denied a Gmail read it had done.
     earlier = deed_record.conversation_block(session, conversation, owner)
     if earlier:
@@ -357,8 +397,16 @@ def run_turn(
         self_text=mind_state.current_self(session) if config.mind_enabled else None,
         owner_profile=owner_profile,
         owner_rules=owner_rules,
-        attachment=conversation_links.context_block(list(read)) if read else "",
+        attachment="\n\n".join(
+            part
+            for part in (
+                conversation_links.context_block(list(read)) if read else "",
+                browsed.block if browsed else "",
+            )
+            if part
+        ),
         files=files,
+        reply_to_id=reply_to_id,
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id
@@ -428,4 +476,11 @@ def run_turn(
         message_id=result.assistant_message.id,
     )
     session.commit()
-    return TurnOutcome(result=result, curiosity=outcome, plan=plan, decision=decision, links=read)
+    return TurnOutcome(
+        result=result,
+        curiosity=outcome,
+        plan=plan,
+        decision=decision,
+        links=read,
+        browsed=tuple(browsed.visits) if browsed else (),
+    )

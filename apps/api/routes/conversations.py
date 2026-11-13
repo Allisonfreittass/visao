@@ -9,11 +9,13 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from apps.api.browser import get_browser
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.links import get_link_reader
 from apps.api.llm import get_llm_provider, missing_llm_settings
 from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
 from apps.api.routes.attachments import AttachmentOut, attachment_out
+from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
@@ -37,6 +39,7 @@ from core.memory.curator import (
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import ReflectionResult, reflect
 from infrastructure.database.models import Conversation, Message, User
+from integrations.browser.base import Browser
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
@@ -52,6 +55,17 @@ class ConversationOut(BaseModel):
     id: uuid.UUID
     created_at: datetime
     memory_status: str | None = None
+    project_id: uuid.UUID | None = None
+
+
+class ConversationProjectIn(BaseModel):
+    project_id: uuid.UUID | None = None
+
+
+class QuotedOut(BaseModel):
+    id: uuid.UUID
+    role: str
+    excerpt: str
 
 
 class MessageOut(BaseModel):
@@ -63,12 +77,16 @@ class MessageOut(BaseModel):
     attachments: list[AttachmentOut] = []
     # A page this reply said it would write (docs/ARTEFATOS.md).
     artifact: ArtifactOut | None = None
+    # The earlier message this one answers (Responder).
+    reply_to: QuotedOut | None = None
 
 
 class MessageIn(BaseModel):
     content: str = Field(default="", max_length=MAX_MESSAGE_CHARS)
     # "voice" when the turn came from a voice session: the reply is spoken, so kept short.
     modality: Literal["text", "voice"] = "text"
+    # Tapping Responder on an earlier message of this conversation.
+    reply_to_id: uuid.UUID | None = None
     # Uploaded first through POST /attachments; a photo alone is a whole message.
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=attachments.MAX_PER_MESSAGE)
 
@@ -118,7 +136,18 @@ class TurnOut(BaseModel):
     sources: list[SourceOut] = []
 
 
-def _message_out(message: Message, files: list | None = None, page=None) -> MessageOut:
+def _quoted(message: Message | None) -> QuotedOut | None:
+    if message is None:
+        return None
+    text = " ".join(message.content.split())
+    return QuotedOut(
+        id=message.id, role=message.role, excerpt=text[:160] + ("…" if len(text) > 160 else "")
+    )
+
+
+def _message_out(
+    message: Message, files: list | None = None, page=None, quoted: Message | None = None
+) -> MessageOut:
     return MessageOut(
         id=message.id,
         role=message.role,
@@ -127,6 +156,7 @@ def _message_out(message: Message, files: list | None = None, page=None) -> Mess
         origin=message.origin or "turn",
         attachments=[attachment_out(a) for a in files or []],
         artifact=artifact_out(page) if page is not None else None,
+        reply_to=_quoted(quoted),
     )
 
 
@@ -146,11 +176,14 @@ def create_conversation(
     factory: SessionFactory,
     provider: OptionalProvider,
     background: BackgroundTasks,
+    project_id: uuid.UUID | None = None,
 ) -> ConversationOut:
     identity = get_identity(db)
     if identity is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado")
-    conversation = Conversation(user_id=user.id, identity_id=identity.id)
+    if project_id is not None:
+        own_project(db, user.id, project_id)
+    conversation = Conversation(user_id=user.id, identity_id=identity.id, project_id=project_id)
     db.add(conversation)
     db.commit()
     # The first turn must not race curation of the conversation it is asking to remember.
@@ -163,7 +196,10 @@ def create_conversation(
             _reflect_previous, factory, user.id, conversation.id, provider, settings
         )
     return ConversationOut(
-        id=conversation.id, created_at=conversation.created_at, memory_status=memory_status
+        id=conversation.id,
+        created_at=conversation.created_at,
+        memory_status=memory_status,
+        project_id=conversation.project_id,
     )
 
 
@@ -186,6 +222,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         review_every_turns=settings.mind_review_turns,
         web_search=settings.tavily_api_key is not None,
         google_secret=settings.secret_key,
+        browse_max_pages=settings.browser_max_pages,
     )
 
 
@@ -346,7 +383,25 @@ def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut
         .where(Conversation.user_id == user.id)
         .order_by(Conversation.created_at.desc())
     )
-    return [ConversationOut(id=c.id, created_at=c.created_at) for c in conversations]
+    return [
+        ConversationOut(id=c.id, created_at=c.created_at, project_id=c.project_id)
+        for c in conversations
+    ]
+
+
+@router.put("/{conversation_id}/project")
+def move_to_project(
+    conversation_id: uuid.UUID, body: ConversationProjectIn, db: DbSession, user: CurrentUser
+) -> ConversationOut:
+    """Puts the conversation in a project, or takes it out (null)."""
+    conversation = _own_conversation(db, user, conversation_id)
+    if body.project_id is not None:
+        own_project(db, user.id, body.project_id)
+    conversation.project_id = body.project_id
+    db.commit()
+    return ConversationOut(
+        id=conversation.id, created_at=conversation.created_at, project_id=conversation.project_id
+    )
 
 
 class ProgressStepOut(BaseModel):
@@ -358,6 +413,13 @@ class ProgressOut(BaseModel):
     active: bool
     elapsed_ms: int = 0
     steps: list[ProgressStepOut] = []
+
+
+@router.post("/{conversation_id}/cancel")
+def cancel_turn(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> dict[str, bool]:
+    """Parar: the turn in flight stops at its next step (a reply being written is not kept)."""
+    conversation = _own_conversation(db, user, conversation_id)
+    return {"cancelled": progress.cancel(conversation.id)}
 
 
 @router.get("/{conversation_id}/progress")
@@ -392,7 +454,10 @@ def list_messages(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) 
     history = conversation_history(db, conversation)
     files = attachments.for_messages(db, [m.id for m in history if m.role == "user"])
     pages = artifacts.for_messages(db, [m.id for m in history if m.role == "assistant"])
-    return [_message_out(m, files.get(m.id), pages.get(m.id)) for m in history]
+    by_id = {m.id: m for m in history}
+    return [
+        _message_out(m, files.get(m.id), pages.get(m.id), by_id.get(m.reply_to_id)) for m in history
+    ]
 
 
 @router.post("/{conversation_id}/messages")
@@ -407,6 +472,7 @@ def send_message(
     links: Annotated[LinkReader, Depends(get_link_reader)],
     background: BackgroundTasks,
     factory: SessionFactory,
+    browser: Annotated[Browser | None, Depends(get_browser)],
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
@@ -417,6 +483,11 @@ def send_message(
     identity = get_identity(db)
     if identity is None or identity.id != conversation.identity_id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Identidade da conversa indisponível")
+    quoted = db.get(Message, body.reply_to_id) if body.reply_to_id else None
+    if body.reply_to_id and (quoted is None or quoted.conversation_id != conversation.id):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "A mensagem respondida não é desta conversa"
+        )
     try:
         files = attachments.pending(db, user.id, body.attachment_ids)
     except attachments.AttachmentRejected as exc:
@@ -436,8 +507,13 @@ def send_message(
                 modality=body.modality,
                 links=links,
                 files=files,
+                browser=browser,
+                reply_to_id=body.reply_to_id,
             )
         result, outcome = turn.result, turn.curiosity
+    except progress.TurnCancelled as exc:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "Parado por você") from exc
     except BudgetExceededError as exc:
         scope = "diário" if exc.scope == "daily" else "desta conversa"
         raise HTTPException(
@@ -503,8 +579,15 @@ def send_message(
             SourceOut(title=r.title, url=r.url, source="GitHub" if r.kind == "github" else "link")
             for r in turn.links
             if r.ok
+        ]
+        + [
+            SourceOut(
+                title=v.title or v.final_url or v.url, url=v.final_url or v.url, source="ao vivo"
+            )
+            for v in turn.browsed
+            if v.ok
         ],
-        user_message=_message_out(result.user_message, files),
+        user_message=_message_out(result.user_message, files, quoted=quoted),
         assistant_message=_message_out(result.assistant_message, page=page),
         usage=UsageOut(
             provider=usage.provider,

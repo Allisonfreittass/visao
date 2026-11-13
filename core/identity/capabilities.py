@@ -35,6 +35,8 @@ class Capabilities:
     attachments: bool = False
     # Pages it writes and publishes at a secret link (core/conversation/artifacts.py).
     pages: bool = False
+    # A real browser for live pages (core/browse.py).
+    browser: bool = False
     mac_projects: tuple[str, ...] = ()
     google: bool = False
     # Devices that get a push with the app closed; None when this was not looked up.
@@ -60,6 +62,13 @@ class Capabilities:
             items.append(
                 "ver as fotos e ler os arquivos (PDF, texto, código, planilhas em CSV) que o "
                 "interlocutor manda no chat, enquanto estão nas mensagens recentes"
+            )
+        if self.browser:
+            items.append(
+                "abrir sites ao vivo num navegador de verdade quando o interlocutor pede algo que "
+                "muda com o tempo (preços de passagens e hotéis, disponibilidade, cotações, "
+                "horários, preços de produtos); só lê: não faz login, não compra, não preenche "
+                "cadastro, e quando um site pede verificação de robô, para e avisa"
             )
         if self.pages:
             items.append(
@@ -173,6 +182,7 @@ class CapabilityInputs:
     read_links: bool = False
     attachments: bool = False
     pages: bool = False
+    browser: bool = False
     self_knowledge: bool = True
 
 
@@ -196,6 +206,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         read_links=inputs.read_links,
         attachments=inputs.attachments,
         pages=inputs.pages,
+        browser=inputs.browser,
         push_devices=session.scalar(
             select(func.count())
             .select_from(PushSubscription)
