@@ -8,6 +8,9 @@ O que é permitido fica aqui no Mac, em ~/.config/visao/braco.json; o servidor n
 Uso: python3 visao_braco.py [--config caminho] [--once]
 """
 
+# The system Python on macOS is 3.9: without this, `dict | None` in a signature fails at import.
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -67,7 +70,7 @@ class Config:
     use_api_key: bool = False
 
     @classmethod
-    def load(cls, path: Path) -> "Config":
+    def load(cls, path: Path) -> Config:
         data = json.loads(path.read_text())
         projects = {
             str(name): Path(folder).expanduser().resolve()
