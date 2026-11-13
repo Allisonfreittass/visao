@@ -13,6 +13,41 @@ export interface Source {
   source: string;
 }
 
+/** One thing the turn in flight is doing, said as it starts ("Pesquisando “voos”"). */
+export interface ProgressStep {
+  label: string;
+  detail?: string | null;
+}
+
+export interface TurnProgress {
+  active: boolean;
+  elapsed_ms: number;
+  steps: ProgressStep[];
+}
+
+/** A page it writes (docs/ARTEFATOS.md); "pending" while it is being written. */
+export interface ArtifactSummary {
+  id: string;
+  title: string;
+  status: "pending" | "ready" | "failed";
+  /** Relative to the API ("/p/<token>"); use Api.pageUrl to open it. */
+  path: string | null;
+  error?: string | null;
+  conversation_id?: string | null;
+  created_at: string;
+}
+
+/** A photo or file sent with a message. */
+export interface Attachment {
+  id: string;
+  kind: "image" | "document";
+  filename: string;
+  media_type: string;
+  size_bytes: number;
+  /** For documents: whether any text could be read out of it. */
+  readable?: boolean | null;
+}
+
 export interface Message {
   id: string;
   role: Role;
@@ -22,6 +57,11 @@ export interface Message {
   origin?: string;
   /** Sources the reply was given (only known for replies received in this session). */
   sources?: Source[];
+  attachments?: Attachment[];
+  /** A page this reply said it would write. */
+  artifact?: ArtifactSummary | null;
+  /** Shown before the server answered (only on this device); "queued" waits for the reply in flight. */
+  local?: "sending" | "queued" | "failed";
 }
 
 export interface MindNote {
@@ -276,12 +316,46 @@ export class Api {
     conversationId: string,
     content: string,
     modality: "text" | "voice" = "text",
+    attachmentIds: string[] = [],
   ): Promise<Turn> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content, modality }),
+      body: JSON.stringify({ content, modality, attachment_ids: attachmentIds }),
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  artifact(id: string): Promise<ArtifactSummary> {
+    return this.request(`/artifacts/${encodeURIComponent(id)}`);
+  }
+
+  artifacts(): Promise<ArtifactSummary[]> {
+    return this.request("/artifacts");
+  }
+
+  deleteArtifact(id: string): Promise<void> {
+    return this.request(`/artifacts/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  /** The page's full address, to open or share: anyone with it can see the page. */
+  pageUrl(path: string): string {
+    return new URL(`${this.baseUrl}${path}`, window.location.origin).toString();
+  }
+
+  progress(conversationId: string): Promise<TurnProgress> {
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/progress`);
+  }
+
+  uploadAttachment(file: Blob, filename: string): Promise<Attachment> {
+    const body = new FormData();
+    body.append("file", file, filename);
+    return this.request("/attachments", { method: "POST", body });
+  }
+
+  /** The file's bytes: sent with the token, so an <img> shows it through an object URL. */
+  async attachmentBlob(id: string): Promise<Blob> {
+    const response = await this.sendRaw(`/attachments/${encodeURIComponent(id)}`, {});
+    return response.blob();
   }
 
   memorySettings(): Promise<{ enabled: boolean }> {

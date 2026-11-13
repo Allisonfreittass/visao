@@ -1,0 +1,190 @@
+/* Aparência "Céu": um céu vivo ao fundo (src/sky) e vidro claro por cima. Ink #1d1d1f, white
+   surfaces, frosted glass, pill controls, 24 px bubbles. At night in the sky the glass goes dark
+   ([data-ceu="noite"]). Visão keeps its own name, orb core and serif. */
+
+[data-theme="ceu"] {
+  color-scheme: light;
+  --fundo: rgb(255 255 255 / .55);
+  --fundo-elevado: rgb(255 255 255 / .78);
+  --fundo-hover: rgb(29 29 31 / .06);
+  --tinta: #1d1d1f;
+  --tinta-suave: #3c3f48;
+  --tinta-fraca: #5d6375;
+  --linha: rgb(29 29 31 / .08);
+  --linha-forte: rgb(29 29 31 / .14);
+  --borda: rgb(29 29 31 / .2);
+  --estanho: #3d4b6b;
+  --estanho-linha: rgb(61 75 107 / .35);
+  --sobre-tinta: #f9f9fa;
+  --sucesso: #1b6a70;
+  --aviso: #7e520f;
+  --erro: #b3342b;
+  --anel-foco: 0 0 0 2px rgb(255 255 255 / .9), 0 0 0 4px #3d4b6b;
+  --elevacao: 0 .8rem 4rem rgb(29 29 31 / .12);
+  /* Glass and bubbles */
+  --vidro: rgb(255 255 255 / .5);
+  --vidro-forte: rgb(255 255 255 / .82);
+  --vidro-borda: rgb(255 255 255 / .55);
+  --vidro-desfoque: blur(1.6rem) saturate(1.5);
+  --bolha-dele: #ffffff;
+  --bolha-dele-tinta: #1d1d1f;
+  --bolha-sua: rgb(255 255 255 / .42);
+  --sombra-bolha: 0 1px 2px rgb(29 29 31 / .1), 0 3px 8px rgb(29 29 31 / .07), 0 8px 40px rgb(29 29 31 / .12);
+  --pilula-ativa: #1d1d1f;
+  --pilula-ativa-tinta: #f9f9fa;
+  --raio-bolha: 24px;
+  --ceu-fallback: linear-gradient(180deg, #6d98dc 0%, #a8c5ee 55%, #e4ecf8 100%);
+}
+
+[data-theme="ceu"][data-ceu="noite"] {
+  color-scheme: dark;
+  --fundo: rgb(20 24 40 / .5);
+  --fundo-elevado: rgb(28 32 52 / .78);
+  --fundo-hover: rgb(245 245 247 / .08);
+  --tinta: #f5f5f7;
+  --tinta-suave: #c7cbd8;
+  --tinta-fraca: #9aa0b4;
+  --linha: rgb(245 245 247 / .1);
+  --linha-forte: rgb(245 245 247 / .18);
+  --borda: rgb(245 245 247 / .24);
+  --estanho: #b1bcd2;
+  --estanho-linha: rgb(177 188 210 / .35);
+  --sobre-tinta: #1d1d1f;
+  --sucesso: #5cc2c9;
+  --aviso: #e3a857;
+  --erro: #ff7a6e;
+  --anel-foco: 0 0 0 2px rgb(20 24 40 / .9), 0 0 0 4px #b1bcd2;
+  --vidro: rgb(24 28 48 / .45);
+  --vidro-forte: rgb(30 34 56 / .82);
+  --vidro-borda: rgb(255 255 255 / .12);
+  --bolha-dele: rgb(36 40 64 / .92);
+  --bolha-dele-tinta: #f5f5f7;
+  --bolha-sua: rgb(255 255 255 / .12);
+  --sombra-bolha: 0 1px 2px rgb(0 0 0 / .25), 0 8px 40px rgb(0 0 0 / .3);
+  --pilula-ativa: #f5f5f7;
+  --pilula-ativa-tinta: #1d1d1f;
+  --ceu-fallback: linear-gradient(180deg, #070d22 0%, #142048 55%, #2b3766 100%);
+}
+
+[data-theme="ceu"] body { background: var(--ceu-fallback); }
+
+/* The sky sits behind everything; the app floats on it. */
+.sky { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; display: block; pointer-events: none; }
+.app--ceu { position: relative; max-width: none; }
+.app--ceu > :not(.sky) { position: relative; z-index: 1; }
+.app--ceu::before { display: none; }
+.app--ceu .topbar { border-bottom: 0; }
+.app--ceu .topbar--app { display: none; }
+
+/* Top bar: round drawer button, the places in a pill, the avatar. */
+.sky-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px 6px; flex-shrink: 0; }
+.sky-round, .sky-avatar { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--vidro-borda); border-radius: 50%; background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); color: var(--tinta); box-shadow: 0 2px 12px rgb(29 29 31 / .06); }
+.sky-round:hover, .sky-avatar:hover { background: var(--vidro-forte); }
+.sky-avatar { background: #4a6ee0; border-color: transparent; color: #fff; font: 500 16px/1 var(--font-sans); letter-spacing: .02em; }
+.sky-avatar:hover, .sky-avatar[aria-current] { background: #3c5fd0; box-shadow: 0 0 0 3px var(--vidro-forte); }
+.sky-tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-pilula); background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 2px 12px rgb(29 29 31 / .06); }
+.sky-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 20px; border: 0; border-radius: var(--raio-pilula); background: transparent; color: var(--tinta-fraca); font: 400 16px/1 var(--font-sans); transition: background .24s ease-in-out, color .24s ease-in-out; }
+.sky-tabs button:hover { color: var(--tinta); }
+.sky-tabs button[aria-current] { background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); }
+.sky-badge { min-width: 18px; height: 18px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--raio-pilula); background: #e0483f; color: #fff; font: 500 11px/1 var(--font-sans); }
+
+/* Drawer: conversations, Mac and the rest, over the sky at any width. */
+.app--ceu .rail { display: none; }
+.app--ceu .rail.open { display: flex; position: fixed; z-index: var(--camada-sobreposicao); top: 12px; bottom: 12px; left: 12px; width: min(300px, 86vw); border: 1px solid var(--vidro-borda); border-radius: 28px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--elevacao); }
+.app--ceu .rail.open .rail-brand { display: block; }
+.app--ceu .rail-nav button, .app--ceu .conversation-list button { border-radius: 14px; }
+.app--ceu .rail-nav button[aria-current], .app--ceu .conversation-list button[aria-current] { box-shadow: none; background: var(--fundo-hover); }
+.app--ceu .scrim { display: block; position: fixed; inset: 0; z-index: calc(var(--camada-sobreposicao) - 1); background: rgb(29 29 31 / .18); -webkit-backdrop-filter: blur(.8rem); backdrop-filter: blur(.8rem); }
+.app--ceu .presence-panel { display: none !important; }
+
+/* Workspace: one centered column, the sky on both sides. */
+.app--ceu .main { padding: 8px 16px 12px; }
+.app--ceu .main > * { max-width: 760px; }
+.app--ceu .chat-head { display: none; }
+.sky-warning { padding: 10px 16px; border-radius: 18px; background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
+
+/* Bubbles: what it says, solid white on the left; what you say, glass on the right. */
+.app--ceu .messages { gap: 14px; padding: 12px 4px 20px; scrollbar-gutter: auto; }
+.app--ceu .bubble { font: 400 17px/1.42 var(--font-sans); letter-spacing: -.005em; }
+.app--ceu .bubble.assistant { align-self: flex-start; width: auto; max-width: min(88%, 620px); padding: 14px 18px; border-radius: var(--raio-bolha); background: var(--bolha-dele); color: var(--bolha-dele-tinta); box-shadow: var(--sombra-bolha); }
+.app--ceu .bubble.user { width: auto; max-width: min(82%, 560px); padding: 14px 18px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-bolha); background: var(--bolha-sua); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 2px 14px rgb(29 29 31 / .05); }
+.app--ceu .live-status-detail { padding: 12px 22px; border-color: var(--vidro-borda); background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); font-size: 15px; color: var(--tinta-suave); }
+.app--ceu .bubble.pending { align-self: flex-start; width: auto; padding: 16px 20px; text-transform: none; letter-spacing: 0; font: 400 15px/1 var(--font-sans); color: var(--tinta-fraca); }
+.app--ceu .message-meta { margin: 0 0 4px; }
+.app--ceu .message-meta > span:first-child, .app--ceu .message-meta > time { display: none; }
+.app--ceu .message-meta:not(:has(.initiative-tag, .failed-tag)) { display: none; }
+.app--ceu .initiative-tag, .app--ceu .failed-tag { display: inline-block; padding: 3px 10px; border-radius: var(--raio-pilula); background: var(--fundo-hover); font: 400 12px/1.3 var(--font-sans); letter-spacing: 0; text-transform: none; }
+.app--ceu .bubble--sending { opacity: .55; }
+.app--ceu .bubble--queued { opacity: .42; }
+.app--ceu .bubble--failed { border-color: var(--erro) !important; }
+.app--ceu .message-feedback summary { font-size: 12px; }
+.app--ceu .sources { margin-top: 10px; }
+.app--ceu .attachment-photos { border-radius: 18px; }
+.app--ceu .attachment-file, .app--ceu .draft-attachment { border-radius: 16px; background: var(--fundo-elevado); }
+.app--ceu .empty-conversation { margin: auto 0; padding: 28px; border-radius: 32px; background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); text-align: center; }
+
+/* Message box: the orb, then a glass pill with + and send. */
+.composer-dock { display: flex; align-items: flex-end; gap: 10px; flex-shrink: 0; }
+.composer-dock > .composer { flex: 1; min-width: 0; }
+.app--ceu .composer { padding: 6px 6px 6px 10px; border: 1px solid var(--vidro-borda); border-radius: 30px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .1); }
+.app--ceu .composer:focus-within { border-color: var(--vidro-borda); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .14), 0 0 0 2px rgb(61 75 107 / .25); }
+.app--ceu .composer textarea { font-size: 17px; padding: 8px 4px; scrollbar-width: none; }
+.app--ceu .composer textarea::-webkit-scrollbar { display: none; }
+.app--ceu .composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app--ceu .composer-row { align-items: center; gap: 6px; }
+.app--ceu .composer-row > button { width: 44px; height: 44px; }
+.app--ceu .composer-row > .composer-attach { order: 2; border: 0; background: transparent; color: var(--tinta); font-size: 28px; }
+.app--ceu .composer-row > .composer-send { order: 3; background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); border-color: var(--pilula-ativa); }
+.app--ceu .composer-row > .composer-send:disabled { display: none; }
+.app--ceu .composer-row > textarea { order: 1; padding-left: 10px; }
+.app--ceu .composer-note { opacity: .8; }
+.app--ceu .chat--dragging .composer { box-shadow: 0 0 0 3px rgb(61 75 107 / .4); }
+.app--ceu .drop-hint { border-radius: 32px; background: rgb(255 255 255 / .45); -webkit-backdrop-filter: blur(.8rem); backdrop-filter: blur(.8rem); }
+
+.sky-orb { position: relative; width: 58px; height: 58px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--vidro-borda); border-radius: 50%; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .1); }
+.sky-orb:hover:not(:disabled) { transform: scale(1.04); }
+.sky-orb:disabled { opacity: 1; cursor: default; }
+.sky-orb-core { width: 12px; height: 12px; border-radius: 50%; background: #e0483f; box-shadow: 0 0 12px 2px rgb(224 72 63 / .45); transition: transform .3s, opacity .3s; }
+.sky-orb[data-state="IDLE"] .sky-orb-core { opacity: .55; }
+.sky-orb[data-state="THINKING"] .sky-orb-core { animation: orbe-pensa 1.1s ease-in-out infinite; }
+.sky-orb[data-state="LISTENING"] .sky-orb-core, .sky-orb[data-state="SPEAKING"] .sky-orb-core { transform: scale(1.5); }
+.sky-orb[data-state="DISCONNECTED"] .sky-orb-core { background: var(--tinta-fraca); box-shadow: none; }
+@keyframes orbe-pensa { 50% { transform: scale(1.6); opacity: .7; } }
+
+/* Ask bars and pages float as glass cards. */
+.app--ceu .ask-bar { border: 1px solid var(--vidro-borda); border-radius: 22px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--sombra-bolha); }
+.app--ceu .ask-bar .row button:first-child, .app--ceu .list-item .row button:first-child { background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); border-color: var(--pilula-ativa); }
+.app--ceu .page { margin-top: 6px; padding: 28px 28px 8px; border: 1px solid var(--vidro-borda); border-radius: 32px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--elevacao); }
+.app--ceu .page-head { border-bottom-color: var(--linha); }
+.app--ceu .study-entry, .app--ceu .study-content > .memory-toggle, .app--ceu .onboarding-toggle { border-radius: 22px; background: var(--fundo-elevado); }
+.app--ceu .rs-botao--principal { border-radius: var(--raio-pilula); }
+.app--ceu .call { background: rgb(255 255 255 / .2); -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem); }
+[data-ceu="noite"] .app--ceu .call { background: rgb(8 12 28 / .35); }
+.app--ceu .auth-main > *, .app--ceu .onboarding { padding: 28px; border-radius: 32px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: var(--elevacao); }
+.app--ceu .rs-campo input, .app--ceu .onboarding-field textarea { border-radius: 14px; background: var(--fundo-elevado); }
+
+@media (max-width: 560px) {
+  .sky-nav { padding: 10px 12px 4px; gap: 8px; }
+  .sky-round, .sky-avatar { width: 42px; height: 42px; }
+  .sky-tabs button { padding: 0 14px; min-height: 38px; font-size: 15px; }
+  .app--ceu .main { padding: 4px 10px 8px; }
+  .app--ceu .bubble { font-size: 16px; }
+  .app--ceu .bubble.assistant { max-width: 92%; }
+  .app--ceu .bubble.user { max-width: 86%; padding: 12px 16px; }
+  .sky-orb { width: 48px; height: 48px; }
+  .composer-dock { gap: 8px; }
+  .app--ceu .composer { padding-left: 6px; }
+  .app--ceu .composer textarea { font-size: 16px; }
+  .app--ceu .composer-row > textarea { padding-left: 8px; }
+  .app--ceu .page { padding: 22px 18px 6px; border-radius: 26px; }
+}
+@media (max-width: 370px) {
+  .sky-tabs button { padding: 0 10px; }
+}
+
+/* The page card sits under its reply, dark like a screen; the viewer floats as glass. */
+.app--ceu .bubble.assistant:has(.artifact-card) { max-width: min(92%, 460px); }
+.app--ceu .artifact-card { margin: 14px -6px -2px; border-radius: 22px; }
+.app--ceu .artifact-viewer { background: rgb(29 29 31 / .25); -webkit-backdrop-filter: blur(1.2rem); backdrop-filter: blur(1.2rem); padding: 12px; gap: 10px; }
+.app--ceu .artifact-viewer-bar { border: 1px solid var(--vidro-borda); border-radius: 22px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
+.app--ceu .artifact-viewer-frame { border-radius: 22px; box-shadow: var(--elevacao); }

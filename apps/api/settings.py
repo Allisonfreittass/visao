@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = Field(default=2048, ge=1)
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
+    # A page it writes (docs/ARTEFATOS.md) is longer than a reply; still within the per-call cap.
+    artifact_max_output_tokens: int = Field(default=4096, ge=256)
 
     # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
     # human quality gate; which approved voice is the agent's own is the agent's decision.

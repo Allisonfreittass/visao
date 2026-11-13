@@ -8,12 +8,14 @@ for the worker instead of delaying the reply.
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import links as conversation_links
+from core.conversation import progress
 from core.conversation.service import Budgets, TurnResult, conversation_history, reply
 from core.curiosity.engine import (
     ASK_USER,
@@ -24,6 +26,7 @@ from core.curiosity.engine import (
     CuriosityOutcome,
     consider,
 )
+from core.decision import record as deed_record
 from core.decision.turn import TurnPlan
 from core.google import assist as google_assist
 from core.identity import name_deliberation, self_knowledge
@@ -40,7 +43,13 @@ from core.mind import state as mind_state
 from core.mind import temperament as mind_temperament
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
-from infrastructure.database.models import AgentIdentity, Conversation, Decision, User
+from infrastructure.database.models import (
+    AgentIdentity,
+    Attachment,
+    Conversation,
+    Decision,
+    User,
+)
 from infrastructure.jobs import queue
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
@@ -87,9 +96,32 @@ def run_turn(
     config: TurnConfig,
     modality: str = "text",
     links: conversation_links.LinkReader | None = None,
+    files: list[Attachment] | None = None,
 ) -> TurnOutcome:
     plan = TurnPlan()
     blocks: list[str] = []
+    progress.step("Pensando")
+    if files:
+        photos = [f for f in files if f.kind == "image"]
+        documents = [f for f in files if f.kind != "image"]
+        if documents:
+            progress.step(
+                "Lendo " + (documents[0].filename if len(documents) == 1 else "os arquivos"),
+                ", ".join(f.filename for f in documents) if len(documents) > 1 else None,
+            )
+        elif photos:
+            progress.step("Olhando a foto" if len(photos) == 1 else "Olhando as fotos")
+        plan.add(
+            "read_attachments",
+            executed=True,
+            reason="owner_sent_files",
+            kinds=[f.kind for f in files],
+            names=[f.filename for f in files],
+        )
+    urls = conversation_links.find(text) if links is not None else []
+    if urls:
+        hosts = list(dict.fromkeys(urlsplit(u).hostname or u for u in urls))
+        progress.step("Abrindo " + hosts[0], ", ".join(hosts[1:]) or None)
     read = tuple(links.read(text)) if links is not None else ()
     if read:
         opened = [r.url for r in read if r.ok]
@@ -111,6 +143,8 @@ def run_turn(
             mind_enabled=config.mind_enabled,
             web_search=config.web_search,
             read_links=links is not None,
+            attachments=True,
+            pages=True,
         ),
     )
     if capabilities.mac_projects:
@@ -165,7 +199,15 @@ def run_turn(
         if helped is not None:
             blocks.append(helped.block)
             if helped.read:
-                plan.add("google_read", executed=True, reason="owner_asked", sources=helped.read)
+                plan.add(
+                    "google_read",
+                    executed=True,
+                    reason="owner_asked",
+                    sources=helped.read,
+                    email_query=helped.email_query,
+                    emails_found=helped.emails_found,
+                    calendar_days=helped.calendar_days,
+                )
             if helped.proposed:
                 plan.add(
                     "google_proposed",
@@ -272,6 +314,8 @@ def run_turn(
                 + "\n".join(f"- {line}" for line in loops)
             )
         blocks.append(mind_temperament.compute(session, owner, now).chat_block())
+    if self_knowledge.about_self(text):
+        progress.step("Lendo o próprio código")
     own_code = self_knowledge.context_block(text)
     if own_code:
         blocks.append(own_code)
@@ -289,6 +333,10 @@ def run_turn(
         )
     )
     blocks.append(plan.facts())
+    # Earlier turns' real actions: without them it once denied a Gmail read it had done.
+    earlier = deed_record.conversation_block(session, conversation, owner)
+    if earlier:
+        blocks.append(earlier)
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
     )
@@ -310,6 +358,7 @@ def run_turn(
         owner_profile=owner_profile,
         owner_rules=owner_rules,
         attachment=conversation_links.context_block(list(read)) if read else "",
+        files=files,
     )
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id

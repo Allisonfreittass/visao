@@ -21,6 +21,8 @@ interface SettingsViewProps {
   onRestartOnboarding: () => void;
   onLogout: () => void;
   onError: (e: unknown) => void;
+  sky: boolean;
+  onToggleSky: () => void;
 }
 
 /** All the switches in one place, grouped by what they touch. */
@@ -61,6 +63,15 @@ export function SettingsView(props: SettingsViewProps) {
         <h1 id="settings-title">Do seu <em>jeito.</em></h1>
       </header>
       <div className="page-body settings">
+        <section className="settings-group" aria-labelledby="g-aparencia">
+          <h2 id="g-aparencia" className="rotulo">Aparência</h2>
+          <Setting
+            title="Céu ao fundo"
+            description="Um céu vivo que muda com a hora do dia, com vidro claro por cima. Desligado, volta o tema escuro."
+            checked={props.sky}
+            onChange={props.onToggleSky}
+          />
+        </section>
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>
           <Setting

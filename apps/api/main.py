@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from apps.api.push import configure_push
 from apps.api.routes import (
     arm,
+    artifacts,
+    attachments,
     auth,
     behavior,
     cloud,
@@ -34,6 +36,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(system.router)
     app.include_router(conversations.router)
+    app.include_router(attachments.router)
+    app.include_router(artifacts.router)
     app.include_router(memory.router)
     app.include_router(voice.router)
     app.include_router(curiosity.router)

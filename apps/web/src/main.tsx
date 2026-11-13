@@ -2,7 +2,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
+import { loadPreference } from "./session";
 import "./styles.css";
+import "./ceu.css";
+
+// Before the first paint, so the "Céu" appearance never flashes the night theme first.
+document.documentElement.dataset.theme = loadPreference("appearance") === "noite" ? "noite" : "ceu";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

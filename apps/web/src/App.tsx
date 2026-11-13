@@ -4,7 +4,10 @@ import {
   Api,
   ApiError,
   utcDate,
+  type ArtifactSummary,
+  type Attachment,
   type Conversation,
+  type ProgressStep,
   type Message,
   type OnboardingStatus,
   type SystemStatus,
@@ -20,6 +23,7 @@ import { Onboarding } from "./components/Onboarding";
 import { type CallControls, Presence, PresencePanel } from "./components/Presence";
 import { Rail, type WorkspaceView } from "./components/Rail";
 import { SettingsView } from "./components/SettingsView";
+import { SkyNav, SkyOrbButton } from "./components/SkyNav";
 import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
@@ -29,6 +33,8 @@ import type { OrbState } from "./orb/orbModel";
 import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
+import { Sky } from "./sky/Sky";
+import { MAX_FILES } from "./attachments";
 
 interface TurnLatency {
   sttMs: number;
@@ -42,6 +48,8 @@ const HEALTH_INTERVAL_MS = 15_000;
 // An installed app on the phone is resumed, not reloaded, so the sync also runs on return.
 const PUSH_SYNC_MS = 60 * 60 * 1000;
 const INITIATIVE_POLL_MS = 15_000;
+const PROGRESS_POLL_MS = 900;
+const ARTIFACT_POLL_MS = 3000;
 const DEMO_STATES: OrbState[] = ["IDLE", "LISTENING", "THINKING", "SPEAKING", "INTERRUPTED", "DISCONNECTED"];
 
 function useHealth(api: Api): boolean {
@@ -107,11 +115,23 @@ export function App() {
   );
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
+  // "Céu" (a live sky, light glass) unless the owner went back to the night theme.
+  const [sky, setSky] = useState(() => loadPreference("appearance") !== "noite");
+  const [skyNight, setSkyNight] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = sky ? "ceu" : "noite";
+    if (sky && skyNight) root.dataset.ceu = "noite";
+    else delete root.dataset.ceu;
+  }, [sky, skyNight]);
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
   const [latency, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
   const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
   const sendingRef = useRef(false);
+  const queueRef = useRef<{ id: string; text: string; files: Attachment[] }[]>([]);
+  // What the turn in flight is doing now, shown in place of "Pensando".
+  const [liveStep, setLiveStep] = useState<ProgressStep | null>(null);
   const messagesRef = useRef<Message[]>([]);
   sendingRef.current = sending;
   messagesRef.current = messages;
@@ -125,7 +145,7 @@ export function App() {
     setError(e instanceof Error ? e.message : String(e));
   }, []);
 
-  const sendRef = useRef<(text: string, spoken?: SpokenTiming) => Promise<void>>(async () => undefined);
+  const sendRef = useRef<(text: string, spoken?: SpokenTiming, files?: Attachment[]) => Promise<void>>(async () => undefined);
   const voice = useVoice({
     api,
     status: voiceStatus,
@@ -210,8 +230,41 @@ export function App() {
       setMessages([]);
       return;
     }
+    // A conversation opened by sending its first message is filled by that send, not by this
+    // load (which would race it and hide the message that is showing).
+    if (sendingRef.current) return;
     api.messages(current).then(setMessages).catch(handleError);
   }, [api, current, loggedIn, handleError]);
+
+  const loadAttachment = useCallback((id: string) => api.attachmentBlob(id), [api]);
+
+  // A page being written: ask about it until it is ready (only while you look, so the server
+  // knows to notify you otherwise).
+  const pendingPages = messages.filter((m) => m.artifact?.status === "pending").map((m) => m.artifact!.id).join(",");
+  useEffect(() => {
+    if (!pendingPages) return;
+    const ids = pendingPages.split(",");
+    const check = () => {
+      if (document.hidden) return;
+      ids.forEach((id) => {
+        api.artifact(id).then((fresh) => {
+          if (fresh.status === "pending") return;
+          setMessages((list) => list.map((m) => (m.artifact?.id === id ? { ...m, artifact: fresh } : m)));
+        }).catch(() => undefined);
+      });
+    };
+    const timer = window.setInterval(check, ARTIFACT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [api, pendingPages]);
+
+  async function deleteArtifact(artifact: ArtifactSummary) {
+    try {
+      await api.deleteArtifact(artifact.id);
+      setMessages((list) => list.map((m) => (m.artifact?.id === artifact.id ? { ...m, artifact: null } : m)));
+    } catch (e) {
+      handleError(e);
+    }
+  }
 
   const speakAloud = speakReplies || voice.inCall;
   const speakRef = useRef<((text: string) => void) | null>(null);
@@ -228,7 +281,8 @@ export function App() {
         const known = new Set(messagesRef.current.map((m) => m.id));
         // What it says on its own, and the arm's reports, are read aloud in a call.
         const fresh = next.filter((m) => m.role === "assistant" && (m.origin === "initiative" || m.origin === "arm") && !known.has(m.id));
-        if (next.length !== messagesRef.current.length) setMessages(next);
+        const unsent = messagesRef.current.filter((m) => m.local === "failed" || m.local === "queued");
+        if (next.length !== messagesRef.current.length - unsent.length) setMessages([...next, ...unsent]);
         const last = fresh[fresh.length - 1];
         if (last && known.size > 0 && speakRef.current) speakRef.current(last.content);
       }).catch(() => undefined);
@@ -280,9 +334,19 @@ export function App() {
     }
   }
 
-  async function send(text: string, spoken?: SpokenTiming): Promise<void> {
+  async function send(text: string, spoken?: SpokenTiming, files: Attachment[] = []): Promise<void> {
     setError(null);
-    const mac = spoken ? null : parseMacCommand(text);
+    if (sendingRef.current) {
+      // Still answering: what you add now shows at once, dimmed, and goes with the next turn.
+      const queuedId = `queued-${Date.now()}-${queueRef.current.length}`;
+      queueRef.current.push({ id: queuedId, text, files });
+      setMessages((list) => [
+        ...list,
+        { id: queuedId, role: "user", content: text, created_at: new Date().toISOString(), attachments: files, local: "queued" },
+      ]);
+      return;
+    }
+    const mac = spoken || files.length ? null : parseMacCommand(text);
     if (mac === "usage") {
       setError("Use assim: /mac projeto o que fazer (ex.: /mac visao rode os testes).");
       return;
@@ -295,13 +359,43 @@ export function App() {
     const willSpeak = (spoken !== undefined || speakAloud) && voice.speakerKind !== null;
     if (willSpeak) voice.unlock(); // inside the gesture, before any await
     let conversationId = current;
+    // What you sent shows at once, before the reply; the server's copy replaces it.
+    const localId = `local-${Date.now()}`;
+    const optimistic: Message = {
+      id: localId,
+      role: "user",
+      content: text,
+      created_at: new Date().toISOString(),
+      attachments: files,
+      local: "sending",
+    };
+    setMessages((list) => [...list, optimistic]);
     setSending(true);
+    let watch = 0;
     try {
       conversationId ??= await openConversation();
+      const watching = conversationId;
+      // Polled only while you look: when the phone locks, the server sees it and also sends the
+      // reply as a notification.
+      const look = () => {
+        if (document.hidden) return;
+        api.progress(watching).then((p) => {
+          const last = p.steps[p.steps.length - 1];
+          if (p.active && last) setLiveStep(last);
+        }).catch(() => undefined);
+      };
+      look();
+      watch = window.setInterval(look, PROGRESS_POLL_MS);
       const llmStarted = performance.now();
-      const turn = await api.send(conversationId, text, spoken ? "voice" : "text");
+      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id));
       const llmMs = performance.now() - llmStarted;
-      setMessages((list) => [...list, turn.user_message, { ...turn.assistant_message, sources: turn.sources }]);
+      setMessages((list) => [
+        ...list.filter((m) => m.id !== localId && m.local !== "queued"),
+        turn.user_message,
+        { ...turn.assistant_message, sources: turn.sources },
+        // What was written while it answered stays below the reply, waiting its turn.
+        ...list.filter((m) => m.local === "queued"),
+      ]);
       pending.refresh(); // a request for the Mac may be waiting for a tap now
       if (spoken) setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
       if (willSpeak) {
@@ -316,13 +410,47 @@ export function App() {
       }
     } catch (e) {
       handleError(e);
-      // The user message may have been stored even if the reply failed: reload the transcript.
-      if (conversationId) api.messages(conversationId).then(setMessages).catch(() => undefined);
+      setMessages((list) => list.map((m) => (m.id === localId ? { ...m, local: "failed" } : m)));
+      // The user message may have been stored even if the reply failed: reload the transcript,
+      // keeping the one that never arrived visible so it is not silently lost.
+      if (conversationId) {
+        const id = conversationId;
+        api
+          .messages(id)
+          .then((stored) => {
+            const last = stored.filter((m) => m.role === "user").at(-1);
+            const arrived = last !== undefined && last.content === text && utcDate(last.created_at) >= utcDate(optimistic.created_at);
+            setMessages((list) => [
+              ...(arrived ? stored : [...stored, { ...optimistic, local: "failed" as const }]),
+              ...list.filter((m) => m.local === "queued"),
+            ]);
+          })
+          .catch(() => undefined);
+      }
     } finally {
+      clearInterval(watch);
+      setLiveStep(null);
       setSending(false);
     }
   }
   sendRef.current = send;
+
+  // When the reply arrives, everything written meanwhile goes as one message: one answer to all
+  // of it, not one per line.
+  useEffect(() => {
+    if (sending || queueRef.current.length === 0) return;
+    const batch = queueRef.current.splice(0);
+    const ids = new Set(batch.map((q) => q.id));
+    setMessages((list) => list.filter((m) => !ids.has(m.id)));
+    const text = batch.map((q) => q.text).filter(Boolean).join("\n\n");
+    const files = batch.flatMap((q) => q.files).slice(0, MAX_FILES);
+    void sendRef.current?.(text, undefined, files);
+  }, [sending]);
+
+  // A queue belongs to the conversation it was typed in.
+  useEffect(() => {
+    queueRef.current = [];
+  }, [current]);
 
   async function sendFeedback(messageId: string, rating: 1 | -1, tags: string[]): Promise<string | null> {
     try {
@@ -354,6 +482,12 @@ export function App() {
     const next = !deviceListening;
     setDeviceListening(next);
     savePreference("device-listening", next ? "1" : "0");
+  }
+
+  function toggleSky() {
+    const next = !sky;
+    setSky(next);
+    savePreference("appearance", next ? "ceu" : "noite");
   }
 
   function logout() {
@@ -407,7 +541,18 @@ export function App() {
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
-    <div className="app">
+    <div className={`app${sky ? " app--ceu" : ""}`}>
+      {sky && <Sky onNight={setSkyNight} />}
+      {sky && ready && !firstRun && (
+        <SkyNav
+          view={view}
+          pendingCount={pending.count}
+          agentName={agentName}
+          menuOpen={menuOpen}
+          onMenu={() => setMenuOpen((o) => !o)}
+          onView={showView}
+        />
+      )}
       <header className={`topbar ${ready ? "topbar--app" : ""}`}>
         {ready && (
           <button type="button" className="rs-botao rs-botao--compacto menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
@@ -507,11 +652,17 @@ export function App() {
                 }}
                 onLogout={logout}
                 onError={handleError}
+                sky={sky}
+                onToggleSky={toggleSky}
               />
             )}
             <ChatView
               hidden={view !== "conversation"}
-              header={
+              placeholder={sky ? `Enviar mensagem para ${agentName ?? "o Visão"}` : undefined}
+              composerStart={sky ? <SkyOrbButton state={orbState} canCall={call.canCall} hint={call.hint} onCall={call.onCall} /> : undefined}
+              header={sky ? (
+                memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined
+              ) : (
                 <div className="chat-head">
                   <div className="chat-head-text">
                     <span className="rotulo">{currentConversation ? dayLabel(utcDate(currentConversation.created_at)) : "Conversa nova"}</span>
@@ -526,7 +677,7 @@ export function App() {
                   </div>
                   <Presence call={call} compact />
                 </div>
-              }
+              )}
               focusRequest={composerFocus}
               agentName={agentName}
               messages={messages}
@@ -552,8 +703,13 @@ export function App() {
                   })),
               ]}
               sending={sending || preparing}
+              status={liveStep}
               error={voice.inCall ? null : error}
-              onSend={(text) => void send(text)}
+              onSend={(text, files) => void send(text, undefined, files)}
+              onUpload={(file, name) => api.uploadAttachment(file, name)}
+              loadAttachment={loadAttachment}
+              pageUrl={(path) => api.pageUrl(path)}
+              onDeleteArtifact={(a) => void deleteArtifact(a)}
               onFeedback={sendFeedback}
             />
             {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}

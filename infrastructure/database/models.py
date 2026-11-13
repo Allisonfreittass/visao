@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -183,6 +184,64 @@ class Message(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+
+class Attachment(Base):
+    """A photo or file the owner sent with a message. Transcript, not curated memory: it goes
+    away with its message, and an upload never sent is dropped by its owner's next upload."""
+
+    __tablename__ = "attachments"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # Empty until the message it came with is sent.
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # "image" goes to the model as a picture; "document" as the text read out of it.
+    kind: Mapped[str] = mapped_column(String(16))
+    filename: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(127))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64))
+    # Loaded only when read: listing a conversation's files never pulls their bytes.
+    data: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    # For documents: what could be read out of the file (None when nothing could).
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+
+class Artifact(Base):
+    """A page it wrote for the owner (a trip plan, a comparison), served at a secret link with no
+    scripts and an opaque origin (docs/ARTEFATOS.md)."""
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # The reply that said it would make this page; the chat shows the card there.
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(120))
+    # The unguessable part of the link; whoever has it can open the page.
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # "pending" while it is written, then "ready" or "failed".
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    html: Mapped[str | None] = mapped_column(Text, nullable=True, deferred=True)
+    error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class ModelUsage(Base):
     """One row per LLM call, successful or not. Source of truth for cost and budgets."""

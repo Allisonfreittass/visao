@@ -2,6 +2,8 @@
 
 [English](README.md) · Português
 
+**V.I.S.A.O.**: *Virtual Intelligence with Supervised Autonomy & Opt-in memory* (inteligência virtual com autonomia supervisionada e memória só com o seu consentimento).
+
 **Rastro · Introspecção.** *Um agente que nasce sem nome e decide quem é.*
 
 ![A tela de conversa: uma resposta com código e botão de copiar, a orbe e o botão Ligar](docs/assets/conversa.webp)
@@ -24,6 +26,10 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 | **Trabalha no meu Mac.** `/mac <projeto> <pedido>` no chat manda o trabalho para um processo pequeno no Mac, que roda o Claude Code num projeto liberado, com uma lista fechada de ferramentas, e responde na conversa. Ele pode propor; só eu aprovo ([docs/BRACO.md](docs/BRACO.md)). | primeira versão feita |
 | **Lê meu email e minha agenda.** Lê o Gmail e a Google Agenda quando eu pergunto, e prepara respostas e eventos que só saem depois do meu toque em Aprovar. A conexão fica cifrada; um email que tenta dar ordens a ele no máximo vira um pedido que eu leio ([docs/GOOGLE.md](docs/GOOGLE.md)). | feito |
 | **Abre o que eu mando.** Links na mensagem são lidos antes da resposta: repositórios do GitHub pela API, outras páginas por um leitor que só alcança endereços HTTPS públicos. | feito |
+| **Vê fotos, lê arquivos.** Anexe pelo +, cole um print ou arraste um arquivo: fotos vão ao modelo como imagem (reduzidas no navegador antes), PDFs e arquivos de texto ou código vão como o texto lido deles, marcado como dado, nunca como ordem. O que você manda aparece na hora, antes da resposta ([docs/ANEXOS.md](docs/ANEXOS.md)). | feito; fotos pedem um modelo com visão |
+| **Um céu para conversar.** A aparência "Céu": um céu vivo em WebGL que segue a hora do dia (nuvens, sol, estrelas à noite), vidro fosco, abas em pílula (Início · Chat · Caderno), bolhas brancas nas respostas dele. Dá para continuar escrevendo enquanto ele responde: essas mensagens esperam, mais apagadas, e vão juntas como a próxima mensagem. O tema escuro antigo volta com um botão em Ajustes. | feito |
+| **Páginas que ele escreve.** Peça um plano, um comparativo ou um roteiro para guardar: a resposta diz o que vai ter, e um cartão embaixo dela passa de "Criando…" para uma página que você abre, compartilha por um link secreto ou apaga. Escrita a partir da conversa e das pesquisas dela, com datas e fontes, "a confirmar" no que faltar; servida sem scripts e com origem opaca, então não alcança a sua sessão ([docs/ARTEFATOS.md](docs/ARTEFATOS.md)). | feito |
+| **Status ao vivo.** Enquanto trabalha, o chat mostra o passo atual ("Pesquisando…", "Abrindo github.com", "Lendo roteiro.pdf"); se você sai do app no meio, a resposta chega também como notificação ([docs/STATUS.md](docs/STATUS.md)). | feito |
 | **Memória autobiográfica** curada por uma política determinística, opt-in por pessoa, com proveniência, exportação e exclusão. Saúde, religião, política, finanças e terceiros ficam de fora. | feito (benchmark: curada 8/8, passiva 6/8, sem memória 1/8) |
 | **Curiosidade com fontes.** Pergunta o que é pessoal e pesquisa só fatos públicos (Wikipédia, arXiv, Hacker News), sempre citando. | feito |
 | **Metas com aprovação.** Perguntas sem resposta viram metas que rodam num worker separado, só depois que eu aprovo. | feito |

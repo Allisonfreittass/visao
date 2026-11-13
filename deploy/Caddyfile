@@ -33,7 +33,8 @@
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
+		# "?" só preenche quando a resposta não trouxe: as páginas (/api/p/...) mandam no-referrer.
+		?Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
 }

@@ -10,17 +10,20 @@ fails open: whatever goes wrong there, the original reply stands and the turn su
 import json
 import logging
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
+from core.conversation import attachments, progress
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
     RULE_CHECK_INSTRUCTIONS,
@@ -31,6 +34,7 @@ from core.memory.retrieval import ScoredMemory, retrieve
 from core.memory.text import fold, tokens
 from infrastructure.database.models import (
     AgentIdentity,
+    Attachment,
     Conversation,
     MemoryRetrieval,
     Message,
@@ -38,6 +42,9 @@ from infrastructure.database.models import (
     User,
 )
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse
+
+if TYPE_CHECKING:
+    from core.conversation.artifacts import Request as PageRequest
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +92,8 @@ class TurnResult:
     assistant_message: Message
     usage: ModelUsage
     recalled: list[ScoredMemory]
+    # The reply asked for a page (core/conversation/artifacts.py); the route records it.
+    page: "PageRequest | None" = None
 
 
 def _spent(session: Session, *conditions: object) -> Decimal:
@@ -115,17 +124,46 @@ def conversation_history(session: Session, conversation: Conversation) -> list[M
     )
 
 
-def build_context(history: list[Message], char_budget: int) -> list[ChatMessage]:
-    """Most recent messages that fit the budget, oldest first. The latest one is always kept."""
+def build_context(
+    history: list[Message],
+    char_budget: int,
+    files: dict[uuid.UUID, list[Attachment]] | None = None,
+) -> list[ChatMessage]:
+    """Most recent messages that fit the budget, oldest first. The latest one is always kept.
+
+    Photos and file text go with the latest messages only; older ones just name their files."""
+    files = files or {}
+    allowance = attachments.ContextAllowance()
     selected: list[ChatMessage] = []
     used = 0
-    for message in reversed(history):
+    for position, message in enumerate(reversed(history)):
         if selected and used + len(message.content) > char_budget:
             break
-        selected.append(ChatMessage(role=message.role, content=message.content))  # type: ignore[arg-type]
+        content, images = message.content, ()
+        block, images = attachments.render(
+            files.get(message.id, []), allowance, recent=position < attachments.RECENT_MESSAGES
+        )
+        if block:
+            content = f"{content}\n\n{block}" if content.strip() else block
+        selected.append(ChatMessage(role=message.role, content=content, images=images))  # type: ignore[arg-type]
         used += len(message.content)
     selected.reverse()
     return selected
+
+
+# What a provider answers when the request itself is not acceptable (e.g. images to a text model).
+REJECTED_INPUT = {"http_400", "http_413", "http_415", "http_422"}
+NO_VISION_NOTE = (
+    "[Sistema] O modelo de agora não recebe imagens: as fotos desta conversa não chegaram até "
+    "você. Diga isso à pessoa em uma frase e responda ao resto; não descreva foto nenhuma."
+)
+
+
+def without_images(prompt: list[ChatMessage]) -> list[ChatMessage]:
+    return [
+        replace(m, images=(), content=f"{m.content}\n\n{NO_VISION_NOTE}") if m.images else m
+        for m in prompt
+    ]
 
 
 def reply(
@@ -147,12 +185,14 @@ def reply(
     owner_profile: str = "",
     owner_rules: str = "",
     attachment: str = "",
+    files: list[Attachment] | None = None,
 ) -> TurnResult:
     check_budgets(session, conversation, budgets)
 
     user_message = Message(conversation_id=conversation.id, role="user", content=user_text)
     session.add(user_message)
     session.flush()
+    attachments.claim(files or [], user_message)
 
     # Memory is recalled only for owners who opted in, and only from their own records.
     recalled = retrieve(session, owner.id, user_text) if owner.memory_consent else []
@@ -187,17 +227,34 @@ def reply(
     if owner_rules:
         system_prompt += "\n\n" + learned_rules_block(owner_rules)
     prompt = [ChatMessage(role="system", content=system_prompt)]
-    prompt += build_context(conversation_history(session, conversation), context_char_budget)
+    history = conversation_history(session, conversation)
+    prompt += build_context(
+        history,
+        context_char_budget,
+        attachments.for_messages(
+            session, [m.id for m in history[-attachments.RECENT_MESSAGES * 4 :]]
+        ),
+    )
     if attachment and prompt[-1].role == "user":
         # What came with this message (a page it opened) goes with the message itself, the last
         # thing read: in the system prompt it lost to earlier replies saying the opposite.
-        prompt[-1] = ChatMessage(role="user", content=f"{prompt[-1].content}\n\n{attachment}")
+        prompt[-1] = replace(prompt[-1], content=f"{prompt[-1].content}\n\n{attachment}")
 
+    progress.step("Escrevendo a resposta")
     try:
         response = provider.complete(prompt, max_output_tokens=max_output_tokens)
     except LLMError as exc:
         _record_failure(session, conversation, provider, exc.kind)
-        raise
+        if exc.kind not in REJECTED_INPUT or not any(m.images for m in prompt):
+            raise
+        # The model in use does not take pictures: answer without them, and say so, instead of
+        # failing every message that has a photo.
+        prompt = without_images(prompt)
+        try:
+            response = provider.complete(prompt, max_output_tokens=max_output_tokens)
+        except LLMError as again:
+            _record_failure(session, conversation, provider, again.kind)
+            raise
 
     usage = ModelUsage(
         conversation_id=conversation.id,
@@ -220,10 +277,15 @@ def reply(
         session.commit()
         raise EmptyReplyError("provider returned an empty reply")
 
-    content = response.text
+    from core.conversation.artifacts import take_marker  # artifacts builds on this module
+
+    content, page = take_marker(response.text)
+    if page is not None and not content.strip():
+        content = f"Vou montar a página “{page.title}”. Ela aparece aqui quando ficar pronta."
     if owner_rules and not truncated:
         # Committed first: the call's admission ledger needs the write lock this session would hold.
         session.commit()
+        progress.step("Conferindo as suas regras")
         content = _obey_rules(
             session,
             conversation=conversation,
@@ -243,7 +305,7 @@ def reply(
     # Observable behavior, measured in code, tagged with the state version in force.
     behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
-    return TurnResult(user_message, assistant_message, usage, recalled)
+    return TurnResult(user_message, assistant_message, usage, recalled, page)
 
 
 def _obey_rules(

@@ -1,6 +1,7 @@
 """Provider for any OpenAI-compatible /chat/completions endpoint (Alibaba Model Studio,
 OpenRouter, DeepInfra, vLLM...). Choosing a host is configuration, not code."""
 
+import base64
 import logging
 import time
 from decimal import Decimal, InvalidOperation
@@ -13,6 +14,18 @@ logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
 _MAX_RETRY_DELAY_SECONDS = 30.0
+
+
+def _content(message: ChatMessage) -> str | list[dict]:
+    if not message.images:
+        return message.content
+    parts: list[dict] = [{"type": "text", "text": message.content}] if message.content else []
+    for image in message.images:
+        encoded = base64.b64encode(image.data).decode("ascii")
+        parts.append(
+            {"type": "image_url", "image_url": {"url": f"data:{image.media_type};base64,{encoded}"}}
+        )
+    return parts
 
 
 class OpenAICompatibleProvider:
@@ -45,7 +58,7 @@ class OpenAICompatibleProvider:
         payload = {
             **self._extra_body,
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [{"role": m.role, "content": _content(m)} for m in messages],
             "max_tokens": max_output_tokens,
         }
         started = time.monotonic()

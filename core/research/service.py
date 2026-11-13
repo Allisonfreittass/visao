@@ -6,8 +6,23 @@ import time
 
 from sqlalchemy.orm import Session
 
+from core.conversation import progress
 from infrastructure.database.models import KnowledgeGap, ResearchSession, ResearchSource, User
 from integrations.search.base import SearchError, SearchProvider
+
+_WHERE = {
+    "tavily": "na web",
+    "open-web": "na web",
+    "arxiv": "no arXiv",
+    "hackernews": "no Hacker News",
+}
+
+
+def _where(name: str) -> str:
+    """Where it is searching, in words: "na Wikipédia", "na web"."""
+    if name.startswith("wikipedia"):
+        return "na Wikipédia"
+    return _WHERE.get(name, f"em {name}")
 
 
 def run_research(
@@ -25,6 +40,7 @@ def run_research(
     )
     session.add(research)
     session.flush()
+    progress.step(f"Pesquisando “{query}”", _where(search.name))
     try:
         results = search.search(query, max_results)
     except SearchError as exc:

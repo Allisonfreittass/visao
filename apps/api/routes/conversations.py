@@ -5,16 +5,19 @@ from decimal import Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.links import get_link_reader
 from apps.api.llm import get_llm_provider, missing_llm_settings
+from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
+from apps.api.routes.attachments import AttachmentOut, attachment_out
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
+from core.conversation import artifacts, attachments, progress
 from core.conversation.links import LinkReader
 from core.conversation.service import (
     BudgetExceededError,
@@ -25,6 +28,7 @@ from core.conversation.service import (
 from core.curiosity.engine import CuriosityLimits
 from core.decision.pipeline import TurnConfig, run_turn
 from core.identity.genesis import get_identity
+from core.initiatives import push
 from core.memory.curator import (
     CurationOutputError,
     curate_conversation,
@@ -56,12 +60,23 @@ class MessageOut(BaseModel):
     content: str
     created_at: datetime
     origin: str = "turn"
+    attachments: list[AttachmentOut] = []
+    # A page this reply said it would write (docs/ARTEFATOS.md).
+    artifact: ArtifactOut | None = None
 
 
 class MessageIn(BaseModel):
-    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
+    content: str = Field(default="", max_length=MAX_MESSAGE_CHARS)
     # "voice" when the turn came from a voice session: the reply is spoken, so kept short.
     modality: Literal["text", "voice"] = "text"
+    # Uploaded first through POST /attachments; a photo alone is a whole message.
+    attachment_ids: list[uuid.UUID] = Field(default=[], max_length=attachments.MAX_PER_MESSAGE)
+
+    @model_validator(mode="after")
+    def _says_something(self) -> "MessageIn":
+        if not self.content.strip() and not self.attachment_ids:
+            raise ValueError("mensagem vazia")
+        return self
 
 
 class UsageOut(BaseModel):
@@ -103,13 +118,15 @@ class TurnOut(BaseModel):
     sources: list[SourceOut] = []
 
 
-def _message_out(message: Message) -> MessageOut:
+def _message_out(message: Message, files: list | None = None, page=None) -> MessageOut:
     return MessageOut(
         id=message.id,
         role=message.role,
         content=message.content,
         created_at=message.created_at,
         origin=message.origin or "turn",
+        attachments=[attachment_out(a) for a in files or []],
+        artifact=artifact_out(page) if page is not None else None,
     )
 
 
@@ -332,10 +349,50 @@ def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut
     return [ConversationOut(id=c.id, created_at=c.created_at) for c in conversations]
 
 
+class ProgressStepOut(BaseModel):
+    label: str
+    detail: str | None = None
+
+
+class ProgressOut(BaseModel):
+    active: bool
+    elapsed_ms: int = 0
+    steps: list[ProgressStepOut] = []
+
+
+@router.get("/{conversation_id}/progress")
+def turn_progress(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> ProgressOut:
+    """What the turn in flight is doing now, for the live status in the app."""
+    conversation = _own_conversation(db, user, conversation_id)
+    live = progress.snapshot(conversation.id)
+    return ProgressOut(**live) if live else ProgressOut(active=False)
+
+
+def notify_reply(
+    db: Session, user: User, conversation_id: uuid.UUID, name: str | None, text: str
+) -> None:
+    try:
+        push.send_to_owner(
+            db,
+            user.id,
+            title=name or "Visão",
+            body=text,
+            url=f"/?c={conversation_id}",
+            tag=f"visao-reply-{conversation_id}",
+        )
+        db.commit()
+    except Exception:  # noqa: BLE001 - the reply is in the chat either way
+        db.rollback()
+        logger.warning("reply push failed", extra={"event": "reply_push_failed"})
+
+
 @router.get("/{conversation_id}/messages")
 def list_messages(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> list[MessageOut]:
     conversation = _own_conversation(db, user, conversation_id)
-    return [_message_out(m) for m in conversation_history(db, conversation)]
+    history = conversation_history(db, conversation)
+    files = attachments.for_messages(db, [m.id for m in history if m.role == "user"])
+    pages = artifacts.for_messages(db, [m.id for m in history if m.role == "assistant"])
+    return [_message_out(m, files.get(m.id), pages.get(m.id)) for m in history]
 
 
 @router.post("/{conversation_id}/messages")
@@ -348,6 +405,8 @@ def send_message(
     provider: OptionalProvider,
     search: Annotated[SearchProvider, Depends(get_search_provider)],
     links: Annotated[LinkReader, Depends(get_link_reader)],
+    background: BackgroundTasks,
+    factory: SessionFactory,
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     if provider is None:
@@ -358,20 +417,26 @@ def send_message(
     identity = get_identity(db)
     if identity is None or identity.id != conversation.identity_id:
         raise HTTPException(status.HTTP_409_CONFLICT, "Identidade da conversa indisponível")
+    try:
+        files = attachments.pending(db, user.id, body.attachment_ids)
+    except attachments.AttachmentRejected as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
     try:
-        turn = run_turn(
-            db,
-            conversation=conversation,
-            identity=identity,
-            owner=user,
-            text=body.content,
-            provider=provider,
-            search=search,
-            config=turn_config(settings),
-            modality=body.modality,
-            links=links,
-        )
+        with progress.tracking(conversation.id):
+            turn = run_turn(
+                db,
+                conversation=conversation,
+                identity=identity,
+                owner=user,
+                text=body.content,
+                provider=provider,
+                search=search,
+                config=turn_config(settings),
+                modality=body.modality,
+                links=links,
+                files=files,
+            )
         result, outcome = turn.result, turn.curiosity
     except BudgetExceededError as exc:
         scope = "diário" if exc.scope == "daily" else "desta conversa"
@@ -386,6 +451,38 @@ def send_message(
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, "O provedor de LLM devolveu resposta vazia"
         ) from exc
+
+    page = None
+    if result.page is not None:
+        # Written after this reply, in the background: a page takes longer than an answer.
+        page = artifacts.create(
+            db,
+            owner=user,
+            conversation=conversation,
+            message_id=result.assistant_message.id,
+            request=result.page,
+        )
+        read_pages = "\n".join(
+            f'<pagina url="{r.url}">\n{r.text[:8000]}\n</pagina>' for r in turn.links if r.ok
+        )
+        background.add_task(
+            build_in_background,
+            factory,
+            page.id,
+            provider,
+            settings,
+            _budgets(settings),
+            identity.chosen_name,
+            read_pages,
+        )
+
+    if progress.owner_left(conversation.id):
+        # The app stopped watching while this ran (phone locked, app closed): the reply also goes
+        # as a notification, like a message from a friend. It answers something just asked, so
+        # it is not an opening and the opening limits do not apply.
+        notify_reply(
+            db, user, conversation.id, identity.chosen_name, result.assistant_message.content
+        )
 
     usage = result.usage
     gap = outcome.gap
@@ -407,8 +504,8 @@ def send_message(
             for r in turn.links
             if r.ok
         ],
-        user_message=_message_out(result.user_message),
-        assistant_message=_message_out(result.assistant_message),
+        user_message=_message_out(result.user_message, files),
+        assistant_message=_message_out(result.assistant_message, page=page),
         usage=UsageOut(
             provider=usage.provider,
             model=usage.model,

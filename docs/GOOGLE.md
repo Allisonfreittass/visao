@@ -60,3 +60,12 @@ o repositório e [PRIVACIDADE.md](PRIVACIDADE.md), com `github.com` como domíni
 Ajustes › Google › **Desconectar** apaga a conexão do banco, revoga o acesso no Google e recusa o
 que estava esperando. Também dá para revogar direto em
 [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+
+## Ele lembra do que leu
+
+Cada leitura fica no registro do turno (a busca usada, quantos emails, quantos dias de agenda). Nas
+respostas seguintes, e no pensamento entre conversas, esse registro vem junto como "o que você fez
+de verdade" ([`core/decision/record.py`](../core/decision/record.py)). Sem isso, num caso real de
+13/11/2026, ele leu o Gmail e duas mensagens depois pediu desculpas por ter "inventado" a lista,
+porque a regra de verdade exige registro de ações anteriores e não havia nenhum à vista. Vale para
+tudo que ele faz: links abertos, anexos vistos, pesquisas, páginas, pedidos ao Mac.

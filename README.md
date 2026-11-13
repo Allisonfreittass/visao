@@ -2,6 +2,8 @@
 
 English · [Português](README.pt-BR.md)
 
+**V.I.S.A.O.**: *Virtual Intelligence with Supervised Autonomy & Opt-in memory.*
+
 **Trace · Introspection.** *An agent that is born without a name and decides who it is.*
 
 ![The conversation screen: a code answer with a copy button, the orb and the Call button](docs/assets/conversa.webp)
@@ -25,6 +27,10 @@ rewrite.
 | **Works on your Mac.** `/mac <project> <request>` in the chat sends work to a small daemon on my Mac, which runs Claude Code in an allowlisted project with a fixed tool list and reports back in the conversation. The agent can propose work; only I can approve it ([docs/BRACO.md](docs/BRACO.md)). | first version built |
 | **Reads my email and calendar.** It reads Gmail and Google Calendar when I ask, and prepares replies and events that only go out after I tap Approve. The connection is stored encrypted; an email that tries to give it orders can at most produce a proposal I read ([docs/GOOGLE.md](docs/GOOGLE.md)). | built |
 | **Opens what I send.** Links in a message are read before the reply: GitHub repositories through the API, other pages through a reader that only reaches public HTTPS addresses. | built |
+| **Sees photos, reads files.** Attach with +, paste a screenshot or drop a file: photos go to the model as pictures (shrunk in the browser first), PDFs and text or code files as the text read out of them, marked as data, never orders. What you send shows at once, before the reply ([docs/ANEXOS.md](docs/ANEXOS.md)). | built; needs a vision model for photos |
+| **A sky to talk under.** The "Céu" look: a live WebGL sky that follows the local hour (clouds, sun, stars at night), frosted glass, pill tabs (Início · Chat · Caderno), white bubbles for its replies. Keep writing while it answers: those messages wait, dimmed, and go together as one next message. The old night theme is one switch away in Ajustes. | built |
+| **Pages it writes.** Ask for a plan, a comparison or an itinerary to keep: the reply says what it will hold, and a card under it turns from "Criando…" into a page you open, share by a secret link or delete. Written from the conversation and its research, with dates and sources, "a confirmar" where something is missing; served with no scripts and an opaque origin, so it cannot touch your session ([docs/ARTEFATOS.md](docs/ARTEFATOS.md)). | built |
+| **Live status.** While it works, the chat shows the current step ("Pesquisando…", "Abrindo github.com", "Lendo roteiro.pdf"); if you leave the app mid-turn, the reply also arrives as a notification ([docs/STATUS.md](docs/STATUS.md)). | built |
 | **Autobiographical memory**, curated by a deterministic policy, opt-in per person, with provenance, export and delete. Health, religion, politics, finances and third parties stay out. | built (benchmark: curated 8/8, passive 6/8, none 1/8) |
 | **Curiosity with sources.** It asks what is personal and researches only public facts (Wikipedia, arXiv, Hacker News), always citing. | built |
 | **Goals with approval.** Unanswered questions can become goals that run in a separate worker only after I approve them. | built |

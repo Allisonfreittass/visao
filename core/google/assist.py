@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from core.conversation import progress
 from core.conversation.service import Budgets, check_budgets
 from core.google import account as accounts
 from core.google import actions
@@ -50,6 +51,10 @@ todos null."""
 class Assist:
     block: str = ""
     read: list[str] = field(default_factory=list)  # what was consulted, for the turn's facts
+    # What was looked up, for the record of what it did (core/decision/record.py).
+    email_query: str = ""
+    emails_found: int = 0
+    calendar_days: int | None = None
     proposed: list[GoogleAction] = field(default_factory=list)
     failure: str = ""
 
@@ -162,17 +167,21 @@ def run(
     try:
         days = wanted.get("calendar_days")
         if isinstance(days, int | float) and 0 <= days <= 14:
+            progress.step("Olhando sua agenda")
             start = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
             events = google.events(
                 start - timedelta(hours=1), start + timedelta(days=int(days) + 1)
             )
             parts.append(f"Agenda (próximos {int(days) or 1} dia(s)):\n{_events_text(events)}")
             result.read.append("agenda")
+            result.calendar_days = int(days) or 1
         query = wanted.get("email_query")
         if isinstance(query, str) and query.strip():
+            progress.step("Procurando no seu Gmail", query.strip())
             found = google.search(query.strip(), limit=8)
             parts.append(f'Emails para a busca "{query.strip()}":\n{_mails_text(found)}')
             result.read.append("gmail")
+            result.email_query, result.emails_found = query.strip(), len(found)
             if wanted.get("open_first_email") is True and found:
                 opened = google.read(found[0].id)
                 parts.append(

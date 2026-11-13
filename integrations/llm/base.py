@@ -8,9 +8,22 @@ Role = Literal["system", "user", "assistant"]
 
 
 @dataclass(frozen=True)
+class ImagePart:
+    """A picture that goes with a message. Bytes as received; each provider encodes them."""
+
+    media_type: str
+    data: bytes
+
+
+# Rough tokens one picture costs, for budget reservations (a 1568 px photo is about 1600).
+IMAGE_TOKEN_ESTIMATE = 1600
+
+
+@dataclass(frozen=True)
 class ChatMessage:
     role: Role
     content: str
+    images: tuple[ImagePart, ...] = ()
 
 
 @dataclass(frozen=True)

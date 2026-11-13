@@ -23,7 +23,13 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from infrastructure.database.models import SystemFlag
-from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse
+from integrations.llm.base import (
+    IMAGE_TOKEN_ESTIMATE,
+    ChatMessage,
+    LLMError,
+    LLMProvider,
+    LLMResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +184,7 @@ class BudgetGuard:
                 ).encode()
             )
             + 1024
+            + IMAGE_TOKEN_ESTIMATE * sum(len(getattr(m, "images", ())) for m in messages)
         )
         if not 0 < output <= self.limits.output_tokens_per_call:
             raise _deny("output reservation exceeds per-call limit")

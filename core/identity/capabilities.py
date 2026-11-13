@@ -31,6 +31,10 @@ class Capabilities:
     code_evolution: bool = False
     mind: bool = False
     read_links: bool = False
+    # Photos and files sent in the chat (core/conversation/attachments.py).
+    attachments: bool = False
+    # Pages it writes and publishes at a secret link (core/conversation/artifacts.py).
+    pages: bool = False
     mac_projects: tuple[str, ...] = ()
     google: bool = False
     # Devices that get a push with the app closed; None when this was not looked up.
@@ -51,6 +55,20 @@ class Capabilities:
             items.append(
                 "abrir os links que o interlocutor manda (páginas públicas e repositórios do "
                 "GitHub) e comentar o conteúdo lido"
+            )
+        if self.attachments:
+            items.append(
+                "ver as fotos e ler os arquivos (PDF, texto, código, planilhas em CSV) que o "
+                "interlocutor manda no chat, enquanto estão nas mensagens recentes"
+            )
+        if self.pages:
+            items.append(
+                "montar uma página para o interlocutor guardar e abrir (roteiro, plano, "
+                "comparação, relatório), quando ele pedir algo assim para ver ou guardar: escreva "
+                "na última linha da resposta, sozinho, [[página: Título curto]] e diga em uma "
+                "frase o que vai ter nela. Ela é escrita depois, a partir desta conversa e das "
+                "pesquisas feitas nela, e aparece aqui num cartão: não diga que já está pronta e "
+                "não invente link"
             )
         if self.google:
             items.append(
@@ -153,6 +171,8 @@ class CapabilityInputs:
     stt_model: str = ""
     web_search: bool = False
     read_links: bool = False
+    attachments: bool = False
+    pages: bool = False
     self_knowledge: bool = True
 
 
@@ -174,6 +194,8 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         code_evolution=inputs.code_autonomy_enabled,
         mind=inputs.mind_enabled,
         read_links=inputs.read_links,
+        attachments=inputs.attachments,
+        pages=inputs.pages,
         push_devices=session.scalar(
             select(func.count())
             .select_from(PushSubscription)

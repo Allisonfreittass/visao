@@ -5,6 +5,7 @@ agent's state never lives here. Retries are off: each attempt needs its own budg
 (integrations/llm/budget.py), so the fallback chain, not the SDK, decides whether to try again.
 """
 
+import base64
 import time
 from typing import Any
 
@@ -19,10 +20,29 @@ _ALLOWED_EXTRA = {"thinking", "output_config"}
 _OPENING = "(Conversa aberta por você; a pessoa ainda não falou.)"
 
 
-def to_messages_api(messages: list[ChatMessage]) -> tuple[str, list[dict[str, str]]]:
+def _content(message: ChatMessage) -> str | list[dict[str, Any]]:
+    if not message.images:
+        return message.content
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": image.media_type,
+                "data": base64.b64encode(image.data).decode("ascii"),
+            },
+        }
+        for image in message.images
+    ]
+    if message.content.strip():
+        blocks.append({"type": "text", "text": message.content})
+    return blocks
+
+
+def to_messages_api(messages: list[ChatMessage]) -> tuple[str, list[dict[str, Any]]]:
     """System prompts become the top-level `system`; turns keep their order."""
     system = "\n\n".join(m.content for m in messages if m.role == "system")
-    turns = [{"role": m.role, "content": m.content} for m in messages if m.role != "system"]
+    turns = [{"role": m.role, "content": _content(m)} for m in messages if m.role != "system"]
     if turns and turns[0]["role"] == "assistant":
         turns.insert(0, {"role": "user", "content": _OPENING})
     if not turns:

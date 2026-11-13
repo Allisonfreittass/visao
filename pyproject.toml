@@ -23,6 +23,8 @@ dependencies = [
     "cryptography>=44",
     # arXiv feeds are parsed without entity expansion or external references.
     "defusedxml>=0.7",
+    # Text out of the PDFs the owner sends (core/conversation/attachments.py).
+    "pypdf>=5.1",
 ]
 
 [project.optional-dependencies]
