@@ -2,6 +2,10 @@
 // the app installed on the home screen (Safari's rule, iOS 16.4+).
 
 import type { Api } from "./api";
+import { loadPreference, savePreference } from "./session";
+
+/** "off" once the owner turned avisos off on this device: sync never turns them back on. */
+const PREFERENCE = "push";
 
 export type PushSupport = "supported" | "needs-install" | "unsupported";
 
@@ -35,15 +39,22 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
 
-/** Must run inside a click: browsers only ask for notification permission from a gesture. */
-export async function subscribe(api: Api, publicKey: string): Promise<void> {
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") throw new Error("os avisos foram negados neste aparelho");
-  const registration = (await registerWorker()) ?? (await navigator.serviceWorker.ready);
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: keyBytes(publicKey) as BufferSource,
-  });
+/** Whether a subscription was made for this server key. A subscription made for another key
+ * (the server's VAPID keys changed, as in the move to a new server) is refused by the push
+ * service, so it has to be replaced. Browsers that do not expose the key are trusted. */
+export function sameKey(subscription: PushSubscription, publicKey: string): boolean {
+  const current = subscription.options?.applicationServerKey;
+  if (!current) return true;
+  const a = new Uint8Array(current);
+  const b = keyBytes(publicKey);
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
+}
+
+async function readyRegistration(): Promise<ServiceWorkerRegistration> {
+  return (await registerWorker()) ?? (await navigator.serviceWorker.ready);
+}
+
+async function send(api: Api, subscription: PushSubscription): Promise<void> {
   const json = subscription.toJSON();
   await api.subscribePush({
     endpoint: subscription.endpoint,
@@ -51,9 +62,51 @@ export async function subscribe(api: Api, publicKey: string): Promise<void> {
   });
 }
 
+/** This device's subscription for `publicKey`: the current one, or a new one in its place. */
+async function freshSubscription(publicKey: string): Promise<PushSubscription> {
+  const registration = await readyRegistration();
+  let subscription = await registration.pushManager.getSubscription();
+  if (subscription && !sameKey(subscription, publicKey)) {
+    await subscription.unsubscribe().catch(() => undefined);
+    subscription = null;
+  }
+  return (
+    subscription ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: keyBytes(publicKey) as BufferSource,
+    }))
+  );
+}
+
+/** Must run inside a click: browsers only ask for notification permission from a gesture. */
+export async function subscribe(api: Api, publicKey: string): Promise<void> {
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("os avisos foram negados neste aparelho");
+  await send(api, await freshSubscription(publicKey));
+  savePreference(PREFERENCE, "on");
+}
+
 export async function unsubscribe(api: Api): Promise<void> {
+  savePreference(PREFERENCE, "off");
   const subscription = await currentSubscription();
   if (!subscription) return;
   await api.unsubscribePush(subscription.endpoint).catch(() => undefined);
   await subscription.unsubscribe();
+}
+
+/**
+ * Runs every time the app opens. The switch used to be the only moment a device registered, so
+ * a subscription the server dropped (after failures), one the phone renewed, or one made for old
+ * VAPID keys left the switch on and the avisos silently gone. Here the device re-sends what it
+ * has (the server upserts) and replaces a subscription made for another key. It never asks for
+ * permission and never undoes the owner turning avisos off on this device.
+ */
+export async function syncSubscription(api: Api): Promise<boolean> {
+  if (pushSupport() !== "supported" || Notification.permission !== "granted") return false;
+  if (loadPreference(PREFERENCE) === "off") return false;
+  const state = await api.pushState();
+  if (!state.enabled || !state.public_key) return false;
+  await send(api, await freshSubscription(state.public_key));
+  return true;
 }

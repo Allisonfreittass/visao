@@ -19,6 +19,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.arm.service import work_record
 from core.behavior import state as behavior_state
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
@@ -171,6 +172,7 @@ def reply(
         self_text=self_text,
         owner_profile=owner_profile,
         owner_rules=owner_rules,
+        arm_record=work_record(session, owner.id, owner.timezone or "UTC"),
     )
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)

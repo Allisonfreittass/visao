@@ -12,6 +12,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -288,3 +289,81 @@ def open_count(session: Session, owner_id: uuid.UUID) -> int:
             select(ArmTask.id).where(ArmTask.owner_user_id == owner_id, ArmTask.status.in_(OPEN))
         ).all()
     )
+
+
+# What the agent is told about its own work on the Mac, so it never disowns a real result (real
+# case, 2026-11-12: it ran `git status` through the arm, then told the owner it had made it up).
+RECORD_TASKS = 6
+RECORD_WINDOW = timedelta(days=7)
+RECORD_RESULT_CHARS = 600
+_STATUS_WORDS = {
+    "proposed": "proposta, esperando o sim do dono",
+    "approved": "aprovada, esperando o Mac pegar",
+    "running": "rodando agora no Mac",
+    "done": "feita",
+    "failed": "falhou",
+    "rejected": "recusada pelo dono",
+    "cancelled": "cancelada",
+}
+
+
+def _clip(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+
+
+def work_record(
+    session: Session, owner_id: uuid.UUID, timezone: str = "UTC", now: datetime | None = None
+) -> str:
+    """The arm's devices and recent tasks as plain lines, or "" when there is no arm at all.
+
+    Built from the database, never from what the model said: this is the record the truth
+    rules point to when the history shows "Terminei no Mac"."""
+    moment = now or _now()
+    try:
+        zone = ZoneInfo(timezone)
+    except Exception:
+        zone = ZoneInfo("UTC")
+
+    def local(value: datetime | None) -> str:
+        stamp = _utc(value)
+        return stamp.astimezone(zone).strftime("%d/%m %H:%M") if stamp else "?"
+
+    devices = session.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == owner_id)).all()
+    tasks = session.scalars(
+        select(ArmTask)
+        .where(ArmTask.owner_user_id == owner_id, ArmTask.created_at >= moment - RECORD_WINDOW)
+        .order_by(ArmTask.created_at.desc())
+        .limit(RECORD_TASKS)
+    ).all()
+    if not devices and not tasks:
+        return ""
+    lines = []
+    for device in devices:
+        state = (
+            "ligado agora"
+            if online(device, moment)
+            else f"desligado, visto por último em {local(device.last_seen_at)}"
+            if device.last_seen_at
+            else "pareado, ainda não se conectou"
+        )
+        projects = ", ".join(p for p in (device.projects or []) if isinstance(p, str)) or "nenhum"
+        lines.append(f'- Mac "{device.name}": {state}; projetos liberados: {projects}.')
+    if not tasks:
+        lines.append("- Nenhuma tarefa no Mac nos últimos 7 dias.")
+    for task in reversed(tasks):
+        who = "pedida pelo dono" if task.requested_by == "owner" else "proposta por você"
+        status = _STATUS_WORDS.get(task.status, task.status)
+        line = (
+            f"- {local(task.created_at)}, projeto {task.project}, {who}: "
+            f'"{_clip(task.prompt, 200)}". Situação: {status}'
+        )
+        if task.finished_at:
+            line += f" às {local(task.finished_at)}"
+        if task.status == "done" and task.result.strip():
+            result = _clip(task.result, RECORD_RESULT_CHARS)
+            line += f". Resultado devolvido pelo Claude Code: {result}"
+        elif task.status == "failed" and task.error:
+            line += f". Erro: {_clip(task.error, 200)}"
+        lines.append(line + ".")
+    return "\n".join(lines)

@@ -154,3 +154,39 @@ def test_subscribe_test_and_unsubscribe_through_the_api(client, db, sender):
 def test_push_routes_require_login(client):
     assert client.get("/push").status_code == 401
     assert client.post("/push/test").status_code == 401
+
+
+def test_every_attempt_leaves_a_reason_the_app_can_show(client, db, sender):
+    """Real case (2026-11-13): the 09:00 opening never reached the phone and nothing said why."""
+    from infrastructure.database.models import AuditLog
+
+    owner = setup(db)
+    assert push.send_to_owner(db, owner.id, title="t", body="segredo") == 0
+    entry = push.last_delivery(db, owner.id)
+    assert entry.outcome == "no_device" and entry.details["devices"] == 0
+
+    _subscribe(db, owner)
+    push.send_to_owner(db, owner.id, title="t", body="segredo")
+    entry = push.last_delivery(db, owner.id)
+    assert entry.outcome == "success" and entry.details["sent"] == 1
+
+    push.configure(RecordingSender(PushResult(False, detail="http_403")))
+    push.send_to_owner(db, owner.id, title="t", body="segredo")
+    entry = push.last_delivery(db, owner.id)
+    assert entry.outcome == "failed" and entry.details["errors"] == ["http_403"]
+    db.commit()
+    for row in db.scalars(select(AuditLog).where(AuditLog.action == push.AUDIT_ACTION)):
+        assert "segredo" not in str(row.details)  # counts and codes, never the text
+
+    push.configure(None)
+    push.send_to_owner(db, owner.id, title="t", body="b")
+    assert push.last_delivery(db, owner.id).outcome == "disabled"
+
+
+def test_the_status_route_reports_the_last_delivery(client, db, sender):
+    owner_user, headers = _owner_client(client, db)
+    assert client.get("/push", headers=headers).json()["last_delivery"] is None
+    push.send_to_owner(db, owner_user.id, title="t", body="b")
+    db.commit()
+    last = client.get("/push", headers=headers).json()["last_delivery"]
+    assert last["outcome"] == "no_device" and last["devices"] == 0

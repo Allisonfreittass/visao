@@ -18,10 +18,20 @@ router = APIRouter(prefix="/push", tags=["push"])
 MAX_SUBSCRIPTIONS = 10
 
 
+class LastDelivery(BaseModel):
+    at: datetime
+    # success | failed | no_device | disabled
+    outcome: str
+    devices: int = 0
+    sent: int = 0
+    errors: list[str] = []
+
+
 class PushStatus(BaseModel):
     enabled: bool
     public_key: str | None
     subscriptions: int
+    last_delivery: LastDelivery | None = None
 
 
 class Keys(BaseModel):
@@ -60,10 +70,23 @@ def _count(db: DbSession, user: CurrentUser) -> int:
 @router.get("", response_model=PushStatus)
 def status_(user: CurrentUser, db: DbSession, settings: AppSettings) -> PushStatus:
     on = enabled(settings)
+    entry = push.last_delivery(db, user.id)
+    last = None
+    if entry is not None:
+        details = entry.details or {}
+        at = entry.created_at if entry.created_at.tzinfo else entry.created_at.replace(tzinfo=UTC)
+        last = LastDelivery(
+            at=at,
+            outcome=entry.outcome,
+            devices=int(details.get("devices", 0)),
+            sent=int(details.get("sent", 0)),
+            errors=[str(e) for e in details.get("errors", [])][:5],
+        )
     return PushStatus(
         enabled=on,
         public_key=settings.webpush_public_key if on else None,
         subscriptions=_count(db, user),
+        last_delivery=last,
     )
 
 

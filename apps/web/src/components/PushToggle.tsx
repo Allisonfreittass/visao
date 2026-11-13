@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-import type { Api, PushState } from "../api";
-import { currentSubscription, pushSupport, subscribe, unsubscribe } from "../push";
+import type { Api, PushDelivery, PushState } from "../api";
+import { utcDate } from "../api";
+import { currentSubscription, pushSupport, subscribe, syncSubscription, unsubscribe } from "../push";
 import { Setting } from "./Setting";
 
 interface PushToggleProps {
@@ -18,8 +19,19 @@ export function PushToggle({ api, onError }: PushToggleProps) {
   const support = pushSupport();
 
   useEffect(() => {
-    api.pushState().then(setServer).catch(() => setServer(null));
-    if (support === "supported") currentSubscription().then((s) => setOn(s !== null)).catch(() => undefined);
+    let alive = true;
+    // Sync first, so the switch and the device count describe what the server really has.
+    syncSubscription(api)
+      .catch(() => false)
+      .then(() => api.pushState())
+      .then((state) => alive && setServer(state))
+      .catch(() => alive && setServer(null));
+    if (support === "supported") {
+      currentSubscription().then((s) => alive && setOn(s !== null)).catch(() => undefined);
+    }
+    return () => {
+      alive = false;
+    };
   }, [api, support]);
 
   async function toggle() {
@@ -48,6 +60,7 @@ export function PushToggle({ api, onError }: PushToggleProps) {
     try {
       const { sent } = await api.testPush();
       setNote(sent > 0 ? "Mandei um teste. Feche o app para ver chegar." : "Nenhum aparelho recebeu.");
+      api.pushState().then(setServer).catch(() => undefined);
     } catch (e) {
       onError(e);
     } finally {
@@ -65,6 +78,8 @@ export function PushToggle({ api, onError }: PushToggleProps) {
           ? "Este navegador não recebe avisos."
           : null;
 
+  const last = server?.last_delivery ? deliveryLine(server.last_delivery) : null;
+
   return (
     <Setting
       title="Avisos neste aparelho"
@@ -73,7 +88,39 @@ export function PushToggle({ api, onError }: PushToggleProps) {
       disabled={busy || reason !== null}
       onChange={() => void toggle()}
     >
+      {last && !reason && <p className="note">{last}</p>}
       {on && !reason && <button type="button" className="link-button" onClick={() => void test()} disabled={busy}>Mandar um teste</button>}
     </Setting>
   );
+}
+
+const DELIVERY_ERRORS: Record<string, string> = {
+  http_403: "o serviço de push recusou a assinatura (chaves VAPID trocadas ou assunto inválido)",
+  http_404: "a inscrição deste aparelho não existe mais",
+  http_410: "a inscrição deste aparelho expirou",
+  http_413: "a mensagem ficou grande demais",
+  http_429: "o serviço de push pediu para esperar",
+};
+
+/** One sentence on what happened to the last aviso, for "it never came". */
+export function deliveryLine(delivery: PushDelivery): string {
+  const when = utcDate(delivery.at).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  switch (delivery.outcome) {
+    case "success":
+      return `Último aviso (${when}): entregue a ${delivery.sent} de ${delivery.devices} aparelho(s).`;
+    case "no_device":
+      return `Último aviso (${when}): não saiu, nenhum aparelho estava inscrito no servidor.`;
+    case "disabled":
+      return `Último aviso (${when}): não saiu, o push estava desligado no processo que mandou.`;
+    default: {
+      const code = delivery.errors[0] ?? "";
+      const why = DELIVERY_ERRORS[code] ?? (code || "erro sem detalhe");
+      return `Último aviso (${when}): falhou, ${why}.`;
+    }
+  }
 }

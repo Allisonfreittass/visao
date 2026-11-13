@@ -164,3 +164,48 @@ def test_a_task_the_mac_never_answered_is_marked_failed(client, db):
     db.commit()
     [listed] = client.get("/arm/tasks", headers=owner).json()
     assert listed["status"] == "failed" and "Mac" in listed["error"]
+
+
+def test_the_agent_is_told_what_its_arm_really_did(client, db, sender):
+    """Real case (2026-11-12): the arm ran `git status`, the result landed in the chat as
+    "Terminei no Mac", and on the next turn the agent apologised for having made it up. The reply
+    prompt now carries the arm's record from the database, and the rule that it is real."""
+    from apps.api.llm import get_llm_provider
+    from tests.fakes import FakeLLMProvider
+
+    llm = FakeLLMProvider(reply_text="Valeu!")
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    owner_user, owner = _owner_client(client, db)
+    _, arm = _pair(client, owner)
+    client.post("/arm/device/heartbeat", json={"projects": ["visao"]}, headers=arm)
+    chat = _conversation(client, owner)
+    client.post(
+        "/arm/tasks",
+        json={"project": "visao", "prompt": "rode git status", "conversation_id": chat},
+        headers=owner,
+    )
+    job = client.get("/arm/device/next", headers=arm).json()
+    client.post(
+        f"/arm/device/tasks/{job['id']}/result",
+        json={"ok": True, "result": "On branch main\nnothing to commit, working tree clean"},
+        headers=arm,
+    )
+
+    response = client.post(
+        f"/conversations/{chat}/messages", headers=owner, json={"content": "você tá forte demais"}
+    )
+    assert response.status_code == 200, response.text
+    system = llm.prompts[-1][0].content
+    assert "registro do braço" in system
+    assert 'projeto visao, pedida pelo dono: "rode git status". Situação: feita' in system
+    assert "nothing to commit, working tree clean" in system
+    assert "nunca diga que não rodou" in system
+    history = [m.content for m in llm.prompts[-1][1:]]
+    assert any(c.startswith("Terminei no Mac") for c in history)
+
+
+def test_without_an_arm_the_prompt_says_nothing_about_it(db):
+    from tests.integration.test_mind import setup
+
+    owner = setup(db)
+    assert service.work_record(db, owner.id) == ""

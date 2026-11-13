@@ -24,6 +24,9 @@ PUSH_SERVICE_HOSTS = (
 )
 TIMEOUT_SECONDS = 5.0
 TTL_SECONDS = 6 * 60 * 60  # an opening older than this is stale; the push service may drop it
+# Everything sent is something the owner should see now. Without it, Apple and FCM may hold the
+# message until the phone wakes on its own (battery saver, low power mode).
+HEADERS = {"Urgency": "high"}
 
 
 @dataclass(frozen=True)
@@ -88,6 +91,7 @@ class WebPushSender:
                 vapid_claims={"sub": self._subject},
                 timeout=TIMEOUT_SECONDS,
                 ttl=TTL_SECONDS,
+                headers=dict(HEADERS),
             )
         except WebPushException as exc:
             status = exc.response.status_code if exc.response is not None else 0

@@ -27,7 +27,7 @@ import { dayLabel } from "./labels";
 import { Orb, STATE_LABELS } from "./orb/Orb";
 import type { OrbState } from "./orb/orbModel";
 import { parseMacCommand } from "./arm";
-import { registerWorker } from "./push";
+import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 
 interface TurnLatency {
@@ -39,6 +39,8 @@ interface TurnLatency {
 }
 
 const HEALTH_INTERVAL_MS = 15_000;
+// An installed app on the phone is resumed, not reloaded, so the sync also runs on return.
+const PUSH_SYNC_MS = 60 * 60 * 1000;
 const INITIATIVE_POLL_MS = 15_000;
 const DEMO_STATES: OrbState[] = ["IDLE", "LISTENING", "THINKING", "SPEAKING", "INTERRUPTED", "DISCONNECTED"];
 
@@ -152,6 +154,21 @@ export function App() {
     navigator.serviceWorker?.addEventListener("message", onMessage);
     return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
   }, []);
+
+  // Keeps this device's avisos alive on the server (see syncSubscription). Silent on failure:
+  // the switch in Ajustes shows what happened to the last aviso.
+  useEffect(() => {
+    if (!loggedIn || demo) return;
+    let last = 0;
+    const sync = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < PUSH_SYNC_MS) return;
+      last = Date.now();
+      syncSubscription(api).catch(() => undefined);
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, [api, loggedIn, demo]);
 
   useEffect(() => {
     if (!loggedIn) return;

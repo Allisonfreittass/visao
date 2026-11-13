@@ -101,10 +101,20 @@ export interface ArmTask {
   finished_at: string | null;
 }
 
+export interface PushDelivery {
+  at: string;
+  /** success | failed | no_device | disabled */
+  outcome: string;
+  devices: number;
+  sent: number;
+  errors: string[];
+}
+
 export interface PushState {
   enabled: boolean;
   public_key: string | null;
   subscriptions: number;
+  last_delivery: PushDelivery | null;
 }
 
 export interface PushSubscriptionBody {
