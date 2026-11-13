@@ -137,6 +137,16 @@ def run_turn(
                 "uma frase o que vai pedir e que roda quando ela aprovar; não diga que já está "
                 "rodando."
             )
+        elif mac_intent.mentions_mac(text, list(capabilities.mac_projects)):
+            # Real case: with the Mac paired it answered "não tenho conexão com o computador".
+            blocks.append(
+                "O Mac da pessoa está pareado com você (projetos liberados: "
+                + ", ".join(capabilities.mac_projects)
+                + "). Esta mensagem não virou um pedido ao Mac. Não diga que não tem conexão com "
+                "o computador: diga como pedir, com /mac projeto pedido no começo da mensagem "
+                "(ex.: /mac " + capabilities.mac_projects[0] + " rode git status) ou pedindo em "
+                "frase normal com o nome do projeto. Nada rodou agora."
+            )
 
     if config.google_secret:
         recent = "\n".join(

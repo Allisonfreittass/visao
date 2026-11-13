@@ -31,6 +31,36 @@ def test_only_a_named_project_or_the_mac_with_an_action_reaches_the_model():
     assert not candidate("roda os testes do visao", [])
 
 
+def test_a_slash_mac_in_the_middle_of_a_sentence_is_a_request_too():
+    assert candidate("Foi bom demais. Vamos testar algo. /mac git status", PROJECTS)
+    assert not candidate("comprei um imac/macbook novo", PROJECTS)
+
+
+def test_a_slash_mac_without_a_project_goes_to_the_only_one_and_waits_for_a_tap(db):
+    owner = setup(db)
+    mac(db, owner, ["visao"])
+    outcome, _ = turn(
+        db,
+        owner,
+        "Foi bom demais. Vamos testar algo. /mac git status",
+        {"mac_task": True, "project": "", "task": "Rode git status e mostre a saída."},
+    )
+    task = db.scalar(select(ArmTask))
+    assert (task.project, task.status) == ("visao", "proposed")
+    assert "mac_proposed" in outcome.plan.executed()
+
+
+def test_talk_about_the_mac_never_gets_a_no_connection_answer(db):
+    owner = setup(db)
+    mac(db, owner, PROJECTS)
+    _, provider = turn(
+        db, owner, "você está conectado no meu mac?", {"mac_task": False, "project": "", "task": ""}
+    )
+    system = provider.prompts[-1][0].content
+    assert "está pareado com você" in system and "/mac mercado rode git status" in system
+    assert db.scalar(select(ArmTask)) is None
+
+
 def responder(extraction):
     def answer(messages: list[ChatMessage]) -> str:
         if '"mac_task"' in messages[0].content:
