@@ -516,3 +516,32 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 /* Keyboard open: the box sits right on it; the home-bar space is under the keyboard anyway. */
 [data-teclado] .app { padding-bottom: 6px; }
 [data-teclado] .composer-note { display: none; }
+
+/* Projetos with nothing yet: a few words in the brand's serif, straight on the background. */
+.projects-vazio { display: grid; align-content: center; gap: 28px; flex: 1; min-height: 0; max-width: 620px !important; margin: 0 auto; padding: 24px 8px; }
+.projects-vazio h1 { margin: 0; font: 400 clamp(32px, 4.2vw, 52px)/1.08 var(--font-display); letter-spacing: -.02em; color: var(--tinta); text-wrap: pretty; }
+.projects-vazio h1 em { font-style: italic; }
+.app--ceu .projects-vazio h1 { text-shadow: 0 1px 18px rgb(255 255 255 / .45); }
+[data-ceu="noite"] .app--ceu .projects-vazio h1 { text-shadow: none; }
+.app--ceu .projects-vazio .projects-new input { background: var(--vidro-forte); border-color: var(--vidro-borda); }
+
+/* Phone: a page opens as a sheet from the bottom, with a grabber; drag it down to close. */
+.sheet-grabber { display: none; }
+@media (max-width: 760px) {
+  .artifact-viewer:not(.artifact-viewer--docked) { top: calc(12px + env(safe-area-inset-top)); border-radius: 22px 22px 0 0; overflow: hidden; transition: transform .28s cubic-bezier(.2, .8, .2, 1); animation: folha-sobe .32s cubic-bezier(.2, .8, .2, 1); box-shadow: 0 -10px 40px rgb(0 0 0 / .25); }
+  .artifact-viewer--dragging { transition: none !important; }
+  .artifact-viewer:not(.artifact-viewer--docked) .artifact-viewer-bar { position: relative; padding-top: 18px; touch-action: none; }
+  .sheet-grabber { display: block; position: absolute; top: 7px; left: 50%; width: 38px; height: 5px; margin-left: -19px; border-radius: 3px; background: var(--linha-forte); }
+  .rail { transition: transform .22s ease-out; touch-action: pan-y; }
+}
+@keyframes folha-sobe { from { transform: translateY(100%); } }
+
+/* The chat text follows the text size chosen on the iPhone (Dynamic Type). */
+@media (hover: none) and (pointer: coarse) {
+  @supports (font: -apple-system-body) {
+    html { font: -apple-system-body; }
+    .app--ceu .bubble, .app--ceu .composer textarea { font-size: max(16px, 1rem) !important; }
+  }
+}
+.projects-new button { min-height: 44px; padding: 0 22px; border-radius: var(--raio-pilula); font: 500 15px/1 var(--font-sans); }
+.projects-new button:disabled { opacity: .5; }

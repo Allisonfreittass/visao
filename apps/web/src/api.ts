@@ -37,6 +37,13 @@ export interface ArtifactSummary {
   created_at: string;
 }
 
+/** The Bancada: what it really did in a conversation, its pages and the sites it read live. */
+export interface Bench {
+  deeds: { at: string; text: string }[];
+  pages: ArtifactSummary[];
+  visits: { title: string; url: string; at: string }[];
+}
+
 /** A photo or file sent with a message. */
 export interface Attachment {
   id: string;
@@ -399,6 +406,10 @@ export class Api {
   /** The page's full address, to open or share: anyone with it can see the page. */
   pageUrl(path: string): string {
     return new URL(`${this.baseUrl}${path}`, window.location.origin).toString();
+  }
+
+  bench(conversationId: string): Promise<Bench> {
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/bench`);
   }
 
   /** Parar: the turn in flight stops at its next step. */

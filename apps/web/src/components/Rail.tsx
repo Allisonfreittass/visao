@@ -1,5 +1,6 @@
 import { type Conversation, utcDate } from "../api";
 import { dayLabel } from "../labels";
+import { useDragToClose } from "../hooks/useDragToClose";
 import { Icon, type IconName } from "./Icon";
 
 export type WorkspaceView = "conversation" | "inbox" | "projects" | "study" | "mac" | "settings";
@@ -27,13 +28,21 @@ interface RailProps {
   onView: (view: WorkspaceView) => void;
   onNewConversation: () => void;
   onSelect: (id: string) => void;
+  /** Closes the drawer (dragging it left, on a phone). */
+  onClose?: () => void;
 }
 
 /** Where everything is: the sections, then the conversations, then whether we're connected. */
 export function Rail(props: RailProps) {
   const { view, conversations, current, onView } = props;
+  const drag = useDragToClose("left", () => props.onClose?.(), 70);
   return (
-    <aside className={`rail ${props.open ? "open" : ""}`} aria-label="Navegação">
+    <aside
+      className={`rail ${props.open ? "open" : ""}`}
+      aria-label="Navegação"
+      style={drag.offset ? { transform: `translateX(${-drag.offset}px)`, transition: "none" } : undefined}
+      {...(props.open ? drag.handlers : {})}
+    >
       <a className="brand rail-brand" href="/" aria-label="Visão, início">Visão</a>
       <nav className="rail-nav" aria-label="Seções">
         {NAV.map((item) => (

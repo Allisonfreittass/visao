@@ -10,6 +10,8 @@ const TABS: { view: WorkspaceView; label: string }[] = [
 ];
 
 interface SkyNavProps {
+  /** On a computer Início is the left column, so the pill holds only Chat and Projetos. */
+  wide?: boolean;
   view: WorkspaceView;
   pendingCount: number;
   agentName: string | null;
@@ -19,15 +21,18 @@ interface SkyNavProps {
 }
 
 /** The "Céu" top bar: the drawer on the left, the three places in a pill, settings on the right. */
-export function SkyNav({ view, pendingCount, agentName, menuOpen, onMenu, onView }: SkyNavProps) {
+export function SkyNav({ wide, view, pendingCount, agentName, menuOpen, onMenu, onView }: SkyNavProps) {
   const initial = (agentName ?? "Visão").trim().charAt(0).toUpperCase() || "V";
   return (
     <header className="sky-nav">
-      <button type="button" className="sky-round" onClick={onMenu} aria-expanded={menuOpen} aria-label="Conversas, Mac e mais">
-        <Icon name="menu" size={20} />
-      </button>
+      <div className="sky-start">
+        <button type="button" className="sky-round" onClick={onMenu} aria-expanded={menuOpen} aria-label="Conversas, Mac e mais">
+          <Icon name="menu" size={20} />
+        </button>
+        {wide && <span className="sky-brand" aria-hidden="true">Visão</span>}
+      </div>
       <nav className="sky-tabs" aria-label="Seções">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => !(wide && tab.view === "inbox")).map((tab) => (
           <button key={tab.view} type="button" aria-current={view === tab.view ? "page" : undefined} onClick={() => onView(tab.view)}>
             {tab.label}
             {tab.view === "inbox" && pendingCount > 0 && (

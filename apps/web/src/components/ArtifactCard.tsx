@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+import { useBackClose } from "../hooks/useBackClose";
+import { useDragToClose } from "../hooks/useDragToClose";
+
 import type { ArtifactSummary } from "../api";
 
 /** The card under the reply that said it would write a page: "Criando…", then open it. */
@@ -31,13 +34,24 @@ export function ArtifactCard({ artifact, onOpen }: { artifact: ArtifactSummary; 
 }
 
 /** The page over the chat, in a frame with no scripts and no access to the app. */
-export function ArtifactViewer({ artifact, url, onClose, onDelete }: { artifact: ArtifactSummary; url: string; onClose: () => void; onDelete: () => void }) {
+export function ArtifactViewer({ artifact, url, onClose, onDelete, docked }: { artifact: ArtifactSummary; url: string; onClose: () => void; onDelete: () => void; docked?: boolean }) {
   const [copied, setCopied] = useState(false);
+  useBackClose(!docked, onClose);
+  const drag = useDragToClose("down", onClose);
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function" && !docked;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  async function share() {
+    try {
+      await navigator.share({ title: artifact.title, url });
+    } catch {
+      // Closed the share sheet: nothing to do.
+    }
+  }
 
   async function copy() {
     try {
@@ -50,11 +64,22 @@ export function ArtifactViewer({ artifact, url, onClose, onDelete }: { artifact:
   }
 
   return (
-    <div className="artifact-viewer" role="dialog" aria-modal="true" aria-label={artifact.title}>
-      <header className="artifact-viewer-bar">
+    <div
+      className={`artifact-viewer${docked ? " artifact-viewer--docked" : ""}${drag.offset ? " artifact-viewer--dragging" : ""}`}
+      role={docked ? "region" : "dialog"}
+      aria-modal={docked ? undefined : true}
+      aria-label={artifact.title}
+      style={drag.offset ? { transform: `translateY(${drag.offset}px)` } : undefined}
+    >
+      <header className="artifact-viewer-bar" {...(docked ? {} : drag.handlers)}>
+        {!docked && <span className="sheet-grabber" aria-hidden="true" />}
         <strong>{artifact.title}</strong>
         <div className="row">
-          <button type="button" onClick={() => void copy()} title="Quem tiver o link consegue abrir">{copied ? "Copiado" : "Copiar link"}</button>
+          {canShare ? (
+            <button type="button" onClick={() => void share()} title="Quem tiver o link consegue abrir">Compartilhar</button>
+          ) : (
+            <button type="button" onClick={() => void copy()} title="Quem tiver o link consegue abrir">{copied ? "Copiado" : "Copiar link"}</button>
+          )}
           <a className="artifact-viewer-tab" href={url} target="_blank" rel="noopener noreferrer">Nova aba</a>
           <button type="button" className="ghost" onClick={onDelete} title="O link para de funcionar">Apagar</button>
           <button type="button" className="artifact-viewer-close" onClick={onClose} aria-label="Fechar">×</button>

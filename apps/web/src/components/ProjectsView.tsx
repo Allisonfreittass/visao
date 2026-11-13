@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { type Api, type Project, type ProjectDetail, utcDate } from "../api";
 import { attachmentUrl, formatSize } from "../attachments";
+import { useBackClose } from "../hooks/useBackClose";
 import { dayLabel } from "../labels";
 
 interface ProjectsViewProps {
@@ -20,6 +21,7 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
   const [list, setList] = useState<Project[] | null>(null);
   const [open, setOpen] = useState<ProjectDetail | null>(null);
   const [name, setName] = useState("");
+  useBackClose(open !== null, () => setOpen(null));
 
   const reload = useCallback(() => {
     api.projects().then(setList).catch(onError);
@@ -146,6 +148,21 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
             </section>
           )}
         </div>
+      </section>
+    );
+  }
+
+  if (list?.length === 0) {
+    return (
+      <section className="projects-vazio" aria-labelledby="projects-title">
+        <h1 id="projects-title">
+          <em>projetos</em> são o lugar de cada assunto: as conversas, as páginas e os arquivos dele juntos, e
+          eu lembrando do que foi dito em todas. dê um nome para começar.
+        </h1>
+        <form className="projects-new" onSubmit={(e) => void create(e)}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="ex.: Viagem a Santiago" maxLength={80} aria-label="Nome do novo projeto" />
+          <button type="submit" className="projects-primary" disabled={!name.trim()}>Criar</button>
+        </form>
       </section>
     );
   }

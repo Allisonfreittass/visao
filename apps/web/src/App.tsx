@@ -6,6 +6,7 @@ import {
   utcDate,
   type ArtifactSummary,
   type Attachment,
+  type Bench as BenchData,
   type Conversation,
   type ProgressStep,
   type Message,
@@ -20,6 +21,11 @@ import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
 import { ProjectsView } from "./components/ProjectsView";
+import { ArtifactViewer } from "./components/ArtifactCard";
+import { Bench } from "./components/Bench";
+import { HomeColumn } from "./components/HomeColumn";
+import { useWide } from "./hooks/useWide";
+import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls, Presence, PresencePanel } from "./components/Presence";
 import { Rail, type WorkspaceView } from "./components/Rail";
@@ -133,6 +139,12 @@ export function App() {
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
   // What the turn in flight is doing now, shown in place of "Pensando".
   const [liveStep, setLiveStep] = useState<ProgressStep | null>(null);
+  const [liveSteps, setLiveSteps] = useState<ProgressStep[]>([]);
+  // On a computer: three columns, and pages open beside the chat instead of over it.
+  const wide = useWide();
+  useBackClose(menuOpen, () => setMenuOpen(false));
+  const [bench, setBench] = useState<BenchData | null>(null);
+  const [sidePage, setSidePage] = useState<ArtifactSummary | null>(null);
   const turnRef = useRef<{ conversationId: string; controller: AbortController } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   sendingRef.current = sending;
@@ -259,10 +271,22 @@ export function App() {
     return () => clearInterval(timer);
   }, [api, pendingPages]);
 
+  // The Bancada follows the open conversation: after each turn and when a page gets ready.
+  const desk = sky && wide;
+  const pageStates = messages.map((m) => m.artifact?.status ?? "").join(",");
+  useEffect(() => {
+    if (!desk || !current || sending) return;
+    let alive = true;
+    api.bench(current).then((b) => { if (alive) setBench(b); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [api, desk, current, sending, pageStates]);
+  useEffect(() => setSidePage(null), [current]);
+
   async function deleteArtifact(artifact: ArtifactSummary) {
     try {
       await api.deleteArtifact(artifact.id);
       setMessages((list) => list.map((m) => (m.artifact?.id === artifact.id ? { ...m, artifact: null } : m)));
+      setSidePage((page) => (page?.id === artifact.id ? null : page));
     } catch (e) {
       handleError(e);
     }
@@ -386,6 +410,7 @@ export function App() {
         api.progress(watching).then((p) => {
           const last = p.steps[p.steps.length - 1];
           if (p.active && last) setLiveStep(last);
+          if (p.active) setLiveSteps(p.steps);
         }).catch(() => undefined);
       };
       look();
@@ -439,6 +464,7 @@ export function App() {
       turnRef.current = null;
       clearInterval(watch);
       setLiveStep(null);
+      setLiveSteps([]);
       setSending(false);
     }
   }
@@ -558,10 +584,11 @@ export function App() {
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
-    <div className={`app${sky ? " app--ceu" : ""}`}>
+    <div className={`app${sky ? " app--ceu" : ""}${sky && wide ? " app--mesa" : ""}`}>
       {sky && <Sky onNight={setSkyNight} />}
       {sky && ready && !firstRun && (
         <SkyNav
+          wide={wide}
           view={view}
           pendingCount={pending.count}
           agentName={agentName}
@@ -604,6 +631,19 @@ export function App() {
 
       {!firstRun && ready && (
         <div className="layout">
+          {desk && (
+            <HomeColumn
+              api={api}
+              call={call}
+              pending={pending}
+              conversations={conversations}
+              current={current}
+              busy={preparing || sending}
+              onOpen={showView}
+              onSelect={(id) => { setCurrent(id); showView("conversation"); }}
+              onNewConversation={() => void newConversation()}
+            />
+          )}
           <Rail
             open={menuOpen}
             view={view}
@@ -617,6 +657,7 @@ export function App() {
             onView={showView}
             onNewConversation={() => void newConversation()}
             onSelect={(id) => { setCurrent(id); showView("conversation"); }}
+            onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
 
@@ -738,13 +779,30 @@ export function App() {
               onUpload={(file, name) => api.uploadAttachment(file, name)}
               loadAttachment={loadAttachment}
               pageUrl={(path) => api.pageUrl(path)}
+              onOpenPage={desk ? setSidePage : undefined}
               onDeleteArtifact={(a) => void deleteArtifact(a)}
               onFeedback={sendFeedback}
             />
             {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
           </main>
 
-          <PresencePanel api={api} call={call} pending={pending} onOpen={showView} />
+          {desk ? (
+            sidePage?.path ? (
+              <ArtifactViewer
+                docked
+                artifact={sidePage}
+                url={api.pageUrl(sidePage.path)}
+                onClose={() => setSidePage(null)}
+                onDelete={() => {
+                  if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
+                }}
+              />
+            ) : (
+              <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
+            )
+          ) : (
+            <PresencePanel api={api} call={call} pending={pending} onOpen={showView} />
+          )}
         </div>
       )}
 

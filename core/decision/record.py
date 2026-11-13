@@ -227,3 +227,17 @@ def correction_block(
             " ações."
         )
     return "\n".join(lines)
+
+
+def timeline(
+    session: Session, conversation: Conversation, owner: User
+) -> list[tuple[datetime, str]]:
+    """Each earlier reply's real actions with its time, oldest first, for the Bancada."""
+    recent = session.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation.id, Message.role == "assistant")
+        .order_by(Message.created_at.desc())
+        .limit(RECORD_MESSAGES)
+    ).all()
+    done = by_message(session, [m.id for m in recent])
+    return [(m.created_at, "; ".join(done[m.id])) for m in reversed(recent) if m.id in done]

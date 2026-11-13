@@ -28,6 +28,7 @@ from core.conversation.service import (
     conversation_history,
 )
 from core.curiosity.engine import CuriosityLimits
+from core.decision import record as deed_record
 from core.decision.pipeline import TurnConfig, run_turn
 from core.identity.genesis import get_identity
 from core.initiatives import push
@@ -38,7 +39,7 @@ from core.memory.curator import (
 )
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import ReflectionResult, reflect
-from infrastructure.database.models import Conversation, Message, User
+from infrastructure.database.models import Artifact, BrowseVisit, Conversation, Message, User
 from integrations.browser.base import Browser
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
@@ -413,6 +414,49 @@ class ProgressOut(BaseModel):
     active: bool
     elapsed_ms: int = 0
     steps: list[ProgressStepOut] = []
+
+
+class DeedOut(BaseModel):
+    at: datetime
+    text: str
+
+
+class VisitOut(BaseModel):
+    title: str
+    url: str
+    at: datetime
+
+
+class BenchOut(BaseModel):
+    """The Bancada: what it really did in this conversation, its pages and the live sites."""
+
+    deeds: list[DeedOut] = []
+    pages: list[ArtifactOut] = []
+    visits: list[VisitOut] = []
+
+
+@router.get("/{conversation_id}/bench")
+def bench(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> BenchOut:
+    conversation = _own_conversation(db, user, conversation_id)
+    pages = db.scalars(
+        select(Artifact)
+        .where(Artifact.conversation_id == conversation.id)
+        .order_by(Artifact.created_at.desc())
+        .limit(12)
+    ).all()
+    visits = db.scalars(
+        select(BrowseVisit)
+        .where(BrowseVisit.conversation_id == conversation.id, BrowseVisit.ok.is_(True))
+        .order_by(BrowseVisit.created_at.desc())
+        .limit(12)
+    ).all()
+    return BenchOut(
+        deeds=[
+            DeedOut(at=at, text=text) for at, text in deed_record.timeline(db, conversation, user)
+        ][-20:],
+        pages=[artifact_out(a) for a in pages],
+        visits=[VisitOut(title=v.title or v.url, url=v.url, at=v.created_at) for v in visits],
+    )
 
 
 @router.post("/{conversation_id}/cancel")

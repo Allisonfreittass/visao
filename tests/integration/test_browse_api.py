@@ -178,3 +178,24 @@ def test_only_public_https_requests_are_allowed():
     assert not allowed_request("file:///etc/passwd", cache)
     assert allowed_request("data:image/png;base64,AAAA", cache)
     assert allowed_request("https://8.8.8.8/", cache)
+
+
+def test_the_bench_shows_what_it_did_the_pages_and_the_live_sites(client, db):
+    page = Visit(
+        url=FLIGHTS, ok=True, final_url=FLIGHTS, title="CNF a SCL | Google Voos", text="R$ 2.195"
+    )
+    world(client, db, plan={"browse": True, "urls": [FLIGHTS]}, pages={FLIGHTS: page})
+    headers = _login(client, db)
+    other = _login(client, db, "b@exemplo.com")
+    conversation, _ = _send(client, headers, "quanto tá a passagem pra Santiago?")
+
+    bench = client.get(f"/conversations/{conversation}/bench", headers=headers).json()
+
+    assert bench["deeds"][-1]["text"] == "abriu num navegador de verdade google.com (1 página(s))"
+    assert bench["visits"][0] == {
+        "title": "CNF a SCL | Google Voos",
+        "url": FLIGHTS,
+        "at": bench["visits"][0]["at"],
+    }
+    assert bench["pages"] == []
+    assert client.get(f"/conversations/{conversation}/bench", headers=other).status_code == 404

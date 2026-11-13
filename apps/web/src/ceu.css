@@ -205,3 +205,60 @@ html[data-theme="ceu"] { background: var(--ceu-chao); }
   mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 18px), transparent 100%);
 }
 [data-ceu="noite"] .app--ceu .artifact-card, [data-ceu="noite"] .app--ceu .action-card { border: 1px solid rgb(255 255 255 / .09); background: #141d23; }
+
+/* ---------- On a computer: three columns over the forest (Início | chat | Bancada) ---------- */
+.sky-start { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.sky-brand { font: 400 30px/1 var(--font-display); letter-spacing: -.02em; color: var(--tinta); text-shadow: 0 1px 12px rgb(255 255 255 / .5); }
+[data-ceu="noite"] .sky-brand { text-shadow: none; }
+.glass-card, .home-chats, .bench-card,
+.app--mesa .presence-panel > .presence, .app--mesa .presence-panel .panel-block {
+  padding: 16px 18px; border: 1px solid var(--vidro-borda); border-radius: 22px; background: var(--vidro-forte);
+  -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 6px 24px rgb(15 25 30 / .08);
+}
+
+@media (min-width: 1180px) {
+  .app--mesa .sky-nav { display: grid; grid-template-columns: 1fr auto 1fr; padding: 16px 24px 10px; }
+  .app--mesa .sky-nav .sky-avatar { justify-self: end; }
+  .app--mesa .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 24px; padding: 0 24px 18px; min-height: 0; }
+  .app--mesa .layout:has(.artifact-viewer--docked) { grid-template-columns: 280px minmax(0, 1fr) minmax(420px, 46%); }
+  .app--mesa .main { padding: 0; min-height: 0; }
+  .app--mesa .main > * { max-width: 680px; }
+
+  .home-column, .bench { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 2px 8px; scrollbar-width: none; }
+  .home-column::-webkit-scrollbar, .bench::-webkit-scrollbar { display: none; }
+  .app--mesa .presence-panel { display: flex !important; width: auto; flex: none; flex-direction: column; gap: 12px; padding: 0; border: 0; overflow: visible; }
+  .app--mesa .presence-panel .panel-block { border-top: 1px solid var(--vidro-borda); }
+  .app--mesa .presence-panel > .presence { align-items: center; }
+  .home-chats { display: grid; gap: 8px; }
+  .home-chats-head { display: flex; align-items: center; justify-content: space-between; }
+  .home-chats ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .home-chats li button { width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: transparent; color: var(--tinta-suave); text-align: left; font: 400 14px/1.3 var(--font-sans); }
+  .home-chats li button:hover, .home-chats li button[aria-current] { background: var(--fundo-hover); color: var(--tinta); }
+  .home-new { min-height: 30px; padding: 0 12px; border: 1px solid var(--linha-forte); border-radius: var(--raio-pilula); background: transparent; color: var(--tinta); font: 500 13px/1 var(--font-sans); }
+
+  .app--mesa .artifact-viewer--docked { position: static; inset: auto; z-index: auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 4px 0 0; background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .app--mesa .artifact-viewer--docked .artifact-viewer-frame { min-height: 0; }
+}
+
+/* The Bancada */
+.bench-title { margin: 0 0 10px; font: 400 22px/1.1 var(--font-display); letter-spacing: -.01em; color: var(--tinta); }
+.bench-quiet, .bench-note { margin: 0; font: 400 13px/1.45 var(--font-sans); color: var(--tinta-fraca); }
+.bench-note { margin-top: 10px; font-size: 12px; }
+.bench-steps, .bench-deeds, .bench-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bench-steps li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; font: 400 14px/1.4 var(--font-sans); color: var(--tinta-suave); }
+.bench-steps small { display: block; font-size: 12px; color: var(--tinta-fraca); overflow-wrap: anywhere; }
+.bench-step-mark { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; border-radius: 50%; background: var(--fundo-hover); font: 600 11px/1 var(--font-sans); color: var(--estanho); }
+.bench-step--current { color: var(--tinta) !important; font-weight: 500 !important; }
+.bench-step--current .bench-step-mark { background: transparent; border: 2px solid var(--linha-forte); border-top-color: var(--tinta); animation: anexo-gira .9s linear infinite; }
+.bench-deeds li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; font: 400 13px/1.45 var(--font-sans); color: var(--tinta-suave); }
+.bench-deeds time { font: 400 12px/1.6 var(--font-mono); color: var(--tinta-fraca); }
+.bench-page, .bench-visit { display: grid; gap: 2px; width: 100%; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 14px; background: var(--fundo-elevado); color: var(--tinta); text-align: left; text-decoration: none; cursor: pointer; }
+.bench-page:hover:not(:disabled), .bench-visit:hover { border-color: var(--estanho-linha); }
+.bench-page strong, .bench-visit strong { font: 500 14px/1.3 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bench-page span, .bench-visit span { font: 400 12px/1.3 var(--font-sans); color: var(--tinta-fraca); }
+@media (max-width: 760px) {
+  .app--ceu .artifact-viewer:not(.artifact-viewer--docked) { padding: 0; gap: 0; background: var(--vidro-forte); }
+  .app--ceu .artifact-viewer:not(.artifact-viewer--docked) .artifact-viewer-bar { border: 0; border-radius: 0; }
+  .app--ceu .artifact-viewer:not(.artifact-viewer--docked) .artifact-viewer-frame { border-radius: 0; box-shadow: none; }
+}
+.app--ceu .composer-note { display: none; }

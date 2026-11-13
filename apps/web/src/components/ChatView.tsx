@@ -46,13 +46,15 @@ interface ChatViewProps {
   /** A page's full address from its path. */
   pageUrl: (path: string) => string;
   onDeleteArtifact: (artifact: ArtifactSummary) => void;
+  /** On a computer, pages open beside the chat (the app shows them); otherwise over it, here. */
+  onOpenPage?: (artifact: ArtifactSummary) => void;
 }
 
 function uploadError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Não deu para enviar";
 }
 
-export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact }: ChatViewProps) {
+export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -204,7 +206,7 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.content && <MessageContent text={m.content} />}
-            {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={setViewing} />}
+            {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={onOpenPage ?? setViewing} />}
             {m.sources && m.sources.length > 0 && (
               <ol className="sources" aria-label="Fontes pesquisadas">
                 {m.sources.map((s) => (
