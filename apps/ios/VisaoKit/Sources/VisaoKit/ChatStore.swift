@@ -33,13 +33,21 @@ public final class ChatStore {
     struct Queued {
         let id: String
         let text: String
+        let attachments: [Attachment]
         let replyTo: Message?
     }
 
-    public init(api: APIClient, conversationId: String?, progressInterval: Duration = .milliseconds(900)) {
+    private let artifactInterval: Duration
+    private var artifactTask: Task<Void, Never>?
+
+    public init(
+        api: APIClient, conversationId: String?, progressInterval: Duration = .milliseconds(900),
+        artifactInterval: Duration = .seconds(3)
+    ) {
         self.api = api
         self.conversationId = conversationId
         self.progressInterval = progressInterval
+        self.artifactInterval = artifactInterval
     }
 
     public func load() async {
@@ -49,6 +57,7 @@ public final class ChatStore {
         do {
             let stored = try await api.messages(conversationId: conversationId)
             messages = merge(stored: stored)
+            watchPages()
         } catch {
             report(error)
         }
@@ -59,7 +68,10 @@ public final class ChatStore {
         guard let conversationId, !sending else { return }
         guard let stored = try? await api.messages(conversationId: conversationId), !sending else { return }
         let next = merge(stored: stored)
-        if next.map(\.id) != messages.map(\.id) { messages = next }
+        if next.map(\.id) != messages.map(\.id) {
+            messages = next
+            watchPages()
+        }
     }
 
     private func merge(stored: [Message]) -> [Message] {
@@ -75,19 +87,56 @@ public final class ChatStore {
 
     public var canStop: Bool { sending && turnTask != nil }
 
-    /// Sends now, or queues it if a reply is still being written.
-    public func send(_ rawText: String, replyTo: Message? = nil) {
+    /// Sends now, or queues it if a reply is still being written. A photo alone is a message.
+    public func send(_ rawText: String, attachments: [Attachment] = [], replyTo: Message? = nil) {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty || !attachments.isEmpty else { return }
+        let files = Array(attachments.prefix(AttachmentRules.maxPerMessage))
         error = nil
         if sending {
             counter += 1
             let id = "queued-\(counter)"
-            queue.append(Queued(id: id, text: text, replyTo: replyTo))
-            messages.append(Message(id: id, role: .user, content: text, createdAt: Date(), replyTo: replyTo?.quoted, local: .queued))
+            queue.append(Queued(id: id, text: text, attachments: files, replyTo: replyTo))
+            messages.append(Message(id: id, role: .user, content: text, createdAt: Date(), attachments: files, replyTo: replyTo?.quoted, local: .queued))
             return
         }
-        Task { await run(text: text, replyTo: replyTo) }
+        Task { await run(text: text, attachments: files, replyTo: replyTo) }
+    }
+
+    /// The page is gone: its link stops working, and the card leaves the reply.
+    public func deleteArtifact(_ artifact: Artifact) async {
+        do {
+            try await api.deleteArtifact(id: artifact.id)
+            for index in messages.indices where messages[index].artifact?.id == artifact.id {
+                messages[index].artifact = nil
+            }
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Pages still being written ("Criando…") are checked every few seconds while you look.
+    private func watchPages() {
+        let pending = messages.compactMap { $0.artifact?.status == "pending" ? $0.artifact?.id : nil }
+        artifactTask?.cancel()
+        guard !pending.isEmpty else { return }
+        let api = self.api
+        let interval = artifactInterval
+        artifactTask = Task { [weak self] in
+            var waiting = Set(pending)
+            while !waiting.isEmpty, !Task.isCancelled {
+                try? await Task.sleep(for: interval)
+                guard let self, !Task.isCancelled else { return }
+                guard self.isVisible else { continue }
+                for id in waiting {
+                    guard let fresh = try? await api.artifact(id: id), fresh.status != "pending" else { continue }
+                    waiting.remove(id)
+                    for index in self.messages.indices where self.messages[index].artifact?.id == id {
+                        self.messages[index].artifact = fresh
+                    }
+                }
+            }
+        }
     }
 
     /// Parar: tell the server, and stop waiting at once.
@@ -98,10 +147,10 @@ public final class ChatStore {
         turnTask.cancel()
     }
 
-    private func run(text: String, replyTo: Message?) async {
+    private func run(text: String, attachments: [Attachment], replyTo: Message?) async {
         counter += 1
         let localId = "local-\(counter)"
-        let optimistic = Message(id: localId, role: .user, content: text, createdAt: Date(), replyTo: replyTo?.quoted, local: .sending)
+        let optimistic = Message(id: localId, role: .user, content: text, createdAt: Date(), attachments: attachments, replyTo: replyTo?.quoted, local: .sending)
         messages.append(optimistic)
         sending = true
         defer {
@@ -124,7 +173,8 @@ public final class ChatStore {
         }
         startWatching(id)
         let api = self.api
-        let task = Task { try await api.send(conversationId: id, content: text, replyToId: replyTo?.id) }
+        let attachmentIds = attachments.map(\.id)
+        let task = Task { try await api.send(conversationId: id, content: text, attachmentIds: attachmentIds, replyToId: replyTo?.id) }
         turnTask = task
         do {
             let turn = try await task.value
@@ -132,6 +182,7 @@ public final class ChatStore {
             reply.sources = turn.sources
             let waiting = messages.filter { $0.local == .queued }
             messages = messages.filter { $0.id != localId && $0.local != .queued } + [turn.userMessage, reply] + waiting
+            if reply.artifact?.status == "pending" { watchPages() }
         } catch {
             let stopped = error is CancellationError || (error as? APIError)?.isStoppedByOwner == true
             if !stopped { report(error) }
@@ -157,9 +208,10 @@ public final class ChatStore {
         queue = []
         let ids = Set(batch.map(\.id))
         messages.removeAll { ids.contains($0.id) }
-        let text = batch.map(\.text).joined(separator: "\n\n")
+        let text = batch.map(\.text).filter { !$0.isEmpty }.joined(separator: "\n\n")
+        let files = Array(batch.flatMap(\.attachments).prefix(AttachmentRules.maxPerMessage))
         let replyTo = batch.first(where: { $0.replyTo != nil })?.replyTo
-        Task { await run(text: text, replyTo: replyTo) }
+        Task { await run(text: text, attachments: files, replyTo: replyTo) }
     }
 
     private func ensureConversation() async throws -> String {

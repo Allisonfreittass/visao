@@ -107,6 +107,45 @@ public final class APIClient: Sendable {
         return result["cancelled"] ?? false
     }
 
+    // MARK: Attachments and pages
+
+    /// A photo or file, sent before the message that carries it (docs/ANEXOS.md). The server
+    /// decides the type by the first bytes, never by the name.
+    public func uploadAttachment(data: Data, filename: String, mimeType: String) async throws -> Attachment {
+        let boundary = "visao-\(UUID().uuidString)"
+        let body = Self.multipart(boundary: boundary, field: "file", filename: filename, mimeType: mimeType, data: data)
+        return try await request(
+            "/attachments", method: "POST", body: body,
+            contentType: "multipart/form-data; boundary=\(boundary)"
+        )
+    }
+
+    /// The bytes of a photo or file, sent with the token.
+    public func attachmentData(id: String) async throws -> Data {
+        try await raw("/attachments/\(segment(id))")
+    }
+
+    public func artifact(id: String) async throws -> Artifact {
+        try await request("/artifacts/\(segment(id))")
+    }
+
+    /// The link stops working for everyone who has it.
+    public func deleteArtifact(id: String) async throws {
+        _ = try await raw("/artifacts/\(segment(id))", method: "DELETE")
+    }
+
+    static func multipart(boundary: String, field: String, filename: String, mimeType: String, data: Data) -> Data {
+        // Quotes and line breaks would end the header early: a name never carries them.
+        let safeName = filename.replacingOccurrences(of: "\"", with: "'").components(separatedBy: .newlines).joined(separator: " ")
+        var body = Data()
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"\(field)\"; filename=\"\(safeName)\"\r\n".utf8))
+        body.append(Data("Content-Type: \(mimeType)\r\n\r\n".utf8))
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        return body
+    }
+
     /// A page's full address, to open or share: anyone with it can see the page.
     public func pageURL(path: String) -> URL {
         URL(string: baseURL.absoluteString.trimmingSuffix("/") + path) ?? baseURL
