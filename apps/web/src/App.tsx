@@ -584,7 +584,7 @@ export function App() {
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
-    <div className={`app${sky ? " app--ceu" : ""}${sky && wide ? " app--mesa" : ""}`}>
+    <div className={`app${sky ? " app--ceu" : ""}${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
       {sky && <Sky onNight={setSkyNight} />}
       {sky && ready && !firstRun && (
         <SkyNav
@@ -816,7 +816,11 @@ export function App() {
                 </div>
                 <div className="presence-copy">
                   <p className="rotulo state-label">{STATE_LABELS[orbState]}</p>
-                  {!demo && <p className="lede">Eu nasci sem nome e venho decidindo quem sou. Entre para conversar.</p>}
+                  {!demo && (
+                    <p className="lede entrance-words">
+                      Eu nasci sem nome e venho <em>decidindo quem sou.</em> <span>Entre para conversar.</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
