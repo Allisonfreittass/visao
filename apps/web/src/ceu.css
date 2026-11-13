@@ -1,39 +1,39 @@
-/* Aparência "Céu": um céu vivo ao fundo (src/sky) e vidro claro por cima. Ink #1d1d1f, white
-   surfaces, frosted glass, pill controls, 24 px bubbles. At night in the sky the glass goes dark
-   ([data-ceu="noite"]). Visão keeps its own name, orb core and serif. */
+/* Aparência "Neblina": pinheiros com neblina viva ao fundo (src/sky) e vidro de névoa por cima,
+   nas cores da marca: ardósia, estanho e a lanterna só no núcleo da orbe. À noite o vidro escurece
+   ([data-ceu="noite"]). */
 
 [data-theme="ceu"] {
   color-scheme: light;
-  --fundo: rgb(255 255 255 / .55);
-  --fundo-elevado: rgb(255 255 255 / .78);
-  --fundo-hover: rgb(29 29 31 / .06);
-  --tinta: #1d1d1f;
-  --tinta-suave: #3c3f48;
-  --tinta-fraca: #5d6375;
+  --fundo: rgb(240 244 245 / .6);
+  --fundo-elevado: rgb(244 247 248 / .82);
+  --fundo-hover: rgb(23 34 42 / .06);
+  --tinta: #17222a;
+  --tinta-suave: #36454e;
+  --tinta-fraca: #56656e;
   --linha: rgb(29 29 31 / .08);
   --linha-forte: rgb(29 29 31 / .14);
   --borda: rgb(29 29 31 / .2);
-  --estanho: #3d4b6b;
-  --estanho-linha: rgb(61 75 107 / .35);
+  --estanho: #4f6366;
+  --estanho-linha: rgb(79 99 102 / .35);
   --sobre-tinta: #f9f9fa;
   --sucesso: #1b6a70;
   --aviso: #7e520f;
   --erro: #b3342b;
-  --anel-foco: 0 0 0 2px rgb(255 255 255 / .9), 0 0 0 4px #3d4b6b;
+  --anel-foco: 0 0 0 2px rgb(255 255 255 / .9), 0 0 0 4px #4f6366;
   --elevacao: 0 .8rem 4rem rgb(29 29 31 / .12);
   /* Glass and bubbles */
-  --vidro: rgb(255 255 255 / .5);
-  --vidro-forte: rgb(255 255 255 / .82);
-  --vidro-borda: rgb(255 255 255 / .55);
+  --vidro: rgb(236 242 244 / .5);
+  --vidro-forte: rgb(242 246 247 / .86);
+  --vidro-borda: rgb(255 255 255 / .45);
   --vidro-desfoque: blur(1.6rem) saturate(1.5);
-  --bolha-dele: #ffffff;
-  --bolha-dele-tinta: #1d1d1f;
-  --bolha-sua: rgb(255 255 255 / .42);
-  --sombra-bolha: 0 1px 2px rgb(29 29 31 / .1), 0 3px 8px rgb(29 29 31 / .07), 0 8px 40px rgb(29 29 31 / .12);
-  --pilula-ativa: #1d1d1f;
-  --pilula-ativa-tinta: #f9f9fa;
-  --raio-bolha: 24px;
-  --ceu-fallback: linear-gradient(180deg, #6d98dc 0%, #a8c5ee 55%, #e4ecf8 100%);
+  --bolha-dele: rgb(248 250 250 / .95);
+  --bolha-dele-tinta: #17222a;
+  --bolha-sua: rgb(214 225 230 / .86);
+  --sombra-bolha: 0 1px 2px rgb(15 25 30 / .08), 0 6px 22px rgb(15 25 30 / .1);
+  --pilula-ativa: #2e3d45;
+  --pilula-ativa-tinta: #eef2f3;
+  --raio-bolha: 20px;
+  --ceu-fallback: linear-gradient(180deg, #e4e9eb 0%, #cfd8dd 45%, #1e2b33 100%);
 }
 
 [data-theme="ceu"][data-ceu="noite"] {
@@ -47,23 +47,23 @@
   --linha: rgb(245 245 247 / .1);
   --linha-forte: rgb(245 245 247 / .18);
   --borda: rgb(245 245 247 / .24);
-  --estanho: #b1bcd2;
-  --estanho-linha: rgb(177 188 210 / .35);
+  --estanho: #a9bcbd;
+  --estanho-linha: rgb(169 188 189 / .35);
   --sobre-tinta: #1d1d1f;
   --sucesso: #5cc2c9;
   --aviso: #e3a857;
   --erro: #ff7a6e;
-  --anel-foco: 0 0 0 2px rgb(20 24 40 / .9), 0 0 0 4px #b1bcd2;
+  --anel-foco: 0 0 0 2px rgb(20 24 40 / .9), 0 0 0 4px #a9bcbd;
   --vidro: rgb(24 28 48 / .45);
   --vidro-forte: rgb(30 34 56 / .82);
   --vidro-borda: rgb(255 255 255 / .12);
-  --bolha-dele: rgb(36 40 64 / .92);
+  --bolha-dele: rgb(30 40 48 / .94);
   --bolha-dele-tinta: #f5f5f7;
-  --bolha-sua: rgb(255 255 255 / .12);
+  --bolha-sua: rgb(58 74 84 / .82);
   --sombra-bolha: 0 1px 2px rgb(0 0 0 / .25), 0 8px 40px rgb(0 0 0 / .3);
   --pilula-ativa: #f5f5f7;
   --pilula-ativa-tinta: #1d1d1f;
-  --ceu-fallback: linear-gradient(180deg, #070d22 0%, #142048 55%, #2b3766 100%);
+  --ceu-fallback: linear-gradient(180deg, #141c26 0%, #1d2833 45%, #070b0f 100%);
 }
 
 [data-theme="ceu"] body { background: var(--ceu-fallback); }
@@ -80,8 +80,8 @@
 .sky-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px 6px; flex-shrink: 0; }
 .sky-round, .sky-avatar { width: 46px; height: 46px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--vidro-borda); border-radius: 50%; background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); color: var(--tinta); box-shadow: 0 2px 12px rgb(29 29 31 / .06); }
 .sky-round:hover, .sky-avatar:hover { background: var(--vidro-forte); }
-.sky-avatar { background: #4a6ee0; border-color: transparent; color: #fff; font: 500 16px/1 var(--font-sans); letter-spacing: .02em; }
-.sky-avatar:hover, .sky-avatar[aria-current] { background: #3c5fd0; box-shadow: 0 0 0 3px var(--vidro-forte); }
+.sky-avatar { background: var(--estanho); border-color: transparent; color: #f4f7f8; font: 500 16px/1 var(--font-sans); letter-spacing: .02em; }
+.sky-avatar:hover, .sky-avatar[aria-current] { background: var(--pilula-ativa); box-shadow: 0 0 0 3px var(--vidro-forte); }
 .sky-tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-pilula); background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 2px 12px rgb(29 29 31 / .06); }
 .sky-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 20px; border: 0; border-radius: var(--raio-pilula); background: transparent; color: var(--tinta-fraca); font: 400 16px/1 var(--font-sans); transition: background .24s ease-in-out, color .24s ease-in-out; }
 .sky-tabs button:hover { color: var(--tinta); }
@@ -107,8 +107,8 @@
 .app--ceu .messages { gap: 14px; padding: 12px 4px 20px; scrollbar-gutter: auto; }
 .app--ceu .bubble { font: 400 17px/1.42 var(--font-sans); letter-spacing: -.005em; }
 .app--ceu .bubble.assistant { align-self: flex-start; width: auto; max-width: min(88%, 620px); padding: 14px 18px; border-radius: var(--raio-bolha); background: var(--bolha-dele); color: var(--bolha-dele-tinta); box-shadow: var(--sombra-bolha); }
-.app--ceu .bubble.user { width: auto; max-width: min(82%, 560px); padding: 14px 18px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-bolha); background: var(--bolha-sua); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 2px 14px rgb(29 29 31 / .05); }
-.app--ceu .live-status-detail { padding: 12px 22px; border-color: var(--vidro-borda); background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); font-size: 15px; color: var(--tinta-suave); }
+.app--ceu .bubble.user { width: auto; max-width: min(82%, 560px); padding: 14px 18px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-bolha); background: var(--bolha-sua); box-shadow: 0 2px 14px rgb(29 29 31 / .05); }
+.app--ceu .live-status-detail { padding: 12px 22px; border-color: var(--vidro-borda); background: var(--vidro-forte); font-size: 15px; color: var(--tinta-suave); }
 .app--ceu .bubble.pending { align-self: flex-start; width: auto; padding: 16px 20px; text-transform: none; letter-spacing: 0; font: 400 15px/1 var(--font-sans); color: var(--tinta-fraca); }
 .app--ceu .message-meta { margin: 0 0 4px; }
 .app--ceu .message-meta > span:first-child, .app--ceu .message-meta > time { display: none; }
@@ -121,13 +121,13 @@
 .app--ceu .sources { margin-top: 10px; }
 .app--ceu .attachment-photos { border-radius: 18px; }
 .app--ceu .attachment-file, .app--ceu .draft-attachment { border-radius: 16px; background: var(--fundo-elevado); }
-.app--ceu .empty-conversation { margin: auto 0; padding: 28px; border-radius: 32px; background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); text-align: center; }
+.app--ceu .empty-conversation { margin: auto 0; padding: 28px; border-radius: 32px; background: var(--vidro-forte); text-align: center; }
 
 /* Message box: the orb, then a glass pill with + and send. */
 .composer-dock { display: flex; align-items: flex-end; gap: 10px; flex-shrink: 0; }
 .composer-dock > .composer { flex: 1; min-width: 0; }
 .app--ceu .composer { padding: 6px 6px 6px 10px; border: 1px solid var(--vidro-borda); border-radius: 30px; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .1); }
-.app--ceu .composer:focus-within { border-color: var(--vidro-borda); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .14), 0 0 0 2px rgb(61 75 107 / .25); }
+.app--ceu .composer:focus-within { border-color: var(--vidro-borda); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .14), 0 0 0 2px rgb(79 99 102 / .25); }
 .app--ceu .composer textarea { font-size: 17px; padding: 8px 4px; scrollbar-width: none; }
 .app--ceu .composer textarea::-webkit-scrollbar { display: none; }
 .app--ceu .composer textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -138,7 +138,7 @@
 .app--ceu .composer-row > .composer-send:disabled { display: none; }
 .app--ceu .composer-row > textarea { order: 1; padding-left: 10px; }
 .app--ceu .composer-note { opacity: .8; }
-.app--ceu .chat--dragging .composer { box-shadow: 0 0 0 3px rgb(61 75 107 / .4); }
+.app--ceu .chat--dragging .composer { box-shadow: 0 0 0 3px rgb(79 99 102 / .4); }
 .app--ceu .drop-hint { border-radius: 32px; background: rgb(255 255 255 / .45); -webkit-backdrop-filter: blur(.8rem); backdrop-filter: blur(.8rem); }
 
 .sky-orb { position: relative; width: 58px; height: 58px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--vidro-borda); border-radius: 50%; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .1); }
@@ -190,5 +190,12 @@
 
 .app--ceu .composer-reply { margin: 2px 4px 0; border-radius: 16px; }
 .app--ceu .bubble-quote { border-radius: 12px; }
-.app--ceu .bubble-reply { border-color: var(--vidro-borda); background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); }
-@media (hover: none) { .app--ceu .bubble-reply { border-color: rgb(29 29 31 / .12); box-shadow: 0 2px 8px rgb(29 29 31 / .12); } }
+.app--ceu .bubble-reply { border-color: var(--vidro-borda); background: var(--vidro-forte); }
+
+/* Safari draws the edges of a scroll area that holds blurred glass, so nothing inside the
+   messages is blurred; instead the list fades out under the tabs and over the message box. */
+.app--ceu .messages {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 18px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 18px), transparent 100%);
+}
+[data-ceu="noite"] .app--ceu .artifact-card, [data-ceu="noite"] .app--ceu .action-card { border: 1px solid rgb(255 255 255 / .09); background: #141d23; }

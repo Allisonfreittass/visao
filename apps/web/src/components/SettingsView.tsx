@@ -66,8 +66,8 @@ export function SettingsView(props: SettingsViewProps) {
         <section className="settings-group" aria-labelledby="g-aparencia">
           <h2 id="g-aparencia" className="rotulo">Aparência</h2>
           <Setting
-            title="Céu ao fundo"
-            description="Um céu vivo que muda com a hora do dia, com vidro claro por cima. Desligado, volta o tema escuro."
+            title="Floresta com neblina ao fundo"
+            description="Pinheiros com neblina que se mexe, nas cores da hora do dia, com vidro de névoa por cima. Desligado, volta o tema escuro."
             checked={props.sky}
             onChange={props.onToggleSky}
           />

@@ -7,6 +7,9 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+/* The page itself never moves: only the lists inside scroll, and only up and down (on iPhone the
+   page used to bounce and slide sideways while scrolling the chat). */
+html, body { overflow: hidden; overscroll-behavior: none; }
 body {
   background: var(--fundo);
   color: var(--tinta);
@@ -102,7 +105,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 /* Chat */
 .chat { display: flex; flex: 1; flex-direction: column; min-height: 0; }
 .chat[hidden] { display: none; }
-.messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--espaco-5); padding: var(--espaco-5) 8px var(--espaco-5) 0; scrollbar-gutter: stable; }
+.messages { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: var(--espaco-5); padding: var(--espaco-5) 8px var(--espaco-5) 0; scrollbar-gutter: stable; }
 .bubble { width: 100%; overflow-wrap: anywhere; font: 400 16px/1.65 var(--font-sans); }
 .bubble.user { align-self: flex-end; max-width: 82%; padding: 14px 18px; background: var(--fundo-elevado); border: 1px solid var(--linha-forte); border-radius: var(--raio-2); }
 .bubble.assistant { max-width: 100%; padding: 0 2px; }
@@ -227,7 +230,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .row { display: flex; flex-wrap: wrap; gap: var(--espaco-2); align-items: center; }
 
 /* Pages: inbox, notebook, Mac, settings */
-.page { flex: 1; min-height: 0; overflow-y: auto; padding-right: 8px; }
+.page { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; padding-right: 8px; }
 .page-head { display: grid; gap: var(--espaco-2); padding-bottom: var(--espaco-4); border-bottom: 1px solid var(--linha); }
 .page-head h1 { font: 400 40px/1 var(--font-display); letter-spacing: -.02em; margin: 0; }
 .page-head h1 em { color: var(--tinta-suave); }
@@ -418,14 +421,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .setting-text code { font-size: 12px; overflow-wrap: anywhere; }
 
 /* Pages it writes: a card under the reply, and the page over the chat. */
-.artifact-card { display: grid; gap: 14px; max-width: 420px; margin-top: 12px; padding: 18px 18px 16px; border-radius: 24px; background: #141518; color: #f5f5f7; box-shadow: 0 8px 40px rgb(0 0 0 / .25); }
+.artifact-card { display: grid; gap: 14px; max-width: 420px; margin-top: 12px; padding: 18px 18px 16px; border-radius: 22px; background: #1b262d; color: #f5f5f7; box-shadow: 0 8px 40px rgb(0 0 0 / .25); }
 .artifact-card-text { display: grid; gap: 2px; min-width: 0; }
 .artifact-card-text strong { font: 500 17px/1.3 var(--font-sans); overflow-wrap: anywhere; }
 .artifact-card-text span { font: 400 14px/1.4 var(--font-sans); color: #9aa0b4; }
 .artifact-card--failed .artifact-card-text span { color: #ff8b80; }
-.artifact-card-making { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; background: #24262c; font: 400 14px/1.3 var(--font-sans); color: #c7cbd8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.artifact-card-making { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; background: #27343c; font: 400 14px/1.3 var(--font-sans); color: #c7cbd8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .artifact-card-making .thinking-dots i { background: #c7cbd8; }
-.artifact-card-open { justify-self: end; min-height: 40px; padding: 0 22px; border: 0; border-radius: 999px; background: #f5f5f7; color: #141518; font: 500 15px/1 var(--font-sans); }
+.artifact-card-open { justify-self: end; min-height: 40px; padding: 0 22px; border: 0; border-radius: 999px; background: #eef2f3; color: #1b262d; font: 500 15px/1 var(--font-sans); }
 .artifact-card-open:hover { background: #fff; }
 .artifact-viewer { position: fixed; inset: 0; z-index: calc(var(--camada-sobreposicao) + 1); display: flex; flex-direction: column; background: var(--fundo); }
 .artifact-viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; border-bottom: 1px solid var(--linha); background: var(--fundo-elevado); }
@@ -446,7 +449,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .bubble-reply { position: absolute; top: 6px; right: -6px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--linha-forte); border-radius: 50%; background: var(--fundo-elevado); color: var(--tinta-suave); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
 .bubble.user .bubble-reply { right: auto; left: -38px; }
 .bubble:hover .bubble-reply, .bubble-reply:focus-visible { opacity: 1; }
-@media (hover: none) { .bubble-reply { opacity: 1; width: 28px; height: 28px; color: var(--tinta-suave); border-color: var(--linha-forte); } }
+/* On touch screens you drag the message to the right instead; the button stays for VoiceOver. */
+@media (hover: none) {
+  .bubble-reply { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 1; }
+}
+.bubble { touch-action: pan-y; transition: transform .22s cubic-bezier(.2, .8, .2, 1); }
+.bubble--swiping { transition: none; }
+.swipe-reply-icon { position: absolute; left: 0; top: 50%; margin-top: -15px; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--fundo-elevado); color: var(--tinta-suave); box-shadow: 0 2px 8px rgb(29 29 31 / .12); pointer-events: none; }
+.swipe-reply-icon--armed { background: var(--tinta); color: var(--sobre-tinta); }
 .bubble.assistant .bubble-reply { right: -38px; }
 .bubble-quote { display: grid; gap: 2px; width: 100%; margin: 0 0 8px; padding: 6px 10px; border: 0; border-left: 3px solid var(--estanho); border-radius: 8px; background: var(--fundo-hover); text-align: left; cursor: pointer; }
 .bubble-quote-who { font: 500 12px/1.3 var(--font-sans); color: var(--estanho); }
@@ -461,15 +471,15 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 }
 
 /* Something waiting for one tap, inside the conversation: dark card, two pill buttons. */
-.action-card { align-self: flex-start; display: grid; gap: 10px; width: min(100%, 440px); padding: 18px; border-radius: 24px; background: #141518; color: #f5f5f7; box-shadow: 0 8px 40px rgb(0 0 0 / .22); }
+.action-card { align-self: flex-start; display: grid; gap: 10px; width: min(100%, 440px); padding: 18px; border-radius: 22px; background: #1b262d; color: #f5f5f7; box-shadow: 0 8px 40px rgb(0 0 0 / .22); }
 .action-card-label { font: 500 12px/1.3 var(--font-sans); letter-spacing: .02em; color: #9aa0b4; }
 .action-card-text { margin: 0; font: 400 16px/1.45 var(--font-sans); overflow-wrap: anywhere; }
-.action-card-detail { margin: 0; max-height: 180px; overflow-y: auto; padding: 10px 12px; border-radius: 14px; background: #24262c; font: 400 14px/1.45 var(--font-sans); color: #d7dae3; }
+.action-card-detail { margin: 0; max-height: 180px; overflow-y: auto; padding: 10px 12px; border-radius: 14px; background: #27343c; font: 400 14px/1.45 var(--font-sans); color: #d7dae3; }
 .action-card-buttons { display: flex; justify-content: flex-end; gap: 8px; }
 .action-card-buttons button { min-height: 40px; padding: 0 20px; border-radius: 999px; font: 500 15px/1 var(--font-sans); }
 .action-card-no { border: 1px solid #3a3d45; background: transparent; color: #f5f5f7; }
 .action-card-no:hover { border-color: #6b7080; }
-.action-card-yes { border: 0; background: #f5f5f7; color: #141518; }
+.action-card-yes { border: 0; background: #eef2f3; color: #1b262d; }
 .action-card-yes:hover { background: #fff; }
 .action-card-note { font: 400 12px/1.3 var(--font-sans); color: #7e8496; }
 

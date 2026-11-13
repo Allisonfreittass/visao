@@ -13,6 +13,8 @@ export interface Ask {
   onReject: () => void;
 }
 import { ArtifactCard, ArtifactViewer } from "./ArtifactCard";
+import { Icon } from "./Icon";
+import { SwipeReply } from "./SwipeReply";
 import { DraftAttachments, MessageAttachments } from "./Attachments";
 import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
@@ -164,7 +166,16 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={m.id} id={`msg-${m.id}`} className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}`}>
+          <SwipeReply
+            key={m.id}
+            id={`msg-${m.id}`}
+            className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}`}
+            disabled={!!m.local}
+            onReply={() => {
+              setReplyTo(m);
+              textareaRef.current?.focus();
+            }}
+          >
             {!m.local && (
               <button
                 type="button"
@@ -176,7 +187,7 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
                 aria-label={`Responder a esta mensagem${m.role === "assistant" ? (agentName ? ` de ${agentName}` : " dele") : " sua"}`}
                 title="Responder"
               >
-                <span aria-hidden="true">↩</span>
+                <Icon name="reply" size={15} />
               </button>
             )}
             {m.reply_to && (
@@ -211,7 +222,7 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
                 <FeedbackBar onSend={(rating, tags) => onFeedback(m.id, rating, tags)} />
               </details>
             )}
-          </div>
+          </SwipeReply>
         ))}
         {sending && (
           <div className="live-status" role="status" aria-live="polite">
