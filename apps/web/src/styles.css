@@ -503,3 +503,11 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 .project-row:hover strong { text-decoration: underline; text-decoration-color: var(--linha-forte); }
 .project-row strong { min-width: 0; font: 500 15px/1.35 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-row span { flex-shrink: 0; font: 400 12px/1.3 var(--font-sans); color: var(--tinta-fraca); }
+
+/* iPhone zooms the whole page into any field whose text is under 16px, and stays zoomed: that
+   is what let the screen slide sideways. Every field is 16px on touch screens. */
+@media (hover: none) {
+  input, textarea, select { font-size: 16px !important; }
+}
+/* Grid children may shrink below their content (a long placeholder pushed a form off a 320px phone). */
+.page-body > * { min-width: 0; }
