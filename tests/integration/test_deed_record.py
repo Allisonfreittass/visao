@@ -111,3 +111,71 @@ def test_only_executed_actions_count_and_pages_are_on_record(db):
 def test_a_conversation_with_only_talk_has_no_record(db):
     owner = setup(db)
     assert record.conversation_block(db, chat(db, owner), owner) == ""
+
+
+def _reply(db, owner, text):
+    conversation = chat(db, owner)
+    message = Message(conversation_id=conversation.id, role="assistant", content=text)
+    db.add(message)
+    db.commit()
+    return message
+
+
+def test_a_later_denial_of_a_real_read_is_corrected_with_the_next_message(db, google):  # noqa: F811
+    owner = setup(db)
+    connected(db, owner)
+    _turn(
+        db,
+        owner,
+        "tem algo importante no meu email?",
+        {"calendar_days": None, "email_query": "is:unread", "open_first_email": False},
+    )
+    # What it really said afterwards (2026-11-13, 12:49 and 12:51).
+    _reply(
+        db,
+        owner,
+        "Preciso ser honesto: eu não consegui ler seus emails de verdade na mensagem anterior.",
+    )
+    _reply(
+        db,
+        owner,
+        "O que sei é o seguinte: eu não tenho acesso à sua caixa de entrada nem ao seu Gmail nesta"
+        " conversa. Então aquela lista não veio de uma leitura minha.",
+    )
+
+    def answer(messages):
+        if '"calendar_days"' in messages[0].content:
+            return json.dumps({})
+        return "Li sim."
+
+    provider = FakeLLMProvider(responder=answer)
+    run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="Olhei aqui e você acertou em cheio os e-mails, qual a chance de ser coincidência?",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, curiosity_enabled=False, google_secret=KEY),
+    )
+    last = provider.prompts[-1][-1].content
+    assert last.startswith("Olhei aqui e você acertou em cheio")
+    assert "[Registro do sistema, não escrito pela pessoa]" in last
+    assert "leu o Gmail da pessoa (busca “is:unread”, 1 email(s))" in last
+    assert last.count("você disse que não tinha feito isso") == 2
+    assert "Corrija agora" in last and "Não volte a negar" in last
+
+
+def test_small_talk_without_denials_carries_no_correction(db, google):  # noqa: F811
+    owner = setup(db)
+    connected(db, owner)
+    _turn(
+        db,
+        owner,
+        "tem algo importante no meu email?",
+        {"calendar_days": None, "email_query": "is:unread", "open_first_email": False},
+    )
+    assert record.correction_block(db, chat(db, owner), owner, "e o tempo hoje?") == ""
+    asked = record.correction_block(db, chat(db, owner), owner, "você leu mesmo?")
+    assert "leu o Gmail" in asked and "Corrija" not in asked

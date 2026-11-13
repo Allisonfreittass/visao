@@ -48,7 +48,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .error { color: var(--erro); font: 400 14px/1.5 var(--font-sans); margin: var(--espaco-2) 0 0; }
 
 /* Shell */
-.app { display: flex; flex-direction: column; height: 100dvh; max-width: 1440px; margin: auto; overflow: hidden;
+.app { display: flex; flex-direction: column; height: var(--app-height, 100dvh); max-width: 1440px; margin: auto; overflow: hidden;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .app::before { /* film grain, above everything you read, never catching the pointer */
   content: ""; position: fixed; inset: 0; z-index: var(--camada-grao); pointer-events: none; opacity: var(--opacidade-grao);
@@ -512,3 +512,7 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 }
 /* Grid children may shrink below their content (a long placeholder pushed a form off a 320px phone). */
 .page-body > * { min-width: 0; }
+
+/* Keyboard open: the box sits right on it; the home-bar space is under the keyboard anyway. */
+[data-teclado] .app { padding-bottom: 6px; }
+[data-teclado] .composer-note { display: none; }

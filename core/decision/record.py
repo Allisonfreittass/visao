@@ -6,6 +6,7 @@ it up" (real case, 2026-11-13). This is the record the truth rules point to: an 
 happened; one missing here must not be claimed.
 """
 
+import re
 import uuid
 from collections.abc import Callable
 from datetime import datetime
@@ -139,3 +140,90 @@ def conversation_block(session: Session, conversation: Conversation, owner: User
     if not lines:
         return ""
     return "\n".join([HEADING, *lines, RULE])
+
+
+# A reply that says it did not do something. Real case, 2026-11-13: the Gmail was read at 09:58,
+# and at 12:51 and 14:18 it said "não tenho acesso", "não veio de uma leitura minha"; the record in
+# the system prompt lost to its own earlier replies, so the correction goes with the message.
+_DENIAL = re.compile(
+    r"n[ãa]o (?:tenho|tive|tinha) (?:como )?acess|n[ãa]o (?:li|lia|leio|abri|vi|pesquisei|fiz)\b|"
+    r"n[ãa]o consegui (?:ler|abrir|ver|acessar)|n[ãa]o (?:veio|vem) de uma leitura|"
+    r"n[ãa]o foi uma leitura|n[ãa]o sei de onde|sem ter (?:lido|acesso)|"
+    r"n[ãa]o (?:fiz|foi) (?:essa|uma) leitura",
+    re.IGNORECASE,
+)
+_TOPIC = {
+    "google_read": re.compile(r"e-?mails?|gmail|caixa|agenda", re.IGNORECASE),
+    "read_links": re.compile(r"links?|site|p[áa]gina", re.IGNORECASE),
+    "browsed": re.compile(r"site|p[áa]gina|pre[çc]o|voo|naveg", re.IGNORECASE),
+    "read_attachments": re.compile(r"foto|arquivo|anexo|imagem|pdf", re.IGNORECASE),
+    "research": re.compile(r"pesquis|fonte", re.IGNORECASE),
+}
+# The person asking about what it did ("você leu mesmo?", "qual a chance de ser coincidência?").
+_ASKS = re.compile(
+    r"\b(?:leu|ler|lido|lida|lendo|acess\w*|abriu|viu|pesquisou|fez|coincid\w*|invent\w*|"
+    r"mentiu|mentira|de onde)\b",
+    re.IGNORECASE,
+)
+
+
+def correction_block(
+    session: Session, conversation: Conversation, owner: User, user_text: str
+) -> str:
+    """Goes with the person's message, the last thing the model reads: what it really did, and
+    every later reply of its own that denied it. "" when there is nothing to say."""
+    recent = session.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation.id, Message.role == "assistant")
+        .order_by(Message.created_at.desc())
+        .limit(RECORD_MESSAGES)
+    ).all()
+    recent = list(reversed(recent))
+    if not recent:
+        return ""
+    decisions = {
+        d.message_id: d
+        for d in session.scalars(
+            select(Decision).where(Decision.message_id.in_([m.id for m in recent]))
+        )
+    }
+    events: list[tuple[Message, str, str]] = []  # (reply, action, words)
+    contradictions: list[str] = []
+    for message in recent:
+        for action in decisions[message.id].actions if message.id in decisions else []:
+            name = action.get("action", "")
+            if action.get("executed") and name in _TOPIC:
+                words = deeds([action])
+                if words:
+                    events.append((message, name, words[0]))
+        if not _DENIAL.search(message.content):
+            continue
+        for done, name, words in events:
+            if done.created_at < message.created_at and _TOPIC[name].search(message.content):
+                contradictions.append(
+                    f"- Às {_local(owner, message.created_at)} você disse que não tinha feito isso,"
+                    f" mas às {_local(owner, done.created_at)} {words} de verdade. Aquela negação"
+                    " estava errada."
+                )
+                break
+    asked = bool(_ASKS.search(user_text))
+    if not contradictions and not (asked and events):
+        return ""
+    lines = [
+        "[Registro do sistema, não escrito pela pessoa] O que você fez de verdade nesta conversa,"
+        " tirado do banco (não do que você disse):"
+    ]
+    lines += [f"- Às {_local(owner, m.created_at)}: {w}" for m, _, w in events[-6:]]
+    if contradictions:
+        lines.append("Depois disso você negou ter feito:")
+        lines += contradictions[-4:]
+        lines.append(
+            "Corrija agora, com clareza e sem rodeio: diga que fez de verdade, que os dados da"
+            " sua resposta vieram dali, e peça desculpas por ter negado. Não volte a negar."
+        )
+    else:
+        lines.append(
+            "Se a pessoa pergunta sobre isso, confirme: os dados das suas respostas vieram dessas"
+            " ações."
+        )
+    return "\n".join(lines)

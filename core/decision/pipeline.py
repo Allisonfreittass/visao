@@ -402,6 +402,7 @@ def run_turn(
             for part in (
                 conversation_links.context_block(list(read)) if read else "",
                 browsed.block if browsed else "",
+                deed_record.correction_block(session, conversation, owner, text),
             )
             if part
         ),
