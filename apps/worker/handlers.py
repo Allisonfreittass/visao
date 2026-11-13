@@ -10,11 +10,12 @@ from apps.api.settings import Settings
 from apps.worker.runner import Handler, HandlerResult
 from core.autonomy.budget import has_room
 from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
+from core.autonomy.cycle import _record as record_action
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
 from core.mind.review import review_once
-from core.mind.think import MindConfig
+from core.mind.think import MindConfig, think_once
 from infrastructure.database.models import Goal, ScheduledJob, User
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
@@ -156,6 +157,32 @@ def name_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     return handle
 
 
+def think_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    """A thinking round at a time the agent chose (core.mind.intentions), outside the cycle."""
+
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        owner = session.get(User, uuid.UUID(job.payload["owner_id"]))
+        budget = autonomy_budget(settings)
+        if provider is None or owner is None or budget.mind is None:
+            return HandlerResult("done", {"skipped": "mind_off"})
+        result = think_once(
+            session, owner=owner, provider=provider, budget=budget, config=budget.mind
+        )
+        if result.reason != "not_due":
+            record_action(
+                session,
+                owner.id,
+                action="mind_think",
+                executed=result.thought is not None,
+                reason=result.reason,
+                delivery=result.delivery,
+                trigger=job.reason,
+            )
+        return HandlerResult("done", {"reason": result.reason, "delivery": result.delivery})
+
+    return handle
+
+
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
     # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
@@ -166,4 +193,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         "cognitive_cycle": cycle_handler(settings, provider, search, fast),
         "name_deliberation": name_handler(settings, provider),
         "mind_review": review_handler(settings, fast),
+        "mind_think": think_handler(settings, provider),
     }

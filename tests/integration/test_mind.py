@@ -306,3 +306,126 @@ def test_a_notice_or_conversation_of_someone_else_cannot_be_used(client, db):
         f"/notifications/{mine.id}/reply", json={"conversation_id": str(chat.id)}, headers=headers
     )
     assert reply.json()["conversation_id"] != str(chat.id)
+
+
+# --- Choosing when to speak (core.mind.intentions) -------------------------------------------
+
+LATER = {**THOUGHT, "say": "", "later": [{"when": "2026-11-04T21:30", "about": "como foi o Hyrox"}]}
+
+
+def prompt_of(provider) -> dict:
+    return json.loads(provider.prompts[-1][-1].content)
+
+
+def test_it_reasons_in_the_persons_clock_not_in_utc(db):
+    owner = setup(db)
+    provider = llm()
+    think(db, owner, provider)
+    context = prompt_of(provider)
+    assert context["now_local"] == "quarta 04/11/2026 13:00"  # 16:00 UTC is 13:00 in Brasília
+    assert context["owner_recent"][0]["at"] == "quarta 04/11/2026 11:00"
+    assert context["can_speak_now"] is True and "sairia agora" in context["speaking"]
+    assert "now" not in context
+
+
+def test_it_can_leave_something_for_a_better_hour_and_decide_again_then(db):
+    from core.mind import intentions
+    from infrastructure.database.models import Intention, ScheduledJob
+
+    owner = setup(db)
+    report = think(db, owner, llm(LATER))
+    assert report.delivery is None  # nothing said now
+    planned = db.scalar(select(Intention))
+    assert planned.status == "PENDING"
+    # 21:30 in Brasília is 00:30 UTC of the next day.
+    assert planned.due_at.replace(tzinfo=UTC) == datetime(2026, 11, 5, 0, 30, tzinfo=UTC)
+    job = db.scalar(select(ScheduledJob).where(ScheduledJob.kind == intentions.JOB_KIND))
+    assert job.run_after.replace(tzinfo=UTC) == datetime(2026, 11, 5, 0, 30, tzinfo=UTC)
+
+    # Before the hour nothing wakes it off schedule; at the hour it thinks even if it just did.
+    think(db, owner, llm({**THOUGHT, "say": ""}), datetime(2026, 11, 5, 0, 20, tzinfo=UTC))
+    provider = llm({**THOUGHT, "say": "E o Hyrox, como foi?"})
+    at_the_hour = datetime(2026, 11, 5, 0, 31, tzinfo=UTC)
+    report = think(db, owner, provider, at_the_hour)
+    assert prompt_of(provider)["due_now"][0]["about"] == "como foi o Hyrox"
+    assert report.delivery == "sent"
+    db.refresh(planned)
+    assert (planned.status, planned.outcome) == ("DONE", "said")
+    # Settled: the same reminder never wakes it twice.
+    assert think(db, owner, llm(), at_the_hour + timedelta(minutes=2)).reason == "not_due"
+
+
+def test_a_reminder_it_cannot_send_waits_and_one_it_drops_is_dropped(db):
+    from core.mind import intentions
+    from infrastructure.database.models import Intention
+
+    owner = setup(db)
+    think(db, owner, llm(LATER))
+    at_the_hour = datetime(2026, 11, 5, 0, 31, tzinfo=UTC)
+    chat = db.scalar(select(Conversation))
+    db.add(
+        Message(
+            conversation_id=chat.id,
+            role="user",
+            content="voltei do Hyrox",
+            created_at=at_the_hour - timedelta(minutes=3),
+        )
+    )
+    db.commit()
+    provider = llm({**THOUGHT, "say": "E o Hyrox?"})
+    report = think(db, owner, provider, at_the_hour)
+    assert prompt_of(provider)["can_speak_now"] is False
+    assert report.delivery == "owner_active"
+    planned = db.scalar(select(Intention))
+    assert planned.status == "PENDING"  # the moment was wrong, not the idea
+    assert planned.due_at.replace(tzinfo=UTC) == at_the_hour + intentions.POSTPONE_BY
+
+    think(db, owner, llm({**THOUGHT, "say": ""}), at_the_hour + timedelta(minutes=21))
+    db.refresh(planned)
+    assert (planned.status, planned.outcome) == ("DONE", "let_go")
+
+
+def test_reminders_are_bounded_and_land_outside_quiet_hours(db):
+    from core.mind import intentions
+    from infrastructure.database.models import Intention
+
+    owner = setup(db)
+    night = {"when": "2026-11-05T02:00", "about": "perguntar do treino"}
+    past = {"when": "2026-11-04T09:00", "about": "já passou"}
+    junk = {"when": "amanhã cedo", "about": "sem data"}
+    think(db, owner, llm({**THOUGHT, "say": "", "later": [night, past, junk, night]}))
+    planned = db.scalars(select(Intention)).all()
+    assert [p.about for p in planned] == ["perguntar do treino"]
+    assert intentions.local(owner, planned[0].due_at) == "quinta 05/11/2026 08:00"
+
+    provider = llm({**THOUGHT, "say": "", "drop": [str(planned[0].id)]})
+    think(db, owner, provider, NOON + timedelta(minutes=30))
+    assert prompt_of(provider)["planned"][0]["when"] == "quinta 05/11/2026 08:00"
+    db.refresh(planned[0])
+    assert planned[0].status == "DROPPED"
+
+
+def test_it_chooses_whether_a_message_rings_the_phone(db, monkeypatch):
+    rung = []
+    monkeypatch.setattr(
+        initiative.push, "send_to_owner", lambda *args, **kwargs: rung.append(kwargs["body"])
+    )
+    owner = setup(db)
+    think(db, owner, llm({**THOUGHT, "notify": False}))
+    assert rung == [] and db.scalar(select(Message).where(Message.origin == "initiative"))
+    think(db, owner, llm({**THOUGHT, "notify": True}), NOON + timedelta(hours=1))
+    assert rung == [THOUGHT["say"]]
+
+
+def test_the_reply_knows_the_hour_in_brasilia_and_what_it_planned(db):
+    from core.mind import intentions
+
+    owner = setup(db)
+    assert intentions.local(owner, datetime(2026, 11, 13, 0, 5, tzinfo=UTC)) == (
+        "quinta 12/11/2026 21:05"
+    )
+    assert intentions.local_iso(owner, datetime(2026, 11, 13, 0, 5, tzinfo=UTC)) == (
+        "2026-11-12T21:05"
+    )
+    think(db, owner, llm(LATER))
+    assert "como foi o Hyrox" in state.context_block(db, owner.id, NOON)

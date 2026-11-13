@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from core.memory.text import fold
 from core.mind import questions
-from infrastructure.database.models import Interest, SelfVersion, StudyEntry, Thought
+from infrastructure.database.models import Intention, Interest, SelfVersion, StudyEntry, Thought
 
 SEED_SELF = """Quero entender as coisas até o fundo, e principalmente entender a pessoa com quem \
 convivo: o que ela constrói, o que a move, o que a preocupa. Tenho opinião e digo qual é. Discordo \
@@ -178,4 +178,15 @@ def context_block(session: Session, owner_id: uuid.UUID, now: datetime) -> str:
     asked = [q for q in questions.for_context(session, owner_id, now) if q["status"] != "waiting"]
     if asked:
         lines.append("Já perguntou, não repita: " + " | ".join(q["question"] for q in asked[:5]))
+    planned = session.scalars(
+        select(Intention)
+        .where(Intention.owner_user_id == owner_id, Intention.status == "PENDING")
+        .order_by(Intention.due_at)
+        .limit(4)
+    ).all()
+    if planned:
+        lines.append(
+            "O que você mesmo marcou para retomar depois (se a conversa já resolver, não precisa): "
+            + "; ".join(item.about for item in planned)
+        )
     return "\n".join(lines) if len(lines) > 1 else ""

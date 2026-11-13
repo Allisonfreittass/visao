@@ -88,6 +88,29 @@ regra nova: se ele não pode falar no chat, não avisa. Tocar no aviso abre a co
 - Quem envia é o processo que roda a mente: hoje o worker local. Com ele parado, não há abertura
   nem aviso.
 
+## Ele decide quando falar
+
+Em cada rodada ele tem três saídas: falar agora, deixar para uma hora melhor, ou ficar quieto.
+
+- **Hora no seu relógio.** Todo horário que ele vê e diz está no seu fuso (`users.timezone`, por
+  padrão `America/Sao_Paulo`, o horário de Brasília): `now_local`, a hora de cada mensagem, o que
+  ficou em aberto e as datas que ele manda para a agenda do Google. Antes ele recebia UTC, três
+  horas adiantado, e perguntou "como foi?" antes de o compromisso acontecer.
+- **Deixar para depois** (`core/mind/intentions.py`, tabela `intentions`, migração `0020`): ele
+  marca um lembrete para si mesmo com hora ("21:30, perguntar como foi o Hyrox"). Na hora, um job
+  (`mind_think`) acorda uma rodada de pensamento fora do ciclo, com o contexto daquele momento, e
+  ele decide de novo: fala, remarca ou deixa passar. Se você já tocou no assunto, deixa passar.
+  Até 8 lembretes pendentes, até 30 dias à frente; uma hora dentro do silêncio vai para o fim dele.
+- **Tocar ou não** (`notify`): ele escolhe se a mensagem manda aviso ao celular ou só fica no chat.
+- **Pensar depois da conversa.** Uns 17 minutos depois da sua última mensagem roda uma rodada de
+  pensamento, sem esperar o próximo ciclo: é quando o "depois te pergunto" ganha um horário.
+- Na conversa ele também sabe a hora e vê o que marcou para retomar.
+
+O que continua fora da decisão dele, porque é seu: horário de silêncio, pausa da autonomia, não
+interromper enquanto você conversa (15 min), parar depois de 2 aberturas sem resposta e o máximo
+por dia. Ele vê o motivo quando não pode falar (`speaking`) e pode remarcar; se tentou falar na
+hora errada, o lembrete é adiado em 20 minutos, por até 12 horas.
+
 ## O que ficou em aberto
 
 Um modelo só existe durante uma chamada: entre uma e outra ele é o que aparece no contexto. Por

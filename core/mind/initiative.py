@@ -118,7 +118,23 @@ def open_in_chat(session: Session, conversation: Conversation, text: str, now: d
     return message
 
 
-def post(session: Session, owner: User, text: str, now: datetime, per_day: int) -> Delivery:
+REASONS = {
+    "paused": "a autonomia está pausada pela pessoa",
+    "quiet_hours": "é horário de silêncio dela",
+    "owner_active": "ela está conversando com você agora ou acabou de falar",
+    "waiting_for_reply": "você já puxou assunto duas vezes sem resposta; espere ela falar",
+    "daily_limit": "você já usou todas as aberturas de hoje",
+}
+
+
+def explain(reason: str | None) -> str:
+    return "uma mensagem sairia agora" if reason is None else f"não sairia: {REASONS[reason]}"
+
+
+def post(
+    session: Session, owner: User, text: str, now: datetime, per_day: int, *, ring: bool = True
+) -> Delivery:
+    """`ring=False` leaves the message in the chat without a push to any device."""
     reason = can_speak(session, owner, now, per_day)
     if reason is not None:
         return Delivery(False, reason)
@@ -138,6 +154,8 @@ def post(session: Session, owner: User, text: str, now: datetime, per_day: int) 
         )
     )
     session.flush()
+    if not ring:
+        return Delivery(True, "sent", message)
     identity = get_identity(session)
     push.send_to_owner(
         session,

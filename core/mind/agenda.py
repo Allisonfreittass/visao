@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from core.arm import service as arm
 from core.goals import lifecycle
+from core.mind import intentions
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Goal, Message, User
 
 FINISHED_WINDOW = timedelta(hours=24)
@@ -142,7 +143,7 @@ def open_loops(session: Session, owner: User, now: datetime) -> dict:
             )
         ],
         "my_openings": [
-            {"said": o.said, "at": o.at.isoformat(), "answered": o.answered}
+            {"said": o.said, "at": intentions.local(owner, o.at), "answered": o.answered}
             for o in openings(session, owner, now)[:6]
         ],
     }

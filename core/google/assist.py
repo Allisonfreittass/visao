@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from core.conversation.service import Budgets, check_budgets
 from core.google import account as accounts
 from core.google import actions
+from core.mind import intentions
 from infrastructure.database.models import Conversation, GoogleAction, ModelUsage, User
 from integrations.google.client import Event, GoogleClient, GoogleError, Mail
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
@@ -40,8 +41,9 @@ Responda SOMENTE JSON:
  "create_event": {"title": "...", "start": "AAAA-MM-DDTHH:MM", "end": "AAAA-MM-DDTHH:MM ou vazio",
    "location": "", "attendees": ["emails"]} ou null}
 
-Só preencha send_email ou create_event quando a pessoa pedir isso claramente. Use now e timezone
-para datas relativas ("amanhã às 15h"). Sem nada a fazer: todos null."""
+Só preencha send_email ou create_event quando a pessoa pedir isso claramente. now já está no
+relógio da pessoa (timezone); use-o para datas relativas ("amanhã às 15h"). Sem nada a fazer:
+todos null."""
 
 
 @dataclass
@@ -63,7 +65,9 @@ def _extract(session, conversation, provider, owner: User, text: str, recent: st
             role="user",
             content=json.dumps(
                 {
-                    "now": datetime.now(UTC).isoformat(),
+                    # The person's wall clock: "amanhã às 15h" is 15h there, not in UTC.
+                    "now": intentions.local_iso(owner, datetime.now(UTC)),
+                    "today": intentions.local(owner, datetime.now(UTC)),
                     "timezone": owner.timezone,
                     "recent_conversation": recent,
                     "message": text,

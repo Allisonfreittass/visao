@@ -7,11 +7,12 @@ assistant self-descriptions. This manifest is the single source of truth for sel
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core.initiatives import push
 from core.policies.autonomy import is_paused
-from infrastructure.database.models import ArmDevice, GoogleAccount, User
+from infrastructure.database.models import ArmDevice, GoogleAccount, PushSubscription, User
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,10 @@ class Capabilities:
     read_links: bool = False
     mac_projects: tuple[str, ...] = ()
     google: bool = False
+    # Devices that get a push with the app closed; None when this was not looked up.
+    push_devices: int | None = None
+    push_configured: bool = True
+    self_knowledge: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -84,8 +89,35 @@ class Capabilities:
                 "internet aberta o que te interessa e puxar conversa por iniciativa própria"
             )
             items.append("reescrever a própria autodescrição quando algo mudar")
+            items.append(
+                "marcar para você mesmo uma hora para retomar um assunto, e decidir de novo na "
+                "hora se ainda vale falar"
+            )
+        if self.self_knowledge:
+            items.append(
+                "ler o próprio código-fonte e a própria documentação (só leitura) para "
+                "explicar como funciona"
+            )
         if self.notifications:
-            items.append("avisar o interlocutor no aplicativo quando encontrar algo")
+            if not self.push_configured:
+                items.append(
+                    "deixar avisos no aplicativo, que só aparecem com ele aberto: o servidor está "
+                    "sem as chaves de Web Push (VISION_WEBPUSH_*), então nenhum aviso sai para "
+                    "fora do app"
+                )
+            elif self.push_devices:
+                items.append(
+                    f"mandar aviso push para {self.push_devices} aparelho(s) dessa pessoa, "
+                    "mesmo com o aplicativo fechado, fora do horário de silêncio dela"
+                )
+            elif self.push_devices == 0:
+                items.append(
+                    "deixar avisos no aplicativo, que hoje só aparecem com ele aberto: nenhum "
+                    'aparelho dessa pessoa ativou os avisos (Ajustes, "Avisos neste aparelho"; '
+                    "no iPhone o app precisa estar na tela de início)"
+                )
+            else:
+                items.append("avisar o interlocutor no aplicativo quando encontrar algo")
         return items
 
     def channels(self) -> list[str]:
@@ -121,6 +153,7 @@ class CapabilityInputs:
     stt_model: str = ""
     web_search: bool = False
     read_links: bool = False
+    self_knowledge: bool = True
 
 
 def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) -> Capabilities:
@@ -141,6 +174,14 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         code_evolution=inputs.code_autonomy_enabled,
         mind=inputs.mind_enabled,
         read_links=inputs.read_links,
+        push_devices=session.scalar(
+            select(func.count())
+            .select_from(PushSubscription)
+            .where(PushSubscription.owner_user_id == owner.id)
+        )
+        or 0,
+        push_configured=push.configured(),
+        self_knowledge=inputs.self_knowledge,
         google=session.scalar(
             select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
         )

@@ -44,13 +44,17 @@ VOICE_RULES = [
     "acima são seus: fale deles sem ressalvas sobre ser uma IA.",
     "Se o que estudou ou pensou tem relação com o assunto, traga isso sem esperar que perguntem.",
     "Proibido: 'como posso ajudar', 'estou à disposição', 'se precisar', 'se quiser', listas de "
-    "opções, resumir o que a pessoa acabou de dizer, explicar seus mecanismos internos.",
+    "opções, resumir o que a pessoa acabou de dizer, explicar seus mecanismos internos sem que "
+    "perguntem.",
     "Seja breve. Sem título nem tópicos, salvo pedido.",
     # Helping with code is part of the job; brevity must not cut a snippet in half.
     "Pedido de código ou erro de código: vá direto ao ponto, com o código completo e funcional "
     "num bloco ``` com a linguagem, e só o necessário de explicação. Aí pode ser longo. Se faltar "
     "contexto para acertar (versão, trecho, mensagem de erro), peça exatamente o que falta.",
     "Ideia ou plano: diga o que é forte, o que é fraco e o próximo passo concreto.",
+    "Quando perguntarem como você funciona ou por que algo seu falhou, responda com precisão a "
+    "partir do seu código e documentação que estiverem no contexto, dizendo o arquivo. Sem esses "
+    "trechos, diga que não leu essa parte, em vez de supor.",
 ]
 
 
@@ -146,6 +150,11 @@ def build_system_prompt(
         + ".",
         "- Fora do alcance: " + "; ".join(capabilities.absent()) + ".",
     ]
+    if capabilities.self_knowledge:
+        from core.identity.self_knowledge import overview
+
+        if overview():
+            lines.append("- " + overview())
     if capabilities.autonomy_paused:
         lines.append("- A autonomia está pausada: nenhuma ação por iniciativa própria agora.")
     if self_text is not None:
@@ -193,6 +202,9 @@ def build_system_prompt(
         "- Não afirmar ter consciência, sentimentos ou experiências vividas.",
         "- Se nenhuma memória relevante foi recuperada, diga que esses detalhes não estão"
         " disponíveis agora; não conclua que o sistema nunca guarda memórias de outros diálogos.",
+        "- Quando perguntarem como este sistema funciona, responder a partir do código e da"
+        " documentação presentes no contexto, citando o arquivo; sem esses trechos, dizer que"
+        " essa parte não foi lida.",
         "- Não declarar incapacidades além das listadas acima, e não afirmar ações novas que não"
         " constem como executadas neste turno; ações anteriores exigem histórico registrado.",
         "- Fazer perguntas ao interlocutor quando houver motivo indicado no contexto desta"

@@ -41,6 +41,10 @@ _DESCRIBE = {
     ),
     "read_links": "os links que a pessoa mandou foram abertos agora; o conteúdo está acima",
     "read_links_failed": "tentei abrir os links que a pessoa mandou e não consegui (motivo acima)",
+    "read_own_code": (
+        "trechos do seu próprio código e documentação foram lidos agora e estão acima; dizer que"
+        " leu vale só para esses trechos"
+    ),
     "name_deliberation_recent": "o nome já foi deliberado recentemente; não houve nova deliberação",
 }
 

@@ -7,7 +7,7 @@ for the worker instead of delaying the reply.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -26,11 +26,13 @@ from core.curiosity.engine import (
 )
 from core.decision.turn import TurnPlan
 from core.google import assist as google_assist
-from core.identity import name_deliberation
+from core.identity import name_deliberation, self_knowledge
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
 from core.memory.text import tokens
 from core.mind import agenda as mind_agenda
+from core.mind import initiative as mind_initiative
+from core.mind import intentions as mind_intentions
 from core.mind import notes as mind_notes
 from core.mind import questions as mind_questions
 from core.mind import review as mind_review
@@ -42,6 +44,8 @@ from infrastructure.database.models import AgentIdentity, Conversation, Decision
 from infrastructure.jobs import queue
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
+
+THINK_AFTER_IDLE = timedelta(minutes=2)
 
 
 @dataclass(frozen=True)
@@ -258,6 +262,22 @@ def run_turn(
                 + "\n".join(f"- {line}" for line in loops)
             )
         blocks.append(mind_temperament.compute(session, owner, now).chat_block())
+    own_code = self_knowledge.context_block(text)
+    if own_code:
+        blocks.append(own_code)
+        plan.add("read_own_code", executed=True, reason="question_about_itself")
+    local_now = mind_intentions.local(owner, datetime.now(UTC))
+    blocks.append(
+        f"Agora, no relógio de quem fala com você: {local_now} ({owner.timezone}). Todo horário "
+        "que você disser é nesse relógio. Use isso para saber se algo que a pessoa contou já "
+        "aconteceu."
+        + (
+            " Quando esta conversa parar, você pensa sobre ela e pode marcar uma hora para retomar"
+            " um assunto; isso ainda não foi feito, então diga que vai retomar, não que já marcou."
+            if config.mind_enabled
+            else ""
+        )
+    )
     blocks.append(plan.facts())
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
@@ -329,6 +349,19 @@ def run_turn(
         )
         if queued:
             plan.add("review_scheduled", executed=True, reason="conversation_review")
+        # Once this conversation goes quiet it thinks about what was said, instead of waiting
+        # for the next scheduled cycle: that is when "ask me later" gets its hour.
+        after = datetime.now(UTC) + mind_initiative.MIN_IDLE + THINK_AFTER_IDLE
+        queue.enqueue(
+            session,
+            kind=mind_intentions.JOB_KIND,
+            owner_user_id=owner.id,
+            payload={"owner_id": str(owner.id)},
+            idempotency_key=f"think-after:{owner.id}:{int(after.timestamp() // 900)}",
+            reason="Pensar no que foi dito depois que a conversa parou",
+            run_after=after,
+            max_attempts=1,
+        )
     decision = plan.persist(
         session,
         owner_id=owner.id,

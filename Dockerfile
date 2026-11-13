@@ -15,6 +15,12 @@ COPY integrations ./integrations
 COPY infrastructure ./infrastructure
 RUN pip install -c infrastructure/deployment/constraints.txt .
 
+# Read by the agent itself (docs/SELF_KNOWLEDGE.md); the source above is read from /app too.
+COPY README.md ./
+COPY docs/*.md ./docs/
+COPY docs/decisions ./docs/decisions
+COPY arm ./arm
+
 COPY alembic.ini ./
 COPY migrations ./migrations
 
