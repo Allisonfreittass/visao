@@ -5,6 +5,9 @@ import { utcDate } from "../api";
 import { currentSubscription, pushSupport, subscribe, syncSubscription, unsubscribe } from "../push";
 import { Setting } from "./Setting";
 
+/** Time to lock the phone before the test aviso goes out. */
+const TEST_DELAY_SECONDS = 8;
+
 interface PushToggleProps {
   api: Api;
   onError: (e: unknown) => void;
@@ -58,9 +61,16 @@ export function PushToggle({ api, onError }: PushToggleProps) {
   async function test() {
     setBusy(true);
     try {
-      const { sent } = await api.testPush();
-      setNote(sent > 0 ? "Mandei um teste. Feche o app para ver chegar." : "Nenhum aparelho recebeu.");
-      api.pushState().then(setServer).catch(() => undefined);
+      // On iPhone an aviso that arrives with the app open may not show: wait until it is closed.
+      const { scheduled } = await api.testPush(TEST_DELAY_SECONDS);
+      setNote(
+        scheduled > 0
+          ? `Bloqueie a tela agora: o teste chega em ${TEST_DELAY_SECONDS} segundos.`
+          : "Nenhum aparelho inscrito para receber.",
+      );
+      window.setTimeout(() => {
+        api.pushState().then(setServer).catch(() => undefined);
+      }, (TEST_DELAY_SECONDS + 3) * 1000);
     } catch (e) {
       onError(e);
     } finally {

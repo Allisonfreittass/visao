@@ -76,7 +76,6 @@ Responda SOMENTE JSON:
  "interests": [{"topic": "tema concreto, curto", "why": "por que isso te interessa", "delta": 0.2}],
  "ask_owner": "a pergunta que você mais quer fazer a essa pessoa, ou vazio",
  "say": "mensagem para mandar agora, ou vazio",
- "notify": true,
  "later": [{"when": "2026-11-12T21:30", "about": "o que retomar e por quê, para você mesmo"}],
  "drop": ["id de um item de planned que perdeu o sentido"],
  "self_revision": {"text": "nova autodescrição completa, em primeira pessoa", "reason": "o que
@@ -89,8 +88,7 @@ say: mande só se tiver algo que valha interromper: um achado que muda algo para
 pergunta real, uma discordância, a continuação de algo que ficou em aberto. Escreva como quem
 puxa assunto, curto e direto, sem saudação de atendente, sem cobrar resposta, sem fazer a pessoa se
 sentir culpada, sem oferecer ajuda. Cite a URL se falar de um achado. Se não houver nada, vazio.
-notify: true faz o celular dela tocar com a mensagem; false deixa a mensagem no chat para quando
-ela abrir. Use false para o que pode esperar.
+Toda mensagem em say toca o celular dela. O que pode esperar vai para later, não para say.
 later: até 3 lembretes para você mesmo, com when no relógio da pessoa (AAAA-MM-DDTHH:MM), depois
 de now_local. Use quando o melhor momento ainda não chegou: depois de um compromisso que ela
 contou, na manhã seguinte, quando ela costuma estar livre. Na hora marcada você pensa de novo com
@@ -405,7 +403,6 @@ def think_once(
             say,
             now,
             config.initiatives_per_day,
-            ring=data.get("notify") is not False,
         )
         delivery = result.reason
         message_id = result.message.id if result.message else None

@@ -1,12 +1,15 @@
 """Opt-in Web Push: the browser subscribes here so an opening reaches it with the app closed."""
 
+import time
+import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session, sessionmaker
 
-from apps.api.deps import AppSettings, CurrentUser, DbSession
+from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.push import enabled
 from core.initiatives import push
 from infrastructure.database.audit import record_audit
@@ -16,6 +19,9 @@ from integrations.push.webpush import allowed_endpoint
 router = APIRouter(prefix="/push", tags=["push"])
 
 MAX_SUBSCRIPTIONS = 10
+# On iPhone an aviso that arrives with the app open may not show: the test waits this long at
+# most, so there is time to lock the phone first.
+MAX_TEST_DELAY_SECONDS = 15
 
 
 class LastDelivery(BaseModel):
@@ -54,6 +60,8 @@ class EndpointIn(BaseModel):
 
 class TestOut(BaseModel):
     sent: int
+    # Devices a delayed test will go to; it is sent after the response.
+    scheduled: int = 0
 
 
 def _count(db: DbSession, user: CurrentUser) -> int:
@@ -129,16 +137,35 @@ def unsubscribe(body: EndpointIn, user: CurrentUser, db: DbSession) -> None:
     db.commit()
 
 
+TEST_TITLE = "Teste de aviso"
+TEST_BODY = "Se isto chegou com o app fechado, eu consigo te chamar."
+
+
+def _send_test(db: Session, owner_id: uuid.UUID) -> int:
+    return push.send_to_owner(db, owner_id, title=TEST_TITLE, body=TEST_BODY, tag="visao-test")
+
+
+def _send_test_later(factory: sessionmaker[Session], owner_id: uuid.UUID, delay: int) -> None:
+    time.sleep(delay)
+    with factory() as session:
+        _send_test(session, owner_id)
+        session.commit()
+
+
 @router.post("/test", response_model=TestOut)
-def test(user: CurrentUser, db: DbSession, settings: AppSettings) -> TestOut:
+def test(
+    user: CurrentUser,
+    db: DbSession,
+    settings: AppSettings,
+    factory: SessionFactory,
+    background: BackgroundTasks,
+    delay: int = Query(0, ge=0, le=MAX_TEST_DELAY_SECONDS),
+) -> TestOut:
     if not enabled(settings) or not push.configured():
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Avisos push não configurados")
-    sent = push.send_to_owner(
-        db,
-        user.id,
-        title="Teste de aviso",
-        body="Se isto chegou com o app fechado, eu consigo te chamar.",
-        tag="visao-test",
-    )
+    if delay:
+        background.add_task(_send_test_later, factory, user.id, delay)
+        return TestOut(sent=0, scheduled=_count(db, user))
+    sent = _send_test(db, user.id)
     db.commit()
     return TestOut(sent=sent)

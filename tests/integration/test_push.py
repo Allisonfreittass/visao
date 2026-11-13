@@ -116,7 +116,7 @@ def _push_settings():
     )
 
 
-def test_subscribe_test_and_unsubscribe_through_the_api(client, db, sender):
+def test_subscribe_test_and_unsubscribe_through_the_api(client, db, sender, monkeypatch):
     owner, headers = _owner_client(client, db)
     assert client.get("/push", headers=headers).json()["enabled"] is False
     assert (
@@ -140,8 +140,17 @@ def test_subscribe_test_and_unsubscribe_through_the_api(client, db, sender):
         assert response.status_code == 204
     assert client.get("/push", headers=headers).json()["subscriptions"] == 1
 
-    assert client.post("/push/test", headers=headers).json() == {"sent": 1}
+    assert client.post("/push/test", headers=headers).json() == {"sent": 1, "scheduled": 0}
     assert sender.sent[0][1]["tag"] == "visao-test"
+
+    # Delayed, so there is time to lock the phone: on iPhone an aviso may not show with the app
+    # open, and the test looked broken.
+    waited = []
+    monkeypatch.setattr("apps.api.routes.push.time.sleep", waited.append)
+    response = client.post("/push/test?delay=8", headers=headers)
+    assert response.json() == {"sent": 0, "scheduled": 1}
+    assert waited == [8] and len(sender.sent) == 2
+    assert client.post("/push/test?delay=60", headers=headers).status_code == 422
 
     response = client.request(
         "DELETE", "/push/subscriptions", json={"endpoint": FCM}, headers=headers

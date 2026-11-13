@@ -101,7 +101,9 @@ Em cada rodada ele tem três saídas: falar agora, deixar para uma hora melhor, 
   (`mind_think`) acorda uma rodada de pensamento fora do ciclo, com o contexto daquele momento, e
   ele decide de novo: fala, remarca ou deixa passar. Se você já tocou no assunto, deixa passar.
   Até 8 lembretes pendentes, até 30 dias à frente; uma hora dentro do silêncio vai para o fim dele.
-- **Tocar ou não** (`notify`): ele escolhe se a mensagem manda aviso ao celular ou só fica no chat.
+- **Toda abertura toca o celular.** Ele já escolheu entre tocar ou só deixar no chat, e marcava
+  tudo como "pode esperar": nenhum aviso chegava. Agora o que pode esperar vai para "deixar para
+  depois", e o que ele manda toca, dentro dos limites abaixo.
 - **Pensar depois da conversa.** Uns 17 minutos depois da sua última mensagem roda uma rodada de
   pensamento, sem esperar o próximo ciclo: é quando o "depois te pergunto" ganha um horário.
 - Na conversa ele também sabe a hora e vê o que marcou para retomar.

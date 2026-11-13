@@ -11,7 +11,7 @@ from core.autonomy.cycle import run_cycle
 from core.identity.genesis import get_identity
 from core.identity.system_prompt import build_system_prompt
 from core.mind import initiative, state
-from core.mind.think import MindConfig, think_once
+from core.mind.think import INSTRUCTIONS, MindConfig, think_once
 from core.policies.autonomy import set_paused
 from core.study.service import study_once
 from infrastructure.database.models import Conversation, Message, Notification, Thought, User
@@ -405,16 +405,17 @@ def test_reminders_are_bounded_and_land_outside_quiet_hours(db):
     assert planned[0].status == "DROPPED"
 
 
-def test_it_chooses_whether_a_message_rings_the_phone(db, monkeypatch):
+def test_every_opening_rings_the_phone(db, monkeypatch):
+    """Real case (2026-11-13): given the choice, it marked all four openings of the day "can
+    wait" and none reached the phone. The limits on openings already keep it from nagging."""
     rung = []
     monkeypatch.setattr(
         initiative.push, "send_to_owner", lambda *args, **kwargs: rung.append(kwargs["body"])
     )
     owner = setup(db)
     think(db, owner, llm({**THOUGHT, "notify": False}))
-    assert rung == [] and db.scalar(select(Message).where(Message.origin == "initiative"))
-    think(db, owner, llm({**THOUGHT, "notify": True}), NOON + timedelta(hours=1))
     assert rung == [THOUGHT["say"]]
+    assert "notify" not in INSTRUCTIONS
 
 
 def test_the_reply_knows_the_hour_in_brasilia_and_what_it_planned(db):

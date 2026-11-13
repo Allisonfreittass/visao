@@ -643,8 +643,10 @@ export class Api {
     });
   }
 
-  testPush(): Promise<{ sent: number }> {
-    return this.request("/push/test", { method: "POST" });
+  /** With a delay, the test goes out that many seconds later (`scheduled` devices). */
+  testPush(delaySeconds = 0): Promise<{ sent: number; scheduled: number }> {
+    const query = delaySeconds > 0 ? `?delay=${delaySeconds}` : "";
+    return this.request(`/push/test${query}`, { method: "POST" });
   }
 
   mind(): Promise<Mind> {
