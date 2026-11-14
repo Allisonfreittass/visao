@@ -252,3 +252,17 @@ public struct DraftReader: Sendable {
         text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }
+
+extension VoiceRules {
+    /// Did the microphone hear him instead of you? True when most of the words heard are words he
+    /// was saying (the echo cancellation leaves bits of his voice, mostly just as he stops). A
+    /// sentence of your own with a word or two in common is not echo.
+    public static func isEcho(_ heard: String, of spoken: String) -> Bool {
+        let heardWords = fold(heard).split(separator: " ")
+        guard !heardWords.isEmpty else { return false }
+        let spokenWords = Set(fold(spoken).split(separator: " "))
+        guard !spokenWords.isEmpty else { return false }
+        let shared = heardWords.filter { spokenWords.contains($0) }.count
+        return Double(shared) / Double(heardWords.count) >= 0.7
+    }
+}

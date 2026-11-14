@@ -61,6 +61,13 @@ final class DuplexVoice {
     private var task: SFSpeechRecognitionTask?
     private var lastChange = ContinuousClock.now
     private var speakingSince = ContinuousClock.now
+    /// What he said last and when he stopped: for a few seconds after, a sentence made of his own
+    /// words is his echo, not you (VoiceRules.isEcho).
+    private var lastSpoken = ""
+    private var spokeUntil: ContinuousClock.Instant?
+    /// Right after he stops, the microphone still carries the tail of his voice: dropped this long.
+    private let echoTail: Duration = .milliseconds(400)
+    private let echoMemory: Duration = .seconds(4)
     private var silenceWatch: Task<Void, Never>?
     private var speech: Task<Void, Never>?
     private var server: APIClient?
@@ -298,7 +305,8 @@ final class DuplexVoice {
             lastChange = .now
         }
         // Talking over him: a word or two that is not the echo of his own voice.
-        if phase == .speaking, ContinuousClock.now - speakingSince > settle, Self.isRealSpeech(text) {
+        if phase == .speaking, ContinuousClock.now - speakingSince > settle, Self.isRealSpeech(text),
+           !VoiceRules.isEcho(text, of: lastSpoken) {
             stopSpeaking()
             phase = .listening
             onBargeIn?()
@@ -325,6 +333,10 @@ final class DuplexVoice {
         partial = ""
         request?.endAudio()
         try? beginSentence()
+        if let spokeUntil, ContinuousClock.now - spokeUntil < echoMemory, VoiceRules.isEcho(sentence, of: lastSpoken) {
+            VoiceLog.write("eco dele ignorado: “\(sentence)”")
+            return
+        }
         if !sentence.isEmpty { onUtterance?(sentence) }
     }
 
@@ -340,6 +352,7 @@ final class DuplexVoice {
         }
         phase = .speaking
         speakingSince = .now
+        lastSpoken = text
         // What you said before he started is not an interruption of this.
         if !partial.isEmpty { finishSentence() }
         speech = Task { [weak self] in
@@ -347,10 +360,18 @@ final class DuplexVoice {
             let finished = await self.render(text)
             guard !Task.isCancelled, finished, self.phase == .speaking else { return }
             self.phase = .listening
+            self.spokeUntil = .now
             // What was heard while he talked was mostly his own voice: listening starts clean,
-            // so that echo is neither sent as your sentence nor leaves the recognition stuck.
-            try? self.beginSentence()
+            // so that echo is neither sent as your sentence nor leaves the recognition stuck. The
+            // first instants after he stops (the tail of his voice in the room) are dropped.
+            self.feed.request = nil
+            self.request?.endAudio()
+            self.task?.cancel()
+            self.partial = ""
             done()
+            try? await Task.sleep(for: self.echoTail)
+            guard self.running, self.phase != .speaking else { return }
+            try? self.beginSentence()
         }
     }
 

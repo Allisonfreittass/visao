@@ -226,3 +226,20 @@ final class DraftReaderTests: XCTestCase {
     }
 }
 
+final class EchoTests: XCTestCase {
+    func testHisOwnWordsAreEcho() {
+        let spoken = "De nada! Qualquer coisa, tá bom? Estou por aqui."
+        XCTAssertTrue(VoiceRules.isEcho("De nada", of: spoken))
+        XCTAssertTrue(VoiceRules.isEcho("tá bom", of: spoken))
+        XCTAssertTrue(VoiceRules.isEcho("estou por aqui", of: spoken))
+    }
+
+    func testYourOwnSentenceIsNotEcho() {
+        let spoken = "De nada! Qualquer coisa, tá bom? Estou por aqui."
+        XCTAssertFalse(VoiceRules.isEcho("Me fala a previsão do tempo pra amanhã", of: spoken))
+        XCTAssertFalse(VoiceRules.isEcho("tá bom então me conta uma piada", of: spoken))
+        XCTAssertFalse(VoiceRules.isEcho("", of: spoken))
+        XCTAssertFalse(VoiceRules.isEcho("De nada", of: ""))
+    }
+}
+
