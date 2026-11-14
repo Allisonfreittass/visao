@@ -240,3 +240,20 @@ def test_gap_links_to_trigger_message_and_is_private(client, db, world) -> None:
     assert len(client.get("/knowledge-gaps", headers=owner).json()) == 1
     assert client.get("/knowledge-gaps", headers=other).json() == []
     assert client.get("/research", headers=other).json() == []
+
+
+def test_a_voice_call_skips_the_assessment_so_the_reply_starts_sooner(client, db, world) -> None:
+    run_genesis(db)
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+
+    spoken = client.post(
+        f"/conversations/{conversation}/messages",
+        headers=headers,
+        json={"content": "Qual é a capital da Austrália?", "modality": "voice"},
+    )
+    assert spoken.status_code == 200, spoken.text
+    assert _assessments(world["llm"]) == 0 and world["search"].queries == []
+
+    _turn(client, headers, "Qual é a capital da Austrália?", conversation)
+    assert _assessments(world["llm"]) == 1

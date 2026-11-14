@@ -40,6 +40,8 @@ class _Turn:
     finished: float | None = None
     last_seen: float | None = None
     cancelled: bool = False
+    # The reply written so far, while a voice call's reply streams (else None).
+    draft: str | None = None
 
 
 class TurnCancelled(Exception):
@@ -133,6 +135,22 @@ def step(label: str, detail: str | None = None) -> None:
         del turn.steps[:-MAX_STEPS]
 
 
+def draft(text: str) -> None:
+    """The reply written so far, for the phone to speak sentence by sentence while the rest is
+    written. A page marker (`[[página: …]]`) and what follows it are not speech. Outside a tracked
+    turn it does nothing."""
+    conversation_id = _current.get()
+    if conversation_id is None:
+        return
+    cut = text.find("[[")
+    if cut >= 0:
+        text = text[:cut]
+    with _lock:
+        turn = _turns.get(conversation_id)
+        if turn is not None and not turn.finished:
+            turn.draft = text
+
+
 def snapshot(conversation_id: uuid.UUID) -> dict | None:
     """The live view for the app; reading it also marks that the owner is looking."""
     now = time.monotonic()
@@ -146,6 +164,7 @@ def snapshot(conversation_id: uuid.UUID) -> dict | None:
             "active": turn.finished is None,
             "elapsed_ms": round(((turn.finished or now) - turn.started) * 1000),
             "steps": [{"label": s.label, "detail": s.detail} for s in turn.steps],
+            "draft": turn.draft,
         }
 
 

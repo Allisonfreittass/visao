@@ -256,7 +256,14 @@ def run_turn(
     # A message with a link is about that link: searching the web for its words found unrelated
     # pages (a site named "nobievolua" brought up a blood pressure drug), so research waits.
     # Pages read live answer it already: a generic search on top only adds noise.
-    if config.curiosity_enabled and not read and not (browsed and browsed.opened):
+    # In a voice call the assessment is skipped: it is a whole model call before the reply can
+    # start, felt as silence on the phone; the text chat keeps it.
+    if (
+        config.curiosity_enabled
+        and modality != "voice"
+        and not read
+        and not (browsed and browsed.opened)
+    ):
         outcome = consider(
             session,
             conversation=conversation,

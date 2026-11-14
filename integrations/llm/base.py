@@ -1,5 +1,9 @@
 """Model-agnostic LLM interface. The agent's state never lives behind this boundary."""
 
+import logging
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal, Protocol
@@ -68,3 +72,37 @@ class LLMProvider(Protocol):
     pricing: Pricing
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse: ...
+
+
+# Where a provider that can stream says the reply written so far (in a voice call, so the phone can
+# speak the first sentence while the rest is written). A context variable instead of a new
+# `complete` argument: the wrappers in between (budget guard, fallback) pass it through untouched,
+# and a provider that cannot stream simply ignores it and answers whole, as before. Calls made on
+# other threads (the rule check) do not see it.
+_draft_sink: ContextVar[Callable[[str], None] | None] = ContextVar("llm_draft_sink", default=None)
+
+
+@contextmanager
+def drafting(sink: Callable[[str], None]) -> Iterator[None]:
+    """Inside this block, a streaming provider calls `sink` with the whole text so far, each time
+    it grows. A new attempt (a fallback provider) starts over from the beginning."""
+    token = _draft_sink.set(sink)
+    try:
+        yield
+    finally:
+        _draft_sink.reset(token)
+
+
+def tell_draft(text: str) -> None:
+    """Hands the text so far to the sink, if any. Never lets the sink break the call."""
+    sink = _draft_sink.get()
+    if sink is None:
+        return
+    try:
+        sink(text)
+    except Exception:  # noqa: BLE001 - a live preview must never cost the reply
+        logging.getLogger(__name__).warning("draft sink failed", extra={"event": "draft_failed"})
+
+
+def wants_draft() -> bool:
+    return _draft_sink.get() is not None

@@ -16,7 +16,7 @@ from apps.api.llm import build_llm_provider, is_anthropic
 from apps.api.settings import Settings
 from infrastructure.database.base import Base
 from integrations.llm.anthropic_provider import AnthropicProvider, to_messages_api
-from integrations.llm.base import ChatMessage, LLMError, Pricing
+from integrations.llm.base import ChatMessage, LLMError, Pricing, drafting
 from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
 
 HAIKU = Pricing(input_per_mtok=Decimal("0.10"), output_per_mtok=Decimal("0.50"))
@@ -31,6 +31,30 @@ class FakeMessages:
         if self.error:
             raise self.error
         return self.response
+
+
+class FakeStream:
+    def __init__(self, pieces, final):
+        self.text_stream, self._final = iter(pieces), final
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get_final_message(self):
+        return self._final
+
+
+class StreamingMessages(FakeMessages):
+    def __init__(self, pieces, response):
+        super().__init__(response)
+        self.pieces, self.streamed = pieces, []
+
+    def stream(self, **kwargs):
+        self.streamed.append(kwargs)
+        return FakeStream(self.pieces, self.response)
 
 
 def reply(text="oi", stop="end_turn", input_tokens=1000, output_tokens=200):
@@ -190,3 +214,37 @@ def test_the_builder_picks_claude_for_anthropic_settings():
     )
     built = build_llm_provider(settings, budget_guard=guard()[0], fast=True)
     assert isinstance(built._provider, AnthropicProvider) and built.admits_paid
+
+
+def test_with_a_draft_wanted_the_reply_streams_and_ends_the_same():
+    messages = StreamingMessages(["Cam", "berra."], reply("Camberra."))
+    seen: list[str] = []
+    with drafting(seen.append):
+        response = provider(messages).complete(
+            [ChatMessage("user", "capital?")], max_output_tokens=50
+        )
+    assert seen == ["Cam", "Camberra."]
+    assert (response.text, response.input_tokens, response.output_tokens) == (
+        "Camberra.",
+        1000,
+        200,
+    )
+    assert messages.calls == [] and messages.streamed[0]["max_tokens"] == 50
+
+
+def test_without_a_draft_wanted_it_does_not_stream():
+    messages = StreamingMessages(["x"], reply("Camberra."))
+    response = provider(messages).complete([ChatMessage("user", "capital?")], max_output_tokens=50)
+    assert response.text == "Camberra." and messages.streamed == [] and len(messages.calls) == 1
+
+
+def test_a_broken_draft_sink_never_costs_the_reply():
+    def boom(_text):
+        raise RuntimeError("sink")
+
+    messages = StreamingMessages(["Cam", "berra."], reply("Camberra."))
+    with drafting(boom):
+        response = provider(messages).complete(
+            [ChatMessage("user", "capital?")], max_output_tokens=50
+        )
+    assert response.text == "Camberra."

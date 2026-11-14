@@ -414,6 +414,8 @@ class ProgressOut(BaseModel):
     active: bool
     elapsed_ms: int = 0
     steps: list[ProgressStepOut] = []
+    # In a voice call, the reply written so far (the phone speaks it sentence by sentence).
+    draft: str | None = None
 
 
 class DeedOut(BaseModel):

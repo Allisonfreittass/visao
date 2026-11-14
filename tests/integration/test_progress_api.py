@@ -2,6 +2,7 @@
 when the app stopped watching the turn (phone locked), never when nobody was watching at all."""
 
 import io
+import uuid
 
 import pytest
 
@@ -10,8 +11,11 @@ from apps.api.settings import Settings, get_settings
 from core.conversation import progress
 from core.identity.genesis import run_genesis
 from core.initiatives import push
+from integrations.llm.base import tell_draft
 from tests.fakes import FakeLLMProvider
 from tests.integration.test_curiosity_api import _login
+
+CONVERSATION = uuid.uuid4()
 
 
 @pytest.fixture(autouse=True)
@@ -69,7 +73,7 @@ def test_with_nothing_running_there_is_nothing_to_show(client, db):
     headers = _login(client, db)
     conversation = client.post("/conversations", headers=headers).json()["id"]
     live = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
-    assert live == {"active": False, "elapsed_ms": 0, "steps": []}
+    assert live == {"active": False, "elapsed_ms": 0, "steps": [], "draft": None}
 
 
 def test_someone_elses_progress_is_not_found(client, db):
@@ -155,3 +159,65 @@ def test_a_step_after_parar_stops_the_turn():
         assert progress.cancel(conversation_id) is True
         with pytest.raises(progress.TurnCancelled):
             progress.step("Navegando por google.com")
+
+
+def streaming_world(client, db, pieces):
+    """A provider that streams `pieces`, recording what /progress showed after each one."""
+    seen: list[str | None] = []
+
+    def respond(messages):
+        conversation_id = progress._current.get()
+        written = ""
+        for piece in pieces:
+            written += piece
+            tell_draft(written)
+            live = progress.snapshot(conversation_id) if conversation_id else None
+            seen.append(live.get("draft") if live else None)
+        return written
+
+    llm = FakeLLMProvider(responder=respond)
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    client.app.dependency_overrides[get_settings] = lambda: Settings()
+    run_genesis(db)
+    db.commit()
+    return seen
+
+
+def test_in_a_voice_call_the_reply_shows_up_while_it_is_written(client, db):
+    seen = streaming_world(client, db, ["Camberra é a capital. ", "Fica no sudeste."])
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+
+    turn = client.post(
+        f"/conversations/{conversation}/messages",
+        headers=headers,
+        json={"content": "Qual é a capital da Austrália?", "modality": "voice"},
+    )
+
+    assert turn.status_code == 200, turn.text
+    assert seen == ["Camberra é a capital. ", "Camberra é a capital. Fica no sudeste."]
+    assert turn.json()["assistant_message"]["content"] == "Camberra é a capital. Fica no sudeste."
+    after = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
+    assert after["draft"] == "Camberra é a capital. Fica no sudeste."
+
+
+def test_in_the_text_chat_nothing_is_shown_before_the_reply(client, db):
+    seen = streaming_world(client, db, ["Camberra. ", "Sudeste."])
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+
+    turn = client.post(
+        f"/conversations/{conversation}/messages",
+        headers=headers,
+        json={"content": "Qual é a capital da Austrália?"},
+    )
+
+    assert turn.status_code == 200, turn.text
+    assert seen == [None, None]
+
+
+def test_a_page_marker_is_not_part_of_what_is_spoken():
+    with progress.tracking(CONVERSATION):
+        progress.draft("Vou montar. [[página: Roteiro]] resto")
+        assert progress.snapshot(CONVERSATION)["draft"] == "Vou montar. "
+    progress.draft("fora de uma resposta")

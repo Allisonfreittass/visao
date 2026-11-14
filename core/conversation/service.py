@@ -41,7 +41,7 @@ from infrastructure.database.models import (
     ModelUsage,
     User,
 )
-from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse
+from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse, drafting
 
 if TYPE_CHECKING:
     from core.conversation.artifacts import Request as PageRequest
@@ -261,7 +261,7 @@ def reply(
 
     progress.step("Escrevendo a resposta")
     try:
-        response = provider.complete(prompt, max_output_tokens=max_output_tokens)
+        response = _write(provider, prompt, max_output_tokens, modality)
     except LLMError as exc:
         _record_failure(session, conversation, provider, exc.kind)
         if exc.kind not in REJECTED_INPUT or not any(m.images for m in prompt):
@@ -270,7 +270,7 @@ def reply(
         # failing every message that has a photo.
         prompt = without_images(prompt)
         try:
-            response = provider.complete(prompt, max_output_tokens=max_output_tokens)
+            response = _write(provider, prompt, max_output_tokens, modality)
         except LLMError as again:
             _record_failure(session, conversation, provider, again.kind)
             raise
@@ -331,6 +331,18 @@ def reply(
     behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
     return TurnResult(user_message, assistant_message, usage, recalled, page)
+
+
+def _write(
+    provider: LLMProvider, prompt: list[ChatMessage], max_output_tokens: int, modality: str
+) -> LLMResponse:
+    """The reply. In a voice call it streams into the turn's progress, so the phone can start
+    speaking the first sentence while the rest is written (a provider that cannot stream answers
+    whole, as before)."""
+    if modality != "voice":
+        return provider.complete(prompt, max_output_tokens=max_output_tokens)
+    with drafting(progress.draft):
+        return provider.complete(prompt, max_output_tokens=max_output_tokens)
 
 
 def _obey_rules(

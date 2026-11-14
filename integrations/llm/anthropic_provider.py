@@ -11,7 +11,14 @@ from typing import Any
 
 import anthropic
 
-from integrations.llm.base import ChatMessage, LLMError, LLMResponse, Pricing
+from integrations.llm.base import (
+    ChatMessage,
+    LLMError,
+    LLMResponse,
+    Pricing,
+    tell_draft,
+    wants_draft,
+)
 
 # Only these request fields can come from configuration (VISION_LLM_FAST_EXTRA_BODY etc.).
 _ALLOWED_EXTRA = {"thinking", "output_config"}
@@ -86,7 +93,9 @@ class AnthropicProvider:
             request["system"] = system
         started = time.monotonic()
         try:
-            response = self._client.messages.create(**request)
+            response = (
+                self._stream(request) if wants_draft() else self._client.messages.create(**request)
+            )
         except anthropic.APITimeoutError as exc:
             raise LLMError("timeout", "provider timed out") from exc
         except anthropic.APIConnectionError as exc:
@@ -95,6 +104,9 @@ class AnthropicProvider:
             raise LLMError("http_429", "rate limited") from exc
         except anthropic.APIStatusError as exc:
             raise LLMError(f"http_{exc.status_code}", f"provider error {exc.status_code}") from exc
+        except anthropic.APIError as exc:
+            # An error event in the middle of a stream (e.g. overloaded) has no status code.
+            raise LLMError("network", f"provider error: {type(exc).__name__}") from exc
         latency_ms = int((time.monotonic() - started) * 1000)
 
         if response.stop_reason == "refusal":
@@ -122,3 +134,13 @@ class AnthropicProvider:
             else response.stop_reason,
             cost_usd=self.pricing.cost(input_tokens, output_tokens),
         )
+
+    def _stream(self, request: dict[str, Any]) -> Any:
+        """The same call, streamed: the text so far goes to the draft sink as it grows, and the
+        final message (text, usage, stop reason) is the same object `create` returns."""
+        written = ""
+        with self._client.messages.stream(**request) as stream:
+            for piece in stream.text_stream:
+                written += piece
+                tell_draft(written)
+            return stream.get_final_message()
