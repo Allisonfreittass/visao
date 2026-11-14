@@ -29,6 +29,9 @@ struct ConversationsView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .glass(palette, cornerRadius: 18, strong: false, shadow: false)
                     }
+                    if !session.pending.asks.isEmpty {
+                        waiting
+                    }
                     if session.conversations.isEmpty && !session.loadingList && session.listError == nil {
                         empty
                     } else {
@@ -107,6 +110,33 @@ struct ConversationsView: View {
                 .glassCircle(palette)
         }
         .accessibilityLabel("Conta e aparência")
+    }
+
+    /// Everything waiting for a yes, from any conversation (or none), so nothing is missed.
+    private var waiting: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Rotulo("Esperando você").padding(.horizontal, 6)
+            ForEach(session.pending.asks) { ask in
+                VStack(alignment: .leading, spacing: 6) {
+                    ActionCard(ask: ask, busy: session.pending.deciding.contains(ask.id)) { approve in
+                        Task { await session.pending.decide(ask, approve: approve) }
+                    }
+                    if let id = ask.conversationId {
+                        Button {
+                            path.append(.existing(id))
+                        } label: {
+                            Label("Abrir a conversa", systemImage: "arrow.right")
+                                .font(Typo.text(.footnote, weight: .medium))
+                                .labelStyle(.titleOnly)
+                                .underline(color: palette.linhaForte)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 8)
+                    }
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: session.pending.asks.map(\.id))
     }
 
     private var list: some View {

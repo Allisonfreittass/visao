@@ -88,7 +88,9 @@ pelo servidor), o passo ao vivo só com a tela visível, mensagem que falhou con
 Markdown (código sem fechar, só links http/https, HTML como texto). Da etapa 2: upload em multipart (nome
 com aspas não quebra o cabeçalho), foto grande vira JPEG de 1568 px e foto pequena vai como está,
 limite de 4 anexos, o motivo de um anexo recusado, foto sozinha como mensagem, página "Criando…"
-que fica pronta e apagar página, e as cores do céu iguais às do web nas horas-chave.
+que fica pronta e apagar página, e as cores do céu iguais às do web nas horas-chave. Da etapa 3:
+só trabalho proposto do Mac vira cartão, o corpo do email aparece, `via=toque`/`via=voz` na rota, e
+decisão recusada pelo servidor não some nem é dada como feita.
 
 ## O que o app tem
 
@@ -135,6 +137,22 @@ que fica pronta e apagar página, e as cores do céu iguais às do web nas horas
   Abrir (o app confere a cada 3 s, só com a tela visível). A página abre numa folha com
   **WKWebView sem JavaScript e sem cookies**; links vão para o Safari. Na folha: compartilhar pela
   folha nativa, abrir no Safari, copiar o link e apagar (o link para de funcionar).
+
+### Etapa 3: aprovar ali mesmo
+
+- Os pedidos que esperam o seu sim viram **cartões com Recusar e Aprovar**, como no web:
+  email a enviar e evento a marcar (`/google/actions`, [GOOGLE.md](GOOGLE.md)) e trabalho que ele
+  propôs para o Mac (`/arm/tasks` com status `proposed`, [BRACO.md](BRACO.md)). **Nada roda sem o
+  toque.** O email mostra o corpo inteiro antes de você aprovar.
+- Na conversa de onde o pedido veio, o cartão fica embaixo das mensagens. Na lista de conversas, o
+  bloco **"Esperando você"** junta todos, inclusive os que não são de nenhuma conversa, com um
+  atalho para abrir a conversa.
+- O toque vai com `?via=toque` (a ligação da etapa 5 usa `via=voz`), e o servidor registra no
+  audit. Se o servidor recusar (já decidido, expirado), o cartão continua e o motivo aparece; o app
+  nunca diz que foi feito antes da resposta do servidor. Depois de aprovar um email ou evento, a
+  mensagem dele dizendo o que fez aparece na conversa.
+- A lista de pedidos é atualizada ao abrir, depois de cada resposta e a cada 15 s com o app na
+  frente.
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

@@ -48,6 +48,13 @@ struct ChatScreen: View {
                     if store.sending {
                         LiveStatusView(step: store.liveStep, canStop: store.canStop, onStop: store.stop)
                     }
+                    ForEach(session.pending.asks(in: store.conversationId)) { ask in
+                        ActionCard(ask: ask, busy: session.pending.deciding.contains(ask.id)) { approve in
+                            decide(ask, approve: approve)
+                        }
+                        .id(ask.id)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                     if let error = store.error {
                         Label(error, systemImage: "exclamationmark.triangle")
                             .font(Typo.text(.footnote))
@@ -78,7 +85,12 @@ struct ChatScreen: View {
                 )
             }
             .onChange(of: store.messages.count) { scrollToBottom(proxy) }
-            .onChange(of: store.sending) { scrollToBottom(proxy) }
+            .onChange(of: store.sending) { _, sending in
+                scrollToBottom(proxy)
+                // A turn can leave an email or Mac work waiting for a tap.
+                if !sending { Task { await session.pending.refresh() } }
+            }
+            .onChange(of: session.pending.asks(in: store.conversationId).count) { scrollToBottom(proxy) }
             .onChange(of: store.liveStep) { scrollToBottom(proxy) }
             .onChange(of: draft.items.count) { scrollToBottom(proxy) }
             .onChange(of: composerFocused) { _, focused in
@@ -137,6 +149,7 @@ struct ChatScreen: View {
             store.onError = { session.handle($0) }
             store.onConversationCreated = { session.added($0) }
             await store.load()
+            await session.pending.refresh()
         }
         .task(id: scenePhase) {
             store.isVisible = scenePhase == .active
@@ -144,6 +157,7 @@ struct ChatScreen: View {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.initiativePoll)
                 await store.refresh()
+                await session.pending.refresh()
             }
         }
     }
@@ -167,6 +181,14 @@ struct ChatScreen: View {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url) else { return }
         draft.addFile(data, filename: url.lastPathComponent)
+    }
+
+    private func decide(_ ask: PendingAsk, approve: Bool) {
+        Task {
+            let ok = await session.pending.decide(ask, approve: approve)
+            // What was sent or scheduled comes back as his message in this conversation.
+            if ok && approve { await store.refresh() }
+        }
     }
 
     private func reply(to message: Message) {

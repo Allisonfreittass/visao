@@ -7,8 +7,13 @@ import VisaoKit
 @Observable
 final class Session {
     private(set) var api: APIClient {
-        didSet { loader = AttachmentLoader(api: api) }
+        didSet {
+            loader = AttachmentLoader(api: api)
+            pending = Session.makePending(api)
+        }
     }
+    /// Emails, events and Mac work waiting for a yes (stage 3).
+    private(set) var pending: PendingStore
     /// Photos and files of the messages, downloaded once per session.
     private(set) var loader: AttachmentLoader
     private(set) var loggedIn: Bool
@@ -27,7 +32,13 @@ final class Session {
         let client = APIClient(baseURL: url, tokens: tokens)
         api = client
         loader = AttachmentLoader(api: client)
+        pending = Session.makePending(client)
         loggedIn = tokens.token != nil
+        pending.onError = { [weak self] in self?.handle($0) }
+    }
+
+    private static func makePending(_ api: APIClient) -> PendingStore {
+        PendingStore(api: api)
     }
 
     /// From Config/Local.xcconfig (VISAO_API_BASE_URL), through Info.plist.
@@ -78,6 +89,8 @@ final class Session {
             conversations = try await list
             agentName = (try? await status)?.identity?.chosenName
             listError = nil
+            pending.onError = { [weak self] in self?.handle($0) }
+            await pending.refresh()
         } catch {
             listError = (error as? LocalizedError)?.errorDescription
             handle(error)
