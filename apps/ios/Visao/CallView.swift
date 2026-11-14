@@ -25,6 +25,33 @@ final class CallController {
     var usesServerVoice: Bool { duplex?.usesServerVoice ?? voice.usesServerVoice }
     var onDevice: Bool { duplex?.onDevice ?? voice.onDevice }
     var canInterruptByVoice: Bool { duplex != nil }
+
+    /// The camera, while it is on: what it sees goes with each sentence.
+    private(set) var camera: CallCamera?
+    private var uploading = false
+
+    func toggleCamera() {
+        if let camera {
+            camera.stop()
+            self.camera = nil
+            return
+        }
+        Task {
+            guard await CallCamera.requestAccess() else {
+                error = CameraError.denied.errorDescription
+                return
+            }
+            let camera = CallCamera()
+            do {
+                try camera.start()
+                self.camera = camera
+            } catch {
+                self.error = (error as? LocalizedError)?.errorDescription
+            }
+        }
+    }
+
+    func flipCamera() { camera?.flip() }
     private let chat: ChatStore
     private let pending: PendingStore
     private let api: APIClient
@@ -83,6 +110,8 @@ final class CallController {
         guard !ended else { return }
         ended = true
         watcher?.cancel()
+        camera?.stop()
+        camera = nil
         duplex?.stop()
         voice.deactivate()
         UIApplication.shared.isIdleTimerDisabled = false
@@ -155,7 +184,22 @@ final class CallController {
         }
         state = .thinking
         awaitingReply = true
-        chat.send(sentence, spoken: true)
+        // Camera on: the picture of this moment goes with the sentence.
+        guard let photo = camera?.snapshot() else {
+            chat.send(sentence, spoken: true)
+            return
+        }
+        uploading = true
+        Task {
+            defer { uploading = false }
+            do {
+                let attachment = try await api.uploadAttachment(data: photo, filename: photoName(index: 0, ext: "jpg"), mimeType: "image/jpeg")
+                chat.send(sentence, attachments: [attachment], spoken: true)
+            } catch {
+                // The words still go, without the picture.
+                chat.send(sentence, spoken: true)
+            }
+        }
     }
 
     /// Watches the chat: the reply to what you said, and what it says on its own, are spoken.
@@ -171,7 +215,7 @@ final class CallController {
 
     private func check() {
         if awaitingReply {
-            guard !chat.sending else { return }
+            guard !chat.sending, !uploading else { return }
             awaitingReply = false
             let fresh = chat.messages.filter { $0.role == .assistant && !known.contains($0.id) }
             known = Set(chat.messages.map(\.id))
@@ -287,6 +331,15 @@ struct CallView: View {
                     }
             }
             HStack(spacing: 12) {
+                Button { controller.toggleCamera() } label: {
+                    Image(systemName: controller.camera == nil ? "camera" : "camera.fill")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(controller.camera == nil ? palette.tinta : palette.pilulaAtivaTinta)
+                        .frame(width: 52, height: 52)
+                        .background(controller.camera == nil ? palette.fundoHover : palette.pilulaAtiva, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(controller.camera == nil ? "Ligar a câmera: ele vê o que ela mostra quando você fala" : "Desligar a câmera")
                 if controller.state == .speaking {
                     PillButton(title: "Interromper") { controller.interrupt() }
                 }
@@ -314,6 +367,34 @@ struct CallView: View {
                 Rectangle().fill(.ultraThinMaterial).opacity(0.55).ignoresSafeArea()
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if let camera = controller.camera {
+                // What he will see with your next sentence.
+                CameraPreview(session: camera.session)
+                    .frame(width: 120, height: 170)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(palette.vidroBorda))
+                    .overlay(alignment: .bottomTrailing) {
+                        Button { controller.flipCamera() } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(.black.opacity(0.35), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(4)
+                        .accessibilityLabel("Trocar de câmera")
+                    }
+                    .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+                    .padding(.top, 44)
+                    .padding(.trailing, 16)
+                    .transition(.scale(scale: 0.8, anchor: .topTrailing).combined(with: .opacity))
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("O que a câmera está mostrando")
+            }
+        }
+        .animation(.spring(duration: 0.3), value: controller.camera != nil)
         .environment(\.palette, palette)
         .task { await controller.start() }
         .onChange(of: scenePhase) { _, phase in

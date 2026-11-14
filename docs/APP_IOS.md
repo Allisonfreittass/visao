@@ -336,6 +336,18 @@ Revisado com a skill [dickwu/apple-design-skill](https://github.com/dickwu/apple
 O sotaque da Kokoro é **neutro**: o "r" forte é um h suave (não o x carioca) e o "r" no meio da
 palavra continua um toque leve.
 
+### Câmera na ligação
+
+O botão de **câmera** na tela da ligação liga a câmera de trás (troca para a da frente na
+janelinha). Com ela ligada, **cada frase que você fala vai com uma foto do momento**
+(`CallCamera.swift`): a imagem é reduzida a 1568 px, sobe como anexo (`/attachments`) e vai com a
+frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem ela.
+
+- Só vídeo, sem áudio, e sem mexer na sessão de áudio da ligação.
+- Só pelo botão, só durante a ligação; desliga quando a ligação acaba ou o app sai da tela.
+- Ele só enxerga se o servidor tiver um modelo com visão (`VISION_LLM_MODEL`, ver
+  [ANEXOS.md](ANEXOS.md)); cada foto reserva cerca de 1600 tokens no orçamento.
+
 ### Pendências da voz (para retomar)
 
 - **Interromper falando ainda não interrompe.** O áudio em via dupla já liga e ouve (diário de

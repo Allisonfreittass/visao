@@ -22,7 +22,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Para entender o que você fala na ligação. Quando o iPhone permite, o reconhecimento roda no próprio aparelho.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Para tirar uma foto e mandar na conversa.</string>
+	<string>Para tirar uma foto e mandar na conversa, e para ele ver o que a câmera mostra numa ligação, só quando você liga a câmera.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
