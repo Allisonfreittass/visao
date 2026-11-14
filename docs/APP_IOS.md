@@ -156,6 +156,14 @@ uma vez, resposta só dentro de 3 minutos e só para o pedido ainda esperando, e
 - A lista de pedidos é atualizada ao abrir, depois de cada resposta e a cada 15 s com o app na
   frente.
 
+### Rolagem do chat
+
+O chat abre no fim da conversa e só desce sozinho se você já está no fim (ou acabou de mandar
+algo): lendo mais acima, nada puxa a lista. A pilha não é preguiçosa (as mensagens antigas eram
+medidas só ao aparecer, e a lista pulava); são desenhadas as últimas 60, com "Mostrar mensagens
+anteriores". Cada mensagem só é redesenhada quando muda, o Markdown é lido uma vez por resposta,
+e as bolhas não têm desfoque ao vivo por cima da floresta, que era refeito a cada quadro.
+
 ### A mesma estrutura do web
 
 O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `ProjectsView.tsx`,
@@ -222,8 +230,10 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
   ligação. Nada escuta em segundo plano.
 - **Ajustes → Voz e avisos**: "Falar as respostas" (fora da ligação também) e "Aprovar por voz na
   ligação".
-- A voz própria do servidor (Kokoro e faster-whisper) não é usada pelo app; ele usa a do iPhone,
-  que funciona também com a versão da nuvem.
+- **Voz própria**: quando o servidor tem o Kokoro instalado e uma voz aprovada (`/voice/status`),
+  o app fala com ela, frase a frase (`/voice/sentences` e `/voice/tts`), sintetizando a próxima
+  enquanto a atual toca, como o web; a ligação mostra "Voz própria". Se o servidor falhar no meio,
+  o resto sai na voz do iPhone. Sem Kokoro no servidor (como na nuvem hoje), é a voz do iPhone.
 
 ### Etapa 7: Live Activity (tela de bloqueio e Dynamic Island)
 

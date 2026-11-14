@@ -5,7 +5,12 @@ import VisaoKit
 /// One message, as in the "Neblina" look of the web: what he says in a solid bubble on the left,
 /// what you say in glass on the right. Names and times stay out of the way; only "puxou
 /// conversa", "no Mac", "não foi enviada" and the like are shown.
-struct MessageRow: View {
+struct MessageRow: View, Equatable {
+    /// Redrawn only when the message itself changes, not on every progress check of the chat.
+    nonisolated static func == (a: MessageRow, b: MessageRow) -> Bool {
+        a.message == b.message && a.speaker == b.speaker
+    }
+
     let message: Message
     let speaker: String
     let onReply: () -> Void
@@ -21,6 +26,8 @@ struct MessageRow: View {
     private let maxOffset: CGFloat = 84
     @State private var offset: CGFloat = 0
     @State private var armed = false
+    /// Decided at the start of a drag: sideways answers, up and down is the list scrolling.
+    @State private var axis: Axis?
 
     private var isUser: Bool { message.role == .user }
     private var canReply: Bool { message.local == nil }
@@ -124,19 +131,14 @@ struct MessageRow: View {
     private var background: some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
         if isUser {
-            Group {
-                if palette.usesGlass {
-                    shape.fill(.ultraThinMaterial).overlay(shape.fill(palette.bolhaSua))
-                } else {
-                    shape.fill(palette.bolhaSua)
-                }
-            }
-            .overlay(shape.strokeBorder(message.local == .failed ? palette.erro : palette.vidroBorda, lineWidth: 1))
-            .shadow(color: palette.sombra.opacity(0.5), radius: 7, y: 2)
+            // No live blur per bubble: over the moving forest it was redrawn every frame.
+            shape.fill(palette.bolhaSua)
+                .overlay(shape.strokeBorder(message.local == .failed ? palette.erro : palette.vidroBorda, lineWidth: 1))
+                .shadow(color: palette.sombra.opacity(0.35), radius: 4, y: 1)
         } else {
             shape.fill(palette.bolhaDele)
                 .overlay(shape.strokeBorder(palette.usesGlass ? .clear : palette.linha, lineWidth: 1))
-                .shadow(color: palette.sombra, radius: 11, y: 6)
+                .shadow(color: palette.sombra.opacity(0.7), radius: 8, y: 3)
         }
     }
 
@@ -170,9 +172,11 @@ struct MessageRow: View {
                 guard canReply else { return }
                 let dx = value.translation.width
                 let dy = value.translation.height
-                guard dx > 0, dx > abs(dy) * 1.5 else {
+                if axis == nil { axis = dx > 0 && dx > abs(dy) * 1.5 ? .horizontal : .vertical }
+                // Scrolling the list: touch nothing, so the row is not redrawn on every move.
+                guard axis == .horizontal, dx > 0 else {
                     if offset != 0 { withAnimation(.spring(duration: 0.25)) { offset = 0 } }
-                    armed = false
+                    if armed { armed = false }
                     return
                 }
                 // Resistance after the trigger point, like a spring.
@@ -181,8 +185,9 @@ struct MessageRow: View {
                 if nowArmed != armed { armed = nowArmed }
             }
             .onEnded { _ in
+                axis = nil
                 let swiped = armed
-                armed = false
+                if armed { armed = false }
                 withAnimation(.spring(duration: 0.3)) { offset = 0 }
                 if swiped { onReply() }
             }

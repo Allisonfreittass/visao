@@ -14,6 +14,10 @@ struct ChatScreen: View {
     @State private var picker: Picker?
     @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var benchOpen = false
+    /// Whether you are at the end of the conversation: new things only pull the list down then.
+    @State private var atBottom = true
+    @State private var shownCount = ChatScreen.page
+    private static let page = 60
     @State private var call: CallController?
     /// "Falar as respostas", outside a call.
     @State private var speaker = VoiceEngine()
@@ -44,11 +48,26 @@ struct ChatScreen: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
+                // A plain stack: a lazy one measured older messages only as they scrolled into
+                // view, and the list jumped. The last ones are drawn; older ones on request.
+                VStack(alignment: .leading, spacing: 14) {
                     if store.messages.isEmpty && !store.sending && !store.loading {
                         EmptyConversation()
                     }
-                    ForEach(store.messages) { message in
+                    if store.messages.count > shownCount {
+                        Button {
+                            shownCount += Self.page
+                        } label: {
+                            Text("Mostrar mensagens anteriores")
+                                .font(Typo.text(.footnote, weight: .medium))
+                                .padding(.horizontal, 14)
+                                .frame(minHeight: 34)
+                                .glass(palette, cornerRadius: 999, strong: false, shadow: false)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                    }
+                    ForEach(store.messages.suffix(shownCount)) { message in
                         MessageRow(
                             message: message,
                             speaker: session.speakerName,
@@ -65,7 +84,9 @@ struct ChatScreen: View {
                                 }
                             }
                         )
+                        .equatable()
                         .id(message.id)
+                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
                     }
                     if store.sending {
                         LiveStatusView(step: store.liveStep, canStop: store.canStop, onStop: store.stop)
@@ -92,8 +113,9 @@ struct ChatScreen: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .defaultScrollAnchor(.bottom)
+            .modifier(BottomAnchor(atBottom: $atBottom))
             .scrollDismissesKeyboard(.interactively)
+            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: store.messages.count)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Composer(
                     text: $text,
@@ -108,7 +130,11 @@ struct ChatScreen: View {
                     onSend: send
                 )
             }
-            .onChange(of: store.messages.count) { scrollToBottom(proxy) }
+            .onChange(of: store.messages.count) { old, new in
+                // What you just sent always comes into view.
+                let mine = new > old && store.messages.last?.local == .sending
+                scrollToBottom(proxy, force: mine)
+            }
             .onChange(of: store.sending) { _, sending in
                 scrollToBottom(proxy)
                 if !sending { speakReplyIfAsked() }
@@ -120,7 +146,7 @@ struct ChatScreen: View {
             .onChange(of: store.liveStep) { scrollToBottom(proxy) }
             .onChange(of: draft.items.count) { scrollToBottom(proxy) }
             .onChange(of: composerFocused) { _, focused in
-                if focused { scrollToBottom(proxy, delay: .milliseconds(250)) }
+                if focused { scrollToBottom(proxy, delay: .milliseconds(250), force: true) }
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -196,6 +222,7 @@ struct ChatScreen: View {
                 onCreated(conversation)
             }
             await store.load()
+            await speaker.prepare(api: session.api)
             await session.pending.refresh()
             // What he said on his own is right here: it stops counting as a notice.
             await session.pending.markOpeningsRead()
@@ -262,7 +289,7 @@ struct ChatScreen: View {
     private func startCall() {
         speaker.stopSpeaking()
         composerFocused = false
-        call = CallController(chat: store, pending: session.pending)
+        call = CallController(chat: store, pending: session.pending, api: session.api)
     }
 
     /// With "Falar as respostas" on, a reply received here is read aloud (never inside a call,
@@ -288,7 +315,10 @@ struct ChatScreen: View {
         composerFocused = true
     }
 
-    private func scrollToBottom(_ proxy: ScrollViewProxy, delay: Duration = .zero) {
+    /// Follows the end of the conversation only when you are there (or just sent something):
+    /// reading further up, nothing yanks the list.
+    private func scrollToBottom(_ proxy: ScrollViewProxy, delay: Duration = .zero, force: Bool = false) {
+        guard atBottom || force else { return }
         Task {
             if delay > .zero { try? await Task.sleep(for: delay) }
             withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(Self.bottomId, anchor: .bottom) }
@@ -371,4 +401,25 @@ struct LiveStatusView: View {
 private struct CallBox: Identifiable {
     let controller: CallController
     var id: ObjectIdentifier { ObjectIdentifier(controller) }
+}
+
+/// Opens at the end of the conversation and knows whether you are still there. On iOS 18+ the
+/// list keeps its place when something above grows, instead of re-pinning to the bottom.
+private struct BottomAnchor: ViewModifier {
+    @Binding var atBottom: Bool
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    let distance = geometry.contentSize.height - geometry.visibleRect.maxY
+                    return distance < 80
+                } action: { _, isNear in
+                    if isNear != atBottom { atBottom = isNear }
+                }
+        } else {
+            content.defaultScrollAnchor(.bottom)
+        }
+    }
 }

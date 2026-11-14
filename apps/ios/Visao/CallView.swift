@@ -19,15 +19,17 @@ final class CallController {
     let voice = VoiceEngine()
     private let chat: ChatStore
     private let pending: PendingStore
+    private let api: APIClient
     private var approvals = VoiceApprovalSession()
     private var known: Set<String> = []
     private var awaitingReply = false
     private var watcher: Task<Void, Never>?
     private var ended = false
 
-    init(chat: ChatStore, pending: PendingStore) {
+    init(chat: ChatStore, pending: PendingStore, api: APIClient) {
         self.chat = chat
         self.pending = pending
+        self.api = api
     }
 
     var asksHere: [PendingAsk] { pending.asks(in: chat.conversationId) }
@@ -46,6 +48,7 @@ final class CallController {
             fail(error)
             return
         }
+        await voice.prepare(api: api)
         UIApplication.shared.isIdleTimerDisabled = true
         known = Set(chat.messages.map(\.id))
         watch()
@@ -193,7 +196,7 @@ struct CallView: View {
                     }
                 }
                 Spacer()
-                Text(controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho")
+                Text(controller.voice.usesServerVoice ? "Voz própria" : controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho")
             }
             .font(Typo.mono(.caption2))
             .textCase(.uppercase)

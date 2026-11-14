@@ -9,7 +9,7 @@ struct MarkdownView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(Markdown.blocks(text).enumerated()), id: \.offset) { _, block in
+            ForEach(Array(MarkdownCache.blocks(text).enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .paragraph(let body):
                     Text(Markdown.inline(body))
@@ -92,5 +92,19 @@ private struct CodeBlock: View {
         }
         .background(palette.fundoElevado, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(palette.linhaForte))
+    }
+}
+
+/// A reply is parsed once, not again every time the list is drawn.
+@MainActor
+enum MarkdownCache {
+    private static var cache: [String: [MarkdownBlock]] = [:]
+
+    static func blocks(_ text: String) -> [MarkdownBlock] {
+        if let hit = cache[text] { return hit }
+        let parsed = Markdown.blocks(text)
+        if cache.count > 400 { cache.removeAll(keepingCapacity: true) }
+        cache[text] = parsed
+        return parsed
     }
 }

@@ -123,3 +123,23 @@ final class SpokenMessageTests: XCTestCase {
         XCTAssertEqual(body["modality"] as? String, "voice")
     }
 }
+
+final class ServerVoiceTests: XCTestCase {
+    func testStatusSentencesAndAudio() async throws {
+        let transport = StubTransport()
+        transport.on("GET", "/api/voice/status", json: #"{"enabled":true,"listening":false,"current_voice":"kokoro-dora","source":"chosen","approved":[],"history":[]}"#)
+        transport.on("POST", "/api/voice/sentences", json: #"{"sentences":["Oi.","Tudo bem?"]}"#)
+        transport.on("POST", "/api/voice/tts", json: "RIFF")
+        let api = APIClient(baseURL: URL(string: "https://visao.test/api")!, transport: transport, tokens: MemoryTokenStore(token: "t"))
+
+        let status = try await api.voiceStatus()
+        XCTAssertTrue(status.enabled)
+        XCTAssertEqual(status.currentVoice, "kokoro-dora")
+        let parts = try await api.sentences("Oi. Tudo bem?")
+        XCTAssertEqual(parts, ["Oi.", "Tudo bem?"])
+        let audio = try await api.tts("Oi.")
+        XCTAssertEqual(String(decoding: audio, as: UTF8.self), "RIFF")
+        let body = try XCTUnwrap(transport.requests.last?.httpBody)
+        XCTAssertEqual(String(decoding: body, as: UTF8.self), #"{"text":"Oi."}"#)
+    }
+}

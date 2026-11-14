@@ -2,6 +2,7 @@ import AVFoundation
 import Observation
 import Speech
 import UIKit
+import VisaoKit
 
 /// The iPhone's own voice (docs/VOICE.md, "Voz do aparelho"): listens in Brazilian Portuguese with
 /// the speech recognizer and speaks with the system synthesizer. Recognition stays on the device
@@ -33,6 +34,16 @@ final class VoiceEngine: NSObject {
     private var silenceWatch: Task<Void, Never>?
     private var onUtterance: ((String) -> Void)?
     private var onSpoken: (() -> Void)?
+
+    /// The server's own voice (Kokoro, "voz própria"), when it has one; the iPhone's otherwise.
+    private(set) var usesServerVoice = false
+    private(set) var serverVoiceName: String?
+    private var server: APIClient?
+    private var serverSpeech: Task<Void, Never>?
+    private var player: AVAudioPlayer?
+    private var playerDone: CheckedContinuation<Void, Never>?
+    /// The utterance being said: a late "cancelled" from the previous one must not end this one.
+    private var currentUtterance: ObjectIdentifier?
 
     override init() {
         super.init()
@@ -174,6 +185,14 @@ final class VoiceEngine: NSObject {
 
     // MARK: Speaking
 
+    /// Asks the server whether it has its own voice; from then on it speaks with it.
+    func prepare(api: APIClient) async {
+        server = api
+        guard let status = try? await api.voiceStatus() else { return }
+        usesServerVoice = status.enabled
+        serverVoiceName = status.currentVoice
+    }
+
     /// Speaks, then calls back (also when stopped).
     func speak(_ text: String, done: @escaping () -> Void = {}) {
         stopListening()
@@ -183,16 +202,79 @@ final class VoiceEngine: NSObject {
             return
         }
         onSpoken = done
+        if usesServerVoice, let server {
+            phase = .speaking
+            serverSpeech = Task { [weak self] in await self?.speakWithServer(text, api: server) }
+            return
+        }
+        speakWithDevice(text)
+    }
+
+    private func speakWithDevice(_ text: String) {
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = Self.bestVoice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.02
         utterance.prefersAssistiveTechnologySettings = true
         phase = .speaking
+        currentUtterance = ObjectIdentifier(utterance)
         synthesizer.speak(utterance)
     }
 
     func stopSpeaking() {
+        serverSpeech?.cancel()
+        serverSpeech = nil
+        player?.stop()
+        player = nil
+        playerDone?.resume()
+        playerDone = nil
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
+    }
+
+    /// Sentence by sentence, the next one synthesized while the current plays (as the web does).
+    /// If the server fails midway, the rest is said with the iPhone's voice.
+    private func speakWithServer(_ text: String, api: APIClient) async {
+        guard let sentences = try? await api.sentences(text), !sentences.isEmpty else {
+            if !Task.isCancelled { speakWithDevice(text) }
+            return
+        }
+        var next: Task<Data, Error>? = Task { try await api.tts(sentences[0]) }
+        for index in sentences.indices {
+            guard !Task.isCancelled, let pending = next else { return }
+            guard let audio = try? await pending.value else {
+                if !Task.isCancelled { speakWithDevice(sentences[index...].joined(separator: " ")) }
+                return
+            }
+            next = index + 1 < sentences.count ? Task { [sentence = sentences[index + 1]] in try await api.tts(sentence) } : nil
+            guard !Task.isCancelled else { return }
+            await play(audio)
+        }
+        if !Task.isCancelled { spoke() }
+    }
+
+    private func play(_ audio: Data) async {
+        guard let player = try? AVAudioPlayer(data: audio) else { return }
+        self.player = player
+        player.delegate = self
+        player.isMeteringEnabled = true
+        await withCheckedContinuation { continuation in
+            playerDone = continuation
+            if !player.play() {
+                playerDone = nil
+                continuation.resume()
+            }
+        }
+        self.player = nil
+    }
+
+    fileprivate func finishedClip() {
+        playerDone?.resume()
+        playerDone = nil
+    }
+
+    fileprivate func deviceSpoke(_ id: ObjectIdentifier) {
+        guard id == currentUtterance else { return }
+        currentUtterance = nil
+        spoke()
     }
 
     private func spoke() {
@@ -214,11 +296,13 @@ final class VoiceEngine: NSObject {
 
 extension VoiceEngine: AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.spoke() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.deviceSpoke(id) }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.spoke() }
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.deviceSpoke(id) }
     }
 }
 
@@ -245,5 +329,11 @@ enum VoicePrefs {
     static var voiceApproval: Bool {
         get { UserDefaults.standard.object(forKey: "voiceApproval") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "voiceApproval") }
+    }
+}
+
+extension VoiceEngine: AVAudioPlayerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in self.finishedClip() }
     }
 }

@@ -116,3 +116,30 @@ public struct VoiceApprovalSession: Sendable {
         return (asked.ask, verdict)
     }
 }
+
+/// The server's own voice (Kokoro, docs/decisions/0004): there when the server has the model
+/// installed and a voice approved.
+public struct ServerVoiceStatus: Decodable, Sendable {
+    public let enabled: Bool
+    public let currentVoice: String?
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case currentVoice = "current_voice"
+    }
+}
+
+extension APIClient {
+    public func voiceStatus() async throws -> ServerVoiceStatus { try await request("/voice/status") }
+
+    /// A reply cut into speakable sentences, so the first plays while the rest is synthesized.
+    public func sentences(_ text: String) async throws -> [String] {
+        let body: [String: [String]] = try await json("/voice/sentences", method: "POST", body: ["text": text])
+        return body["sentences"] ?? []
+    }
+
+    /// One sentence as WAV audio, in the voice it chose.
+    public func tts(_ text: String) async throws -> Data {
+        try await raw("/voice/tts", method: "POST", body: try JSONEncoder().encode(["text": text]), contentType: "application/json")
+    }
+}
