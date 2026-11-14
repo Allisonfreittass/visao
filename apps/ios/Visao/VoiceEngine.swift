@@ -23,7 +23,7 @@ final class VoiceEngine: NSObject {
     var canListen: Bool { recognizer?.isAvailable ?? false }
 
     /// A sentence ends after this much silence.
-    private let endOfSentence: Duration = .milliseconds(1300)
+    private let endOfSentence: Duration = .milliseconds(900) // was 1.3 s: part of the wait
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))
     private let audio = AVAudioEngine()

@@ -169,8 +169,17 @@ extension VoiceRules {
                 merged.append(piece)
             }
         }
-        return merged.flatMap { split($0, maxLength: maxLength) }
+        var pieces2 = merged.flatMap { split($0, maxLength: maxLength) }
+        // The first piece short: it is synthesized before any sound comes out.
+        if let first = pieces2.first, first.count > firstMaxLength {
+            let head = split(first, maxLength: firstMaxLength)
+            pieces2.replaceSubrange(0...0, with: [head[0], head.dropFirst().joined(separator: " ")].filter { !$0.isEmpty })
+        }
+        return pieces2
     }
+
+    /// How long the first spoken piece may be, so the first sound comes out sooner.
+    static let firstMaxLength = 70
 
     private static func split(_ text: String, maxLength: Int) -> [String] {
         guard text.count > maxLength else { return [text] }

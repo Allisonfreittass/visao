@@ -36,7 +36,7 @@ final class DuplexVoice {
     private var everHeard = false
     private var lastLevelLog = ContinuousClock.now
 
-    private let endOfSentence: Duration = .milliseconds(1300)
+    private let endOfSentence: Duration = .milliseconds(900) // was 1.3 s: part of the wait
     /// Right after he starts a sentence, the echo canceller is still settling: ignore that much.
     private let settle: Duration = .milliseconds(450)
 
@@ -388,8 +388,15 @@ final class DuplexVoice {
         return !Task.isCancelled
     }
 
+    /// Set by the call when your sentence ended; the first sound after it is logged.
+    var measureFrom: ContinuousClock.Instant?
+
     private func play(_ source: AVAudioPCMBuffer) async {
         guard let playFormat, let buffer = Self.convert(source, to: playFormat) else { return }
+        if let start = measureFrom {
+            measureFrom = nil
+            VoiceLog.write("começou a falar \(CallController.seconds(since: start)) depois de você terminar")
+        }
         nonisolated(unsafe) let node = player
         nonisolated(unsafe) let pcm = buffer
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in

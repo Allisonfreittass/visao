@@ -99,6 +99,8 @@ final class CallController {
             }
             await voice.prepare(api: api)
         }
+        // The voice model opens now, not on the first reply (it can take a few seconds).
+        Task { _ = await LocalVoices.shared.active?.ensureLoaded() }
         UIApplication.shared.isIdleTimerDisabled = true
         known = Set(chat.messages.map(\.id))
         watch()
@@ -170,7 +172,12 @@ final class CallController {
         }
     }
 
+    /// When your sentence ended, to measure how long until he answers and starts speaking.
+    private var heardAt: ContinuousClock.Instant?
+
     private func heard(_ sentence: String) {
+        heardAt = .now
+        VoiceLog.write("você terminou de falar: “\(sentence)”")
         // A clear answer to what it just read decides it, said back only after the server accepted.
         if voiceApproval, let (ask, verdict) = approvals.interpret(sentence, stillWaiting: asksHere) {
             state = .thinking
@@ -220,10 +227,10 @@ final class CallController {
             let fresh = chat.messages.filter { $0.role == .assistant && !known.contains($0.id) }
             known = Set(chat.messages.map(\.id))
             if let reply = fresh.last {
-                Task {
-                    await pending.refresh()
-                    say(VoiceRules.speakable(reply.content))
-                }
+                if let heardAt { VoiceLog.write("resposta chegou \(Self.seconds(since: heardAt)) depois") }
+                // Speak at once; what waits for a yes is fetched meanwhile and read after.
+                say(VoiceRules.speakable(reply.content))
+                Task { await pending.refresh() }
             } else {
                 // Failed or stopped: say so and keep listening.
                 say(chat.error.map { "Não consegui responder: \($0)" } ?? "Parei.")
@@ -249,6 +256,7 @@ final class CallController {
             self.afterSpeaking()
         }
         if let duplex {
+            if let heardAt { duplex.measureFrom = heardAt; self.heardAt = nil }
             duplex.speak(text, done: after)
         } else {
             voice.speak(text, done: after)
@@ -263,6 +271,11 @@ final class CallController {
             return
         }
         listen()
+    }
+
+    static func seconds(since start: ContinuousClock.Instant) -> String {
+        let d = ContinuousClock.now - start
+        return String(format: "%.1f s", Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18)
     }
 
     private func fail(_ error: Error) {

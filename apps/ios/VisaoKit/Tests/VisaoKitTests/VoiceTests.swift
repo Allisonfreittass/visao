@@ -163,3 +163,12 @@ final class SentenceTests: XCTestCase {
         XCTAssertEqual(VoiceRules.sentences("   \n "), [])
     }
 }
+
+final class FirstPieceTests: XCTestCase {
+    func testFirstPieceIsShortSoTheFirstSoundComesSooner() {
+        let text = "Boa pergunta, a história do Brasil começa muito antes de 1500, com os povos que já viviam aqui há milhares de anos. Depois vieram os portugueses."
+        let parts = VoiceRules.sentences(text)
+        XCTAssertLessThanOrEqual(parts[0].count, 70)
+        XCTAssertEqual(parts.joined(separator: " ").split(separator: " "), text.split(separator: " "), "no word lost")
+    }
+}
