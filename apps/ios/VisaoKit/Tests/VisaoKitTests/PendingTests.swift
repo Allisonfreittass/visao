@@ -82,3 +82,84 @@ final class PendingTests: XCTestCase {
         APIClient(baseURL: base, transport: transport, tokens: MemoryTokenStore(token: "t"))
     }
 }
+
+@MainActor
+final class WorkspaceTests: XCTestCase {
+    private let base = URL(string: "https://visao.test/api")!
+
+    private func api(_ transport: StubTransport) -> APIClient {
+        APIClient(baseURL: base, transport: transport, tokens: MemoryTokenStore(token: "t"))
+    }
+
+    func testGoalsAndNoticesCountButOpeningsDoNot() async throws {
+        let transport = StubTransport()
+        transport.on("GET", "/api/google/actions", json: "[]")
+        transport.on("GET", "/api/arm/tasks", json: "[]")
+        transport.on("GET", "/api/approvals", json: #"[{"id":"goal1","origin":"curiosity","kind":"research","title":"Estudar Rust","rationale":"Você falou disso","success_criteria":"","required_permissions":["web"],"budget":{},"status":"proposed","evidence":{},"created_at":"2026-11-13T12:00:00Z","history":[]}]"#)
+        transport.on("GET", "/api/notifications", json: #"[{"id":"n1","kind":"initiative","title":"Ele","body":"Oi","goal_id":null,"created_at":"2026-11-13T12:00:00Z","deliver_after":null,"read_at":null},{"id":"n2","kind":"study","title":"Estudei","body":"Achei isto","goal_id":null,"created_at":"2026-11-13T12:00:00Z","deliver_after":null,"read_at":null},{"id":"n3","kind":"study","title":"Lida","body":"","goal_id":null,"created_at":"2026-11-13T12:00:00Z","deliver_after":null,"read_at":"2026-11-13T12:01:00Z"}]"#)
+        transport.on("POST", "/api/notifications/n1/read") { _ in (204, "") }
+        let store = PendingStore(api: api(transport))
+
+        await store.refresh()
+        XCTAssertEqual(store.goals.first?.requiredPermissions, ["web"])
+        XCTAssertEqual(store.notices.map(\.id), ["n2"], "openings and read notices stay out")
+        XCTAssertEqual(store.count, 2)
+
+        await store.markOpeningsRead()
+        XCTAssertEqual(transport.count("POST", "/api/notifications/n1/read"), 1)
+        XCTAssertTrue(store.openings.isEmpty)
+    }
+
+    func testReplyToNoticeOpensConversation() async throws {
+        let transport = StubTransport()
+        transport.on("POST", "/api/notifications/n2/reply", json: #"{"conversation_id":"c9"}"#)
+        for path in ["/api/google/actions", "/api/arm/tasks", "/api/approvals", "/api/notifications"] { transport.on("GET", path, json: "[]") }
+        let store = PendingStore(api: api(transport))
+        let notice = try APIDate.decoder.decode(AppNotice.self, from: Data(#"{"id":"n2","kind":"study","title":"t","body":"b","created_at":"2026-11-13T12:00:00Z","read_at":null}"#.utf8))
+
+        let opened = await store.reply(notice, from: nil)
+
+        XCTAssertEqual(opened, "c9")
+        let body = try XCTUnwrap(transport.requests.first?.httpBody)
+        XCTAssertEqual(String(decoding: body, as: UTF8.self), #"{"conversation_id":null}"#)
+    }
+
+    func testProjectsAndSettings() async throws {
+        let transport = StubTransport()
+        transport.on("GET", "/api/projects", json: #"[{"id":"p1","name":"Viagem","created_at":"2026-11-13T12:00:00Z","conversations":1,"pages":2,"files":0}]"#)
+        transport.on("POST", "/api/projects", status: 201, json: #"{"id":"p2","name":"Novo","created_at":"2026-11-13T12:00:00Z"}"#)
+        transport.on("PUT", "/api/conversations/c1/project", json: #"{"id":"c1","created_at":"2026-11-13T12:00:00Z","project_id":"p1"}"#)
+        transport.on("GET", "/api/memory/settings", json: #"{"enabled":true}"#)
+        transport.on("GET", "/api/system/autonomy", json: #"{"paused":false}"#)
+        transport.on("GET", "/api/autonomy/permissions", json: #"{"auto_research":true}"#)
+        transport.on("PUT", "/api/system/autonomy", json: #"{"paused":true}"#)
+        let client = api(transport)
+
+        let list = try await client.projects()
+        XCTAssertEqual(list.first?.countsLabel, "1 conversa · 2 páginas")
+        let created = try await client.createProject(name: "Novo")
+        XCTAssertEqual(created.conversations, 0)
+        let moved = try await client.moveConversation("c1", toProject: "p1")
+        XCTAssertEqual(moved.projectId, "p1")
+        let settings = try await client.serverSettings()
+        XCTAssertEqual(settings, ServerSettings(memory: true, paused: false, autoResearch: true))
+        let paused = try await client.setAutonomy(paused: true)
+        XCTAssertTrue(paused)
+        let pause = try XCTUnwrap(transport.requests.last { $0.httpMethod == "PUT" }?.httpBody)
+        XCTAssertTrue(String(decoding: pause, as: UTF8.self).contains(#""paused":true"#))
+    }
+
+    func testNewConversationFromProjectIsCreatedInIt() async throws {
+        let transport = StubTransport()
+        transport.on("POST", "/api/conversations", json: #"{"id":"c5","created_at":"2026-11-13T10:00:00Z","project_id":"p1"}"#)
+        transport.on("POST", "/api/conversations/c5/messages", json: Fixture.turn(user: "oi", reply: "olá"))
+        let store = ChatStore(api: api(transport), conversationId: nil, projectId: "p1")
+
+        store.send("oi")
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(3)
+        while store.messages.count < 2, clock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+
+        XCTAssertEqual(transport.requests.first?.url?.query, "project_id=p1")
+    }
+}

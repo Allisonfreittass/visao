@@ -8,6 +8,8 @@ import Observation
 @Observable
 public final class ChatStore {
     public private(set) var conversationId: String?
+    /// A new conversation started from a project is created inside it.
+    public let projectId: String?
     public private(set) var messages: [Message] = []
     public private(set) var sending = false
     /// What the turn in flight is doing now; nil reads "Pensando".
@@ -41,11 +43,12 @@ public final class ChatStore {
     private var artifactTask: Task<Void, Never>?
 
     public init(
-        api: APIClient, conversationId: String?, progressInterval: Duration = .milliseconds(900),
+        api: APIClient, conversationId: String?, projectId: String? = nil, progressInterval: Duration = .milliseconds(900),
         artifactInterval: Duration = .seconds(3)
     ) {
         self.api = api
         self.conversationId = conversationId
+        self.projectId = projectId
         self.progressInterval = progressInterval
         self.artifactInterval = artifactInterval
     }
@@ -216,7 +219,7 @@ public final class ChatStore {
 
     private func ensureConversation() async throws -> String {
         if let conversationId { return conversationId }
-        let created = try await api.createConversation()
+        let created = try await api.createConversation(projectId: projectId)
         conversationId = created.id
         if created.memoryUnavailable {
             error = "Não consegui preparar a memória desta vez. Dá para conversar, mas posso esquecer detalhes."

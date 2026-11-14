@@ -137,6 +137,15 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
 @Observable
 public final class PendingStore {
     public private(set) var asks: [PendingAsk] = []
+    /// Goals it wants to pursue on its own.
+    public private(set) var goals: [Goal] = []
+    /// Unread notices that only live here (openings are already chat messages).
+    public private(set) var notices: [AppNotice] = []
+    /// Unread openings ("puxou conversa"): marked read once the chat is on screen.
+    public private(set) var openings: [AppNotice] = []
+
+    /// How many things wait for the owner: the badge on Início.
+    public var count: Int { asks.count + goals.count + notices.count }
     /// Asks being decided right now: their buttons wait.
     public private(set) var deciding: Set<String> = []
     public var onError: ((Error) -> Void)?
@@ -153,14 +162,74 @@ public final class PendingStore {
     }
 
     public func refresh() async {
+        // Each list on its own: one route failing (Google not set up, say) keeps the others.
+        async let google = attempt { try await api.googleActions() }
+        async let arm = attempt { try await api.armTasks() }
+        async let wanted = attempt { try await api.approvals() }
+        async let notes = attempt { try await api.notices() }
+        let (actions, tasks, goalList, noticeList) = await (google, arm, wanted, notes)
+
+        var next: [PendingAsk] = []
+        if case .success(let list) = actions { next += list.map { PendingAsk(source: .google($0)) } }
+        else { next += asks.filter { if case .google = $0.source { true } else { false } } }
+        if case .success(let list) = tasks { next += list.filter { $0.status == "proposed" }.map { PendingAsk(source: .arm($0)) } }
+        else { next += asks.filter { if case .arm = $0.source { true } else { false } } }
+        asks = next
+        if case .success(let list) = goalList { goals = list }
+        if case .success(let list) = noticeList {
+            let unread = list.filter { $0.readAt == nil }
+            notices = unread.filter { $0.kind != "initiative" }
+            openings = unread.filter { $0.kind == "initiative" }
+        }
+        // A lost session is said once; other failures leave the last known lists.
+        for result in [actions.error, tasks.error, goalList.error, noticeList.error] {
+            if let error = result as? APIError, error.isUnauthorized {
+                onError?(error)
+                break
+            }
+        }
+    }
+
+    public func decide(_ goal: Goal, approve: Bool) async -> Bool {
+        await act(goal.id) { try await self.api.decideGoal(id: goal.id, approve: approve) }
+    }
+
+    public func dismiss(_ notice: AppNotice) async -> Bool {
+        await act(notice.id) { try await self.api.markRead(noticeId: notice.id) }
+    }
+
+    /// Answers a notice in a conversation; returns the conversation to open.
+    public func reply(_ notice: AppNotice, from conversationId: String?) async -> String? {
         do {
-            async let google = api.googleActions()
-            async let arm = api.armTasks()
-            let (actions, tasks) = try await (google, arm)
-            asks = actions.map { PendingAsk(source: .google($0)) }
-                + tasks.filter { $0.status == "proposed" }.map { PendingAsk(source: .arm($0)) }
+            let id = try await api.reply(toNotice: notice.id, conversationId: conversationId)
+            await refresh()
+            return id
         } catch {
             onError?(error)
+            return nil
+        }
+    }
+
+    /// The chat is on screen: its openings were seen there, so they stop counting.
+    public func markOpeningsRead() async {
+        let seen = openings
+        guard !seen.isEmpty else { return }
+        openings = []
+        for notice in seen { try? await api.markRead(noticeId: notice.id) }
+    }
+
+    private func act(_ id: String, _ action: () async throws -> Void) async -> Bool {
+        guard !deciding.contains(id) else { return false }
+        deciding.insert(id)
+        defer { deciding.remove(id) }
+        do {
+            try await action()
+            await refresh()
+            return true
+        } catch {
+            onError?(error)
+            await refresh()
+            return false
         }
     }
 
@@ -183,5 +252,16 @@ public final class PendingStore {
             await refresh()
             return false
         }
+    }
+}
+
+private func attempt<T: Sendable>(_ body: @Sendable () async throws -> T) async -> Result<T, Error> {
+    do { return .success(try await body()) } catch { return .failure(error) }
+}
+
+extension Result where Failure == Error {
+    var error: Error? {
+        if case .failure(let error) = self { return error }
+        return nil
     }
 }
