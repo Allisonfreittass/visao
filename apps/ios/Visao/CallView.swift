@@ -58,6 +58,13 @@ final class CallController {
     private var approvals = VoiceApprovalSession()
     private var known: Set<String> = []
     private var awaitingReply = false
+    /// The reply being written, read sentence by sentence as it streams (VisaoKit DraftReader).
+    private var reader = DraftReader()
+    /// Talked over: the rest of this reply is not spoken.
+    private var muteReply = false
+    /// What waits to be spoken, and whether something is being spoken now.
+    private var speechQueue: [String] = []
+    private var talking = false
     private var watcher: Task<Void, Never>?
     private var ended = false
 
@@ -80,7 +87,10 @@ final class CallController {
         if VoicePrefs.bargeIn {
             let duplex = DuplexVoice()
             duplex.onUtterance = { [weak self] sentence in self?.heard(sentence) }
-            duplex.onBargeIn = { [weak self] in self?.state = .listening }
+            duplex.onBargeIn = { [weak self] in
+                self?.silence()
+                self?.state = .listening
+            }
             duplex.onDeaf = { [weak self] in self?.fallBackToHalfDuplex() }
             do {
                 try await duplex.start(api: api)
@@ -121,6 +131,7 @@ final class CallController {
 
     /// Stops it talking and listens again.
     func interrupt() {
+        silence()
         duplex?.stopSpeaking()
         voice.stopSpeaking()
         state = .interrupted
@@ -129,6 +140,7 @@ final class CallController {
 
     func decideOnScreen(_ ask: PendingAsk, approve: Bool) {
         Task {
+            silence()
             duplex?.stopSpeaking()
             voice.stopSpeaking()
             let ok = await pending.decide(ask, approve: approve)
@@ -174,9 +186,11 @@ final class CallController {
 
     /// When your sentence ended, to measure how long until he answers and starts speaking.
     private var heardAt: ContinuousClock.Instant?
+    private var askedAt: ContinuousClock.Instant?
 
     private func heard(_ sentence: String) {
         heardAt = .now
+        askedAt = heardAt
         VoiceLog.write("você terminou de falar: “\(sentence)”")
         // A clear answer to what it just read decides it, said back only after the server accepted.
         if voiceApproval, let (ask, verdict) = approvals.interpret(sentence, stillWaiting: asksHere) {
@@ -191,6 +205,8 @@ final class CallController {
         }
         state = .thinking
         awaitingReply = true
+        reader = DraftReader()
+        muteReply = false
         // Camera on: the picture of this moment goes with the sentence.
         guard let photo = camera?.snapshot() else {
             chat.send(sentence, spoken: true)
@@ -222,16 +238,34 @@ final class CallController {
 
     private func check() {
         if awaitingReply {
-            guard !chat.sending, !uploading else { return }
+            if uploading { return }
+            if chat.sending {
+                // Still being written: each sentence that ended is spoken now (voice calls stream).
+                guard !muteReply, let draft = chat.liveDraft else { return }
+                let chunk = reader.take(draft)
+                guard !chunk.isEmpty else { return }
+                if reader.taken == chunk, let askedAt {
+                    VoiceLog.write("primeira frase escrita \(Self.seconds(since: askedAt)) depois")
+                }
+                enqueue(VoiceRules.speakable(chunk))
+                return
+            }
             awaitingReply = false
             let fresh = chat.messages.filter { $0.role == .assistant && !known.contains($0.id) }
             known = Set(chat.messages.map(\.id))
             if let reply = fresh.last {
-                if let heardAt { VoiceLog.write("resposta chegou \(Self.seconds(since: heardAt)) depois") }
-                // Speak at once; what waits for a yes is fetched meanwhile and read after.
-                say(VoiceRules.speakable(reply.content))
+                if let askedAt { VoiceLog.write("resposta inteira chegou \(Self.seconds(since: askedAt)) depois") }
+                askedAt = nil
+                // What the draft did not say yet; what waits for a yes is fetched meanwhile.
+                let rest = muteReply ? "" : VoiceRules.speakable(reader.finish(reply.content))
                 Task { await pending.refresh() }
+                if !rest.isEmpty {
+                    enqueue(rest)
+                } else if !talking, state != .listening {
+                    afterSpeaking()
+                }
             } else {
+                askedAt = nil
                 // Failed or stopped: say so and keep listening.
                 say(chat.error.map { "Não consegui responder: \($0)" } ?? "Parei.")
             }
@@ -249,11 +283,43 @@ final class CallController {
     }
 
     private func say(_ text: String) {
+        enqueue(text)
+    }
+
+    /// Spoken after what is already being said (sentences of a reply arrive while it is written).
+    private func enqueue(_ text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ended, !text.isEmpty else { return }
+        speechQueue.append(text)
+        if !talking { speakQueued() }
+    }
+
+    /// Talked over or stopped: nothing queued is said, nor the rest of the reply being written.
+    private func silence() {
+        speechQueue = []
+        talking = false
+        if awaitingReply { muteReply = true }
+    }
+
+    private func speakQueued() {
         guard !ended else { return }
+        guard !speechQueue.isEmpty else {
+            talking = false
+            // The reply is still being written: wait for its next sentence.
+            if awaitingReply {
+                state = .thinking
+            } else {
+                afterSpeaking()
+            }
+            return
+        }
+        let text = speechQueue.joined(separator: " ")
+        speechQueue = []
+        talking = true
         state = .speaking
         let after: () -> Void = { [weak self] in
-            guard let self, self.state == .speaking else { return }
-            self.afterSpeaking()
+            guard let self, self.talking, self.state == .speaking else { return }
+            self.speakQueued()
         }
         if let duplex {
             if let heardAt { duplex.measureFrom = heardAt; self.heardAt = nil }

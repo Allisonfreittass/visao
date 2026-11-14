@@ -15,6 +15,8 @@ public final class ChatStore {
     /// What the turn in flight is doing now; nil reads "Pensando".
     public private(set) var liveStep: ProgressStep?
     public private(set) var liveSteps: [ProgressStep] = []
+    /// In a voice call, the reply written so far, so the call can start speaking before it ends.
+    public private(set) var liveDraft: String?
     public var error: String?
     public private(set) var loading = false
     /// Set by the screen from the scene phase: progress is only asked for while you look, so the
@@ -185,6 +187,7 @@ public final class ChatStore {
             watchTask = nil
             liveStep = nil
             liveSteps = []
+            liveDraft = nil
             sending = false
             flushQueue()
         }
@@ -197,7 +200,9 @@ public final class ChatStore {
             mark(localId, .failed)
             return
         }
-        startWatching(id)
+        liveDraft = nil
+        // Spoken: asked more often, since every sentence of the draft is heard as soon as it ends.
+        startWatching(id, every: spoken ? .milliseconds(300) : progressInterval)
         let api = self.api
         let attachmentIds = attachments.map(\.id)
         let task = Task { try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id) }
@@ -251,9 +256,8 @@ public final class ChatStore {
         return created.id
     }
 
-    private func startWatching(_ id: String) {
+    private func startWatching(_ id: String, every interval: Duration) {
         let api = self.api
-        let interval = progressInterval
         watchTask = Task { [weak self] in
             while !Task.isCancelled {
                 if self?.isVisible == true || self?.followInBackground == true, let progress = try? await api.progress(conversationId: id) {
@@ -262,6 +266,7 @@ public final class ChatStore {
                         self.liveStep = last
                         self.liveSteps = progress.steps
                     }
+                    if progress.active, let draft = progress.draft, !draft.isEmpty { self.liveDraft = draft }
                 }
                 try? await Task.sleep(for: interval)
             }

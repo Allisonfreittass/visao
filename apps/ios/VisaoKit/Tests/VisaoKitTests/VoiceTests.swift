@@ -172,3 +172,57 @@ final class FirstPieceTests: XCTestCase {
         XCTAssertEqual(parts.joined(separator: " ").split(separator: " "), text.split(separator: " "), "no word lost")
     }
 }
+
+private extension String {
+    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
+final class DraftReaderTests: XCTestCase {
+    func testEachFinishedSentenceIsHandedOutOnce() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.take("Camberra").trimmed, "".trimmed)
+        XCTAssertEqual(reader.take("Camberra é a capital. Fica").trimmed, "Camberra é a capital. ".trimmed)
+        XCTAssertEqual(reader.take("Camberra é a capital. Fica no sudeste").trimmed, "".trimmed)
+        XCTAssertEqual(reader.take("Camberra é a capital. Fica no sudeste! E mais").trimmed, "Fica no sudeste! ".trimmed)
+        XCTAssertEqual(reader.finish("Camberra é a capital. Fica no sudeste! E mais nada.").trimmed, "E mais nada.".trimmed)
+    }
+
+    func testANumberIsNotTheEndOfASentence() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.take("Custa 3.5 reais").trimmed, "".trimmed)
+        XCTAssertEqual(reader.take("Custa 3.5 reais.\nDepois").trimmed, "Custa 3.5 reais.\n".trimmed)
+    }
+
+    func testAnOpenCodeBlockWaits() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.take("Veja. ```py\nx = 1.\n").trimmed, "Veja. ".trimmed)
+        XCTAssertEqual(reader.take("Veja. ```py\nx = 1.\n```\nPronto. ").trimmed, "```py\nx = 1.\n```\nPronto. ".trimmed)
+    }
+
+    func testNothingTakenMeansTheWholeReplyIsSaid() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.finish("Oi. Tudo bem?").trimmed, "Oi. Tudo bem?".trimmed)
+    }
+
+    func testARewrittenDraftIsNotSaidTwice() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.take("Primeira tentativa. ").trimmed, "Primeira tentativa. ".trimmed)
+        XCTAssertEqual(reader.take("Outra coisa. ").trimmed, "".trimmed)
+        XCTAssertEqual(reader.finish("Outra coisa. Fim.").trimmed, "".trimmed)
+    }
+
+    func testTheFinalReplyMayDifferOnlyInSpacing() {
+        var reader = DraftReader()
+        XCTAssertEqual(reader.take("Vou montar a página.  \n\n").trimmed, "Vou montar a página.  \n".trimmed)
+        XCTAssertEqual(reader.finish("Vou montar a página.\n\nEla aparece aqui.").trimmed, "Ela aparece aqui.".trimmed)
+    }
+
+    func testTheDraftComesWithTheProgress() throws {
+        let json = #"{"active": true, "elapsed_ms": 900, "steps": [], "draft": "Oi. "}"#
+        let progress = try JSONDecoder().decode(TurnProgress.self, from: Data(json.utf8))
+        XCTAssertEqual(progress.draft, "Oi. ")
+        let old = try JSONDecoder().decode(TurnProgress.self, from: Data(#"{"active": false}"#.utf8))
+        XCTAssertNil(old.draft)
+    }
+}
+

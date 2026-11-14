@@ -258,9 +258,11 @@ public struct TurnProgress: Codable, Sendable {
     public let active: Bool
     public let elapsedMs: Int
     public let steps: [ProgressStep]
+    /// In a voice call, the reply written so far (spoken sentence by sentence while it is written).
+    public let draft: String?
 
     enum CodingKeys: String, CodingKey {
-        case active, steps
+        case active, steps, draft
         case elapsedMs = "elapsed_ms"
     }
 
@@ -269,5 +271,6 @@ public struct TurnProgress: Codable, Sendable {
         active = try c.decode(Bool.self, forKey: .active)
         elapsedMs = try c.decodeIfPresent(Int.self, forKey: .elapsedMs) ?? 0
         steps = try c.decodeIfPresent([ProgressStep].self, forKey: .steps) ?? []
+        draft = try c.decodeIfPresent(String.self, forKey: .draft)
     }
 }

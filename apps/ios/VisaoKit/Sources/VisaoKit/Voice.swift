@@ -200,3 +200,55 @@ extension VoiceRules {
         return parts
     }
 }
+
+/// Reads a reply that is still being written (a voice call's draft), handing out each finished
+/// stretch once, so the first sentence is spoken while the rest is written.
+public struct DraftReader: Sendable {
+    /// The raw text already handed out.
+    public private(set) var taken = ""
+
+    public init() {}
+
+    /// What `draft` adds that ends in a full sentence: up to the last ".", "!", "?" or "…" followed
+    /// by a space, or a line break. Never inside an open code block. Empty when nothing new ended,
+    /// or when the draft no longer starts with what was handed out (it was rewritten).
+    public mutating func take(_ draft: String) -> String {
+        guard draft.hasPrefix(taken) else { return "" }
+        let rest = draft.dropFirst(taken.count)
+        var end: Substring.Index?
+        var index = rest.startIndex
+        while index < rest.endIndex {
+            let character = rest[index]
+            let next = rest.index(after: index)
+            if character == "\n" || (".!?…".contains(character) && next < rest.endIndex && rest[next].isWhitespace) {
+                end = next
+            }
+            index = next
+        }
+        guard let end else { return "" }
+        var chunk = String(rest[..<end])
+        // A code block still open: wait for it to close (it is said as one line anyway).
+        if (taken + chunk).components(separatedBy: "```").count % 2 == 0 {
+            guard let fence = chunk.range(of: "```", options: .backwards) else { return "" }
+            chunk = String(chunk[..<fence.lowerBound])
+        }
+        guard !chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "" }
+        taken += chunk
+        return chunk
+    }
+
+    /// What the final reply adds to what was handed out: all of it when nothing was, the rest when
+    /// it continues what was said, nothing when it was rewritten after he started speaking.
+    public mutating func finish(_ final: String) -> String {
+        defer { taken = final }
+        if taken.isEmpty { return final }
+        if final.hasPrefix(taken) { return String(final.dropFirst(taken.count)) }
+        let said = Self.collapsed(taken)
+        let whole = Self.collapsed(final)
+        return whole.hasPrefix(said) ? String(whole.dropFirst(said.count)) : ""
+    }
+
+    private static func collapsed(_ text: String) -> String {
+        text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+}
