@@ -4,11 +4,13 @@ import Foundation
 import KokoroTTS
 import Observation
 import SupertonicTTS
+import VisaoKit
 
 /// Voices that run on the iPhone itself (soniqo/speech-swift, Core ML), with no server and no
 /// network once downloaded. Two for now, chosen in Ajustes → Voz no iPhone:
 /// - Kokoro-82M, the open voice he chose on the server (pf_dora, docs/decisions/0004). Portuguese
-///   goes through a dictionary and rules in Swift (no espeak-ng, no GPL), which sounds robotic.
+///   The package's Portuguese dictionary is European, so the words go through our own Brazilian
+///   phonemes (VisaoKit.BrazilianPhonemes) instead.
 /// - Supertonic 3 (Supertone), 31 languages read straight from the text, no phoneme rules.
 @MainActor
 @Observable
@@ -62,7 +64,7 @@ final class LocalVoice: Identifiable {
         var size: String { self == .kokoro ? "335 MB" : "350 MB" }
         var summary: String {
             switch self {
-            case .kokoro: "A voz aberta que ele escolheu no servidor (Dora). O português sai de regras simples e soa robótico."
+            case .kokoro: "A voz aberta que ele escolheu no servidor (Dora), treinada em português do Brasil, agora com pronúncia brasileira."
             case .supertonic: "Lê o português direto do texto, sem regras de pronúncia: costuma soar mais natural. 10 vozes."
             }
         }
@@ -247,7 +249,12 @@ actor LocalVoiceEngine {
         switch kind {
         case .kokoro:
             guard let kokoro else { throw LocalVoiceError.notLoaded }
-            return WAV.encode(try kokoro.synthesize(text: text, voice: voice, language: "pt"), sampleRate: kind.sampleRate)
+            // Brazilian phonemes of our own (BrazilianPhonemes), not the package's European
+            // dictionary: each word goes as a code whose pronunciation is registered first.
+            let input = BrazilianPhonemes.kokoroInput(text)
+            guard !input.text.isEmpty else { return WAV.encode([], sampleRate: kind.sampleRate) }
+            kokoro.addPronunciations(input.pronunciations)
+            return WAV.encode(try kokoro.synthesize(text: input.text, voice: voice, language: "en"), sampleRate: kind.sampleRate)
         case .supertonic:
             guard let supertonic else { throw LocalVoiceError.notLoaded }
             return WAV.encode(try supertonic.synthesize(text: text, voice: voice, language: "pt"), sampleRate: kind.sampleRate)

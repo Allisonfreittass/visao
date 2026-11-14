@@ -70,13 +70,19 @@ final class VoiceEngine: NSObject {
 
     // MARK: Session
 
+    /// In a call the session records and plays; outside one, speaking sets up playback itself.
+    private var inCall = false
+    private var playbackSession = false
+
     func activate() throws {
+        inCall = true
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .duckOthers])
         try session.setActive(true)
     }
 
     func deactivate() {
+        inCall = false
         stopListening()
         stopSpeaking()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -201,6 +207,7 @@ final class VoiceEngine: NSObject {
             done()
             return
         }
+        if !inCall { beginPlayback() }
         onSpoken = done
         // A voice on the iPhone first (no network), then the server's own voice, then the iPhone's.
         if let local = LocalVoices.shared.active {
@@ -306,7 +313,28 @@ final class VoiceEngine: NSObject {
         spoke()
     }
 
+    /// Outside a call: spoken audio, which plays with the silent switch on (the default ambient
+    /// session was muted by it, so "Ouvir uma amostra" was silent) and lowers other audio.
+    private func beginPlayback() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+            playbackSession = true
+        } catch {
+            playbackSession = false
+        }
+    }
+
+    /// Music that was lowered comes back up.
+    private func endPlayback() {
+        guard playbackSession, !inCall else { return }
+        playbackSession = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
     private func spoke() {
+        endPlayback()
         if phase == .speaking { phase = .idle }
         let callback = onSpoken
         onSpoken = nil

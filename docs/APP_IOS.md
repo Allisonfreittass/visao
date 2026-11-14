@@ -240,6 +240,15 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
     pessoal, com restrições de uso (proíbe imitar pessoas reais sem consentimento, entre outras).
     Produto `SupertonicTTS` do mesmo pacote. Na primeira vez que abre, o iPhone compila o modelo,
     o que leva alguns segundos.
+- **Pronúncia brasileira no Kokoro**: o dicionário de português do pacote é **europeu** ("tarde"
+  vira tˈaɾədɨ), por isso a Dora, treinada em pt-BR, soava robótica e não brasileira. O app
+  converte o texto com regras próprias de português do Brasil (`VisaoKit/BrazilianPhonemes.swift`,
+  sem espeak e sem GPL), nos mesmos símbolos com que a voz foi treinada (espeak-ng `pt-br`
+  passado pelo misaki: ʤ, ʧ, I, A, W): "de"/"di" → ʤi, "te"/"ti" → ʧi, e/o finais → i/ʊ, l final
+  → w, r forte → x, s entre vogais → z, vogais nasais, acento pelas regras e uma lista de palavras
+  comuns; números por extenso. Como o gancho público de pronúncias do pacote só vale no caminho do
+  inglês, cada palavra vai como um código neutro ("qx…") registrado com a pronúncia brasileira.
+  Erros de pronúncia se corrigem na lista de exceções ou nas regras, com teste.
 - **Kokoro no iPhone** (~335 MB, uma vez): o Kokoro-82M
   roda no próprio iPhone pelo Core ML (Neural Engine), com a voz `pf_dora`, a mesma que ele
   escolheu no servidor. Depois de baixado, fala sem servidor e sem internet, frase a frase,
