@@ -71,6 +71,9 @@ struct Palette: Equatable {
     /// Glass over the forest; flat panels in "Noite".
     var usesGlass: Bool
 
+    /// "Conectado", on: teal, darker on light glass.
+    var sucesso: Color { self == .neblinaDia ? Color(rgb: 0x1b6a70) : Color(rgb: 0x5cc2c9) }
+
     static let neblinaDia = Palette(
         tinta: Color(rgb: 0x17222a), tintaSuave: Color(rgb: 0x36454e), tintaFraca: Color(rgb: 0x56656e),
         linha: Color(rgb: 0x1d1d1f, opacity: 0.08), linhaForte: Color(rgb: 0x1d1d1f, opacity: 0.14),

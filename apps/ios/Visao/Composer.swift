@@ -11,6 +11,7 @@ struct Composer: View {
     let draft: AttachmentDraft
     let thinking: Bool
     let speaker: String
+    var placeholder = "Escreva ou cole código…"
     let onPick: (ChatScreen.Picker) -> Void
     let onSend: () -> Void
     @Environment(\.palette) private var palette
@@ -33,7 +34,7 @@ struct Composer: View {
                     DraftAttachmentsRow(draft: draft)
                 }
                 HStack(alignment: .bottom, spacing: 4) {
-                    TextField(draft.items.isEmpty ? "Escreva ou cole código…" : "Quer dizer algo sobre isso?", text: $text, axis: .vertical)
+                    TextField(draft.items.isEmpty ? placeholder : "Quer dizer algo sobre isso?", text: $text, axis: .vertical)
                         .font(Typo.text(.body))
                         .lineLimit(1...6)
                         .focused(focused)

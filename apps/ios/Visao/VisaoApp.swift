@@ -10,7 +10,7 @@ struct VisaoApp: App {
         WindowGroup {
             Group {
                 if session.loggedIn {
-                    ConversationsView()
+                    Shell()
                 } else {
                     LoginView()
                 }

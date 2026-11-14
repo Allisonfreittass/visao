@@ -98,8 +98,9 @@ decisão recusada pelo servidor não some nem é dada como feita.
 
 - **Login** com e-mail e senha; o token fica no **Keychain** (só este aparelho, depois do primeiro
   desbloqueio), nunca em UserDefaults. Um 401 em qualquer chamada volta para o login.
-- **Conversas**: a lista do servidor (rotulada pela data, como no web), puxar para atualizar e
-  nova conversa. A conversa só é criada no servidor com a primeira mensagem.
+- **Conversas**: na gaveta (rotuladas pela data, como no web), com + para começar outra. O app
+  abre direto na conversa mais recente; uma conversa nova só é criada no servidor com a primeira
+  mensagem.
 - **Chat**: envio otimista; o que você escreve enquanto ele responde aparece mais apagado ("na
   fila") e vai junto depois da resposta. O passo atual vem de `/conversations/{id}/progress` a
   cada 0,9 s, **só com o app na frente** (com a tela bloqueada o servidor percebe e manda o aviso,
@@ -120,8 +121,8 @@ decisão recusada pelo servidor não some nem é dada como feita.
   (`SkyLook` no VisaoKit, testado contra as horas-chave do web). Vidro fosco claro de dia e escuro
   à noite, como o web troca: o teclado e as folhas do sistema acompanham. As respostas dele em
   bolha sólida à esquerda, as suas em vidro à direita; a orbe com a lanterna ao lado do campo.
-- **Noite**: o tema escuro liso da marca. A aparência e "Neblina em movimento" ficam no menu da
-  conta (ícone de pessoa na lista de conversas) até a etapa de Ajustes.
+- **Noite**: o tema escuro liso da marca, quando "Floresta com neblina ao fundo" está desligado
+  em Ajustes.
 - **Leve**: a neblina é desenhada em meia resolução e a 20 quadros por segundo, e para com Reduzir
   Movimento, Modo de Pouca Energia, app em segundo plano ou "Neblina em movimento" desligado
   (continua seguindo a hora).
@@ -144,15 +145,37 @@ decisão recusada pelo servidor não some nem é dada como feita.
   email a enviar e evento a marcar (`/google/actions`, [GOOGLE.md](GOOGLE.md)) e trabalho que ele
   propôs para o Mac (`/arm/tasks` com status `proposed`, [BRACO.md](BRACO.md)). **Nada roda sem o
   toque.** O email mostra o corpo inteiro antes de você aprovar.
-- Na conversa de onde o pedido veio, o cartão fica embaixo das mensagens. Na lista de conversas, o
-  bloco **"Esperando você"** junta todos, inclusive os que não são de nenhuma conversa, com um
-  atalho para abrir a conversa.
+- Na conversa de onde o pedido veio, o cartão fica embaixo das mensagens. Todos também aparecem
+  em **Início → Pendências**, inclusive os que não são de nenhuma conversa.
 - O toque vai com `?via=toque` (a ligação da etapa 5 usa `via=voz`), e o servidor registra no
   audit. Se o servidor recusar (já decidido, expirado), o cartão continua e o motivo aparece; o app
   nunca diz que foi feito antes da resposta do servidor. Depois de aprovar um email ou evento, a
   mensagem dele dizendo o que fez aparece na conversa.
 - A lista de pedidos é atualizada ao abrir, depois de cada resposta e a cada 15 s com o app na
   frente.
+
+### A mesma estrutura do web
+
+O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `ProjectsView.tsx`,
+`MacView.tsx`, `SettingsView.tsx`), não um app de sistema com lista e navegação do iOS:
+
+- **Barra de topo**: o botão redondo da gaveta, a pílula **Início · Chat · Projetos** (com o número
+  de pendências em vermelho no Início) e o avatar com a inicial dele, que abre Ajustes.
+- **Gaveta** de vidro pela esquerda: a marca, Conversa, Pendências, Projetos, Mac e Ajustes, as
+  conversas com + e "Conectado" embaixo. Arrastar para a esquerda ou tocar fora fecha.
+- **Chat** é a tela de entrada, como no web.
+- **Início → Pendências**: "Nada esperando por você." ou o que precisa de você, em grupos: No Mac,
+  Email e agenda, Metas que eu quero seguir e Avisos (Responder abre a conversa, Dispensar marca
+  como lido). As aberturas dele não contam: já estão no chat e são marcadas como lidas ao abrir.
+- **Projetos**: sem nenhum, a frase grande em serifa sobre a floresta com o campo para criar; com
+  projetos, os cartões; dentro de um, nova conversa aqui, trazer a conversa aberta, renomear,
+  apagar e as conversas, páginas e arquivos dele.
+- **Mac**: os Macs pareados (ligado ou não, projetos liberados) e o que ele fez lá. Parear um Mac
+  novo continua no site, porque mostra um token secreto para colar no Mac.
+- **Ajustes** ("Do seu jeito."): Aparência (floresta e movimento), Autonomia (agir por conta
+  própria, pesquisar sozinho), Google (estado da conexão e olhar sozinho; conectar continua pelo
+  computador), Memória e Conta (login e sair). Os de voz entram com a ligação (etapa 5). Ainda
+  faltam o Caderno, trocar senha ou email e refazer as perguntas iniciais.
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

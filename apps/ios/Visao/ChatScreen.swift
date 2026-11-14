@@ -23,8 +23,12 @@ struct ChatScreen: View {
     /// It can speak first: what it said on its own shows up while you look (as on the web).
     private static let initiativePoll: Duration = .seconds(15)
 
-    init(api: APIClient, conversationId: String?) {
-        _store = State(initialValue: ChatStore(api: api, conversationId: conversationId))
+    /// Told when the first message creates the conversation, so the drawer marks it.
+    private let onCreated: (Conversation) -> Void
+
+    init(api: APIClient, conversationId: String?, projectId: String? = nil, onCreated: @escaping (Conversation) -> Void = { _ in }) {
+        _store = State(initialValue: ChatStore(api: api, conversationId: conversationId, projectId: projectId))
+        self.onCreated = onCreated
         _draft = State(initialValue: AttachmentDraft(api: api))
     }
 
@@ -80,6 +84,7 @@ struct ChatScreen: View {
                     draft: draft,
                     thinking: store.sending,
                     speaker: session.speakerName,
+                    placeholder: "Enviar mensagem para \(session.agentName ?? "o Visão")",
                     onPick: { picker = $0 },
                     onSend: send
                 )
@@ -97,16 +102,6 @@ struct ChatScreen: View {
                 if focused { scrollToBottom(proxy, delay: .milliseconds(250)) }
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(session.agentName ?? "Conversa")
-                    .font(Typo.display(22, relativeTo: .title3))
-                    .accessibilityAddTraits(.isHeader)
-            }
-        }
-        .visaoBackground()
         .environment(\.attachmentLoader, session.loader)
         .sheet(item: $viewing) { artifact in
             if let path = artifact.path {
@@ -147,9 +142,14 @@ struct ChatScreen: View {
         }
         .task {
             store.onError = { session.handle($0) }
-            store.onConversationCreated = { session.added($0) }
+            store.onConversationCreated = { conversation in
+                session.added(conversation)
+                onCreated(conversation)
+            }
             await store.load()
             await session.pending.refresh()
+            // What he said on his own is right here: it stops counting as a notice.
+            await session.pending.markOpeningsRead()
         }
         .task(id: scenePhase) {
             store.isVisible = scenePhase == .active
@@ -158,6 +158,7 @@ struct ChatScreen: View {
                 try? await Task.sleep(for: Self.initiativePoll)
                 await store.refresh()
                 await session.pending.refresh()
+                await session.pending.markOpeningsRead()
             }
         }
     }

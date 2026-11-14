@@ -235,3 +235,30 @@ extension APIClient {
         return id
     }
 }
+
+/// The Google connection (docs/GOOGLE.md). Connecting happens on the site, where the sign-in is.
+public struct GoogleState: Codable, Sendable, Equatable {
+    public let connected: Bool
+    public let email: String
+    /// Reading the inbox and agenda between conversations, to bring up what matters.
+    public let background: Bool
+    public let problem: String
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        connected = try c.decode(Bool.self, forKey: .connected)
+        email = try c.decodeIfPresent(String.self, forKey: .email) ?? ""
+        background = try c.decodeIfPresent(Bool.self, forKey: .background) ?? false
+        problem = try c.decodeIfPresent(String.self, forKey: .problem) ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey { case connected, email, background, problem }
+}
+
+extension APIClient {
+    public func google() async throws -> GoogleState { try await request("/google") }
+
+    public func setGoogleBackground(_ enabled: Bool) async throws -> GoogleState {
+        try await json("/google/background", method: "PUT", body: ["enabled": enabled])
+    }
+}
