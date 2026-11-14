@@ -336,6 +336,19 @@ Revisado com a skill [dickwu/apple-design-skill](https://github.com/dickwu/apple
 O sotaque da Kokoro é **neutro**: o "r" forte é um h suave (não o x carioca) e o "r" no meio da
 palavra continua um toque leve.
 
+### Pendências da voz (para retomar)
+
+- **Interromper falando ainda não interrompe.** O áudio em via dupla já liga e ouve (diário de
+  14/11, 11:36: motor religado, frases reconhecidas), mas falar por cima enquanto ele fala ainda
+  não o para. Próximo passo: registrar no diário o que o reconhecimento recebe durante a fala dele
+  (hoje o diário só escreve quando ele está ouvindo), para saber se a sua voz chega ou se o
+  cancelamento de eco a engole. O diário fica em `Library/Caches/diario-da-voz.txt` no app e se lê
+  pelo cabo:
+  `xcrun devicectl device copy from --device <id> --domain-type appDataContainer --domain-identifier io.github.allisonfreittass.visao --source Library/Caches/diario-da-voz.txt --destination diario.txt`
+- **Atraso até ele começar a falar.** Hoje ele só fala depois que a resposta inteira chega do
+  servidor. Para começar a falar enquanto escreve, o servidor precisaria mandar a resposta aos
+  pedaços (streaming), o que é uma mudança na API, a combinar.
+
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 
 | | Apple ID grátis | Conta paga |
