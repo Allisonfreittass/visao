@@ -357,9 +357,13 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
   cancelamento de eco a engole. O diário fica em `Library/Caches/diario-da-voz.txt` no app e se lê
   pelo cabo:
   `xcrun devicectl device copy from --device <id> --domain-type appDataContainer --domain-identifier io.github.allisonfreittass.visao --source Library/Caches/diario-da-voz.txt --destination diario.txt`
-- **Atraso até ele começar a falar.** Hoje ele só fala depois que a resposta inteira chega do
-  servidor. Para começar a falar enquanto escreve, o servidor precisaria mandar a resposta aos
-  pedaços (streaming), o que é uma mudança na API, a combinar.
+- **Atraso até ele começar a falar.** Medido em 14/11 (diário, 12:42): 5,2 s do fim da sua fala até
+  a voz, sendo 4,8 s esperando o servidor e 0,4 s no app. O servidor fazia duas chamadas ao modelo:
+  a resposta e, depois, a conferência das regras aprendidas (até 4 s). Nas ligações
+  (`modality=voice`) a conferência agora é pulada; as regras continuam no prompt de sistema. No chat
+  por texto nada mudou. O passo seguinte, se ainda demorar, é o servidor mandar a resposta aos
+  pedaços (streaming) para ele falar a primeira frase enquanto escreve o resto, uma mudança na API,
+  a combinar.
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

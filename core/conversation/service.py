@@ -305,7 +305,9 @@ def reply(
     content, page = take_marker(response.text)
     if page is not None and not content.strip():
         content = f"Vou montar a página “{page.title}”. Ela aparece aqui quando ficar pronta."
-    if owner_rules and not truncated:
+    if owner_rules and not truncated and modality != "voice":
+        # Not in a voice call: the check is a second model call before anything can be spoken
+        # (up to RULE_CHECK_DEADLINE_SECONDS), and the rules already ride in the system prompt.
         # Committed first: the call's admission ledger needs the write lock this session would hold.
         session.commit()
         progress.step("Conferindo as suas regras")

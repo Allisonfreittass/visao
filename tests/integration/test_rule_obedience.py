@@ -57,7 +57,9 @@ def world(db):
     return identity, owner, conversation
 
 
-def turn(db, provider, rules=RULES, budgets=None, text="Rust ou Python pro worker?"):
+def turn(
+    db, provider, rules=RULES, budgets=None, text="Rust ou Python pro worker?", modality="text"
+):
     identity, owner, conversation = world(db)
     return reply(
         db,
@@ -71,6 +73,7 @@ def turn(db, provider, rules=RULES, budgets=None, text="Rust ou Python pro worke
         context_char_budget=4000,
         self_text="eu",
         owner_rules=rules,
+        modality=modality,
     )
 
 
@@ -88,6 +91,15 @@ def test_a_broken_rule_is_rewritten_and_only_the_final_text_is_kept(db):
     assert result.usage.purpose == "chat_reply"
     assert saved[0].model_usage_id == result.usage.id
     assert [c.outcome for c in checks(db)] == ["rewritten"]
+
+
+def test_a_voice_call_skips_the_check_so_the_reply_can_be_spoken_sooner(db):
+    provider = llm(rewrite(FIXED))
+    result = turn(db, provider, modality="voice")
+    assert result.assistant_message.content == DRAFT
+    assert checks(db) == []
+    assert not any(is_check(p) for p in provider.prompts)
+    assert RULES in provider.prompts[0][0].content
 
 
 def test_a_reply_that_obeys_goes_out_untouched(db):
