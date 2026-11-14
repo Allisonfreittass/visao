@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import type { Message } from "../api";
+import { type CallCamera, cameraSupported } from "../call/camera";
+import { Icon } from "./Icon";
 import { Orb, STATE_LABELS } from "../orb/Orb";
 import type { OrbState } from "../orb/orbModel";
 import { speakableText } from "../speech/speakable";
@@ -19,6 +21,8 @@ interface CallViewProps {
   ask?: { label: string; text: string; detail?: string; onApprove: () => void; onReject: () => void } | null;
   /** Whether a spoken "pode mandar" / "não" answers it. */
   voiceApproval?: boolean;
+  /** The camera: while on, what it shows goes with each sentence you say. */
+  camera?: CallCamera;
 }
 
 function clock(ms: number): string {
@@ -36,7 +40,7 @@ const HINTS: Partial<Record<OrbState, string>> = {
 };
 
 /** A call: the whole screen is the conversation, hands free, the screen kept on. */
-export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval }: CallViewProps) {
+export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval, camera }: CallViewProps) {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(started);
   useEffect(() => {
@@ -50,6 +54,12 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onHangUp]);
+
+  const stream = camera?.stream ?? null;
+  const videoRef = camera?.videoRef;
+  useEffect(() => {
+    if (videoRef?.current) videoRef.current.srcObject = stream;
+  }, [stream, videoRef]);
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
@@ -71,7 +81,17 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         {lastUser && <p><span>Você</span>{lastUser.content}</p>}
         {lastReply && <p><span>{agentName ?? "Ele"}</span>{speakableText(lastReply.content).slice(0, 280)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
+        {camera?.error && <p className="error" role="alert">{camera.error}</p>}
       </div>
+      {camera?.on && (
+        <figure className="call-camera" aria-label="O que a câmera está mostrando">
+          {/* What he will see with your next sentence. */}
+          <video ref={camera.videoRef} autoPlay playsInline muted className={camera.facing === "user" ? "is-mirrored" : undefined} />
+          <button type="button" className="call-camera-flip" onClick={camera.flip} aria-label="Trocar de câmera">
+            <Icon name="flip" size={18} />
+          </button>
+        </figure>
+      )}
       {ask && (
         <section className="call-ask" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
           <span className="call-ask-label">{ask.label}</span>
@@ -85,6 +105,17 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         </section>
       )}
       <footer className="call-actions">
+        {camera && cameraSupported() && (
+          <button
+            type="button"
+            className={`call-camera-toggle${camera.on ? " is-on" : ""}`}
+            onClick={camera.toggle}
+            aria-pressed={camera.on}
+            aria-label={camera.on ? "Desligar a câmera" : "Ligar a câmera: ele vê o que ela mostra quando você fala"}
+          >
+            <Icon name="camera" size={20} />
+          </button>
+        )}
         {speaking && <button type="button" className="rs-botao" onClick={onInterrupt}>Interromper</button>}
         <button type="button" className="rs-botao rs-botao--principal call-hangup" onClick={onHangUp}>Desligar</button>
       </footer>

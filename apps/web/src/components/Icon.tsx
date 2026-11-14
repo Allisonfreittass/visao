@@ -10,6 +10,8 @@ const PATHS = {
   folder: "M3 6h6l2 2h10v11H3z",
   reply: "M9 15L4 10l5-5M4 10h10a6 6 0 0 1 6 6v2",
   phone: "M6 3l3 1 1.5 4-2 1.5a11 11 0 0 0 6 6l1.5-2 4 1.5 1 3-2 2C11 20 4 13 4 5z",
+  camera: "M3 8h4l2-3h6l2 3h4v11H3zM12 10a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z",
+  flip: "M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

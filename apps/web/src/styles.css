@@ -327,6 +327,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 .call-transcript span { display: block; font: 400 12px/1.5 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-fraca); }
 .call-actions { display: flex; justify-content: center; gap: var(--espaco-3); }
 .call-actions .rs-botao { min-width: 140px; justify-content: center; height: 52px; }
+.call-camera-toggle { width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--linha); display: inline-grid; place-items: center; background: var(--fundo-hover); color: var(--tinta); cursor: pointer; }
+.call-camera-toggle.is-on { background: var(--tinta); color: var(--fundo); border-color: var(--tinta); }
+.call-camera-toggle:focus-visible, .call-camera-flip:focus-visible { outline: 2px solid var(--estanho); outline-offset: 2px; }
+.call-camera { position: fixed; top: calc(var(--espaco-6) + env(safe-area-inset-top) + 24px); right: var(--espaco-4); width: 132px; aspect-ratio: 3 / 4; margin: 0; border-radius: 18px; overflow: hidden; border: 1px solid var(--linha); box-shadow: 0 6px 20px rgb(0 0 0 / .25); background: #000; z-index: 1; }
+.call-camera video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.call-camera video.is-mirrored { transform: scaleX(-1); }
+.call-camera-flip { position: absolute; right: 4px; bottom: 4px; width: 44px; height: 44px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgb(0 0 0 / .35); color: #fff; cursor: pointer; }
+@media (min-width: 900px) { .call-camera { width: 200px; } }
 
 /* Onboarding */
 .onboarding-main { overflow-y: auto; }

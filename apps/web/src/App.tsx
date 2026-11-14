@@ -14,6 +14,7 @@ import {
   type SystemStatus,
   type VoiceStatus,
 } from "./api";
+import { useCallCamera } from "./call/camera";
 import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
 import { Login } from "./components/Login";
@@ -177,6 +178,8 @@ export function App() {
     onError: setError,
   });
 
+  const camera = useCallCamera(voice.inCall);
+
   const firstRun = loggedIn && !demo && onboarding !== "done";
   const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
   const pending = usePending(api, ready, handleError, ready && view === "conversation");
@@ -324,7 +327,17 @@ export function App() {
         return;
       }
     }
-    await sendRef.current(text, timing);
+    // Camera on: the picture of this moment goes with the sentence (the words still go without it).
+    const photo = camera.on ? await camera.snapshot() : null;
+    let files: Attachment[] = [];
+    if (photo) {
+      try {
+        files = [await api.uploadAttachment(photo, `camera-${Date.now()}.jpg`)];
+      } catch {
+        files = [];
+      }
+    }
+    await sendRef.current(text, timing, files);
   };
 
   const pendingPages = messages.filter((m) => m.artifact?.status === "pending").map((m) => m.artifact!.id).join(",");
@@ -923,6 +936,7 @@ export function App() {
           onHangUp={voice.endCall}
           ask={liveAsks[0] ?? null}
           voiceApproval={voiceApproval}
+          camera={camera}
         />
       )}
     </div>
