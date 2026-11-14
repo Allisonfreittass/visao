@@ -357,13 +357,18 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
   cancelamento de eco a engole. O diário fica em `Library/Caches/diario-da-voz.txt` no app e se lê
   pelo cabo:
   `xcrun devicectl device copy from --device <id> --domain-type appDataContainer --domain-identifier io.github.allisonfreittass.visao --source Library/Caches/diario-da-voz.txt --destination diario.txt`
-- **Atraso até ele começar a falar.** Medido em 14/11 (diário, 12:42): 5,2 s do fim da sua fala até
-  a voz, sendo 4,8 s esperando o servidor e 0,4 s no app. O servidor fazia duas chamadas ao modelo:
-  a resposta e, depois, a conferência das regras aprendidas (até 4 s). Nas ligações
-  (`modality=voice`) a conferência agora é pulada; as regras continuam no prompt de sistema. No chat
-  por texto nada mudou. O passo seguinte, se ainda demorar, é o servidor mandar a resposta aos
-  pedaços (streaming) para ele falar a primeira frase enquanto escreve o resto, uma mudança na API,
-  a combinar.
+- **Atraso até ele começar a falar.** Medido em 14/11 (diário): 5,2 s do fim da sua fala até a voz,
+  quase tudo esperando o servidor, que fazia três chamadas ao modelo uma atrás da outra: a avaliação
+  de curiosidade, a resposta inteira e a conferência das regras. Nas ligações (`modality=voice`)
+  agora:
+  - a avaliação de curiosidade e a conferência das regras são puladas (as regras seguem no prompt
+    de sistema; no chat por texto nada mudou);
+  - a resposta é escrita em pedaços (streaming do provedor Anthropic) e o texto até ali aparece no
+    campo `draft` do `/progress`, que o app pergunta a cada 0,3 s durante a ligação;
+  - cada frase que termina vai para a voz na hora (`DraftReader` em VisaoKit); quando a resposta
+    final chega, ele fala só o que faltou. Falar por cima ou tocar para parar descarta o resto.
+  O diário mostra "primeira frase escrita X s depois" e "resposta inteira chegou X s depois". O
+  provedor compatível com OpenAI ainda responde inteiro (sem rascunho), como antes.
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 
