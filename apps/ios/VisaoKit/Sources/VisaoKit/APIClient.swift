@@ -67,6 +67,11 @@ public final class APIClient: Sendable {
         tokens.token = nil
     }
 
+    /// After a password or email change the server hands a new token; the old one stops working.
+    func replaceToken(_ token: String) {
+        tokens.token = token
+    }
+
     public func me() async throws -> UserInfo { try await request("/auth/me") }
 
     public func status() async throws -> SystemStatus { try await request("/system/status") }

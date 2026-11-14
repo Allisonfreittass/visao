@@ -96,6 +96,14 @@ public final class ChatStore {
         guard !text.isEmpty || !attachments.isEmpty else { return }
         let files = Array(attachments.prefix(AttachmentRules.maxPerMessage))
         error = nil
+        // `/mac projeto pedido`: work for the Mac, not a message to him (as on the web).
+        if attachments.isEmpty, !sending, let command = MacCommand.parse(text) {
+            switch command {
+            case .usage: error = MacCommand.usageText
+            case .ask(let project, let prompt): Task { await askMac(project: project, prompt: prompt) }
+            }
+            return
+        }
         if sending {
             counter += 1
             let id = "queued-\(counter)"
@@ -104,6 +112,18 @@ public final class ChatStore {
             return
         }
         Task { await run(text: text, attachments: files, replyTo: replyTo) }
+    }
+
+    private func askMac(project: String, prompt: String) async {
+        sending = true
+        defer { sending = false }
+        do {
+            let id = try await ensureConversation()
+            _ = try await api.askArm(project: project, prompt: prompt, conversationId: id)
+            messages = merge(stored: try await api.messages(conversationId: id))
+        } catch {
+            report(error)
+        }
     }
 
     /// The page is gone: its link stops working, and the card leaves the reply.
