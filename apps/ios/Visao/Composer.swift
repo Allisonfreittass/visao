@@ -25,7 +25,7 @@ struct Composer: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            Orb(thinking: thinking, size: 48)
+            Orb(thinking: thinking, size: 50)
             VStack(alignment: .leading, spacing: 0) {
                 if let replyTo {
                     replyBanner(replyTo)
@@ -62,7 +62,7 @@ struct Composer: View {
             }
             .padding(4)
             .padding(.leading, 2)
-            .glass(palette, cornerRadius: 26)
+            .liquidGlass(palette, in: RoundedRectangle(cornerRadius: 26, style: .continuous), tint: palette.vidroForte.opacity(0.55), interactive: false)
         }
         .padding(.horizontal, 10)
         .padding(.top, 6)

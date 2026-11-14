@@ -13,6 +13,7 @@ struct ChatScreen: View {
     @State private var viewing: Artifact?
     @State private var picker: Picker?
     @State private var pickedPhotos: [PhotosPickerItem] = []
+    @State private var benchOpen = false
     @FocusState private var composerFocused: Bool
 
     enum Picker: Identifiable {
@@ -26,7 +27,11 @@ struct ChatScreen: View {
     /// Told when the first message creates the conversation, so the drawer marks it.
     private let onCreated: (Conversation) -> Void
 
-    init(api: APIClient, conversationId: String?, projectId: String? = nil, onCreated: @escaping (Conversation) -> Void = { _ in }) {
+    /// In front: the progress and the openings are only looked at while you see this chat.
+    private let isActive: Bool
+
+    init(api: APIClient, conversationId: String?, projectId: String? = nil, isActive: Bool = true, onCreated: @escaping (Conversation) -> Void = { _ in }) {
+        self.isActive = isActive
         _store = State(initialValue: ChatStore(api: api, conversationId: conversationId, projectId: projectId))
         self.onCreated = onCreated
         _draft = State(initialValue: AttachmentDraft(api: api))
@@ -45,7 +50,16 @@ struct ChatScreen: View {
                             speaker: session.speakerName,
                             onReply: { reply(to: message) },
                             onQuoteTap: { id in withAnimation { proxy.scrollTo(id, anchor: .center) } },
-                            onOpenPage: { viewing = $0 }
+                            onOpenPage: { viewing = $0 },
+                            onFeedback: { positive, tags in
+                                do {
+                                    let changed = try await session.api.feedback(messageId: message.id, positive: positive, tags: tags)
+                                    return changed ? "Valeu. Ajustei meu jeito de responder." : "Valeu."
+                                } catch {
+                                    session.handle(error)
+                                    return nil
+                                }
+                            }
                         )
                         .id(message.id)
                     }
@@ -102,6 +116,31 @@ struct ChatScreen: View {
                 if focused { scrollToBottom(proxy, delay: .milliseconds(250)) }
             }
         }
+        .overlay(alignment: .topTrailing) {
+            // The Bancada: what he really did here, the pages and the sites he read.
+            if store.conversationId != nil {
+                Button { benchOpen = true } label: {
+                    Image(systemName: "list.bullet.rectangle")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(palette.tinta)
+                        .glassCircle(palette, size: 38)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 14)
+                .padding(.top, 4)
+                .accessibilityLabel("Bancada: o que ele fez nesta conversa")
+            }
+        }
+        .sheet(isPresented: $benchOpen) {
+            if let id = store.conversationId {
+                BenchSheet(conversationId: id, working: store.sending, steps: store.liveSteps) { artifact in
+                    benchOpen = false
+                    viewing = artifact
+                }
+                .presentationDetents([.medium, .large])
+                .presentationBackground(.thinMaterial)
+            }
+        }
         .environment(\.attachmentLoader, session.loader)
         .sheet(item: $viewing) { artifact in
             if let path = artifact.path {
@@ -151,9 +190,11 @@ struct ChatScreen: View {
             // What he said on his own is right here: it stops counting as a notice.
             await session.pending.markOpeningsRead()
         }
-        .task(id: scenePhase) {
-            store.isVisible = scenePhase == .active
-            guard scenePhase == .active else { return }
+        .task(id: [scenePhase == .active, isActive]) {
+            store.isVisible = scenePhase == .active && isActive
+            guard store.isVisible else { return }
+            await store.refresh()
+            await session.pending.markOpeningsRead()
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.initiativePoll)
                 await store.refresh()

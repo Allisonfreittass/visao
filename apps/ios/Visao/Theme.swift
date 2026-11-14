@@ -223,14 +223,39 @@ extension View {
     /// A round glass button, like the drawer and avatar buttons of the web.
     func glassCircle(_ palette: Palette, size: CGFloat = 44) -> some View {
         frame(width: size, height: size)
-            .background {
+            .contentShape(Circle())
+            .liquidGlass(palette, in: Circle())
+    }
+}
+
+extension View {
+    /// Liquid Glass on iOS 26 and later (it bends the light and reacts to the touch); the web's
+    /// frosted glass before that. For controls that float over the content: buttons, the pill,
+    /// the message box, the drawer.
+    @ViewBuilder
+    func liquidGlass<S: Shape>(_ palette: Palette, in shape: S, tint: Color? = nil, interactive: Bool = true) -> some View {
+        if #available(iOS 26.0, *), palette.usesGlass {
+            glassEffect(Glass.regular.tint(tint ?? palette.vidro.opacity(0.35)).interactive(interactive), in: shape)
+        } else {
+            background {
                 if palette.usesGlass {
-                    Circle().fill(.ultraThinMaterial).overlay(Circle().fill(palette.vidro))
+                    shape.fill(.ultraThinMaterial).overlay(shape.fill(tint ?? palette.vidroForte))
                 } else {
-                    Circle().fill(palette.fundoElevado)
+                    shape.fill(tint ?? palette.fundoElevado)
                 }
             }
-            .overlay(Circle().strokeBorder(palette.vidroBorda, lineWidth: 1))
-            .shadow(color: palette.sombra.opacity(0.5), radius: 8, y: 2)
+            .overlay(shape.stroke(palette.vidroBorda, lineWidth: 1))
+            .shadow(color: palette.sombra.opacity(0.6), radius: 10, y: 3)
+        }
+    }
+
+    /// Groups glass shapes so they blend and morph into each other (iOS 26), nothing before.
+    @ViewBuilder
+    func glassGroup(spacing: CGFloat = 12) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) { self }
+        } else {
+            self
+        }
     }
 }

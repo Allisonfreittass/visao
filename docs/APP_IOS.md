@@ -160,8 +160,15 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
 `MacView.tsx`, `SettingsView.tsx`), não um app de sistema com lista e navegação do iOS:
 
 - **Barra de topo**: o botão redondo da gaveta, a pílula **Início · Chat · Projetos** (com o número
-  de pendências em vermelho no Início) e o avatar com a inicial dele, que abre Ajustes.
-- **Gaveta** de vidro pela esquerda: a marca, Conversa, Pendências, Projetos, Mac e Ajustes, as
+  de pendências em vermelho no Início) e o avatar com a inicial dele, que abre Ajustes. A seleção
+  da pílula é uma gota que **desliza** até a aba com mola; dá para **arrastar** a gota de uma aba
+  para outra, com um toque leve de vibração em cada uma, como na barra de abas do iOS 26.
+- **As telas deslizam** para o lado da aba. Em Início e Projetos, arrastar para o lado troca de
+  aba (no chat, arrastar uma mensagem continua sendo responder). O chat fica montado enquanto você
+  visita as outras telas: uma resposta a caminho continua e você volta onde estava.
+- **Liquid Glass** (iOS 26 em diante) nos controles que flutuam: os botões da barra, a pílula, o
+  campo de mensagem, a orbe e a gaveta. Antes do iOS 26, o vidro fosco do web.
+- **Gaveta** de vidro pela esquerda: a marca, Conversa, Pendências, Projetos, Caderno, Mac e Ajustes, as
   conversas com + e "Conectado" embaixo. Arrastar para a esquerda ou tocar fora fecha.
 - **Chat** é a tela de entrada, como no web.
 - **Início → Pendências**: "Nada esperando por você." ou o que precisa de você, em grupos: No Mac,
@@ -170,12 +177,22 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
 - **Projetos**: sem nenhum, a frase grande em serifa sobre a floresta com o campo para criar; com
   projetos, os cartões; dentro de um, nova conversa aqui, trazer a conversa aberta, renomear,
   apagar e as conversas, páginas e arquivos dele.
-- **Mac**: os Macs pareados (ligado ou não, projetos liberados) e o que ele fez lá. Parear um Mac
-  novo continua no site, porque mostra um token secreto para colar no Mac.
+- **Caderno** ("O que eu fiz enquanto você não estava."): o que ele sabe de você e o que aprendeu
+  com as suas correções (desfazer e apagar), temperamento, o que quer te perguntar, como se
+  descreve (desfazer), interesses, pensamentos e o caderno de estudo com achados e fontes, e a
+  chave do estudo autônomo. Atualiza a cada 15 s com a tela aberta.
+- **Mac**: os Macs pareados (ligado ou não, projetos liberados), desconectar, **parear** (o token
+  aparece uma vez, com Copiar) e o que ele fez lá. `/mac projeto pedido` no chat pede ao Mac.
+- **No chat**: "Como foi essa resposta?" embaixo das respostas dele (polegar e etiquetas, como no
+  web) e a **Bancada** no botão do canto: o passo atual, as páginas, os sites lidos ao vivo e o
+  que ele fez de verdade, tirado do registro.
+- **Boas-vindas**: na primeira vez, os três passos do web (como funciona, perguntas, permissões),
+  sempre dá para pular; refazer em Ajustes → Memória.
 - **Ajustes** ("Do seu jeito."): Aparência (floresta e movimento), Autonomia (agir por conta
-  própria, pesquisar sozinho), Google (estado da conexão e olhar sozinho; conectar continua pelo
-  computador), Memória e Conta (login e sair). Os de voz entram com a ligação (etapa 5). Ainda
-  faltam o Caderno, trocar senha ou email e refazer as perguntas iniciais.
+  própria, pesquisar sozinho), Google (estado, olhar sozinho, desconectar; conectar continua pelo
+  computador), Memória (lembrar, refazer as perguntas iniciais) e Conta (trocar senha e email,
+  sair). Os de voz entram com a ligação (etapa 5); avisos com o app fechado dependem da conta paga
+  (APNs).
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

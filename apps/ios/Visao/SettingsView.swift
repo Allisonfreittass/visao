@@ -12,6 +12,9 @@ struct SettingsView: View {
     @State private var email: String?
     @State private var error: String?
     @State private var confirmLogout = false
+    @State private var changing: AccountChange?
+    @State private var confirmGoogle = false
+    @State private var notice: String?
 
     var body: some View {
         @Bindable var appearance = appearance
@@ -63,6 +66,12 @@ struct SettingsView: View {
                     }
                 }
                 if google?.connected == true {
+                    PageRow {
+                        HStack {
+                            Spacer()
+                            PillButton(title: "Desconectar") { confirmGoogle = true }
+                        }
+                    }
                     SettingRow(
                         title: "Olhar email e agenda sozinho",
                         description: "Vejo os compromissos das próximas 24 h e os assuntos dos emails não lidos, nunca o texto, para te lembrar do que importa.",
@@ -79,6 +88,22 @@ struct SettingsView: View {
                     isOn: serverBinding(\.memory) { try await session.api.setMemory(enabled: $0) },
                     disabled: server == nil
                 )
+                PageRow {
+                    HStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Perguntas iniciais").font(Typo.text(.subheadline, weight: .medium))
+                            Text("Refazer a apresentação do começo, para eu te conhecer de novo.")
+                                .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                        }
+                        Spacer()
+                        PillButton(title: "Refazer") {
+                            Task {
+                                await run { try await session.api.restartOnboarding() }
+                                NotificationCenter.default.post(name: .visaoRestartOnboarding, object: nil)
+                            }
+                        }
+                    }
+                }
             }
             PageGroup(label: "Conta") {
                 PageRow {
@@ -86,6 +111,14 @@ struct SettingsView: View {
                         Text("Login").font(Typo.text(.subheadline, weight: .medium))
                         Text(email ?? "…").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
                         Text(session.serverAddress).font(Typo.mono(.caption2)).foregroundStyle(palette.tintaFraca)
+                        HStack(spacing: 14) {
+                            linkButton("Trocar senha") { changing = .password }
+                            linkButton("Trocar email") { changing = .email }
+                        }
+                        .padding(.top, 4)
+                        if let notice {
+                            Text("✓ \(notice)").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                        }
                     }
                 }
                 PageRow {
@@ -104,6 +137,23 @@ struct SettingsView: View {
         .refreshable { await load() }
         .confirmationDialog("Sair desta conta?", isPresented: $confirmLogout, titleVisibility: .visible) {
             Button("Sair", role: .destructive) { session.logout() }
+        }
+        .confirmationDialog("Desconectar o Google?", isPresented: $confirmGoogle, titleVisibility: .visible) {
+            Button("Desconectar", role: .destructive) {
+                Task {
+                    await run { try await session.api.disconnectGoogle() }
+                    await load()
+                }
+            }
+        } message: {
+            Text("Ele para de ler seu email e sua agenda. Para conectar de novo, é pelo computador.")
+        }
+        .sheet(item: $changing) { mode in
+            AccountChangeSheet(mode: mode) { message in
+                notice = message
+                Task { await load() }
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -135,6 +185,16 @@ struct SettingsView: View {
         )
     }
 
+    private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(Typo.text(.footnote, weight: .medium))
+                .underline(color: palette.linhaForte)
+                .foregroundStyle(palette.tinta)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func run(_ action: () async throws -> Void) async {
         do {
             try await action()
@@ -153,5 +213,80 @@ struct SettingsView: View {
         server = await s ?? server
         google = await g ?? google
         email = await me?.email ?? email
+    }
+}
+
+enum AccountChange: String, Identifiable {
+    case password, email
+    var id: String { rawValue }
+}
+
+/// Email or password, changed with the current password; every other device is signed out,
+/// this one keeps going with the new token (AccountPanel.tsx).
+struct AccountChangeSheet: View {
+    let mode: AccountChange
+    let onDone: (String) -> Void
+    @Environment(Session.self) private var session
+    @Environment(Appearance.self) private var appearance
+    @Environment(\.dismiss) private var dismiss
+    @State private var current = ""
+    @State private var next = ""
+    @State private var confirm = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    SecureField("Senha atual", text: $current).textContentType(.password)
+                    if mode == .password {
+                        SecureField("Senha nova", text: $next).textContentType(.newPassword)
+                        SecureField("Repita a senha nova", text: $confirm).textContentType(.newPassword)
+                    } else {
+                        TextField("Email novo", text: $next)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                } footer: {
+                    Text("Os outros aparelhos vão pedir login de novo; este continua conectado.")
+                }
+                if let error {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+            }
+            .navigationTitle(mode == .password ? "Trocar senha" : "Trocar email")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(busy ? "Trocando…" : "Trocar") { Task { await submit() } }
+                        .disabled(busy || current.isEmpty || next.isEmpty)
+                }
+            }
+        }
+        .tint(appearance.palette.tinta)
+    }
+
+    private func submit() async {
+        if mode == .password && next != confirm {
+            error = "As senhas novas não conferem."
+            return
+        }
+        busy = true
+        defer { busy = false }
+        do {
+            if mode == .password {
+                try await session.api.changePassword(current: current, new: next)
+            } else {
+                try await session.api.changeEmail(current: current, newEmail: next.trimmingCharacters(in: .whitespaces).lowercased())
+            }
+            onDone(mode == .password ? "Senha trocada. Os outros aparelhos vão pedir login de novo." : "Email trocado. Os outros aparelhos vão pedir login de novo.")
+            dismiss()
+        } catch {
+            self.error = (error as? LocalizedError)?.errorDescription ?? "Não consegui trocar agora."
+        }
     }
 }

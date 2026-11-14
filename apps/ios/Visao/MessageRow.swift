@@ -11,7 +11,10 @@ struct MessageRow: View {
     let onReply: () -> Void
     let onQuoteTap: (String) -> Void
     let onOpenPage: (Artifact) -> Void
+    /// Rates a reply; answers what to say back ("Valeu…"), nil when it failed.
+    var onFeedback: ((Bool, [String]) async -> String?)?
     @Environment(\.palette) private var palette
+    @State private var feedbackOpen = false
 
     /// Past this, letting go answers the message (as SwipeReply.tsx on the web).
     private let trigger: CGFloat = 56
@@ -92,6 +95,9 @@ struct MessageRow: View {
             }
             if !message.sources.isEmpty {
                 SourcesList(sources: message.sources)
+            }
+            if !isUser, message.local == nil, let onFeedback {
+                FeedbackBar(open: $feedbackOpen, send: onFeedback)
             }
         }
         .font(Typo.text(.body))
@@ -205,5 +211,99 @@ private struct SourcesList: View {
         .padding(.top, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Fontes pesquisadas")
+    }
+}
+
+/// "Como foi essa resposta?": thumbs and a few tags, the only evidence its way of answering
+/// learns from (FeedbackBar.tsx).
+private struct FeedbackBar: View {
+    @Binding var open: Bool
+    let send: (Bool, [String]) async -> String?
+    @Environment(\.palette) private var palette
+    @State private var tags: Set<String> = []
+    @State private var done: String?
+    @State private var busy = false
+
+    private let options = ["muito longo", "muito curto", "faltou fonte", "perguntas demais"]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let done {
+                Text(done).font(Typo.text(.caption)).foregroundStyle(palette.tintaFraca)
+            } else if open {
+                HStack(spacing: 8) {
+                    thumb("hand.thumbsup", label: "Resposta boa", positive: true)
+                    thumb("hand.thumbsdown", label: "Resposta ruim", positive: false)
+                }
+                FlowChips(options: options, selected: $tags)
+            } else {
+                Button {
+                    withAnimation(.spring(duration: 0.3)) { open = true }
+                } label: {
+                    Text("Como foi essa resposta?")
+                        .font(Typo.text(.caption))
+                        .foregroundStyle(palette.tintaFraca)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func thumb(_ icon: String, label: String, positive: Bool) -> some View {
+        Button {
+            busy = true
+            Task {
+                let reply = await send(positive, Array(tags))
+                busy = false
+                withAnimation { done = reply ?? "Não deu para mandar agora." }
+            }
+        } label: {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .frame(width: 40, height: 34)
+                .overlay(Capsule().strokeBorder(palette.linhaForte))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(busy)
+        .sensoryFeedback(.impact(weight: .light), trigger: done)
+        .accessibilityLabel(label)
+    }
+}
+
+/// Tags you tap on and off, wrapping to the next line.
+private struct FlowChips: View {
+    let options: [String]
+    @Binding var selected: Set<String>
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) { chips }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) { ForEach(options.prefix(2), id: \.self, content: chip) }
+                HStack(spacing: 6) { ForEach(options.dropFirst(2), id: \.self, content: chip) }
+            }
+        }
+    }
+
+    private var chips: some View { ForEach(options, id: \.self, content: chip) }
+
+    private func chip(_ tag: String) -> some View {
+        let on = selected.contains(tag)
+        return Button {
+            if on { selected.remove(tag) } else { selected.insert(tag) }
+        } label: {
+            Text(tag)
+                .font(Typo.text(.caption))
+                .padding(.horizontal, 10)
+                .frame(minHeight: 30)
+                .foregroundStyle(on ? palette.pilulaAtivaTinta : palette.tintaSuave)
+                .background(on ? palette.pilulaAtiva : .clear, in: Capsule())
+                .overlay(Capsule().strokeBorder(on ? .clear : palette.linhaForte))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
