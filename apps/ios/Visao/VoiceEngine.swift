@@ -343,12 +343,12 @@ final class VoiceEngine: NSObject {
 
     /// A Brazilian voice from the iPhone, the best quality installed (Ajustes → Acessibilidade →
     /// Conteúdo Falado → Vozes downloads better ones).
-    static var bestVoice: AVSpeechSynthesisVoice? {
+    nonisolated static var bestVoice: AVSpeechSynthesisVoice? {
         let voices = AVSpeechSynthesisVoice.speechVoices().filter { $0.language == "pt-BR" }
         return voices.max { $0.quality.rawValue < $1.quality.rawValue } ?? AVSpeechSynthesisVoice(language: "pt-BR")
     }
 
-    static var voiceName: String { bestVoice?.name ?? "voz do aparelho" }
+    nonisolated static var voiceName: String { bestVoice?.name ?? "voz do aparelho" }
 }
 
 extension VoiceEngine: AVSpeechSynthesizerDelegate {
@@ -380,6 +380,12 @@ enum VoicePrefs {
     static var speakReplies: Bool {
         get { UserDefaults.standard.bool(forKey: "speakReplies") }
         set { UserDefaults.standard.set(newValue, forKey: "speakReplies") }
+    }
+
+    /// Talking over him stops him (two-way audio with echo cancellation). On unless turned off.
+    static var bargeIn: Bool {
+        get { UserDefaults.standard.object(forKey: "bargeIn") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "bargeIn") }
     }
 
     /// On unless turned off, as on the web.

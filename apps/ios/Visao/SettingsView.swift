@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var speakReplies = VoicePrefs.speakReplies
     @State private var sampleVoice = VoiceEngine()
     @State private var voiceApproval = VoicePrefs.voiceApproval
+    @State private var bargeIn = VoicePrefs.bargeIn
     private let onDeviceSpeech = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))?.supportsOnDeviceRecognition ?? false
 
     var body: some View {
@@ -55,6 +56,11 @@ struct SettingsView: View {
                     title: "Falar as respostas",
                     description: "Leio em voz alta com a voz do aparelho (\(VoiceEngine.voiceName)). Vozes melhores em Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes.",
                     isOn: Binding(get: { speakReplies }, set: { speakReplies = $0; VoicePrefs.speakReplies = $0 })
+                )
+                SettingRow(
+                    title: "Interromper falando",
+                    description: "Na ligação, é só falar por cima que eu paro e escuto. Se eu me cortar sozinho (alto-falante muito alto, por exemplo), desligue: aí eu paro de ouvir enquanto falo e você usa o botão Interromper.",
+                    isOn: Binding(get: { bargeIn }, set: { bargeIn = $0; VoicePrefs.bargeIn = $0 })
                 )
                 SettingRow(
                     title: "Aprovar por voz na ligação",

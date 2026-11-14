@@ -215,8 +215,14 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
 - **Falar**: `AVSpeechSynthesizer` com a melhor voz pt-BR instalada no iPhone (vozes melhores em
   Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes). Código e links não são lidos:
   ele diz que deixou na tela (as mesmas regras do `speakable.ts`).
-- Enquanto ele fala, não ouve: a voz do sistema não é tirada do microfone, então ele se ouviria.
-  **Interromper** para a fala e volta a ouvir, como a voz do aparelho no web.
+- **Interromper falando** (ligado por padrão): é só falar por cima que ele para e escuta, como no
+  modo de voz do Grok. O áudio da ligação vai nos dois sentidos ao mesmo tempo
+  (`DuplexVoice.swift`): o microfone fica aberto com o processamento de voz do iPhone (o
+  cancelamento de eco do FaceTime) e a voz dele toca pelo mesmo motor de áudio, então o iPhone
+  sabe o que tirar do microfone. Enquanto ele fala, o reconhecimento continua; uma ou duas
+  palavras suas (não o eco) param a fala e viram o seu turno. Os primeiros 450 ms de cada fala são
+  ignorados, enquanto o cancelamento de eco se ajusta. Desligado em Ajustes → Voz e avisos, volta o
+  jeito antigo: enquanto fala não ouve, e o botão **Interromper** para.
 - Na ligação, a resposta e o que ele fala por conta própria (aberturas, o relatório do Mac) saem
   em voz. O que você fala vai como `modality=voice`.
 - **Aprovar por voz**: quando há um email, evento ou pedido ao Mac esperando, ele termina de

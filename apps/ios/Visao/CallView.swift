@@ -17,6 +17,14 @@ final class CallController {
     let started = Date()
 
     let voice = VoiceEngine()
+    /// Two-way audio, so talking over him stops him; nil when "Interromper falando" is off.
+    private(set) var duplex: DuplexVoice?
+
+    var level: Float { duplex?.level ?? voice.level }
+    var partial: String { duplex?.partial ?? voice.partial }
+    var usesServerVoice: Bool { duplex?.usesServerVoice ?? voice.usesServerVoice }
+    var onDevice: Bool { duplex?.onDevice ?? voice.onDevice }
+    var canInterruptByVoice: Bool { duplex != nil }
     private let chat: ChatStore
     private let pending: PendingStore
     private let api: APIClient
@@ -42,13 +50,27 @@ final class CallController {
             fail(VoiceError.denied)
             return
         }
-        do {
-            try voice.activate()
-        } catch {
-            fail(error)
-            return
+        if VoicePrefs.bargeIn {
+            let duplex = DuplexVoice()
+            duplex.onUtterance = { [weak self] sentence in self?.heard(sentence) }
+            duplex.onBargeIn = { [weak self] in self?.state = .listening }
+            do {
+                try await duplex.start(api: api)
+                self.duplex = duplex
+            } catch {
+                // The iPhone refused two-way audio: the call goes on the old way.
+                duplex.stop()
+            }
         }
-        await voice.prepare(api: api)
+        if duplex == nil {
+            do {
+                try voice.activate()
+            } catch {
+                fail(error)
+                return
+            }
+            await voice.prepare(api: api)
+        }
         UIApplication.shared.isIdleTimerDisabled = true
         known = Set(chat.messages.map(\.id))
         watch()
@@ -60,12 +82,14 @@ final class CallController {
         guard !ended else { return }
         ended = true
         watcher?.cancel()
+        duplex?.stop()
         voice.deactivate()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
     /// Stops it talking and listens again.
     func interrupt() {
+        duplex?.stopSpeaking()
         voice.stopSpeaking()
         state = .interrupted
         listen()
@@ -73,6 +97,7 @@ final class CallController {
 
     func decideOnScreen(_ ask: PendingAsk, approve: Bool) {
         Task {
+            duplex?.stopSpeaking()
             voice.stopSpeaking()
             let ok = await pending.decide(ask, approve: approve)
             if ok && approve { await chat.refresh() }
@@ -85,6 +110,11 @@ final class CallController {
 
     private func listen() {
         guard !ended else { return }
+        // Two-way: the microphone never stopped.
+        if duplex != nil {
+            state = .listening
+            return
+        }
         do {
             try voice.listen { [weak self] sentence in self?.heard(sentence) }
             state = .listening
@@ -152,9 +182,14 @@ final class CallController {
     private func say(_ text: String) {
         guard !ended else { return }
         state = .speaking
-        voice.speak(text) { [weak self] in
+        let after: () -> Void = { [weak self] in
             guard let self, self.state == .speaking else { return }
             self.afterSpeaking()
+        }
+        if let duplex {
+            duplex.speak(text, done: after)
+        } else {
+            voice.speak(text, done: after)
         }
     }
 
@@ -202,9 +237,9 @@ struct CallView: View {
             .textCase(.uppercase)
             .foregroundStyle(palette.tintaSuave)
 
-            KokoroOffer(usesServerVoice: controller.voice.usesServerVoice)
+            KokoroOffer(usesServerVoice: controller.usesServerVoice)
             Spacer(minLength: 0)
-            CallOrb(state: controller.state, level: controller.voice.level)
+            CallOrb(state: controller.state, level: controller.level)
             VStack(spacing: 6) {
                 Text(agentName ?? "Sem nome ainda")
                     .font(Typo.display(34, relativeTo: .largeTitle, italic: agentName == nil))
@@ -278,8 +313,8 @@ struct CallView: View {
         let lastUser = messages.last { $0.role == .user }
         let lastReply = messages.last { $0.role == .assistant }
         VStack(alignment: .leading, spacing: 8) {
-            if !controller.voice.partial.isEmpty {
-                line("Você", controller.voice.partial, dim: true)
+            if !controller.partial.isEmpty {
+                line("Você", controller.partial, dim: true)
             } else if let lastUser {
                 line("Você", lastUser.content)
             }
@@ -308,8 +343,8 @@ struct CallView: View {
     /// Which voice is speaking, top right.
     private var voiceLabel: String {
         if let local = LocalVoices.shared.active { return "Voz \(local.kind.name) · no iPhone" }
-        if controller.voice.usesServerVoice { return "Voz própria" }
-        return controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho"
+        if controller.usesServerVoice { return "Voz própria" }
+        return controller.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho"
     }
 
     private var stateLabel: String {
@@ -328,7 +363,7 @@ struct CallView: View {
         case .starting: "Pedindo o microfone."
         case .listening: "Pode falar. Eu espero você terminar."
         case .thinking: "Pensando no que você disse."
-        case .speaking: "Toque em Interromper para falar por cima."
+        case .speaking: controller.canInterruptByVoice ? "Fale por cima para me interromper." : "Toque em Interromper para falar por cima."
         case .interrupted: "Parei. Continue."
         case .failed: "A ligação não começou."
         }

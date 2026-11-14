@@ -196,7 +196,12 @@ final class LocalVoice: Identifiable {
 
     /// One sentence as WAV audio, ready for AVAudioPlayer.
     func audio(for sentence: String) async throws -> Data {
-        try await engine.wav(sentence, voice: voiceId)
+        WAV.encode(try await samples(for: sentence), sampleRate: kind.sampleRate)
+    }
+
+    /// One sentence as raw samples (mono, `kind.sampleRate`), for the call's audio engine.
+    func samples(for sentence: String) async throws -> [Float] {
+        try await engine.pcm(sentence, voice: voiceId)
     }
 }
 
@@ -245,19 +250,19 @@ actor LocalVoiceEngine {
         supertonic = nil
     }
 
-    func wav(_ text: String, voice: String) throws -> Data {
+    func pcm(_ text: String, voice: String) throws -> [Float] {
         switch kind {
         case .kokoro:
             guard let kokoro else { throw LocalVoiceError.notLoaded }
             // Brazilian phonemes of our own (BrazilianPhonemes), not the package's European
             // dictionary: each word goes as a code whose pronunciation is registered first.
             let input = BrazilianPhonemes.kokoroInput(text)
-            guard !input.text.isEmpty else { return WAV.encode([], sampleRate: kind.sampleRate) }
+            guard !input.text.isEmpty else { return [] }
             kokoro.addPronunciations(input.pronunciations)
-            return WAV.encode(try kokoro.synthesize(text: input.text, voice: voice, language: "en"), sampleRate: kind.sampleRate)
+            return try kokoro.synthesize(text: input.text, voice: voice, language: "en")
         case .supertonic:
             guard let supertonic else { throw LocalVoiceError.notLoaded }
-            return WAV.encode(try supertonic.synthesize(text: text, voice: voice, language: "pt"), sampleRate: kind.sampleRate)
+            return try supertonic.synthesize(text: text, voice: voice, language: "pt")
         }
     }
 }
