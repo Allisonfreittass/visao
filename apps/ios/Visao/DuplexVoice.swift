@@ -303,7 +303,15 @@ final class DuplexVoice {
             phase = .listening
             onBargeIn?()
         }
-        if final, phase != .speaking { finishSentence() }
+        guard final else { return }
+        if phase == .speaking {
+            // A recognition that ends while he talks (it heard his own voice and closed) would
+            // leave nothing listening once he stops: a fresh one takes over now.
+            VoiceLog.write("reconhecimento fechou durante a fala dele; outro começa")
+            try? beginSentence()
+        } else {
+            finishSentence()
+        }
     }
 
     /// Two letters of noise are not an interruption.
@@ -339,6 +347,9 @@ final class DuplexVoice {
             let finished = await self.render(text)
             guard !Task.isCancelled, finished, self.phase == .speaking else { return }
             self.phase = .listening
+            // What was heard while he talked was mostly his own voice: listening starts clean,
+            // so that echo is neither sent as your sentence nor leaves the recognition stuck.
+            try? self.beginSentence()
             done()
         }
     }
