@@ -21,11 +21,12 @@ final class BrazilianPhonemesTests: XCTestCase {
         XCTAssertEqual(ipa("casas"), "kˈazɐs")
     }
 
+    /// Neutral accent: a soft h, not the carioca x.
     func testStrongR() {
-        XCTAssertEqual(ipa("rato"), "xˈatʊ")
-        XCTAssertEqual(ipa("carro"), "kˈaxʊ")
+        XCTAssertEqual(ipa("rato"), "hˈatʊ")
+        XCTAssertEqual(ipa("carro"), "kˈahʊ")
         XCTAssertEqual(ipa("caro"), "kˈaɾʊ")
-        XCTAssertEqual(ipa("amar"), "ɐmˈax")
+        XCTAssertEqual(ipa("amar"), "ɐmˈah")
     }
 
     func testNasals() {
@@ -50,7 +51,7 @@ final class BrazilianPhonemesTests: XCTestCase {
         XCTAssertEqual(ipa("filho"), "fˈiʎʊ")
         XCTAssertEqual(ipa("ninho"), "nˈiɲʊ")
         XCTAssertEqual(ipa("queijo"), "kˈAʒʊ")
-        XCTAssertEqual(ipa("guerra"), "ɡˈexɐ")
+        XCTAssertEqual(ipa("guerra"), "ɡˈehɐ")
         XCTAssertEqual(ipa("casa"), "kˈazɐ")
         XCTAssertEqual(ipa("cidadão"), "sidadˈɐ̃ʊ̃")
         XCTAssertEqual(ipa("exame"), "ezˈɐmi")

@@ -177,7 +177,7 @@ struct ChatScreen: View {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(palette.tinta)
-                        .glassCircle(palette, size: 38)
+                        .glassCircle(palette, size: 44)
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 14)
@@ -409,14 +409,16 @@ struct LiveStatusView: View {
                             .foregroundStyle(palette.tintaSuave)
                             .frame(width: 28, height: 28)
                             .background(palette.fundoHover, in: Circle())
+                            .frame(width: 44, height: 44) // touch target: 44 pt (HIG), drawn at 28
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Parar")
                 }
             }
             .padding(.leading, 20)
-            .padding(.trailing, canStop ? 10 : 20)
-            .padding(.vertical, canStop ? 10 : 16)
+            .padding(.trailing, canStop ? 2 : 20)
+            .padding(.vertical, canStop ? 2 : 16)
             .background(palette.bolhaDele, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: palette.sombra, radius: 11, y: 6)
 

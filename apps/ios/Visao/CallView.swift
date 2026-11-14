@@ -372,7 +372,9 @@ struct CallOrb: View {
                     .opacity(state == .failed ? 0.4 : 1)
             }
             .frame(width: 220, height: 220)
-            .liquidGlass(palette, in: Circle(), tint: palette.vidro.opacity(0.2), interactive: false)
+            // Content, not a control: a standard material, not Liquid Glass (liquid-glass.md).
+            .background(palette.usesGlass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(palette.fundoElevado), in: Circle())
+            .overlay(Circle().strokeBorder(palette.vidroBorda))
         }
         .accessibilityHidden(true)
     }

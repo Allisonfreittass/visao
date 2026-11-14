@@ -80,12 +80,18 @@ extension View {
 
 private struct VisaoBackground: ViewModifier {
     @Environment(Appearance.self) private var appearance
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
         content
             .background { SkyBackground() }
-            .environment(\.palette, appearance.palette)
-            .foregroundStyle(appearance.palette.tinta)
-            .tint(appearance.palette.tinta)
+            .environment(\.palette, palette)
+            .foregroundStyle(palette.tinta)
+            .tint(palette.tinta)
+    }
+
+    private var palette: Palette {
+        appearance.palette.adapted(reduceTransparency: reduceTransparency, increaseContrast: contrast == .increased)
     }
 }

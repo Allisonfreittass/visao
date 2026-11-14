@@ -59,6 +59,8 @@ struct Composer: View {
                                 .foregroundStyle(palette.pilulaAtivaTinta)
                                 .frame(width: 40, height: 40)
                                 .background(palette.pilulaAtiva, in: Circle())
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
                         }
                         .buttonStyle(.plain)
                         .keyboardShortcut(.return, modifiers: .command)
@@ -89,7 +91,7 @@ struct Composer: View {
         } label: {
             Image(systemName: "plus")
                 .font(.title3)
-                .frame(width: 40, height: 40)
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .disabled(draft.room <= 0)
@@ -114,7 +116,8 @@ struct Composer: View {
                 Image(systemName: "xmark")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.tintaFraca)
-                    .frame(width: 26, height: 26)
+                    .frame(width: 44, height: 44) // was 26 pt, under the 28 pt minimum
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Não responder a essa mensagem")

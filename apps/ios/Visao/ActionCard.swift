@@ -59,7 +59,7 @@ struct ActionCard: View {
             .disabled(busy)
             Text("Nada roda sem o seu toque.")
                 .font(Typo.text(.caption))
-                .foregroundStyle(Color(rgb: 0x7e8496))
+                .foregroundStyle(Color(rgb: 0x9aa0b4)) // 5.9:1 on the card (the old #7e8496 was 4.1:1)
         }
         .padding(18)
         .frame(maxWidth: 440, alignment: .leading)

@@ -266,9 +266,10 @@ private struct FeedbackBar: View {
         } label: {
             Image(systemName: icon)
                 .font(.subheadline)
-                .frame(width: 40, height: 34)
+                .frame(width: 44, height: 34)
                 .overlay(Capsule().strokeBorder(palette.linhaForte))
-                .contentShape(Capsule())
+                .frame(height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(busy)
@@ -307,6 +308,8 @@ private struct FlowChips: View {
                 .foregroundStyle(on ? palette.pilulaAtivaTinta : palette.tintaSuave)
                 .background(on ? palette.pilulaAtiva : .clear, in: Capsule())
                 .overlay(Capsule().strokeBorder(on ? .clear : palette.linhaForte))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])

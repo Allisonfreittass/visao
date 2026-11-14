@@ -71,8 +71,32 @@ struct Palette: Equatable {
     /// Glass over the forest; flat panels in "Noite".
     var usesGlass: Bool
 
+    /// The iPhone's accessibility settings, applied to the colors (apple-design skill:
+    /// liquid-glass.md, review checklist 5; accessibility.md › Color and effects).
+    /// - Reduce Transparency: no glass anywhere; every surface becomes opaque.
+    /// - Increase Contrast: secondary text as strong as the body's second level, firmer lines.
+    func adapted(reduceTransparency: Bool, increaseContrast: Bool) -> Palette {
+        var p = self
+        if reduceTransparency && usesGlass {
+            let dark = self == .neblinaNoite
+            p.usesGlass = false
+            p.fundoElevado = dark ? Color(rgb: 0x1e2337) : Color(rgb: 0xeef2f4)
+            p.vidro = p.fundoElevado
+            p.vidroForte = p.fundoElevado
+            p.fundo = dark ? Color(rgb: 0x141828) : Color(rgb: 0xe4e9eb)
+            p.bolhaSua = dark ? Color(rgb: 0x3a4a54) : Color(rgb: 0xd6e1e6)
+            p.bolhaDele = dark ? Color(rgb: 0x1e2830) : Color(rgb: 0xf8fafa)
+        }
+        if increaseContrast {
+            p.tintaFraca = p.tintaSuave
+            p.linha = p.linhaForte
+            p.vidroBorda = p.linhaForte
+        }
+        return p
+    }
+
     /// "Conectado", on: teal, darker on light glass.
-    var sucesso: Color { self == .neblinaDia ? Color(rgb: 0x1b6a70) : Color(rgb: 0x5cc2c9) }
+    var sucesso: Color { tinta == Palette.neblinaDia.tinta ? Color(rgb: 0x1b6a70) : Color(rgb: 0x5cc2c9) }
 
     static let neblinaDia = Palette(
         tinta: Color(rgb: 0x17222a), tintaSuave: Color(rgb: 0x36454e), tintaFraca: Color(rgb: 0x56656e),

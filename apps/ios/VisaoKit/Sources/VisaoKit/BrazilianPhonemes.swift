@@ -6,7 +6,8 @@ import Foundation
 /// symbols: tied d^ʒ → ʤ, t^ʃ → ʧ, a^ɪ → I, e^ɪ → A, a^ʊ → W, o^ʊ → O, ɔ^ɪ → Y, and drops the ties.
 /// The dictionary inside the speech-swift package is European Portuguese ("tarde" → tˈaɾədɨ),
 /// which is why the voice sounded robotic and not Brazilian. This writes the Brazilian sounds by
-/// rule (no espeak, no GPL): ʤi/ʧi, final e/o as i/ʊ, final l as w, strong r as x, nasal vowels,
+/// rule (no espeak, no GPL): ʤi/ʧi, final e/o as i/ʊ, final l as w, a soft strong r (neutral
+/// accent), nasal vowels,
 /// stress before the stressed vowel as espeak marks it.
 public enum BrazilianPhonemes {
     /// A text as speakable tokens: words as phonemes, punctuation kept for the pauses.
@@ -63,22 +64,22 @@ public enum BrazilianPhonemes {
         "isso": "ˈisʊ", "isto": "ˈistʊ", "esse": "ˈesi", "essa": "ˈɛsɐ", "este": "ˈesʧi",
         "esta": "ˈɛstɐ", "aquele": "akˈeli", "aquela": "akˈɛlɐ", "gente": "ʒˈẽʧi",
         "noite": "nˈoɪʧi", "tarde": "tˈaɾʤi", "cidade": "sidˈaʤi", "verdade": "veɾdˈaʤi",
-        "porque": "poɾkˈe", "por": "poɾ", "para": "pˈaɾɐ", "pra": "pɾɐ", "tudo": "tˈudʊ",
+        "porque": "poɾkˈe", "por": "poh", "para": "pˈaɾɐ", "pra": "pɾɐ", "tudo": "tˈudʊ",
         "coisa": "kˈoɪzɐ", "coisas": "kˈoɪzɐs", "mais": "mˈIs", "mas": "mˈas", "depois": "depˈoɪs",
         "nós": "nˈɔs", "vou": "vˈo", "vai": "vˈI", "vamos": "vˈɐ̃mʊs", "foi": "fˈoɪ", "sou": "sˈo",
         "tem": "tˈẽɪ̃", "têm": "tˈẽɪ̃ẽɪ̃", "bom": "bˈõ", "boa": "bˈoɐ", "dia": "ʤˈiɐ", "dias": "ʤˈiɐs",
         "ontem": "ˈõtẽɪ̃", "sempre": "sˈẽpɾi", "nunca": "nˈũkɐ", "nada": "nˈadɐ", "onde": "ˈõʤi",
         "quando": "kwˈɐ̃dʊ", "como": "kˈomʊ", "quanto": "kwˈɐ̃tʊ", "qual": "kwˈaw", "quais": "kwˈIs",
         "aqui": "akˈi", "ali": "alˈi", "lá": "lˈa", "já": "ʒˈa", "só": "sˈɔ", "ainda": "aˈĩdɐ",
-        "então": "ẽtˈɐ̃ʊ̃", "assim": "asˈĩ", "mesmo": "mˈezmʊ", "melhor": "meʎˈɔɾ", "pior": "piˈɔɾ",
-        "senhor": "seɲˈoɾ", "senhora": "seɲˈɔɾɐ", "homem": "ˈɔmẽɪ̃", "mulher": "muʎˈɛɾ",
+        "então": "ẽtˈɐ̃ʊ̃", "assim": "asˈĩ", "mesmo": "mˈezmʊ", "melhor": "meʎˈɔh", "pior": "piˈɔh",
+        "senhor": "seɲˈoh", "senhora": "seɲˈɔɾɐ", "homem": "ˈɔmẽɪ̃", "mulher": "muʎˈɛh",
         "tchau": "ʧˈW", "beleza": "belˈezɐ", "certo": "sˈɛɾtʊ", "certeza": "seɾtˈezɐ",
         "hora": "ˈɔɾɐ", "horas": "ˈɔɾɐs", "nova": "nˈɔvɐ", "novo": "nˈovʊ", "nossa": "nˈɔsɐ",
         "nosso": "nˈɔsʊ", "pessoa": "pesˈoɐ", "pessoas": "pesˈoɐs", "email": "imˈeɪw",
         "mac": "mˈɛk", "google": "ɡˈuɡow", "visão": "vizˈɐ̃ʊ̃", "brasil": "bɾazˈiw",
         "deus": "dˈeʊs", "seu": "sˈeʊ", "sua": "sˈuɐ", "meu": "mˈeʊ", "minha": "mˈĩɲɐ",
-        "eu": "ˈeʊ", "ter": "tˈeɾ", "ser": "sˈeɾ", "fazer": "fazˈeɾ", "dizer": "ʤizˈeɾ",
-        "quero": "kˈɛɾʊ", "quer": "kˈɛɾ", "precisa": "pɾesˈizɐ", "preciso": "pɾesˈizʊ",
+        "eu": "ˈeʊ", "ter": "tˈeh", "ser": "sˈeh", "fazer": "fazˈeh", "dizer": "ʤizˈeh",
+        "quero": "kˈɛɾʊ", "quer": "kˈɛh", "precisa": "pɾesˈizɐ", "preciso": "pɾesˈizʊ",
     ]
 
     /// Clitics and function words: no stress of their own.
@@ -268,10 +269,12 @@ public enum BrazilianPhonemes {
         case "n":
             if next == "h" { index = i + 2; return "ɲ" }
             return "n"
+        // Neutral accent: the strong r is a soft h (not the guttural x of Rio), the r inside a
+        // word stays a light tap.
         case "r":
-            if next == "r" { index = i + 2; return "x" }
-            if previous == nil || previous == "n" || previous == "l" || previous == "s" { return "x" }
-            if next == nil { return "x" }
+            if next == "r" { index = i + 2; return "h" }
+            if previous == nil || previous == "n" || previous == "l" || previous == "s" { return "h" }
+            if next == nil { return "h" }
             return "ɾ"
         case "s":
             if next == "s" { index = i + 2; return "s" }

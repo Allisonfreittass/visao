@@ -310,6 +310,26 @@ recebe o token do cartão. Falta:
 
 Até lá o token não é mandado para lugar nenhum.
 
+### Revisão pelas diretrizes da Apple
+
+Revisado com a skill [dickwu/apple-design-skill](https://github.com/dickwu/apple-design-skill)
+(as páginas das Human Interface Guidelines, lidas direto do repositório, sem instalar):
+
+- **Reduzir Transparência** (Ajustes do iPhone → Acessibilidade): nenhum vidro; toda superfície
+  vira opaca (`Palette.adapted`).
+- **Aumentar Contraste**: texto secundário e linhas mais fortes.
+- **Alvos de toque** de 44 pt em tudo que se toca (o × de "Respondendo a…" tinha 26 pt, abaixo do
+  mínimo de 28); o desenho continua do mesmo tamanho.
+- **Contraste**: a nota "Nada roda sem o seu toque." passou de 4,1:1 para 5,9:1. Os outros pares
+  medidos passam de 4,5:1 (texto 14:1, secundário 5,3:1 de dia e 6:1 à noite).
+- **Liquid Glass só nos controles** (barra, pílula, campo, botões, gaveta); a orbe grande da
+  ligação e a do login são conteúdo e usam material comum.
+- Desvio mantido de propósito: as abas ficam numa pílula no topo, como no web, e não numa barra
+  de abas embaixo, como a HIG recomenda.
+
+O sotaque da Kokoro é **neutro**: o "r" forte é um h suave (não o x carioca) e o "r" no meio da
+palavra continua um toque leve.
+
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 
 | | Apple ID grátis | Conta paga |

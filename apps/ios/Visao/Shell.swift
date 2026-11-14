@@ -240,6 +240,7 @@ struct SkyNav: View {
                 Capsule()
                     .fill(palette.pilulaAtiva)
                     .frame(width: segment, height: 38)
+                    .frame(height: 44)
                     .scaleEffect(dragX == nil ? 1 : 1.12)
                     .offset(x: x)
                     .shadow(color: .black.opacity(dragX == nil ? 0.12 : 0.22), radius: dragX == nil ? 4 : 10, y: 2)
@@ -265,8 +266,8 @@ struct SkyNav: View {
                     }
                     .font(Typo.text(.subheadline, weight: lit ? .medium : .regular))
                     .foregroundStyle(lit ? palette.pilulaAtivaTinta : palette.tintaFraca)
-                    .frame(width: segment, height: 38)
-                    .contentShape(Capsule())
+                    .frame(width: segment, height: 44) // touch target: 44 pt, the drop is drawn at 38
+                    .contentShape(Rectangle())
                     .onTapGesture { onPlace(tab) }
                     .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(place == tab ? [.isButton, .isSelected] : .isButton)
@@ -275,7 +276,8 @@ struct SkyNav: View {
                 }
             }
         }
-        .padding(4)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
         .frame(width: width)
         .liquidGlass(palette, in: Capsule(), interactive: false)
         .gesture(
@@ -397,6 +399,8 @@ struct Drawer: View {
                         .foregroundStyle(palette.tintaSuave)
                         .frame(width: 28, height: 28)
                         .overlay(Circle().strokeBorder(palette.linhaForte))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Nova conversa")

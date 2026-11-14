@@ -25,7 +25,7 @@ struct LoginView: View {
                     .accessibilityAddTraits(.isHeader)
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Orb(thinking: busy, size: 64)
+                    Orb(thinking: busy, size: 64, control: false)
                     (Text("Eu nasci sem nome e venho ").font(Typo.display(30, relativeTo: .title))
                         + Text("decidindo quem sou.").font(Typo.display(30, relativeTo: .title, italic: true)))
                     Text("Entre para conversar.")
@@ -153,6 +153,9 @@ private struct Campo<Content: View>: View {
 struct Orb: View {
     var thinking = false
     var size: CGFloat = 48
+    /// A button (next to the message box) floats in glass; elsewhere it is content, in a
+    /// standard material (liquid-glass.md: no Liquid Glass in the content layer).
+    var control = true
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
@@ -164,7 +167,7 @@ struct Orb: View {
             .shadow(color: palette.lanterna.opacity(0.45), radius: 6)
             .scaleEffect(thinking && pulse && !reduceMotion ? 1.6 : 1)
             .opacity(thinking ? (pulse ? 0.7 : 1) : 0.55)
-            .glassCircle(palette, size: size)
+            .modifier(OrbBackground(control: control, size: size))
             .onChange(of: thinking, initial: true) { _, now in
                 if now && !reduceMotion {
                     withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { pulse = true }
@@ -173,5 +176,22 @@ struct Orb: View {
                 }
             }
             .accessibilityHidden(true)
+    }
+}
+
+private struct OrbBackground: ViewModifier {
+    let control: Bool
+    let size: CGFloat
+    @Environment(\.palette) private var palette
+
+    func body(content: Content) -> some View {
+        if control {
+            content.glassCircle(palette, size: size)
+        } else {
+            content
+                .frame(width: size, height: size)
+                .background(palette.usesGlass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(palette.fundoElevado), in: Circle())
+                .overlay(Circle().strokeBorder(palette.vidroBorda))
+        }
     }
 }

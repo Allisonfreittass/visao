@@ -150,7 +150,8 @@ struct PillButton: View {
             .frame(minHeight: 40)
             .background(primary ? palette.pilulaAtiva : .clear, in: Capsule())
             .overlay(Capsule().strokeBorder(primary ? .clear : palette.linhaForte))
-            .contentShape(Capsule())
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
             .opacity(isEnabled ? 1 : 0.45)
         }
         .buttonStyle(.plain)
