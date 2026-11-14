@@ -43,11 +43,18 @@ final class VoiceEngine: NSObject {
 
     /// Microphone and speech recognition, asked once by the system.
     func requestPermissions() async -> Bool {
-        let speech = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0 == .authorized) }
-        }
-        guard speech else { return false }
+        guard await Self.speechAuthorization() else { return false }
         return await AVAudioApplication.requestRecordPermission()
+    }
+
+    /// The system answers on a background queue: asked outside the main actor, or Swift stops the
+    /// app for answering on the wrong thread.
+    nonisolated private static func speechAuthorization() async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status == .authorized)
+            }
+        }
     }
 
     // MARK: Session
