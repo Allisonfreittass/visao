@@ -366,7 +366,7 @@ private struct KokoroRow: View {
                         ProgressView()
                         Text("Abrindo o modelo…").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
                     }
-                case .ready:
+                case .ready, .onDisk:
                     Toggle(isOn: $kokoro.enabled) {
                         Text("Falar com a voz Kokoro").font(Typo.text(.footnote, weight: .medium))
                     }

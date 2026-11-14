@@ -22,8 +22,6 @@ struct VisaoApp: App {
             // system sheets follow it.
             .preferredColorScheme(appearance.isDark ? .dark : .light)
             .task {
-                // A Kokoro model already on the iPhone opens in the background, no network.
-                Task { await KokoroVoice.shared.loadIfDownloaded() }
                 while !Task.isCancelled {
                     appearance.tick()
                     try? await Task.sleep(for: .seconds(60))

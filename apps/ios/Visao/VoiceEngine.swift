@@ -207,10 +207,20 @@ final class VoiceEngine: NSObject {
             phase = .speaking
             let sentences = VoiceRules.sentences(text)
             serverSpeech = Task { [weak self] in
+                // Opened on first use; if it cannot open here, the next voice in line speaks.
+                guard await KokoroVoice.shared.ensureLoaded() else {
+                    self?.speakWithoutKokoro(text)
+                    return
+                }
                 await self?.speakClips(sentences, fallbackText: text) { try await KokoroVoice.shared.audio(for: $0) }
             }
             return
         }
+        speakWithoutKokoro(text)
+    }
+
+    private func speakWithoutKokoro(_ text: String) {
+        guard !Task.isCancelled else { return }
         if usesServerVoice, let server {
             phase = .speaking
             serverSpeech = Task { [weak self] in await self?.speakWithServer(text, api: server) }

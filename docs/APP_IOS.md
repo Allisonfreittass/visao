@@ -242,6 +242,11 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
     Baixar. "Apagar" libera o espaço.
   - Exige iOS 18: o app passou a pedir iOS 18 ou mais novo.
   - A ordem da voz fica: Kokoro no iPhone → voz própria do servidor → voz do iPhone.
+  - O modelo só abre na primeira vez que vai falar, nunca ao abrir o app. Roda no CPU + Neural
+    Engine: no iOS 27.3 beta o caminho pela GPU (MPSGraph) derrubava o Core ML ao abrir o modelo.
+    Se abrir o modelo derrubar o app, na vez seguinte ele tenta só no CPU; se de novo, desliga o
+    Kokoro neste aparelho e diz por quê, em vez de cair a cada uso ("Tentar de novo" em Ajustes
+    recomeça depois de atualizar o iOS).
 - **Voz própria**: quando o servidor tem o Kokoro instalado e uma voz aprovada (`/voice/status`),
   o app fala com ela, frase a frase (`/voice/sentences` e `/voice/tts`), sintetizando a próxima
   enquanto a atual toca, como o web; a ligação mostra "Voz própria". Se o servidor falhar no meio,

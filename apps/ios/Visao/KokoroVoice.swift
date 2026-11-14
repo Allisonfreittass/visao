@@ -1,4 +1,5 @@
 import AudioCommon
+import CoreML
 import Foundation
 import KokoroTTS
 import Observation
@@ -15,10 +16,23 @@ final class KokoroVoice {
     enum State: Equatable {
         case absent
         case downloading(Double)
+        /// Downloaded, opened only the first time it has to speak.
+        case onDisk
         case loading
         case ready
         case failed(String)
     }
+
+    /// Where the model runs. The GPU path crashed Core ML on the iOS 27.3 beta (MPSGraph), so it
+    /// starts on CPU + Neural Engine and falls back to the CPU alone.
+    private enum Units: String {
+        case neuralEngine, cpu
+        var compute: MLComputeUnits { self == .neuralEngine ? .cpuAndNeuralEngine : .cpuOnly }
+    }
+
+    private static let unitsKey = "kokoroUnits"
+    /// Set while the model opens; still set at the next launch means opening it crashed the app.
+    private static let openingKey = "kokoroOpening"
 
     private(set) var state: State = .absent
     /// The voice he chose on the server, pf_dora by default.
@@ -35,40 +49,80 @@ final class KokoroVoice {
 
     private init() {
         enabled = UserDefaults.standard.object(forKey: "kokoroEnabled") as? Bool ?? true
-        if KokoroEngine.downloaded { state = .loading }
+        guard KokoroEngine.downloaded else { return }
+        state = .onDisk
+        // The last attempt to open it took the app down: step down to the CPU, or give up on
+        // this system instead of crashing at every use.
+        if UserDefaults.standard.bool(forKey: Self.openingKey) {
+            UserDefaults.standard.set(false, forKey: Self.openingKey)
+            if units == .neuralEngine {
+                units = .cpu
+            } else {
+                state = .failed("Neste iPhone (iOS 27.3 beta) o sistema travou ao abrir a voz Kokoro. Ele fala com a voz do servidor ou do iPhone; tente de novo depois de atualizar o iOS.")
+            }
+        }
+    }
+
+    private var units: Units {
+        get { Units(rawValue: UserDefaults.standard.string(forKey: Self.unitsKey) ?? "") ?? .neuralEngine }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: Self.unitsKey) }
     }
 
     var isReady: Bool { state == .ready }
-    var speaks: Bool { enabled && isReady }
+    /// Downloaded, switched on and not known to crash here: Kokoro is the voice.
+    var speaks: Bool { enabled && (state == .ready || state == .onDisk) }
 
-    /// Loads a model already on the iPhone (no network), once per launch.
-    func loadIfDownloaded() async {
-        guard KokoroEngine.downloaded, state != .ready else {
-            if !KokoroEngine.downloaded { state = .absent }
-            return
+    /// Opens the model the first time it has to speak (no network). False: use another voice.
+    func ensureLoaded() async -> Bool {
+        switch state {
+        case .ready: return true
+        case .onDisk: break
+        case .loading:
+            while state == .loading { try? await Task.sleep(for: .milliseconds(100)) }
+            return state == .ready
+        default: return false
         }
         state = .loading
+        UserDefaults.standard.set(true, forKey: Self.openingKey)
         do {
-            try await engine.load(offline: true) { _ in }
+            try await engine.load(offline: true, units: units.compute) { _ in }
+            UserDefaults.standard.set(false, forKey: Self.openingKey)
             state = .ready
+            return true
         } catch {
+            UserDefaults.standard.set(false, forKey: Self.openingKey)
             state = .failed("Não deu para abrir o modelo: \(error.localizedDescription)")
+            return false
         }
+    }
+
+    /// Tries again from the start (after an iOS update, say): Neural Engine first.
+    func retry() async {
+        units = .neuralEngine
+        state = KokoroEngine.downloaded ? .onDisk : .absent
+        if state == .onDisk { _ = await ensureLoaded() }
     }
 
     /// Downloads the model from Hugging Face (aufklarer/Kokoro-82M-CoreML), only on request.
     func download() async {
         guard !isReady else { return }
+        if KokoroEngine.downloaded {
+            await retry()
+            return
+        }
         state = .downloading(0)
+        UserDefaults.standard.set(true, forKey: Self.openingKey)
         do {
-            try await engine.load(offline: false) { fraction in
+            try await engine.load(offline: false, units: units.compute) { fraction in
                 Task { @MainActor in
                     if case .downloading = KokoroVoice.shared.state { KokoroVoice.shared.state = .downloading(fraction) }
                 }
             }
+            UserDefaults.standard.set(false, forKey: Self.openingKey)
             state = .ready
         } catch {
-            state = .failed("O download não terminou: \(error.localizedDescription)")
+            UserDefaults.standard.set(false, forKey: Self.openingKey)
+            state = KokoroEngine.downloaded ? .onDisk : .failed("O download não terminou: \(error.localizedDescription)")
         }
     }
 
@@ -99,10 +153,10 @@ actor KokoroEngine {
             && FileManager.default.fileExists(atPath: cacheDirectory.appendingPathComponent("voices/pf_dora.json").path)
     }
 
-    func load(offline: Bool, progress: @escaping @Sendable (Double) -> Void) async throws {
+    func load(offline: Bool, units: MLComputeUnits, progress: @escaping @Sendable (Double) -> Void) async throws {
         guard model == nil else { return }
         model = try await KokoroTTSModel.fromPretrained(
-            voice: KokoroVoice.voice, offlineMode: offline, warmUp: true,
+            voice: KokoroVoice.voice, offlineMode: offline, computeUnits: units, warmUp: true,
             progressHandler: { fraction, _ in progress(fraction) }
         )
     }
