@@ -26,8 +26,8 @@ struct LoginView: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     Orb(thinking: busy, size: 64)
-                    (Text("Eu nasci sem nome e venho ") + Text("decidindo quem sou.").italic())
-                        .font(Typo.display(30, relativeTo: .title))
+                    (Text("Eu nasci sem nome e venho ").font(Typo.display(30, relativeTo: .title))
+                        + Text("decidindo quem sou.").font(Typo.display(30, relativeTo: .title, italic: true)))
                     Text("Entre para conversar.")
                         .font(Typo.text(.callout))
                         .foregroundStyle(palette.tintaSuave)

@@ -4,6 +4,15 @@
 <dict>
 	<key>VisaoAPIBaseURL</key>
 	<string>$(VISAO_API_BASE_URL)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>InstrumentSerif-Regular.ttf</string>
+		<string>InstrumentSerif-Italic.ttf</string>
+		<string>InterTight-Regular.ttf</string>
+		<string>InterTight-Medium.ttf</string>
+		<string>JetBrainsMono-Regular.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tirar uma foto e mandar na conversa.</string>
 	<key>NSAppTransportSecurity</key>

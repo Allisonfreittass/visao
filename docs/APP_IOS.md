@@ -29,6 +29,16 @@ iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem depend�
    Sem isso o `xcodebuild` e o simulador não carregam (`CoreSimulator.framework` não encontrado).
    Abrir o Xcode e aceitar a instalação de componentes faz o mesmo.
 
+   O fundo de pinheiros é um shader Metal, e o Xcode não traz mais o compilador de Metal junto.
+   Uma vez por instalação do Xcode:
+
+   ```bash
+   xcodebuild -downloadComponent MetalToolchain
+   ```
+
+   (Xcode → Settings → Components também instala.) Sem ele o build para em `Sky.metal` com
+   "missing Metal Toolchain".
+
 2. **Entre com o seu Apple ID no Xcode**: Xcode → Settings → Accounts → + → Apple ID. Isso cria
    o seu "Personal Team", e o Team ID dele vai no `Local.xcconfig`.
 
@@ -42,7 +52,7 @@ iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem depend�
 
    | Chave | O que é |
    |---|---|
-         | `VISAO_DEVELOPMENT_TEAM` | O Team ID do passo 2 (o do "Personal Team"). |
+   | `VISAO_DEVELOPMENT_TEAM` | O Team ID do passo 2 (o do "Personal Team"). |
    | `VISAO_API_BASE_URL` | Onde a API responde. Produção: `https:/$()/seu-endereco/api`. API no Mac: `http:/$()/seu-mac.local:8000`. O `$()` é obrigatório: num `.xcconfig`, `//` começa um comentário. |
 
    O endereço também dá para trocar na tela de login, em "Servidor"; o que você digita ali fica
@@ -75,9 +85,14 @@ token Bearer, 401 que derruba a sessão, erros do FastAPI (texto e lista de vali
 igual ao do web, datas sem fuso e com microssegundos lidas como UTC, a fila (a mensagem aparece na
 hora, o que você escreve enquanto ele responde vai junto como uma mensagem só), Parar (pelo app e
 pelo servidor), o passo ao vivo só com a tela visível, mensagem que falhou continua visível, e o
-Markdown (código sem fechar, só links http/https, HTML como texto).
+Markdown (código sem fechar, só links http/https, HTML como texto). Da etapa 2: upload em multipart (nome
+com aspas não quebra o cabeçalho), foto grande vira JPEG de 1568 px e foto pequena vai como está,
+limite de 4 anexos, o motivo de um anexo recusado, foto sozinha como mensagem, página "Criando…"
+que fica pronta e apagar página, e as cores do céu iguais às do web nas horas-chave.
 
-## O que tem nesta etapa
+## O que o app tem
+
+### Etapa 1: conversa
 
 - **Login** com e-mail e senha; o token fica no **Keychain** (só este aparelho, depois do primeiro
   desbloqueio), nunca em UserDefaults. Um 401 em qualquer chamada volta para o login.
@@ -93,11 +108,33 @@ Markdown (código sem fechar, só links http/https, HTML como texto).
 - **Markdown** nas respostas: parágrafos, títulos, listas, `código` e blocos de código com a
   linguagem, rolagem lateral e Copiar. Links só http/https.
 - **Teclado**: o campo fica colado no teclado e arrastar a conversa para baixo fecha o teclado.
-- **Dynamic Type** (só estilos de texto do sistema, nada de tamanho fixo), **modo escuro** pelas
-  cores do sistema, VoiceOver com ação "Responder".
+- **Dynamic Type** (todo tamanho de letra segue o do iPhone) e VoiceOver com ação "Responder".
 
-As próximas etapas (fotos e arquivos, páginas, cartões de aprovação, projetos e ajustes, ligação
-por voz, o céu de pinheiros e Live Activity) entram aqui à medida que forem feitas.
+### Etapa 2: o visual do web, fotos, arquivos e páginas
+
+- **Neblina**, a aparência do web ([`ceu.css`](../apps/web/src/ceu.css)): a floresta de pinheiros
+  com neblina atrás de tudo, que é o shader de [`sky.ts`](../apps/web/src/sky/sky.ts) portado para
+  Metal ([`Sky.metal`](../apps/ios/Visao/Sky.metal)), com as mesmas cores por hora do dia
+  (`SkyLook` no VisaoKit, testado contra as horas-chave do web). Vidro fosco claro de dia e escuro
+  à noite, como o web troca: o teclado e as folhas do sistema acompanham. As respostas dele em
+  bolha sólida à esquerda, as suas em vidro à direita; a orbe com a lanterna ao lado do campo.
+- **Noite**: o tema escuro liso da marca. A aparência e "Neblina em movimento" ficam no menu da
+  conta (ícone de pessoa na lista de conversas) até a etapa de Ajustes.
+- **Leve**: a neblina é desenhada em meia resolução e a 20 quadros por segundo, e para com Reduzir
+  Movimento, Modo de Pouca Energia, app em segundo plano ou "Neblina em movimento" desligado
+  (continua seguindo a hora).
+- **Fontes do web**: Instrument Serif, Inter Tight e JetBrains Mono, do Google Fonts, com as
+  licenças OFL em `apps/ios/Visao/Fonts/`.
+- **Anexos** pelo + do campo: **Fotos**, **Câmera** e **Arquivos**, nos limites de
+  [ANEXOS.md](ANEXOS.md): até 4 por mensagem, foto até 5 MB, PDF e texto até 10 MB. Cada um sobe
+  assim que é escolhido e mostra se falhou e por quê; uma foto sozinha já é uma mensagem. Fotos
+  viram JPEG de até 1568 px antes de subir (HEIC da câmera sempre, porque o servidor não aceita
+  HEIC); GIF vai como está.
+- Fotos e arquivos das mensagens abrem no **Quick Look**, que já tem o botão de compartilhar.
+- **Páginas** ([ARTEFATOS.md](ARTEFATOS.md)): o cartão embaixo da resposta passa de "Criando…" para
+  Abrir (o app confere a cada 3 s, só com a tela visível). A página abre numa folha com
+  **WKWebView sem JavaScript e sem cookies**; links vão para o Safari. Na folha: compartilhar pela
+  folha nativa, abrir no Safari, copiar o link e apagar (o link para de funcionar).
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

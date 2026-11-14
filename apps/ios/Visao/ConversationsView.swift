@@ -141,8 +141,8 @@ struct ConversationsView: View {
     private var empty: some View {
         VStack(spacing: 12) {
             Rotulo("Conversa nova")
-            (Text("Por onde a gente ") + Text("começa?").italic())
-                .font(Typo.display(30, relativeTo: .title))
+            (Text("Por onde a gente ").font(Typo.display(30, relativeTo: .title))
+                + Text("começa?").font(Typo.display(30, relativeTo: .title, italic: true)))
                 .multilineTextAlignment(.center)
             Text("Um bug, uma ideia pela metade, um plano.")
                 .font(Typo.text(.callout))
