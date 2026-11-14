@@ -27,17 +27,37 @@ final class DuplexVoice {
     var onUtterance: ((String) -> Void)?
     /// You started talking over him: he already stopped.
     var onBargeIn: (() -> Void)?
+    /// Your voice reaches the microphone but no text comes out: the call should go back to the
+    /// half-duplex way instead of leaving you talking to nobody.
+    var onDeaf: (() -> Void)?
+
+    /// Seconds of loud microphone with no recognized text, and whether any text ever came.
+    private var loudWithoutText: Double = 0
+    private var everHeard = false
+    private var lastLevelLog = ContinuousClock.now
 
     private let endOfSentence: Duration = .milliseconds(1300)
     /// Right after he starts a sentence, the echo canceller is still settling: ignore that much.
     private let settle: Duration = .milliseconds(450)
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))
-    private let audio = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    // A fresh engine for each attempt: after voice processing is switched, reusing one tends
+    // to leave the microphone silent.
+    private var audio = AVAudioEngine()
+    private var player = AVAudioPlayerNode()
+    /// The microphone goes into this mixer at volume zero: with voice processing on, iOS only
+    /// pulls audio from an input that is wired into the graph (a loose tap got nothing at all).
+    private var micSink = AVAudioMixerNode()
+    private var configObserver: NSObjectProtocol?
+    private var watchdog: Task<Void, Never>?
+    private var gotFirstBuffer = false
     private let synthesizer = AVSpeechSynthesizer()
     private var playFormat: AVAudioFormat?
     private var request: SFSpeechAudioBufferRecognitionRequest?
+    /// Which recognition is the current one. Closing the previous one makes iOS report "no
+    /// speech" for it; treated as current, that restarted the new one, and so on every 300 ms,
+    /// so no recognition lived long enough to hear you. Old ones are now ignored.
+    private var generation = 0
     private var task: SFSpeechRecognitionTask?
     private var lastChange = ContinuousClock.now
     private var speakingSince = ContinuousClock.now
@@ -50,12 +70,40 @@ final class DuplexVoice {
 
     // MARK: Start and stop
 
+    /// Opens the two-way audio. Tries the voice-chat session first and the default one second,
+    /// each with a brand-new engine, and only keeps one where the microphone keeps delivering
+    /// sound. Throws when neither does: the call then goes on the half-duplex way.
     func start(api: APIClient) async throws {
         server = api
         if let status = try? await api.voiceStatus() { usesServerVoice = status.enabled }
+        for mode in [AVAudioSession.Mode.voiceChat, .default] {
+            do {
+                try configure(mode: mode)
+                if await microphoneFlows() {
+                    VoiceLog.write("modo \(mode.rawValue): microfone entregando som (\(feed.buffers) blocos)")
+                    running = true
+                    observeEngine()
+                    try beginSentence()
+                    return
+                }
+                VoiceLog.write("modo \(mode.rawValue): microfone mudo (\(feed.buffers) blocos em 1,5 s, motor \(audio.isRunning ? "ligado" : "parado"))")
+            } catch {
+                VoiceLog.write("modo \(mode.rawValue) falhou: \(error.localizedDescription)")
+            }
+            teardown()
+        }
+        throw VoiceError.unavailable
+    }
+
+    private func configure(mode: AVAudioSession.Mode) throws {
+        audio = AVAudioEngine()
+        player = AVAudioPlayerNode()
+        micSink = AVAudioMixerNode()
+        feed.buffers = 0
+        gotFirstBuffer = false
 
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try session.setCategory(.playAndRecord, mode: mode, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try session.setActive(true)
 
         let input = audio.inputNode
@@ -67,29 +115,82 @@ final class DuplexVoice {
         playFormat = format
         audio.connect(player, to: audio.mainMixerNode, format: format)
 
-        Self.installTap(on: input, format: input.outputFormat(forBus: 0), feed: feed) { [weak self] level in
-            Task { @MainActor in self?.level = level }
+        let inFormat = input.outputFormat(forBus: 0)
+        audio.attach(micSink)
+        audio.connect(input, to: micSink, format: inFormat)
+        audio.connect(micSink, to: audio.mainMixerNode, format: inFormat)
+        micSink.outputVolume = 0
+        VoiceLog.write("início (\(mode.rawValue)): rota \(session.currentRoute.inputs.map(\.portType.rawValue))→\(session.currentRoute.outputs.map(\.portType.rawValue)); entrada \(inFormat.sampleRate) Hz, \(inFormat.channelCount) canais; processamento de voz \(input.isVoiceProcessingEnabled), mudo \(input.isVoiceProcessingInputMuted)")
+        Self.installTap(on: input, format: inFormat, feed: feed) { [weak self] level in
+            Task { @MainActor in self?.measure(level) }
         }
         audio.prepare()
         try audio.start()
         player.play()
-        running = true
-        try beginSentence()
+    }
+
+    /// Sound keeps coming from the microphone: a few blocks within 1.5 s.
+    private func microphoneFlows() async -> Bool {
+        for _ in 0..<15 {
+            try? await Task.sleep(for: .milliseconds(100))
+            if feed.buffers >= 6 { return true }
+        }
+        return false
+    }
+
+    private func teardown() {
+        player.stop()
+        audio.inputNode.removeTap(onBus: 0)
+        audio.stop()
+        try? audio.inputNode.setVoiceProcessingEnabled(false)
+        audio.detach(player)
+        audio.detach(micSink)
+    }
+
+    /// If iOS reconfigures the audio mid-call the engine stops quietly: start it again. And if
+    /// the microphone goes quiet anyway, the call goes back to the half-duplex way.
+    private func observeEngine() {
+        configObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: audio, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.running else { return }
+                VoiceLog.write("o iOS reconfigurou o áudio; religando o motor")
+                try? self.audio.start()
+                self.player.play()
+            }
+        }
+        watchdog = Task { [weak self] in
+            var last = 0
+            var quiet = 0
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, self.running else { return }
+                let now = self.feed.buffers
+                if now == last {
+                    quiet += 1
+                    VoiceLog.write("microfone sem som há \(quiet) s (motor \(self.audio.isRunning ? "ligado" : "parado"))")
+                    if quiet == 2 { try? self.audio.start(); self.player.play() }
+                    if quiet >= 4 { self.onDeaf?(); return }
+                } else {
+                    quiet = 0
+                }
+                last = now
+            }
+        }
     }
 
     func stop() {
         running = false
+        watchdog?.cancel()
+        if let configObserver { NotificationCenter.default.removeObserver(configObserver) }
+        configObserver = nil
         stopSpeaking()
         silenceWatch?.cancel()
         feed.request = nil
         request?.endAudio()
         task?.cancel()
-        if audio.isRunning {
-            player.stop()
-            audio.inputNode.removeTap(onBus: 0)
-            audio.stop()
-        }
-        try? audio.inputNode.setVoiceProcessingEnabled(false)
+        teardown()
         phase = .idle
         level = 0
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -100,6 +201,8 @@ final class DuplexVoice {
     /// A new recognition for your next sentence; the microphone itself never stops.
     private func beginSentence() throws {
         guard running, let recognizer, recognizer.isAvailable else { throw VoiceError.unavailable }
+        generation += 1
+        let current = generation
         task?.cancel()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
@@ -110,7 +213,15 @@ final class DuplexVoice {
         partial = ""
         lastChange = .now
         task = Self.recognize(with: recognizer, request: request) { [weak self] text, final in
-            Task { @MainActor in self?.heard(text, final: final) }
+            Task { @MainActor in
+                guard let self, current == self.generation else { return }
+                self.heard(text, final: final)
+            }
+        } failed: { [weak self] message in
+            Task { @MainActor in
+                guard let self, current == self.generation else { return }
+                self.recognitionFailed(message)
+            }
         }
         if phase != .speaking { phase = .listening }
         silenceWatch?.cancel()
@@ -126,8 +237,47 @@ final class DuplexVoice {
         }
     }
 
+    /// The microphone level for the orb, and the watch for "voice but no text".
+    private func measure(_ value: Float) {
+        level = value
+        if !gotFirstBuffer {
+            gotFirstBuffer = true
+            VoiceLog.write("primeiro som do microfone chegou (nível \(String(format: "%.2f", value)))")
+        }
+        guard running, phase != .speaking else { return }
+        if value > 0.35 && partial.isEmpty && !everHeard {
+            loudWithoutText += 1024 / 48_000
+            if loudWithoutText > 4 {
+                VoiceLog.write("surdo: \(String(format: "%.1f", loudWithoutText)) s de voz no microfone e nenhum texto; voltando ao modo sem interrupção")
+                loudWithoutText = 0
+                onDeaf?()
+            }
+        }
+        if ContinuousClock.now - lastLevelLog > .seconds(3) {
+            lastLevelLog = .now
+            VoiceLog.write("nível \(String(format: "%.2f", value)), fase \(phase), parcial \(partial.isEmpty ? "vazio" : "“\(partial)”")")
+        }
+    }
+
+    /// The recognizer gave up (no speech, a hiccup): a new one starts, the microphone stays on.
+    private func recognitionFailed(_ message: String) {
+        guard running else { return }
+        VoiceLog.write("reconhecimento falhou: \(message)")
+        let failedGeneration = generation
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            // Restart only if nothing else already did.
+            guard self.running, self.generation == failedGeneration else { return }
+            try? self.beginSentence()
+        }
+    }
+
     private func heard(_ text: String, final: Bool) {
         guard running else { return }
+        if !everHeard, !text.isEmpty {
+            everHeard = true
+            VoiceLog.write("primeiro texto: “\(text)”")
+        }
         if text != partial {
             partial = text
             lastChange = .now
@@ -241,23 +391,32 @@ final class DuplexVoice {
         level: @escaping @Sendable (Float) -> Void
     ) {
         node.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+            feed.count()
             feed.request?.append(buffer)
             guard let channel = buffer.floatChannelData?[0] else { return }
             let count = Int(buffer.frameLength)
             guard count > 0 else { return }
             var sum: Float = 0
             for i in 0..<count { sum += channel[i] * channel[i] }
-            level(min(1, sqrt(sum / Float(count)) * 12))
+            // Voice processing lowers the signal a lot: a decibel scale (-55 dB to -15 dB).
+            let rms = sqrt(sum / Float(count))
+            let db = 20 * log10(max(rms, 1e-7))
+            level(min(1, max(0, (db + 55) / 40)))
         }
     }
 
     nonisolated private static func recognize(
         with recognizer: SFSpeechRecognizer, request: SFSpeechAudioBufferRecognitionRequest,
-        handler: @escaping @Sendable (String, Bool) -> Void
+        handler: @escaping @Sendable (String, Bool) -> Void,
+        failed: @escaping @Sendable (String) -> Void
     ) -> SFSpeechRecognitionTask {
-        recognizer.recognitionTask(with: request) { result, _ in
-            guard let result else { return }
-            handler(result.bestTranscription.formattedString, result.isFinal)
+        recognizer.recognitionTask(with: request) { result, error in
+            if let result {
+                handler(result.bestTranscription.formattedString, result.isFinal)
+            } else if let error = error as NSError?, !(error.domain == "kLSRErrorDomain" && error.code == 301) {
+                // 301 is "cancelled", which we do ourselves for every new sentence.
+                failed("\(error.domain) \(error.code): \(error.localizedDescription)")
+            }
         }
     }
 
@@ -349,6 +508,15 @@ final class DuplexVoice {
 final class RequestBox: @unchecked Sendable {
     private let lock = NSLock()
     private var current: SFSpeechAudioBufferRecognitionRequest?
+    private var received = 0
+
+    /// Blocks of sound the microphone delivered since the last reset.
+    var buffers: Int {
+        get { lock.withLock { received } }
+        set { lock.withLock { received = newValue } }
+    }
+
+    func count() { lock.withLock { received += 1 } }
 
     var request: SFSpeechAudioBufferRecognitionRequest? {
         get { lock.withLock { current } }
@@ -366,4 +534,26 @@ struct Clip: @unchecked Sendable {
 struct SynthBox: @unchecked Sendable {
     let synth: AVSpeechSynthesizer
     init(_ synth: AVSpeechSynthesizer) { self.synth = synth }
+}
+
+/// A small diary of the call's audio, in the app's caches, read through the cable to find out
+/// why it did not hear (xcrun devicectl … --domain-type appDataContainer). Kept short.
+enum VoiceLog {
+    static var url: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent("diario-da-voz.txt")
+    }
+
+    static func write(_ line: String) {
+        let stamp = Date().formatted(date: .omitted, time: .standard)
+        let entry = Data("\(stamp) \(line)\n".utf8)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            if (try? handle.seekToEnd()) ?? 0 > 200_000 {
+                try? handle.truncate(atOffset: 0)
+            }
+            try? handle.write(contentsOf: entry)
+        } else {
+            try? entry.write(to: url)
+        }
+    }
 }

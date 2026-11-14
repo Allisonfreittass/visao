@@ -54,6 +54,7 @@ final class CallController {
             let duplex = DuplexVoice()
             duplex.onUtterance = { [weak self] sentence in self?.heard(sentence) }
             duplex.onBargeIn = { [weak self] in self?.state = .listening }
+            duplex.onDeaf = { [weak self] in self?.fallBackToHalfDuplex() }
             do {
                 try await duplex.start(api: api)
                 self.duplex = duplex
@@ -103,6 +104,23 @@ final class CallController {
             if ok && approve { await chat.refresh() }
             known = Set(chat.messages.map(\.id))
             say(VoiceRules.done(for: ask, verdict: approve ? .approve : .reject, accepted: ok))
+        }
+    }
+
+    /// Two-way audio heard your voice but no words: the call goes on the old way, and says so.
+    private func fallBackToHalfDuplex() {
+        guard let duplex else { return }
+        duplex.stop()
+        self.duplex = nil
+        Task {
+            do {
+                try voice.activate()
+                await voice.prepare(api: api)
+                error = "Troquei para o modo sem interrupção: pode falar de novo."
+                listen()
+            } catch {
+                fail(error)
+            }
         }
     }
 
