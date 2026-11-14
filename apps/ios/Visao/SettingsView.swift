@@ -1,3 +1,4 @@
+import Speech
 import SwiftUI
 import VisaoKit
 
@@ -15,6 +16,9 @@ struct SettingsView: View {
     @State private var changing: AccountChange?
     @State private var confirmGoogle = false
     @State private var notice: String?
+    @State private var speakReplies = VoicePrefs.speakReplies
+    @State private var voiceApproval = VoicePrefs.voiceApproval
+    private let onDeviceSpeech = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))?.supportsOnDeviceRecognition ?? false
 
     var body: some View {
         @Bindable var appearance = appearance
@@ -36,6 +40,33 @@ struct SettingsView: View {
                         description: "Desligado, a floresta fica parada e só acompanha a hora, gastando menos bateria. Para sozinha no Modo de Pouca Energia.",
                         isOn: $appearance.moving
                     )
+                }
+            }
+            PageGroup(label: "Voz e avisos") {
+                SettingRow(
+                    title: "Falar as respostas",
+                    description: "Leio em voz alta com a voz do aparelho (\(VoiceEngine.voiceName)). Vozes melhores em Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes.",
+                    isOn: Binding(get: { speakReplies }, set: { speakReplies = $0; VoicePrefs.speakReplies = $0 })
+                )
+                SettingRow(
+                    title: "Aprovar por voz na ligação",
+                    description: "Numa ligação, eu leio em voz alta o email, o evento ou o pedido ao Mac e espero você dizer “pode mandar” (ou “não”). Fora da ligação, só com o toque.",
+                    isOn: Binding(get: { voiceApproval }, set: { voiceApproval = $0; VoicePrefs.voiceApproval = $0 })
+                )
+                PageRow {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ligar").font(Typo.text(.subheadline, weight: .medium))
+                        Text("Toque na orbe ao lado do campo. Eu ouço pelo reconhecimento de fala do iPhone\(onDeviceSpeech ? ", que roda no próprio aparelho: o áudio não sai dele." : "; neste iPhone ele usa os servidores da Apple.") Nada escuta com o app fechado.")
+                            .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                PageRow {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Avisos com o app fechado").font(Typo.text(.subheadline, weight: .medium))
+                        Text("Precisam da conta paga de desenvolvedor da Apple (APNs). Até lá, os avisos chegam pelo app do site na tela inicial.")
+                            .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                    }
                 }
             }
             PageGroup(label: "Autonomia") {

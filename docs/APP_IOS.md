@@ -90,7 +90,9 @@ com aspas não quebra o cabeçalho), foto grande vira JPEG de 1568 px e foto peq
 limite de 4 anexos, o motivo de um anexo recusado, foto sozinha como mensagem, página "Criando…"
 que fica pronta e apagar página, e as cores do céu iguais às do web nas horas-chave. Da etapa 3:
 só trabalho proposto do Mac vira cartão, o corpo do email aparece, `via=toque`/`via=voz` na rota, e
-decisão recusada pelo servidor não some nem é dada como feita.
+decisão recusada pelo servidor não some nem é dada como feita. Da etapa 5: os vereditos de voz
+com os mesmos casos do `approval.test.ts`, o texto falado do `speakable.test.ts`, cada pedido lido
+uma vez, resposta só dentro de 3 minutos e só para o pedido ainda esperando, e `modality=voice`.
 
 ## O que o app tem
 
@@ -193,6 +195,35 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
   computador), Memória (lembrar, refazer as perguntas iniciais) e Conta (trocar senha e email,
   sair). Os de voz entram com a ligação (etapa 5); avisos com o app fechado dependem da conta paga
   (APNs).
+
+### Etapa 5: ligação por voz
+
+Toque na **orbe** ao lado do campo: a tela inteira vira a conversa, sem as mãos e com a tela
+acesa, como a ligação do web ([VOICE.md](VOICE.md)).
+
+- **Ouvir**: `SFSpeechRecognizer` em pt-BR. Quando o iPhone permite, o reconhecimento roda **no
+  próprio aparelho** (a tela da ligação diz "no iPhone"); senão usa os servidores da Apple, e
+  Ajustes avisa. Uma frase termina depois de 1,3 s de silêncio.
+- **Falar**: `AVSpeechSynthesizer` com a melhor voz pt-BR instalada no iPhone (vozes melhores em
+  Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes). Código e links não são lidos:
+  ele diz que deixou na tela (as mesmas regras do `speakable.ts`).
+- Enquanto ele fala, não ouve: a voz do sistema não é tirada do microfone, então ele se ouviria.
+  **Interromper** para a fala e volta a ouvir, como a voz do aparelho no web.
+- Na ligação, a resposta e o que ele fala por conta própria (aberturas, o relatório do Mac) saem
+  em voz. O que você fala vai como `modality=voice`.
+- **Aprovar por voz**: quando há um email, evento ou pedido ao Mac esperando, ele termina de
+  falar, lê exatamente o que vai fazer e espera **"pode mandar"** (ou "pode marcar", "pode rodar",
+  "aprovo", "confirmo", um "sim" curto) ou **"não"** ("cancela", "espera"). Regras fixas, sem
+  modelo, iguais às do `approval.ts`: frase que mistura sim e não, ou longa, não decide nada e
+  segue como mensagem. Vale só para o pedido que ele acabou de ler, por 3 minutos. A decisão vai
+  com `via=voz` e ele só diz "pronto" depois que o servidor aceitou; se falhar, diz que ficou na
+  tela. O cartão também aparece grande na ligação, com Aprovar e Recusar.
+- **Privacidade**: o microfone só abre pela orbe; sair do app ou bloquear a tela desliga a
+  ligação. Nada escuta em segundo plano.
+- **Ajustes → Voz e avisos**: "Falar as respostas" (fora da ligação também) e "Aprovar por voz na
+  ligação".
+- A voz própria do servidor (Kokoro e faster-whisper) não é usada pelo app; ele usa a do iPhone,
+  que funciona também com a versão da nuvem.
 
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 

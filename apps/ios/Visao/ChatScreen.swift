@@ -14,6 +14,10 @@ struct ChatScreen: View {
     @State private var picker: Picker?
     @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var benchOpen = false
+    @State private var call: CallController?
+    /// "Falar as respostas", outside a call.
+    @State private var speaker = VoiceEngine()
+    @State private var spokenIds: Set<String> = []
     @FocusState private var composerFocused: Bool
 
     enum Picker: Identifiable {
@@ -100,12 +104,14 @@ struct ChatScreen: View {
                     speaker: session.speakerName,
                     placeholder: "Enviar mensagem para \(session.agentName ?? "o Visão")",
                     onPick: { picker = $0 },
+                    onCall: { startCall() },
                     onSend: send
                 )
             }
             .onChange(of: store.messages.count) { scrollToBottom(proxy) }
             .onChange(of: store.sending) { _, sending in
                 scrollToBottom(proxy)
+                if !sending { speakReplyIfAsked() }
                 // A turn can leave an email or Mac work waiting for a tap.
                 if !sending { Task { await session.pending.refresh() } }
             }
@@ -130,6 +136,9 @@ struct ChatScreen: View {
                 .padding(.top, 4)
                 .accessibilityLabel("Bancada: o que ele fez nesta conversa")
             }
+        }
+        .fullScreenCover(item: Binding(get: { call.map(CallBox.init) }, set: { call = $0?.controller })) { box in
+            CallView(controller: box.controller, agentName: session.agentName, messages: store.messages)
         }
         .sheet(isPresented: $benchOpen) {
             if let id = store.conversationId {
@@ -225,6 +234,22 @@ struct ChatScreen: View {
         draft.addFile(data, filename: url.lastPathComponent)
     }
 
+    private func startCall() {
+        speaker.stopSpeaking()
+        composerFocused = false
+        call = CallController(chat: store, pending: session.pending)
+    }
+
+    /// With "Falar as respostas" on, a reply received here is read aloud (never inside a call,
+    /// which speaks for itself).
+    private func speakReplyIfAsked() {
+        guard VoicePrefs.speakReplies, call == nil, isActive,
+              let reply = store.messages.last(where: { $0.role == .assistant }),
+              !spokenIds.contains(reply.id) else { return }
+        spokenIds.insert(reply.id)
+        speaker.speak(VoiceRules.speakable(reply.content))
+    }
+
     private func decide(_ ask: PendingAsk, approve: Bool) {
         Task {
             let ok = await session.pending.decide(ask, approve: approve)
@@ -316,4 +341,9 @@ struct LiveStatusView: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel(step?.label ?? "Pensando")
     }
+}
+
+private struct CallBox: Identifiable {
+    let controller: CallController
+    var id: ObjectIdentifier { ObjectIdentifier(controller) }
 }

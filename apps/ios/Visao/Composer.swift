@@ -13,6 +13,8 @@ struct Composer: View {
     let speaker: String
     var placeholder = "Escreva ou cole código…"
     let onPick: (ChatScreen.Picker) -> Void
+    /// Tapping the orb calls him (as on the web).
+    var onCall: () -> Void = {}
     let onSend: () -> Void
     @Environment(\.palette) private var palette
 
@@ -25,7 +27,12 @@ struct Composer: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            Orb(thinking: thinking, size: 50)
+            Button(action: onCall) {
+                Orb(thinking: thinking, size: 50)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Ligar")
+            .accessibilityHint("Conversa por voz, sem as mãos")
             VStack(alignment: .leading, spacing: 0) {
                 if let replyTo {
                     replyBanner(replyTo)

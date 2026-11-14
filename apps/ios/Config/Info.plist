@@ -13,6 +13,10 @@
 		<string>JetBrainsMono-Regular.ttf</string>
 		<string>JetBrainsMono-Medium.ttf</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Para você conversar com ele por voz numa ligação. Nada escuta com o app fechado.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Para entender o que você fala na ligação. Quando o iPhone permite, o reconhecimento roda no próprio aparelho.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tirar uma foto e mandar na conversa.</string>
 	<key>NSAppTransportSecurity</key>
