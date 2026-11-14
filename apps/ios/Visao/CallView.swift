@@ -196,7 +196,7 @@ struct CallView: View {
                     }
                 }
                 Spacer()
-                Text(controller.voice.usesServerVoice ? "Voz própria" : controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho")
+                Text(KokoroVoice.shared.speaks ? "Voz Kokoro · no iPhone" : controller.voice.usesServerVoice ? "Voz própria" : controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho")
             }
             .font(Typo.mono(.caption2))
             .textCase(.uppercase)

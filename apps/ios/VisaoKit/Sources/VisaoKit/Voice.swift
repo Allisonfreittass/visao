@@ -143,3 +143,51 @@ extension APIClient {
         try await raw("/voice/tts", method: "POST", body: try JSONEncoder().encode(["text": text]), contentType: "application/json")
     }
 }
+
+extension VoiceRules {
+    /// A reply in sentences, so the first is heard while the next is synthesized on the iPhone.
+    /// Very short pieces join the next one; long ones are cut at commas, then at words.
+    public static func sentences(_ text: String, maxLength: Int = 220) -> [String] {
+        var pieces: [String] = []
+        var current = ""
+        for character in text {
+            current.append(character)
+            if ".!?…\n".contains(character) {
+                let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { pieces.append(trimmed) }
+                current = ""
+            }
+        }
+        let rest = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !rest.isEmpty { pieces.append(rest) }
+
+        var merged: [String] = []
+        for piece in pieces {
+            if let last = merged.last, last.count < 24 {
+                merged[merged.count - 1] = last + " " + piece
+            } else {
+                merged.append(piece)
+            }
+        }
+        return merged.flatMap { split($0, maxLength: maxLength) }
+    }
+
+    private static func split(_ text: String, maxLength: Int) -> [String] {
+        guard text.count > maxLength else { return [text] }
+        var parts: [String] = []
+        var current = ""
+        for word in text.split(separator: " ") {
+            if current.count + word.count + 1 > maxLength, !current.isEmpty {
+                parts.append(current)
+                current = ""
+            }
+            current += current.isEmpty ? String(word) : " " + word
+            if word.hasSuffix(","), current.count > maxLength / 2 {
+                parts.append(current)
+                current = ""
+            }
+        }
+        if !current.isEmpty { parts.append(current) }
+        return parts
+    }
+}

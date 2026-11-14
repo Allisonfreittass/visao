@@ -143,3 +143,23 @@ final class ServerVoiceTests: XCTestCase {
         XCTAssertEqual(String(decoding: body, as: UTF8.self), #"{"text":"Oi."}"#)
     }
 }
+
+final class SentenceTests: XCTestCase {
+    func testSplitsAtSentenceEndsAndJoinsTinyOnes() {
+        XCTAssertEqual(
+            VoiceRules.sentences("Oi! Tudo bem com você hoje? Eu terminei o roteiro da viagem.\nDeixei o código na tela."),
+            ["Oi! Tudo bem com você hoje?", "Eu terminei o roteiro da viagem.", "Deixei o código na tela."]
+        )
+    }
+
+    func testLongSentenceIsCutWithoutLosingWords() {
+        let long = Array(repeating: "palavra", count: 80).joined(separator: " ")
+        let parts = VoiceRules.sentences(long, maxLength: 100)
+        XCTAssertTrue(parts.allSatisfy { $0.count <= 100 })
+        XCTAssertEqual(parts.joined(separator: " "), long)
+    }
+
+    func testNothingToSay() {
+        XCTAssertEqual(VoiceRules.sentences("   \n "), [])
+    }
+}

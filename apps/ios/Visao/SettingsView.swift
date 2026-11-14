@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var confirmGoogle = false
     @State private var notice: String?
     @State private var speakReplies = VoicePrefs.speakReplies
+    @State private var sampleVoice = VoiceEngine()
     @State private var voiceApproval = VoicePrefs.voiceApproval
     private let onDeviceSpeech = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))?.supportsOnDeviceRecognition ?? false
 
@@ -43,6 +44,7 @@ struct SettingsView: View {
                 }
             }
             PageGroup(label: "Voz e avisos") {
+                KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
                 SettingRow(
                     title: "Falar as respostas",
                     description: "Leio em voz alta com a voz do aparelho (\(VoiceEngine.voiceName)). Vozes melhores em Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes.",
@@ -318,6 +320,63 @@ struct AccountChangeSheet: View {
             dismiss()
         } catch {
             self.error = (error as? LocalizedError)?.errorDescription ?? "Não consegui trocar agora."
+        }
+    }
+}
+
+/// The Kokoro voice on the iPhone: download it once (with progress), hear a sample, switch it on
+/// or off, delete it to free the space.
+private struct KokoroRow: View {
+    let sample: () -> Void
+    @Environment(\.palette) private var palette
+    @State private var confirmRemove = false
+
+    private var kokoro: KokoroVoice { KokoroVoice.shared }
+
+    var body: some View {
+        @Bindable var kokoro = KokoroVoice.shared
+        PageRow {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Voz Kokoro no iPhone").font(Typo.text(.subheadline, weight: .medium))
+                    Text("A voz aberta que ele escolheu (Dora), rodando no próprio iPhone: mais natural que a do sistema, sem servidor e sem internet depois de baixar.")
+                        .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                switch kokoro.state {
+                case .absent:
+                    PillButton(title: "Baixar (\(KokoroVoice.downloadSize))", primary: true) { Task { await kokoro.download() } }
+                    Text("De preferência no Wi-Fi. Vem do Hugging Face (aufklarer/Kokoro-82M-CoreML, licença Apache-2.0).")
+                        .font(Typo.text(.caption)).foregroundStyle(palette.tintaFraca)
+                case .downloading(let fraction):
+                    ProgressView(value: fraction) {
+                        Text("Baixando… \(Int(fraction * 100))%").font(Typo.text(.footnote))
+                    }
+                    .tint(palette.estanho)
+                case .loading:
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Abrindo o modelo…").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                    }
+                case .ready:
+                    Toggle(isOn: $kokoro.enabled) {
+                        Text("Falar com a voz Kokoro").font(Typo.text(.footnote, weight: .medium))
+                    }
+                    .toggleStyle(VisaoSwitch())
+                    HStack(spacing: 8) {
+                        PillButton(title: "Ouvir uma amostra", primary: true, action: sample)
+                        PillButton(title: "Apagar") { confirmRemove = true }
+                    }
+                case .failed(let reason):
+                    Text(reason).font(Typo.text(.footnote)).foregroundStyle(palette.erro)
+                    PillButton(title: "Tentar de novo", primary: true) { Task { await kokoro.download() } }
+                }
+            }
+        }
+        .confirmationDialog("Apagar a voz Kokoro do iPhone?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Apagar", role: .destructive) { Task { await KokoroVoice.shared.remove() } }
+        } message: {
+            Text("Libera \(KokoroVoice.downloadSize). Ele volta a falar com a voz do servidor ou do iPhone.")
         }
     }
 }

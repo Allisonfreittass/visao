@@ -202,6 +202,15 @@ final class VoiceEngine: NSObject {
             return
         }
         onSpoken = done
+        // Kokoro on the iPhone first (no network), then the server's own voice, then the iPhone's.
+        if KokoroVoice.shared.speaks {
+            phase = .speaking
+            let sentences = VoiceRules.sentences(text)
+            serverSpeech = Task { [weak self] in
+                await self?.speakClips(sentences, fallbackText: text) { try await KokoroVoice.shared.audio(for: $0) }
+            }
+            return
+        }
         if usesServerVoice, let server {
             phase = .speaking
             serverSpeech = Task { [weak self] in await self?.speakWithServer(text, api: server) }
@@ -237,14 +246,24 @@ final class VoiceEngine: NSObject {
             if !Task.isCancelled { speakWithDevice(text) }
             return
         }
-        var next: Task<Data, Error>? = Task { try await api.tts(sentences[0]) }
+        await speakClips(sentences, fallbackText: text) { try await api.tts($0) }
+    }
+
+    /// Plays sentence after sentence, rendering the next while the current plays. A failure
+    /// midway says the rest with the iPhone's voice.
+    private func speakClips(_ sentences: [String], fallbackText: String, render: @escaping @Sendable (String) async throws -> Data) async {
+        guard !sentences.isEmpty else {
+            if !Task.isCancelled { spoke() }
+            return
+        }
+        var next: Task<Data, Error>? = Task { try await render(sentences[0]) }
         for index in sentences.indices {
             guard !Task.isCancelled, let pending = next else { return }
             guard let audio = try? await pending.value else {
                 if !Task.isCancelled { speakWithDevice(sentences[index...].joined(separator: " ")) }
                 return
             }
-            next = index + 1 < sentences.count ? Task { [sentence = sentences[index + 1]] in try await api.tts(sentence) } : nil
+            next = index + 1 < sentences.count ? Task { [sentence = sentences[index + 1]] in try await render(sentence) } : nil
             guard !Task.isCancelled else { return }
             await play(audio)
         }

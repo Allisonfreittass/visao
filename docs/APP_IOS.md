@@ -15,7 +15,7 @@ O app se chama **V.I.S.A.O.** na tela inicial, com o bundle id `io.github.alliso
 nenhum: com assinatura automática, o Xcode registra na Apple sozinho na primeira vez que roda no
 iPhone.
 
-iOS 17 ou mais novo, Swift 6, Observation, async/await e URLSession. Sem dependências de terceiros.
+iOS 18 ou mais novo, Swift 6, Observation, async/await e URLSession. Uma dependência de terceiros, aprovada: soniqo/speech-swift (só o Kokoro), para a voz no iPhone.
 
 ## Antes da primeira vez
 
@@ -230,6 +230,18 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
   ligação. Nada escuta em segundo plano.
 - **Ajustes → Voz e avisos**: "Falar as respostas" (fora da ligação também) e "Aprovar por voz na
   ligação".
+- **Voz Kokoro no iPhone** (Ajustes → Voz e avisos → Baixar, ~335 MB, uma vez): o Kokoro-82M
+  roda no próprio iPhone pelo Core ML (Neural Engine), com a voz `pf_dora`, a mesma que ele
+  escolheu no servidor. Depois de baixado, fala sem servidor e sem internet, frase a frase,
+  sintetizando a próxima enquanto a atual toca. É a primeira escolha quando está baixado e ligado.
+  - Pacote: [soniqo/speech-swift](https://github.com/soniqo/speech-swift) **0.0.29** (versão
+    exata), produto `KokoroTTS`, Apache-2.0. O português sai de um dicionário de pronúncia e de
+    regras em Swift: **sem espeak-ng, sem GPL**. Por isso a pronúncia pode errar em algumas palavras.
+  - Modelo: [aufklarer/Kokoro-82M-CoreML](https://huggingface.co/aufklarer/Kokoro-82M-CoreML)
+    (pesos do hexgrad/Kokoro-82M, Apache-2.0), baixado do Hugging Face só quando você toca em
+    Baixar. "Apagar" libera o espaço.
+  - Exige iOS 18: o app passou a pedir iOS 18 ou mais novo.
+  - A ordem da voz fica: Kokoro no iPhone → voz própria do servidor → voz do iPhone.
 - **Voz própria**: quando o servidor tem o Kokoro instalado e uma voz aprovada (`/voice/status`),
   o app fala com ela, frase a frase (`/voice/sentences` e `/voice/tts`), sintetizando a próxima
   enquanto a atual toca, como o web; a ligação mostra "Voz própria". Se o servidor falhar no meio,
