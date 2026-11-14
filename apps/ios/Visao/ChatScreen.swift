@@ -112,6 +112,7 @@ struct ChatScreen: View {
             .onChange(of: store.sending) { _, sending in
                 scrollToBottom(proxy)
                 if !sending { speakReplyIfAsked() }
+                followOnLockScreen(sending: sending)
                 // A turn can leave an email or Mac work waiting for a tap.
                 if !sending { Task { await session.pending.refresh() } }
             }
@@ -199,6 +200,13 @@ struct ChatScreen: View {
             // What he said on his own is right here: it stops counting as a notice.
             await session.pending.markOpeningsRead()
         }
+        .onChange(of: store.liveSteps) { _, steps in LiveTurn.shared.update(steps) }
+        .onChange(of: scenePhase) { _, phase in
+            // Leaving mid-turn: keep the card going for the seconds the iPhone allows.
+            let away = phase != .active && store.sending
+            store.followInBackground = away
+            if away { LiveTurn.shared.beginBackgroundTime() }
+        }
         .task(id: [scenePhase == .active, isActive]) {
             store.isVisible = scenePhase == .active && isActive
             guard store.isVisible else { return }
@@ -232,6 +240,23 @@ struct ChatScreen: View {
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url) else { return }
         draft.addFile(data, filename: url.lastPathComponent)
+    }
+
+    /// The Live Activity: starts with the turn, ends with the reply (docs/APP_IOS.md, stage 7).
+    private func followOnLockScreen(sending: Bool) {
+        if sending {
+            LiveTurn.shared.start(agentName: session.agentName, conversationId: store.conversationId)
+            return
+        }
+        let reply = store.messages.last { $0.role == .assistant }
+        let stopped = store.messages.last { $0.role == .user }?.local
+        let failed = stopped == .failed || stopped == .stopped
+        LiveTurn.shared.finish(
+            reply: failed ? (store.error ?? "Parou antes de responder.") : reply?.content,
+            failed: failed,
+            onScreen: scenePhase == .active
+        )
+        store.followInBackground = false
     }
 
     private func startCall() {

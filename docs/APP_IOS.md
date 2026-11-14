@@ -225,6 +225,45 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
 - A voz própria do servidor (Kokoro e faster-whisper) não é usada pelo app; ele usa a do iPhone,
   que funciona também com a versão da nuvem.
 
+### Etapa 7: Live Activity (tela de bloqueio e Dynamic Island)
+
+Quando você manda uma mensagem, aparece um cartão na tela de bloqueio e na Dynamic Island com a
+lanterna, o nome dele, o passo atual ("Pesquisando “voos”", "Abrindo github.com"), o detalhe, os
+passos já feitos e o tempo desde a pergunta (contado pelo próprio sistema). Quando a resposta
+chega, o cartão diz **"Respondeu"** com as primeiras palavras; se você estava no app, ele some na
+hora; se não, fica 30 minutos.
+
+| Peça | Onde |
+|---|---|
+| O que o cartão mostra (`VisaoTurnAttributes`), compilado no app e na extensão | `apps/ios/Shared/TurnActivity.swift` |
+| O cartão e a Dynamic Island | alvo `VisaoLive` (`apps/ios/VisaoLive/`, id `<bundle id>.live`) |
+| Começar, atualizar e encerrar | `apps/ios/Visao/LiveTurn.swift` |
+
+**Com o Apple ID grátis o cartão é atualizado só pelo app**: enquanto ele está na tela e, depois
+que você sai ou bloqueia, pelos cerca de 30 segundos que o iPhone dá a um app (uma background
+task). Nesse tempo o app continua perguntando o passo e fecha o cartão com a resposta se ela
+chegar. Uma resposta mais demorada deixa o cartão no último passo, com o tempo correndo, até você
+voltar ao app (ou o cartão ficar velho, 10 minutos depois). O aviso do servidor continua como
+antes: quando o app para de consultar, ele manda a notificação.
+
+Para desligar: Ajustes do iPhone → V.I.S.A.O. → Atividades ao Vivo.
+
+#### O caminho por push, pronto e desligado
+
+Para o cartão acompanhar até o fim com o app suspenso, o servidor precisa mandar cada passo e o fim
+do turno ao APNs. O app já está preparado (`LiveActivityPush` em `LiveTurn.swift`): com
+`VISAO_LIVE_ACTIVITY_PUSH = YES` no `Local.xcconfig`, ele pede o cartão com `pushType: .token` e
+recebe o token do cartão. Falta:
+
+1. **Conta paga** (Apple Developer): o entitlement `aps-environment` e uma chave APNs (.p8).
+2. **Uma rota no servidor**, que não existe hoje e não foi criada: por exemplo
+   `POST /live-activities` com `{"conversation_id", "token"}`, guardando o token do cartão.
+3. **O servidor mandar o push**: em `core/conversation/progress.py`, a cada `progress.step(...)` e no
+   fim do turno, um push `liveactivity` para esse token com o mesmo `ContentState` (`steps`,
+   `detail`, `done`, `excerpt`, `failed`), e `event: end` no fim.
+
+Até lá o token não é mandado para lugar nenhum.
+
 ## O que depende da conta paga (Apple Developer, US$ 99/ano)
 
 | | Apple ID grátis | Conta paga |
@@ -232,6 +271,6 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
 | Rodar no seu iPhone pelo cabo | sim, reinstalando a cada 7 dias | sim, perfil de 1 ano |
 | TestFlight / App Store | não | sim |
 | Avisos por push (APNs) com o app fechado | não | sim |
-| Live Activity atualizada pelo servidor (push) | não; só atualização local, com o app aberto | sim |
+| Live Activity atualizada pelo servidor (push) | não; só pelo app, enquanto está na tela e uns 30 s depois | sim, com a rota no servidor (etapa 7) |
 
 Sem a conta paga, o aviso "terminou" com o app fechado continua chegando pelo PWA (Web Push).

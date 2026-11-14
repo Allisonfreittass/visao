@@ -7,4 +7,8 @@ VISAO_DEVELOPMENT_TEAM =
 // "//" começa comentário num xcconfig; $() no meio impede isso.
 VISAO_API_BASE_URL = https:/$()/visao.example.com/api
 
+// Live Activity atualizada por push (APNs) precisa da conta paga e de uma rota no servidor que
+// ainda não existe (docs/APP_IOS.md). Desligado: o cartão é atualizado só pelo app.
+VISAO_LIVE_ACTIVITY_PUSH = NO
+
 #include? "Local.xcconfig"

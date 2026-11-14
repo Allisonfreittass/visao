@@ -8,7 +8,32 @@
 
 /* Begin PBXBuildFile section */
 		A1000000000000000000B001 /* VisaoKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000C001 /* VisaoKit */; };
+		A1000000000000000000B002 /* VisaoLive.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F006 /* VisaoLive.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A1000000000000000000P001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000002001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000001002;
+			remoteInfo = VisaoLive;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A1000000000000000000D004 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A1000000000000000000B002 /* VisaoLive.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A1000000000000000000F001 /* Visao.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Visao.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -16,12 +41,24 @@
 		A1000000000000000000F003 /* Local.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.example.xcconfig; sourceTree = "<group>"; };
 		A1000000000000000000F004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000000000000000000F005 /* VisaoKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = VisaoKit; sourceTree = "<group>"; };
+		A1000000000000000000F006 /* VisaoLive.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VisaoLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000F007 /* VisaoLive-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "VisaoLive-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A1000000000000000000E001 /* Visao */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Visao;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000E002 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000E003 /* VisaoLive */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = VisaoLive;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +72,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1000000000000000000D006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -42,6 +86,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000E001 /* Visao */,
+				A1000000000000000000E002 /* Shared */,
+				A1000000000000000000E003 /* VisaoLive */,
 				A1000000000000000000F005 /* VisaoKit */,
 				A1000000000000000000A003 /* Config */,
 				A1000000000000000000A002 /* Products */,
@@ -52,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000F001 /* Visao.app */,
+				A1000000000000000000F006 /* VisaoLive.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -62,6 +109,7 @@
 				A1000000000000000000F002 /* Visao.xcconfig */,
 				A1000000000000000000F003 /* Local.example.xcconfig */,
 				A1000000000000000000F004 /* Info.plist */,
+				A1000000000000000000F007 /* VisaoLive-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -76,13 +124,16 @@
 				A1000000000000000000D002 /* Sources */,
 				A1000000000000000000D001 /* Frameworks */,
 				A1000000000000000000D003 /* Resources */,
+				A1000000000000000000D004 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A1000000000000000000G001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A1000000000000000000E001 /* Visao */,
+				A1000000000000000000E002 /* Shared */,
 			);
 			name = Visao;
 			packageProductDependencies = (
@@ -91,6 +142,27 @@
 			productName = Visao;
 			productReference = A1000000000000000000F001 /* Visao.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A10000000000000000001002 /* VisaoLive */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000003003 /* Build configuration list for PBXNativeTarget "VisaoLive" */;
+			buildPhases = (
+				A1000000000000000000D005 /* Sources */,
+				A1000000000000000000D006 /* Frameworks */,
+				A1000000000000000000D007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A1000000000000000000E002 /* Shared */,
+				A1000000000000000000E003 /* VisaoLive */,
+			);
+			name = VisaoLive;
+			productName = VisaoLive;
+			productReference = A1000000000000000000F006 /* VisaoLive.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -121,12 +193,20 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000001001 /* Visao */,
+				A10000000000000000001002 /* VisaoLive */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A1000000000000000000D003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000D007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -143,7 +223,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1000000000000000000D005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1000000000000000000G001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000001002 /* VisaoLive */;
+			targetProxy = A1000000000000000000P001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A10000000000000000004001 /* Debug */ = {
@@ -246,6 +341,54 @@
 			};
 			name = Release;
 		};
+		A10000000000000000004005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(VISAO_DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/VisaoLive-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(VISAO_DISPLAY_NAME)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VISAO_BUNDLE_ID).live";
+				PRODUCT_NAME = VisaoLive;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000004006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(VISAO_DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/VisaoLive-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(VISAO_DISPLAY_NAME)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(VISAO_BUNDLE_ID).live";
+				PRODUCT_NAME = VisaoLive;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -263,6 +406,15 @@
 			buildConfigurations = (
 				A10000000000000000004003 /* Debug */,
 				A10000000000000000004004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000003003 /* Build configuration list for PBXNativeTarget "VisaoLive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000004005 /* Debug */,
+				A10000000000000000004006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

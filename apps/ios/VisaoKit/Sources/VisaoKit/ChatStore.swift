@@ -20,6 +20,9 @@ public final class ChatStore {
     /// Set by the screen from the scene phase: progress is only asked for while you look, so the
     /// server notices a locked phone and also sends the reply as a notification (docs/STATUS.md).
     public var isVisible = true
+    /// The lock-screen card (Live Activity) keeps following the turn for the little time the
+    /// iPhone gives an app after it leaves the screen; the server still notifies once it stops.
+    public var followInBackground = false
     /// Called when a conversation is created by the first message (the list adds it).
     public var onConversationCreated: ((Conversation) -> Void)?
     /// Called with every API error, so a 401 can send the app back to the login screen.
@@ -253,7 +256,7 @@ public final class ChatStore {
         let interval = progressInterval
         watchTask = Task { [weak self] in
             while !Task.isCancelled {
-                if self?.isVisible == true, let progress = try? await api.progress(conversationId: id) {
+                if self?.isVisible == true || self?.followInBackground == true, let progress = try? await api.progress(conversationId: id) {
                     guard let self, !Task.isCancelled else { return }
                     if progress.active, let last = progress.steps.last {
                         self.liveStep = last
