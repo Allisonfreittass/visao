@@ -109,6 +109,9 @@ final class DuplexVoice {
         let input = audio.inputNode
         // The voice processing unit: echo cancellation of what this engine plays.
         try input.setVoiceProcessingEnabled(true)
+        // Let the route and the voice processing settle before starting: changed right after
+        // the start, they stop the engine ("motor parado" in the diary).
+        Thread.sleep(forTimeInterval: 0.25)
         audio.attach(player)
         let rate = audio.outputNode.outputFormat(forBus: 0).sampleRate
         let format = AVAudioFormat(standardFormatWithSampleRate: rate > 0 ? rate : 48_000, channels: 1)!
@@ -129,11 +132,23 @@ final class DuplexVoice {
         player.play()
     }
 
-    /// Sound keeps coming from the microphone: a few blocks within 1.5 s.
+    /// Sound keeps coming from the microphone: a few blocks within 3 s. iOS may still stop the
+    /// engine while it finishes setting up the audio; then it is started again, right here.
     private func microphoneFlows() async -> Bool {
-        for _ in 0..<15 {
+        var restarts = 0
+        for _ in 0..<30 {
             try? await Task.sleep(for: .milliseconds(100))
             if feed.buffers >= 6 { return true }
+            if !audio.isRunning && restarts < 4 {
+                restarts += 1
+                do {
+                    try audio.start()
+                    player.play()
+                    VoiceLog.write("motor parou ao começar; religado (\(restarts))")
+                } catch {
+                    VoiceLog.write("motor não religou: \(error.localizedDescription)")
+                }
+            }
         }
         return false
     }
