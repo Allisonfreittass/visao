@@ -91,7 +91,7 @@ public final class ChatStore {
     public var canStop: Bool { sending && turnTask != nil }
 
     /// Sends now, or queues it if a reply is still being written. A photo alone is a message.
-    public func send(_ rawText: String, attachments: [Attachment] = [], replyTo: Message? = nil) {
+    public func send(_ rawText: String, attachments: [Attachment] = [], replyTo: Message? = nil, spoken: Bool = false) {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !attachments.isEmpty else { return }
         let files = Array(attachments.prefix(AttachmentRules.maxPerMessage))
@@ -111,7 +111,7 @@ public final class ChatStore {
             messages.append(Message(id: id, role: .user, content: text, createdAt: Date(), attachments: files, replyTo: replyTo?.quoted, local: .queued))
             return
         }
-        Task { await run(text: text, attachments: files, replyTo: replyTo) }
+        Task { await run(text: text, attachments: files, replyTo: replyTo, spoken: spoken) }
     }
 
     private func askMac(project: String, prompt: String) async {
@@ -170,7 +170,7 @@ public final class ChatStore {
         turnTask.cancel()
     }
 
-    private func run(text: String, attachments: [Attachment], replyTo: Message?) async {
+    private func run(text: String, attachments: [Attachment], replyTo: Message?, spoken: Bool = false) async {
         counter += 1
         let localId = "local-\(counter)"
         let optimistic = Message(id: localId, role: .user, content: text, createdAt: Date(), attachments: attachments, replyTo: replyTo?.quoted, local: .sending)
@@ -197,7 +197,7 @@ public final class ChatStore {
         startWatching(id)
         let api = self.api
         let attachmentIds = attachments.map(\.id)
-        let task = Task { try await api.send(conversationId: id, content: text, attachmentIds: attachmentIds, replyToId: replyTo?.id) }
+        let task = Task { try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id) }
         turnTask = task
         do {
             let turn = try await task.value

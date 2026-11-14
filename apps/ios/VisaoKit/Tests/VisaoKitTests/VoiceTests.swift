@@ -106,3 +106,20 @@ final class VoiceApprovalTests: XCTestCase {
         XCTAssertNil(other.interpret("pode mandar", stillWaiting: [], now: start.addingTimeInterval(5)), "tapped on screen meanwhile")
     }
 }
+
+@MainActor
+final class SpokenMessageTests: XCTestCase {
+    func testWhatIsSaidInACallGoesAsVoice() async throws {
+        let transport = StubTransport()
+        transport.on("POST", "/api/conversations/c1/messages", json: Fixture.turn(user: "oi", reply: "olá"))
+        let store = ChatStore(api: APIClient(baseURL: URL(string: "https://visao.test/api")!, transport: transport, tokens: MemoryTokenStore(token: "t")), conversationId: "c1")
+
+        store.send("oi", spoken: true)
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(3)
+        while store.messages.count < 2, clock.now < deadline { try await Task.sleep(for: .milliseconds(5)) }
+
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: transport.requests.first { $0.httpMethod == "POST" }?.httpBody ?? Data()) as? [String: Any])
+        XCTAssertEqual(body["modality"] as? String, "voice")
+    }
+}
