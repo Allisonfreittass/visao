@@ -29,6 +29,12 @@ struct SettingsView: View {
                     .font(Typo.text(.footnote))
                     .foregroundStyle(palette.erro)
             }
+            if KokoroVoice.shared.state == .absent {
+                // The first thing to see while the voice is still the robotic one.
+                PageGroup(label: "Voz") {
+                    KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
+                }
+            }
             PageGroup(label: "Aparência") {
                 SettingRow(
                     title: "Floresta com neblina ao fundo",
@@ -44,7 +50,9 @@ struct SettingsView: View {
                 }
             }
             PageGroup(label: "Voz e avisos") {
-                KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
+                if KokoroVoice.shared.state != .absent {
+                    KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
+                }
                 SettingRow(
                     title: "Falar as respostas",
                     description: "Leio em voz alta com a voz do aparelho (\(VoiceEngine.voiceName)). Vozes melhores em Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes.",

@@ -130,6 +130,27 @@ struct ChatScreen: View {
                     onSend: send
                 )
             }
+            // The messages arrive after the screen opens: once loaded, open at the last one.
+            .onChange(of: store.loading) { _, loading in
+                if !loading { jumpToEnd(proxy) }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                // Reading further up: one tap back to the end, as in Messages.
+                if !atBottom && !store.messages.isEmpty {
+                    Button { jumpToEnd(proxy, animated: true) } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(palette.tinta)
+                            .glassCircle(palette, size: 40)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 8)
+                    .transition(.scale.combined(with: .opacity))
+                    .accessibilityLabel("Ir para a última mensagem")
+                }
+            }
+            .animation(.spring(duration: 0.3), value: atBottom)
             .onChange(of: store.messages.count) { old, new in
                 // What you just sent always comes into view.
                 let mine = new > old && store.messages.last?.local == .sending
@@ -315,6 +336,22 @@ struct ChatScreen: View {
         composerFocused = true
     }
 
+    /// To the last message, without animation when the conversation opens; twice, because long
+    /// replies finish measuring a moment after the first pass.
+    private func jumpToEnd(_ proxy: ScrollViewProxy, animated: Bool = false) {
+        Task {
+            await Task.yield()
+            if animated {
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.bottomId, anchor: .bottom) }
+            } else {
+                proxy.scrollTo(Self.bottomId, anchor: .bottom)
+                try? await Task.sleep(for: .milliseconds(120))
+                proxy.scrollTo(Self.bottomId, anchor: .bottom)
+            }
+            atBottom = true
+        }
+    }
+
     /// Follows the end of the conversation only when you are there (or just sent something):
     /// reading further up, nothing yanks the list.
     private func scrollToBottom(_ proxy: ScrollViewProxy, delay: Duration = .zero, force: Bool = false) {
@@ -412,6 +449,8 @@ private struct BottomAnchor: ViewModifier {
         if #available(iOS 18.0, *) {
             content
                 .defaultScrollAnchor(.bottom, for: .initialOffset)
+                // At the end, growth keeps you at the end; reading above, nothing moves.
+                .defaultScrollAnchor(atBottom ? .bottom : nil, for: .sizeChanges)
                 .onScrollGeometryChange(for: Bool.self) { geometry in
                     let distance = geometry.contentSize.height - geometry.visibleRect.maxY
                     return distance < 80

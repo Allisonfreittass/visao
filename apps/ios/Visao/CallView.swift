@@ -202,6 +202,7 @@ struct CallView: View {
             .textCase(.uppercase)
             .foregroundStyle(palette.tintaSuave)
 
+            KokoroOffer(usesServerVoice: controller.voice.usesServerVoice)
             Spacer(minLength: 0)
             CallOrb(state: controller.state, level: controller.voice.level)
             VStack(spacing: 6) {
@@ -367,5 +368,38 @@ struct CallOrb: View {
             .liquidGlass(palette, in: Circle(), tint: palette.vidro.opacity(0.2), interactive: false)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// While the voice is still the iPhone's robotic one: a nudge to download Kokoro, right here.
+private struct KokoroOffer: View {
+    let usesServerVoice: Bool
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        let kokoro = KokoroVoice.shared
+        switch kokoro.state {
+        case .absent where !usesServerVoice, .failed where !usesServerVoice:
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Voz robótica?").font(Typo.text(.footnote, weight: .medium))
+                    Text("A voz Kokoro roda no iPhone e soa bem melhor (\(KokoroVoice.downloadSize), uma vez).")
+                        .font(Typo.text(.caption)).foregroundStyle(palette.tintaSuave)
+                }
+                Spacer()
+                PillButton(title: "Baixar", primary: true) { Task { await kokoro.download() } }
+            }
+            .padding(12)
+            .glass(palette, cornerRadius: 18, shadow: false)
+        case .downloading(let fraction):
+            ProgressView(value: fraction) {
+                Text("Baixando a voz Kokoro… \(Int(fraction * 100))%").font(Typo.text(.caption))
+            }
+            .tint(palette.estanho)
+            .padding(12)
+            .glass(palette, cornerRadius: 18, shadow: false)
+        default:
+            EmptyView()
+        }
     }
 }
