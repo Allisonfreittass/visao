@@ -15,7 +15,7 @@ O app se chama **V.I.S.A.O.** na tela inicial, com o bundle id `io.github.alliso
 nenhum: com assinatura automática, o Xcode registra na Apple sozinho na primeira vez que roda no
 iPhone.
 
-iOS 18 ou mais novo, Swift 6, Observation, async/await e URLSession. Uma dependência de terceiros, aprovada: soniqo/speech-swift (só o Kokoro), para a voz no iPhone.
+iOS 18 ou mais novo, Swift 6, Observation, async/await e URLSession. Uma dependência de terceiros, aprovada: soniqo/speech-swift (só o Kokoro e a Supertonic), para as vozes no iPhone.
 
 ## Antes da primeira vez
 
@@ -230,7 +230,17 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
   ligação. Nada escuta em segundo plano.
 - **Ajustes → Voz e avisos**: "Falar as respostas" (fora da ligação também) e "Aprovar por voz na
   ligação".
-- **Voz Kokoro no iPhone** (Ajustes → Voz e avisos → Baixar, ~335 MB, uma vez): o Kokoro-82M
+- **Vozes no iPhone** (Ajustes → **Voz no iPhone**): cada uma é baixada uma vez, quando você toca
+  em Baixar, tem "Ouvir uma amostra", "Usar esta voz" e "Apagar"; a escolhida vale para a ligação
+  e para "Falar as respostas". "Voz do servidor ou do iPhone" volta ao que não precisa baixar.
+  - **Supertonic 3** (~350 MB, versão FP16 para o Neural Engine,
+    [aufklarer/Supertonic-3-CoreML-FP16](https://huggingface.co/aufklarer/Supertonic-3-CoreML-FP16)):
+    99M de parâmetros, 31 idiomas, lê o português direto do texto, sem regras de pronúncia, e
+    tem 10 vozes (5 femininas, 5 masculinas). Licença dos pesos **OpenRAIL-M**: livre para uso
+    pessoal, com restrições de uso (proíbe imitar pessoas reais sem consentimento, entre outras).
+    Produto `SupertonicTTS` do mesmo pacote. Na primeira vez que abre, o iPhone compila o modelo,
+    o que leva alguns segundos.
+- **Kokoro no iPhone** (~335 MB, uma vez): o Kokoro-82M
   roda no próprio iPhone pelo Core ML (Neural Engine), com a voz `pf_dora`, a mesma que ele
   escolheu no servidor. Depois de baixado, fala sem servidor e sem internet, frase a frase,
   sintetizando a próxima enquanto a atual toca. É a primeira escolha quando está baixado e ligado.
@@ -241,7 +251,7 @@ acesa, como a ligação do web ([VOICE.md](VOICE.md)).
     (pesos do hexgrad/Kokoro-82M, Apache-2.0), baixado do Hugging Face só quando você toca em
     Baixar. "Apagar" libera o espaço.
   - Exige iOS 18: o app passou a pedir iOS 18 ou mais novo.
-  - A ordem da voz fica: Kokoro no iPhone → voz própria do servidor → voz do iPhone.
+  - A ordem da voz fica: a voz escolhida no iPhone → voz própria do servidor → voz do iPhone.
   - O modelo só abre na primeira vez que vai falar, nunca ao abrir o app. Roda no CPU + Neural
     Engine: no iOS 27.3 beta o caminho pela GPU (MPSGraph) derrubava o Core ML ao abrir o modelo.
     Se abrir o modelo derrubar o app, na vez seguinte ele tenta só no CPU; se de novo, desliga o

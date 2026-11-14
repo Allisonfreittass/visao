@@ -10,6 +10,7 @@
 		A1000000000000000000B001 /* VisaoKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000C001 /* VisaoKit */; };
 		A1000000000000000000B002 /* VisaoLive.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1000000000000000000F006 /* VisaoLive.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A1000000000000000000B003 /* KokoroTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000C003 /* KokoroTTS */; };
+		A1000000000000000000B004 /* SupertonicTTS in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000C005 /* SupertonicTTS */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +72,7 @@
 			files = (
 				A1000000000000000000B001 /* VisaoKit in Frameworks */,
 				A1000000000000000000B003 /* KokoroTTS in Frameworks */,
+				A1000000000000000000B004 /* SupertonicTTS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -141,6 +143,7 @@
 			packageProductDependencies = (
 				A1000000000000000000C001 /* VisaoKit */,
 				A1000000000000000000C003 /* KokoroTTS */,
+				A1000000000000000000C005 /* SupertonicTTS */,
 			);
 			productName = Visao;
 			productReference = A1000000000000000000F001 /* Visao.app */;
@@ -452,6 +455,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1000000000000000000C004 /* XCRemoteSwiftPackageReference "speech-swift" */;
 			productName = KokoroTTS;
+		};
+		A1000000000000000000C005 /* SupertonicTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000000000000000000C004 /* XCRemoteSwiftPackageReference "speech-swift" */;
+			productName = SupertonicTTS;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

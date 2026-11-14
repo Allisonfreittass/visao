@@ -29,11 +29,12 @@ struct SettingsView: View {
                     .font(Typo.text(.footnote))
                     .foregroundStyle(palette.erro)
             }
-            if KokoroVoice.shared.state == .absent {
-                // The first thing to see while the voice is still the robotic one.
-                PageGroup(label: "Voz") {
-                    KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
+            // First on the page: the voice decides whether the call sounds like a robot.
+            PageGroup(label: "Voz no iPhone") {
+                ForEach(LocalVoices.shared.all) { voice in
+                    LocalVoiceRow(voice: voice) { sample(voice) }
                 }
+                SystemVoiceRow()
             }
             PageGroup(label: "Aparência") {
                 SettingRow(
@@ -50,9 +51,6 @@ struct SettingsView: View {
                 }
             }
             PageGroup(label: "Voz e avisos") {
-                if KokoroVoice.shared.state != .absent {
-                    KokoroRow(sample: { sampleVoice.speak("Oi! Esta é a voz Kokoro, rodando aqui no seu iPhone, sem servidor.") })
-                }
                 SettingRow(
                     title: "Falar as respostas",
                     description: "Leio em voz alta com a voz do aparelho (\(VoiceEngine.voiceName)). Vozes melhores em Ajustes do iPhone → Acessibilidade → Conteúdo Falado → Vozes.",
@@ -226,6 +224,12 @@ struct SettingsView: View {
         )
     }
 
+    /// Plays a sample in that voice, choosing it first.
+    private func sample(_ voice: LocalVoice) {
+        LocalVoices.shared.selected = voice.kind
+        sampleVoice.speak("Oi! Esta é a voz \(voice.kind.name), rodando aqui no seu iPhone, sem servidor. Como você está hoje?")
+    }
+
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -332,29 +336,41 @@ struct AccountChangeSheet: View {
     }
 }
 
-/// The Kokoro voice on the iPhone: download it once (with progress), hear a sample, switch it on
-/// or off, delete it to free the space.
-private struct KokoroRow: View {
+/// A voice that runs on the iPhone: download it once (with progress), hear it, choose it, pick
+/// one of its voices, delete it to free the space.
+private struct LocalVoiceRow: View {
+    let voice: LocalVoice
     let sample: () -> Void
     @Environment(\.palette) private var palette
     @State private var confirmRemove = false
 
-    private var kokoro: KokoroVoice { KokoroVoice.shared }
+    private var chosen: Bool { LocalVoices.shared.selected == voice.kind && voice.usable }
 
     var body: some View {
-        @Bindable var kokoro = KokoroVoice.shared
+        @Bindable var voice = voice
         PageRow {
             VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Voz Kokoro no iPhone").font(Typo.text(.subheadline, weight: .medium))
-                    Text("A voz aberta que ele escolheu (Dora), rodando no próprio iPhone: mais natural que a do sistema, sem servidor e sem internet depois de baixar.")
-                        .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
-                        .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(voice.kind.name).font(Typo.text(.subheadline, weight: .medium))
+                        Text(voice.kind.summary)
+                            .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    if chosen {
+                        Text("em uso")
+                            .font(Typo.mono(.caption2)).textCase(.uppercase)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(palette.fundoHover, in: Capsule())
+                    }
                 }
-                switch kokoro.state {
+                switch voice.state {
                 case .absent:
-                    PillButton(title: "Baixar (\(KokoroVoice.downloadSize))", primary: true) { Task { await kokoro.download() } }
-                    Text("De preferência no Wi-Fi. Vem do Hugging Face (aufklarer/Kokoro-82M-CoreML, licença Apache-2.0).")
+                    PillButton(title: "Baixar (\(voice.kind.size))", primary: true) {
+                        Task { await LocalVoices.shared.download(voice.kind) }
+                    }
+                    Text("De preferência no Wi-Fi. \(voice.kind.source).")
                         .font(Typo.text(.caption)).foregroundStyle(palette.tintaFraca)
                 case .downloading(let fraction):
                     ProgressView(value: fraction) {
@@ -364,27 +380,60 @@ private struct KokoroRow: View {
                 case .loading:
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Abrindo o modelo…").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                        Text("Abrindo a voz… a primeira vez pode levar alguns segundos.")
+                            .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
                     }
                 case .ready, .onDisk:
-                    Toggle(isOn: $kokoro.enabled) {
-                        Text("Falar com a voz Kokoro").font(Typo.text(.footnote, weight: .medium))
+                    if voice.kind.voices.count > 1 {
+                        Picker("Voz", selection: $voice.voiceId) {
+                            ForEach(voice.kind.voices, id: \.id) { Text($0.label).tag($0.id) }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(palette.tinta)
                     }
-                    .toggleStyle(VisaoSwitch())
-                    HStack(spacing: 8) {
+                    FlowButtons {
                         PillButton(title: "Ouvir uma amostra", primary: true, action: sample)
+                        if !chosen {
+                            PillButton(title: "Usar esta voz") { LocalVoices.shared.selected = voice.kind }
+                        }
                         PillButton(title: "Apagar") { confirmRemove = true }
                     }
                 case .failed(let reason):
                     Text(reason).font(Typo.text(.footnote)).foregroundStyle(palette.erro)
-                    PillButton(title: "Tentar de novo", primary: true) { Task { await kokoro.download() } }
+                    PillButton(title: "Tentar de novo", primary: true) { Task { await LocalVoices.shared.download(voice.kind) } }
                 }
             }
         }
-        .confirmationDialog("Apagar a voz Kokoro do iPhone?", isPresented: $confirmRemove, titleVisibility: .visible) {
-            Button("Apagar", role: .destructive) { Task { await KokoroVoice.shared.remove() } }
+        .confirmationDialog("Apagar a voz \(voice.kind.name) do iPhone?", isPresented: $confirmRemove, titleVisibility: .visible) {
+            Button("Apagar", role: .destructive) { Task { await voice.remove() } }
         } message: {
-            Text("Libera \(KokoroVoice.downloadSize). Ele volta a falar com a voz do servidor ou do iPhone.")
+            Text("Libera \(voice.kind.size).")
+        }
+    }
+}
+
+/// No voice on the iPhone: the server's own voice when it has one, the iPhone's otherwise.
+private struct SystemVoiceRow: View {
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        PageRow {
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Voz do servidor ou do iPhone").font(Typo.text(.subheadline, weight: .medium))
+                    Text("Sem baixar nada: a voz própria do servidor quando ele tem, senão a do sistema.")
+                        .font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                }
+                Spacer()
+                if LocalVoices.shared.active == nil {
+                    Text("em uso")
+                        .font(Typo.mono(.caption2)).textCase(.uppercase)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(palette.fundoHover, in: Capsule())
+                } else {
+                    PillButton(title: "Usar") { LocalVoices.shared.selected = nil }
+                }
+            }
         }
     }
 }

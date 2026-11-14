@@ -196,7 +196,7 @@ struct CallView: View {
                     }
                 }
                 Spacer()
-                Text(KokoroVoice.shared.speaks ? "Voz Kokoro · no iPhone" : controller.voice.usesServerVoice ? "Voz própria" : controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho")
+                Text(voiceLabel)
             }
             .font(Typo.mono(.caption2))
             .textCase(.uppercase)
@@ -305,6 +305,13 @@ struct CallView: View {
         }
     }
 
+    /// Which voice is speaking, top right.
+    private var voiceLabel: String {
+        if let local = LocalVoices.shared.active { return "Voz \(local.kind.name) · no iPhone" }
+        if controller.voice.usesServerVoice { return "Voz própria" }
+        return controller.voice.onDevice ? "Voz do aparelho · no iPhone" : "Voz do aparelho"
+    }
+
     private var stateLabel: String {
         switch controller.state {
         case .starting: "conectando"
@@ -371,35 +378,33 @@ struct CallOrb: View {
     }
 }
 
-/// While the voice is still the iPhone's robotic one: a nudge to download Kokoro, right here.
+/// While the voice is still the iPhone's robotic one: a nudge to download a better one, here.
 private struct KokoroOffer: View {
     let usesServerVoice: Bool
     @Environment(\.palette) private var palette
 
     var body: some View {
-        let kokoro = KokoroVoice.shared
-        switch kokoro.state {
-        case .absent where !usesServerVoice, .failed where !usesServerVoice:
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Voz robótica?").font(Typo.text(.footnote, weight: .medium))
-                    Text("A voz Kokoro roda no iPhone e soa bem melhor (\(KokoroVoice.downloadSize), uma vez).")
-                        .font(Typo.text(.caption)).foregroundStyle(palette.tintaSuave)
-                }
-                Spacer()
-                PillButton(title: "Baixar", primary: true) { Task { await kokoro.download() } }
-            }
-            .padding(12)
-            .glass(palette, cornerRadius: 18, shadow: false)
-        case .downloading(let fraction):
+        let voices = LocalVoices.shared
+        let supertonic = voices.supertonic
+        if case .downloading(let fraction) = supertonic.state {
             ProgressView(value: fraction) {
-                Text("Baixando a voz Kokoro… \(Int(fraction * 100))%").font(Typo.text(.caption))
+                Text("Baixando a voz Supertonic… \(Int(fraction * 100))%").font(Typo.text(.caption))
             }
             .tint(palette.estanho)
             .padding(12)
             .glass(palette, cornerRadius: 18, shadow: false)
-        default:
-            EmptyView()
+        } else if voices.active == nil && !usesServerVoice && supertonic.state == .absent {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Voz robótica?").font(Typo.text(.footnote, weight: .medium))
+                    Text("A Supertonic roda no iPhone e soa bem mais natural (\(supertonic.kind.size), uma vez).")
+                        .font(Typo.text(.caption)).foregroundStyle(palette.tintaSuave)
+                }
+                Spacer()
+                PillButton(title: "Baixar", primary: true) { Task { await voices.download(.supertonic) } }
+            }
+            .padding(12)
+            .glass(palette, cornerRadius: 18, shadow: false)
         }
     }
 }

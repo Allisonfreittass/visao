@@ -202,17 +202,17 @@ final class VoiceEngine: NSObject {
             return
         }
         onSpoken = done
-        // Kokoro on the iPhone first (no network), then the server's own voice, then the iPhone's.
-        if KokoroVoice.shared.speaks {
+        // A voice on the iPhone first (no network), then the server's own voice, then the iPhone's.
+        if let local = LocalVoices.shared.active {
             phase = .speaking
             let sentences = VoiceRules.sentences(text)
             serverSpeech = Task { [weak self] in
                 // Opened on first use; if it cannot open here, the next voice in line speaks.
-                guard await KokoroVoice.shared.ensureLoaded() else {
+                guard await local.ensureLoaded() else {
                     self?.speakWithoutKokoro(text)
                     return
                 }
-                await self?.speakClips(sentences, fallbackText: text) { try await KokoroVoice.shared.audio(for: $0) }
+                await self?.speakClips(sentences, fallbackText: text) { try await local.audio(for: $0) }
             }
             return
         }
