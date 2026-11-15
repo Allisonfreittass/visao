@@ -17,9 +17,9 @@ nela (título, link, trecho e data de cada fonte) e as páginas que você mandou
 instrução manda usar só fatos do material, escrever "a confirmar" no que faltar, marcar
 estimativas, dar a data dos preços e listar as fontes.
 
-A página só é tão boa quanto o material: com a pesquisa de hoje (web, Wikipédia, links que você
-manda), ele não consulta preços ao vivo em sites de passagem ou hotel. Isso é o navegador na
-nuvem, um passo seguinte.
+A página só é tão boa quanto o material. Entram também as páginas que ele abriu ao vivo no
+navegador nesta conversa (Google Voos, Google Hotéis...), com a hora em que foram lidas
+([NAVEGADOR.md](NAVEGADOR.md)).
 
 ## Segurança
 

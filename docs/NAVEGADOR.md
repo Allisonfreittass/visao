@@ -16,7 +16,11 @@ guardado para as páginas que ele escreve depois ([ARTEFATOS.md](ARTEFATOS.md)).
 2. Uma chamada curta ao modelo planeja até 4 endereços, com modelos que funcionam:
    Google Voos (`/travel/flights?q=Flights to SCL from CNF on 2027-10-01 through 2027-10-08`) e
    Google Hotéis (`/travel/search?q=hotéis em … datas`). Sem endereço certo, ele usa a busca que já
-   existe (Tavily/web) para achar páginas. Faltando a data ou a origem, não navega e pergunta.
+   existe (Tavily/web) para achar páginas. Faltando algo essencial, o plano diz o quê (`"missing": ["origem", "datas"]`): ele não navega, a
+   pesquisa genérica da curiosidade também não roda, e a resposta recebe um bloco dizendo que ele
+   **consegue** ver os preços de agora e deve perguntar só o que falta (nunca "não tenho acesso a
+   sites ao vivo"). Quando a pessoa responde com os dados, o planejador junta com o pedido de
+   antes e navega.
 3. O navegador abre as páginas; o texto vai junto da mensagem como dado de terceiros.
 
 Testado em 13/11/2026: Google Voos e Google Hotéis devolvem preços reais. A busca do Google,

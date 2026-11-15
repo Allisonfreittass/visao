@@ -242,7 +242,16 @@ def run_turn(
             search=search,
             max_pages=config.browse_max_pages,
         )
-        if browsed is not None:
+        if browsed is not None and browsed.missing:
+            # Not an action: nothing opened. The reply asks for what is missing.
+            plan.add(
+                "browse_needs_details",
+                executed=False,
+                reason="planner_missing_details",
+                missing=browsed.missing,
+            )
+            blocks.append(browsed.block)
+        elif browsed is not None:
             plan.add(
                 "browsed",
                 executed=True,
@@ -255,14 +264,16 @@ def run_turn(
     outcome = NO_OUTCOME
     # A message with a link is about that link: searching the web for its words found unrelated
     # pages (a site named "nobievolua" brought up a blood pressure drug), so research waits.
-    # Pages read live answer it already: a generic search on top only adds noise.
+    # Pages read live answer it already: a generic search on top only adds noise. So does a turn
+    # that waits for the trip's details: there the search brought "Cecília Meireles · Wikipédia"
+    # and a credit rating of an insurer (14/11/2026).
     # In a voice call the assessment is skipped: it is a whole model call before the reply can
     # start, felt as silence on the phone; the text chat keeps it.
     if (
         config.curiosity_enabled
         and modality != "voice"
         and not read
-        and not (browsed and browsed.opened)
+        and not (browsed and (browsed.opened or browsed.missing))
     ):
         outcome = consider(
             session,
@@ -413,7 +424,7 @@ def run_turn(
             part
             for part in (
                 conversation_links.context_block(list(read)) if read else "",
-                browsed.block if browsed else "",
+                browsed.block if browsed and not browsed.missing else "",
             )
             if part
         ),
