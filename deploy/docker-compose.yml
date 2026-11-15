@@ -24,7 +24,7 @@ services:
     # Só para o próprio servidor (túnel SSH e testes); de fora, só pelo Caddy.
     ports:
       - "127.0.0.1:8000:8000"
-    # `browsing`: a rede onde só ela fala com o navegador.
+    # `browsing`: a rede onde só a API e o worker falam com o navegador.
     networks: [default, browsing]
 
   # O worker roda 24 h aqui: é ele que pensa, estuda e puxa conversa. Não deixe outro worker
@@ -32,6 +32,8 @@ services:
   worker:
     <<: *visao
     command: ["python", "-m", "apps.worker.main"]
+    # A conferência diária dos painéis do Início abre as páginas (docs/decisions/0012).
+    networks: [default, browsing]
     healthcheck:
       test: ["CMD", "python", "-m", "apps.worker.health"]
       interval: 15s
@@ -43,7 +45,8 @@ services:
         condition: service_healthy
 
   # O navegador de verdade das páginas ao vivo (docs/NAVEGADOR.md). Sem segredos, sem banco e
-  # numa rede só com a API: uma página maliciosa que escape do Chromium não acha nada de valor.
+  # numa rede só com a API e o worker: uma página maliciosa que escape do Chromium não acha nada
+  # de valor.
   # A versão tem de ser a mesma do pacote playwright do pyproject.toml.
   browser:
     image: mcr.microsoft.com/playwright:v1.62.0-noble

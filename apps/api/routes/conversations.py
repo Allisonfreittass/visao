@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.browser import get_browser
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
+from apps.api.limits import panel_limits
 from apps.api.links import get_link_reader
 from apps.api.llm import get_llm_provider, missing_llm_settings
 from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
@@ -43,7 +44,6 @@ from core.memory.curator import (
 )
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import ReflectionResult, reflect
-from infrastructure.database.audit import record_audit
 from infrastructure.database.models import Artifact, BrowseVisit, Conversation, Message, User
 from integrations.browser.base import Browser
 from integrations.llm.base import LLMError, LLMProvider
@@ -234,6 +234,7 @@ def turn_config(settings: Settings) -> TurnConfig:
         web_search=settings.tavily_api_key is not None,
         google_secret=settings.secret_key,
         browse_max_pages=settings.browser_max_pages,
+        panel_limits=panel_limits(settings),
     )
 
 
@@ -672,28 +673,6 @@ def send_message(
             read_pages,
         )
 
-    if turn.accepted_page is not None:
-        # "pode" to the panel offer: the page from the live quote, written like any other page.
-        page = page or turn.accepted_page
-        background.add_task(
-            build_in_background,
-            factory,
-            turn.accepted_page.id,
-            provider,
-            settings,
-            _budgets(settings),
-            identity.chosen_name,
-            "",
-        )
-        record_audit(
-            db,
-            "panel_offer.approve",
-            "success",
-            actor_user_id=user.id,
-            details={"via": "texto"},
-        )
-        db.commit()
-
     # After the reply, never before it: the worker writes it (a small call of its own).
     title.request(db, conversation)
 
@@ -755,7 +734,13 @@ def send_message(
 
 
 # A turn that leaves something waiting for the owner's tap: the app refreshes its cards.
-WAITING_FOR_A_TAP = {"mac_proposed", "google_proposed", "panel_offered", "panel_accepted"}
+WAITING_FOR_A_TAP = {
+    "mac_proposed",
+    "google_proposed",
+    "panel_offered",
+    "panel_accepted",
+    "panel_edited",
+}
 
 
 def _stream_error(conversation_id: uuid.UUID, code: int, message: str) -> HTTPException:

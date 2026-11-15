@@ -45,8 +45,12 @@ _DESCRIBE = {
         " que não abriram e o motivo"
     ),
     "panel_accepted": (
-        "a pessoa aceitou o painel que você ofereceu; a página com a cotação começou a ser montada"
-        " e aparece num cartão quando ficar pronta (ainda não está)"
+        "a pessoa aceitou o painel que você ofereceu; ele foi criado agora e já está no Início,"
+        " com a cotação lida ao vivo, e confere o preço uma vez por dia"
+    ),
+    "panel_edited": (
+        "o painel do Início foi atualizado agora, a pedido da pessoa; a versão anterior ficou"
+        " guardada"
     ),
     "read_attachments": (
         "as fotos e arquivos que a pessoa mandou nesta mensagem estão nela, acima; fale só do"

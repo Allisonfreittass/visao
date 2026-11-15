@@ -5,6 +5,8 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from apps.api.browser import get_browser
+from apps.api.limits import panel_limits
 from apps.api.llm import build_llm_provider
 from apps.api.settings import Settings
 from apps.worker.runner import Handler, HandlerResult
@@ -18,7 +20,8 @@ from core.identity import name_deliberation
 from core.identity.genesis import get_identity
 from core.mind.review import review_once
 from core.mind.think import MindConfig, think_once
-from infrastructure.database.models import Goal, ScheduledJob, User
+from core.panels import service as panels
+from infrastructure.database.models import Goal, Panel, ScheduledJob, User
 from integrations.llm.base import LLMProvider
 from integrations.search.base import SearchProvider
 from integrations.search.open_web import OpenWebSearch
@@ -201,6 +204,31 @@ def title_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     return handle
 
 
+def panel_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    """The daily check of a live panel (core/panels/service.py, ADR-0012): the agent's own call,
+    so it counts in the autonomy budget and stops with the global pause."""
+
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        panel = session.get(Panel, uuid.UUID(job.payload["panel_id"]))
+        if panel is None:
+            return HandlerResult("done", {"skipped": "deleted"})
+        owner = session.get(User, panel.owner_user_id)
+        if owner is None:
+            return HandlerResult("done", {"skipped": "no_owner"})
+        outcome = panels.recheck(
+            session,
+            panel,
+            owner=owner,
+            browser=get_browser(),
+            provider=provider,
+            limits=panel_limits(settings),
+            has_room=lambda: autonomy_room(session, settings),
+        )
+        return HandlerResult("done", {"outcome": outcome})
+
+    return handle
+
+
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
     # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
@@ -213,4 +241,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         "mind_review": review_handler(settings, fast),
         "mind_think": think_handler(settings, provider),
         conversation_title.JOB_KIND: title_handler(settings, fast),
+        panels.JOB_KIND: panel_handler(settings, fast),
     }

@@ -97,6 +97,10 @@ def _schedule(session: Session, panel: Panel, when: datetime) -> None:
     )
 
 
+def schedule_next(session: Session, panel: Panel, owner: User, now: datetime | None = None) -> None:
+    _schedule(session, panel, next_check(owner, now or datetime.now(UTC)))
+
+
 def _pages(rows: list[BrowseVisit]) -> list[Page]:
     return [
         Page(visit_id=r.id, url=r.url, title=r.title, text=r.text, read_at=r.created_at)
@@ -235,6 +239,7 @@ def recheck(
     has_room: Callable[[], bool],
     now: datetime | None = None,
     reschedule: bool = True,
+    purpose: str = RECHECK_PURPOSE,
 ) -> str:
     """One check. Returns what happened (for the job result and the tests)."""
     now = now or datetime.now(UTC)
@@ -290,7 +295,7 @@ def recheck(
         today=local_today(owner, now),
         spec=spec,
         conversation_id=panel.conversation_id,
-        purpose=RECHECK_PURPOSE,
+        purpose=purpose,
     )
     if found is None:
         return later("não conferido hoje: não deu para ler os preços", "no_extract")
@@ -311,6 +316,16 @@ def recheck(
 
 
 _KINDS = {"flight": "o voo", "hotel": "a hospedagem"}
+
+
+def gap_words(gap: Decimal | None, goal: Decimal | None) -> str | None:
+    if gap is None or goal is None:
+        return None
+    if gap > 0:
+        return f"{money(gap)} acima da meta de {money(goal)}"
+    if gap < 0:
+        return f"{money(-gap)} abaixo da meta de {money(goal)}"
+    return f"exatamente na meta de {money(goal)}"
 
 
 def card(session: Session, panel: Panel, owner: User, now: datetime | None = None) -> dict:

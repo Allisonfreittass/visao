@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     browser_executable_path: str | None = None
     browser_max_pages: int = Field(default=4, ge=1, le=8)
     browser_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
+    # Live panels on the home screen (docs/PAINEIS.md): how many at once, pages per daily check
+    # (the `browser` container has 700 MB) and the drop, in percent, that is worth a notice.
+    panels_max_active: int = Field(default=3, ge=1, le=10)
+    panel_max_pages: int = Field(default=2, ge=1, le=4)
+    panel_alert_drop_percent: int = Field(default=10, ge=1, le=90)
 
     # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
     # human quality gate; which approved voice is the agent's own is the agent's decision.

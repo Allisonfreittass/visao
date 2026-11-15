@@ -2,8 +2,7 @@
 (docs/PAINEIS.md). The reply ends with a short offer, a card with Aprovar shows under it, and a
 tap or a plain yes in the next message ("pode", "por favor") accepts it.
 
-Until the live panels exist, accepting writes a page (docs/ARTEFATOS.md) from the same pages read
-live, so the offer is already useful.
+Accepting creates the live panel (core/panels/service.py) from the same pages read live.
 """
 
 import re
@@ -14,9 +13,8 @@ from decimal import Decimal, InvalidOperation
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.conversation import artifacts
 from core.memory.text import fold
-from infrastructure.database.models import Artifact, Message, PanelOffer, User
+from infrastructure.database.models import Message, PanelOffer, User
 
 TITLE_CHARS = 60
 DEFAULT_TITLE = "Cotação ao vivo"
@@ -82,11 +80,21 @@ def offer_block(goal: Decimal | None) -> str:
     )
 
 
-def accepted_block(title: str) -> str:
+def ready_block(title: str, total: str | None, gap: str | None) -> str:
+    """For the reply right after the panel was created from the owner's yes."""
+    numbers = f" Total agora: {total}." if total else " Os preços ainda estão a confirmar."
+    distance = f" {gap}." if gap else ""
     return (
-        f"A pessoa aceitou o painel. A página “{title}”, com a cotação a partir das páginas lidas "
-        "ao vivo, está sendo montada agora e aparece aqui num cartão quando ficar pronta. Confirme "
-        "em uma frase curta; não diga que já está pronta e não repita os preços."
+        f"A pessoa aceitou, e o painel “{title}” já está no Início, com a cotação lida ao vivo."
+        f"{numbers}{distance} Ele confere o preço uma vez por dia e avisa se mudar algo "
+        "importante. Confirme em uma ou duas bolhas curtas, sem repetir a cotação inteira."
+    )
+
+
+def limit_block(limit: int) -> str:
+    return (
+        f"A pessoa aceitou o painel, mas ela já tem {limit} painéis ativos, o limite. Nada foi "
+        "criado. Diga isso em uma frase e que dá para pausar ou apagar um no Início."
     )
 
 
@@ -158,21 +166,6 @@ def own(session: Session, owner_id: uuid.UUID, offer_id: uuid.UUID) -> PanelOffe
     if offer is None or offer.owner_user_id != owner_id or offer.status != "proposed":
         raise LookupError("offer")
     return offer
-
-
-def accept(
-    session: Session, offer: PanelOffer, owner: User, conversation, message_id: uuid.UUID
-) -> Artifact:
-    """For now a page from the same live pages; the build runs in the background (the caller)."""
-    page = artifacts.create(
-        session,
-        owner=owner,
-        conversation=conversation,
-        message_id=message_id,
-        request=artifacts.Request(title=offer.title),
-    )
-    offer.status, offer.decided_at, offer.artifact_id = "accepted", datetime.now(UTC), page.id
-    return page
 
 
 def reject(offer: PanelOffer) -> None:

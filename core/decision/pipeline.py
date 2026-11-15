@@ -43,15 +43,17 @@ from core.mind import questions as mind_questions
 from core.mind import review as mind_review
 from core.mind import state as mind_state
 from core.mind import temperament as mind_temperament
+from core.panels import editing as panel_editing
 from core.panels import offers as panel_offers
+from core.panels import service as panels
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import (
     AgentIdentity,
-    Artifact,
     Attachment,
     Conversation,
     Decision,
+    Panel,
     User,
 )
 from infrastructure.jobs import queue
@@ -80,6 +82,8 @@ class TurnConfig:
     google_secret: str | None = None
     # Live pages per turn (docs/NAVEGADOR.md); the browser itself comes with run_turn.
     browse_max_pages: int = 4
+    # Live panels (docs/PAINEIS.md).
+    panel_limits: panels.Limits = panels.Limits()
 
 
 @dataclass(frozen=True)
@@ -90,8 +94,8 @@ class TurnOutcome:
     decision: Decision
     links: tuple[conversation_links.LinkRead, ...] = ()
     browsed: tuple[Visit, ...] = ()
-    # The page an accepted panel offer is writing (the route builds it after the reply).
-    accepted_page: Artifact | None = None
+    # A panel this turn created (the owner said yes) or edited.
+    panel: Panel | None = None
 
 
 def run_turn(
@@ -229,18 +233,77 @@ def run_turn(
                     action_ids=[str(a.id) for a in helped.proposed],
                 )
 
-    # "pode", "por favor" right after it offered a panel: that answers the card.
+    # "pode", "por favor" right after it offered a panel: that answers the card, and the panel is
+    # made now, before the reply, so "está no Início" is true when it is said.
     accepted = panel_offers.answered_by(session, conversation.id, text)
+    created = None
     if accepted is not None:
-        plan.add(
-            "panel_accepted", executed=True, reason="owner_said_yes", offer_id=str(accepted.id)
-        )
-        blocks.append(panel_offers.accepted_block(accepted.title))
+        progress.step("Montando seu painel")
+        try:
+            created = panels.create_from_offer(
+                session,
+                offer=accepted,
+                owner=owner,
+                conversation=conversation,
+                provider=provider,
+                limits=config.panel_limits,
+                via="texto",
+            )
+        except panels.LimitReached:
+            blocks.append(panel_offers.limit_block(config.panel_limits.max_active))
+        else:
+            shown = panels.card(session, created, owner)
+            plan.add(
+                "panel_accepted", executed=True, reason="owner_said_yes", panel_id=str(created.id)
+            )
+            blocks.append(
+                panel_offers.ready_block(
+                    created.title,
+                    panels.money(shown["total"]) if shown["total"] is not None else None,
+                    panels.gap_words(shown["goal_gap"], shown["goal"]),
+                )
+            )
+
+    # "troca o hotel pra Providencia", "muda a meta pra R$ 5.500": the same panel changes.
+    edited = None
+    if accepted is None and panel_editing.wants_edit(text):
+        target = panel_editing.target(session, owner.id, conversation.id)
+        if target is not None:
+            progress.step("Editando seu painel")
+            changes, title = panel_editing.propose(
+                session, provider, target, text, conversation_id=conversation.id
+            )
+            changed = panels.edit(session, target, changes=changes, title=title, reason=text)
+            if changed:
+                rechecked = False
+                if set(changed) & panels.SEARCH_FIELDS and browser is not None:
+                    progress.step("Conferindo os preços de novo")
+                    outcome_of_check = panels.recheck(
+                        session,
+                        target,
+                        owner=owner,
+                        browser=browser,
+                        provider=provider,
+                        limits=config.panel_limits,
+                        has_room=lambda: True,
+                        reschedule=False,
+                        purpose="panel_extract",
+                    )
+                    rechecked = outcome_of_check in ("checked", "alerted")
+                plan.add(
+                    "panel_edited",
+                    executed=True,
+                    reason="owner_asked",
+                    panel_id=str(target.id),
+                    changed=changed,
+                )
+                blocks.append(panel_editing.edited_block(target.title, changed, rechecked))
+                edited = target
 
     browsed = None
     offering = False
     budget_goal = None
-    if browser is not None and not read and accepted is None:
+    if browser is not None and not read and accepted is None and edited is None:
         browsed = browse.run(
             session,
             owner=owner,
@@ -480,11 +543,6 @@ def run_turn(
                     reason="open_conversation_thread",
                     gap_id=str(outcome.gap.id),
                 )
-    accepted_page = None
-    if accepted is not None:
-        accepted_page = panel_offers.accept(
-            session, accepted, owner, conversation, result.assistant_message.id
-        )
     if offering and browsed is not None:
         offer = panel_offers.propose(
             session,
@@ -548,5 +606,5 @@ def run_turn(
         decision=decision,
         links=read,
         browsed=tuple(browsed.visits) if browsed else (),
-        accepted_page=accepted_page,
+        panel=created or edited,
     )

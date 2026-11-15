@@ -13,7 +13,7 @@ from core import browse
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.decision import record
 from core.identity.genesis import run_genesis
-from infrastructure.database.models import BrowseVisit, PanelOffer
+from infrastructure.database.models import BrowseVisit, Panel, PanelOffer
 from integrations.browser.base import Visit
 from integrations.browser.playwright_browser import allowed_request
 from tests.fakes import FakeLLMProvider
@@ -315,13 +315,14 @@ def test_a_live_quote_ends_with_a_panel_offer_that_cites_the_budget(client, db):
     assert offers[0]["conversation_id"] == conversation
 
 
-def test_a_plain_yes_accepts_the_offer_and_a_page_is_written(client, db):
+def test_a_plain_yes_accepts_the_offer_and_the_panel_is_made(client, db):
     llm = _offer_world(client, db)
     headers = _login(client, db)
     conversation, _ = _send(client, headers, "quanto tá a passagem pra Santiago?")
     _, turn = _send(client, headers, "por favor", conversation)
-    assert any("A pessoa aceitou o painel" in prompt[0].content for prompt in llm.prompts)
-    assert turn["assistant_message"]["artifact"]["title"] == "Combo Santiago"
+    assert any("já está no Início" in prompt[0].content for prompt in llm.prompts)
+    assert turn["assistant_message"]["artifact"] is None  # a live panel now, not a page
+    assert db.query(Panel).one().title == "Combo Santiago"
     assert client.get("/panels/offers", headers=headers).json() == []
     assert db.query(PanelOffer).one().status == "accepted"
 
@@ -334,7 +335,7 @@ def test_a_tap_accepts_and_another_owner_cannot(client, db):
     offer = client.get("/panels/offers", headers=headers).json()[0]
     assert client.post(f"/panels/offers/{offer['id']}/approve", headers=other).status_code == 404
     done = client.post(f"/panels/offers/{offer['id']}/approve", headers=headers).json()
-    assert done["status"] == "accepted" and done["artifact"]["title"] == "Combo Santiago"
+    assert done["status"] == "accepted" and done["panel_id"]
     again = client.post(f"/panels/offers/{offer['id']}/approve", headers=headers)
     assert again.status_code == 404
 

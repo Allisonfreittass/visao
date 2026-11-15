@@ -1,20 +1,22 @@
-"""Panel offers (docs/PAINEIS.md): after a live quote, the card that waits for a yes."""
+"""Live panels on the home screen (docs/PAINEIS.md, ADR-0012): the offer card after a live quote,
+the panels themselves (pause, delete, history) and the suggestions when there is nothing yet."""
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
-from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
-from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
-from apps.api.routes.conversations import OptionalProvider, _budgets
-from core.identity.genesis import get_identity
+from apps.api.deps import AppSettings, CurrentUser, DbSession
+from apps.api.limits import panel_limits
+from apps.api.routes.conversations import OptionalProvider
 from core.panels import offers
+from core.panels import service as panels
+from core.panels.suggestions import suggestions
 from infrastructure.database.audit import record_audit
-from infrastructure.database.models import Conversation, PanelOffer
+from infrastructure.database.models import Conversation, Panel, PanelOffer
 
 router = APIRouter(prefix="/panels", tags=["panels"])
 
@@ -29,11 +31,66 @@ class OfferOut(BaseModel):
     status: str
     # What the card says.
     summary: str
-    artifact: ArtifactOut | None = None
+    panel_id: uuid.UUID | None = None
     created_at: datetime
 
 
-def offer_out(offer: PanelOffer, page=None) -> OfferOut:
+class ItemOut(BaseModel):
+    kind: str
+    provider: str
+    where: str
+    dates: str
+    connections: int | None
+    price: Decimal | None
+    price_basis: str
+    cost: Decimal | None
+    currency: str
+    site: str
+    url: str
+    read_at: datetime | None
+
+
+class PanelOut(BaseModel):
+    id: uuid.UUID
+    kind: str
+    title: str
+    status: str
+    spec: dict[str, Any]
+    total: Decimal | None
+    goal: Decimal | None
+    goal_gap: Decimal | None
+    # "R$ 555 acima da meta de R$ 6.000", computed here.
+    goal_words: str | None
+    change: Decimal | None
+    items: list[ItemOut]
+    checked_at: datetime | None
+    # False: the numbers are from an earlier day; the card says when, never "agora".
+    checked_today: bool
+    next_check_at: datetime | None
+    note: str
+    conversation_id: uuid.UUID | None
+    created_at: datetime
+
+
+class PointOut(BaseModel):
+    total: Decimal | None
+    checked_at: datetime
+
+
+class PanelDetailOut(PanelOut):
+    history: list[PointOut]
+
+
+class PanelPatch(BaseModel):
+    status: Literal["active", "paused"]
+
+
+class SuggestionOut(BaseModel):
+    text: str
+    draft: str
+
+
+def offer_out(offer: PanelOffer, panel_id: uuid.UUID | None = None) -> OfferOut:
     goal = (
         f", com a distância da meta de {offers.money(offer.goal_amount)}"
         if offer.goal_amount
@@ -48,9 +105,21 @@ def offer_out(offer: PanelOffer, page=None) -> OfferOut:
         currency=offer.currency,
         status=offer.status,
         summary=f"Deixar “{offer.title}” no Início{goal}, conferindo o preço todo dia",
-        artifact=artifact_out(page) if page is not None else None,
+        panel_id=panel_id,
         created_at=offer.created_at,
     )
+
+
+def panel_out(db, panel: Panel, user) -> PanelOut:
+    shown = panels.card(db, panel, user)
+    return PanelOut(**shown, goal_words=panels.gap_words(shown["goal_gap"], shown["goal"]))
+
+
+def _own(db, user_id: uuid.UUID, panel_id: uuid.UUID) -> Panel:
+    panel = db.get(Panel, panel_id)
+    if panel is None or panel.owner_user_id != user_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Painel não encontrado")
+    return panel
 
 
 @router.get("/offers")
@@ -66,41 +135,93 @@ def decide(
     user: CurrentUser,
     settings: AppSettings,
     provider: OptionalProvider,
-    factory: SessionFactory,
-    background: BackgroundTasks,
     via: Literal["toque", "voz"] = "toque",
 ) -> OfferOut:
     try:
         offer = offers.own(db, user.id, offer_id)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "oferta não encontrada") from exc
-    page = None
-    if decision == "approve":
-        if provider is None:
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM não configurado")
-        conversation = db.get(Conversation, offer.conversation_id)
-        if conversation is None or offer.message_id is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "conversa não encontrada")
-        page = offers.accept(db, offer, user, conversation, offer.message_id)
-        identity = get_identity(db)
-        background.add_task(
-            build_in_background,
-            factory,
-            page.id,
-            provider,
-            settings,
-            _budgets(settings),
-            identity.chosen_name if identity else None,
-            "",
-        )
-    else:
+    if decision == "reject":
         offers.reject(offer)
+        record_audit(
+            db, "panel_offer.reject", "success", actor_user_id=user.id, details={"via": via}
+        )
+        db.commit()
+        return offer_out(offer)
+    if provider is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "LLM não configurado")
+    conversation = db.get(Conversation, offer.conversation_id)
+    if conversation is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "conversa não encontrada")
+    limits = panel_limits(settings)
+    try:
+        panel = panels.create_from_offer(
+            db,
+            offer=offer,
+            owner=user,
+            conversation=conversation,
+            provider=provider,
+            limits=limits,
+            via=via,
+        )
+    except panels.LimitReached as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Você já tem {limits.max_active} painéis ativos. Pause ou apague um no Início.",
+        ) from exc
+    return offer_out(offer, panel.id)
+
+
+@router.get("")
+def list_panels(db: DbSession, user: CurrentUser) -> list[PanelOut]:
+    rows = db.query(Panel).filter(Panel.owner_user_id == user.id).order_by(Panel.created_at)
+    return [panel_out(db, p, user) for p in rows if p.status != "expired"]
+
+
+@router.get("/suggestions")
+def list_suggestions(db: DbSession, user: CurrentUser) -> list[SuggestionOut]:
+    return [SuggestionOut(**s) for s in suggestions(db, user)]
+
+
+@router.get("/{panel_id}")
+def panel_detail(panel_id: uuid.UUID, db: DbSession, user: CurrentUser) -> PanelDetailOut:
+    panel = _own(db, user.id, panel_id)
+    out = panel_out(db, panel, user)
+    return PanelDetailOut(
+        **out.model_dump(), history=[PointOut(**h) for h in panels.history(db, panel)]
+    )
+
+
+@router.patch("/{panel_id}")
+def pause_or_resume(
+    panel_id: uuid.UUID, body: PanelPatch, db: DbSession, user: CurrentUser
+) -> PanelOut:
+    """Paused: no daily check, no notices. Resumed: checked again from the next morning."""
+    panel = _own(db, user.id, panel_id)
+    if panel.status == "expired":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Esse painel já expirou")
+    panel.status = body.status
+    if body.status == "active":
+        panels.schedule_next(db, panel, user)
+    else:
+        panel.next_check_at = None
     record_audit(
         db,
-        f"panel_offer.{decision}",
+        f"panel.{'resume' if body.status == 'active' else 'pause'}",
         "success",
         actor_user_id=user.id,
-        details={"via": via, "offer_id": str(offer.id)},
+        details={"panel_id": str(panel.id)},
     )
     db.commit()
-    return offer_out(offer, page)
+    return panel_out(db, panel, user)
+
+
+@router.delete("/{panel_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_panel(panel_id: uuid.UUID, db: DbSession, user: CurrentUser) -> Response:
+    panel = _own(db, user.id, panel_id)
+    db.delete(panel)
+    record_audit(
+        db, "panel.delete", "success", actor_user_id=user.id, details={"panel_id": str(panel_id)}
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
