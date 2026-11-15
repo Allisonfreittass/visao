@@ -51,7 +51,7 @@ final class ChatStoreTests: XCTestCase {
         try await until { !store.sending }
 
         XCTAssertEqual(transport.count("POST", path), 2, "two turns, not three")
-        let second = try XCTUnwrap(transport.requests.last?.httpBody)
+        let second = try XCTUnwrap(transport.requests.last(where: { $0.httpMethod == "POST" })?.httpBody)
         let body = try XCTUnwrap(JSONSerialization.jsonObject(with: second) as? [String: Any])
         XCTAssertEqual(body["content"] as? String, "segunda\n\nterceira")
         XCTAssertEqual(body["reply_to_id"] as? String, "old")

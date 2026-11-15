@@ -38,7 +38,7 @@ extension URLSession: HTTPTransport {
 /// `baseURL` already includes the API prefix: "https://host/api", or "http://mac.local:8000".
 public final class APIClient: Sendable {
     public let baseURL: URL
-    private let transport: HTTPTransport
+    let transport: HTTPTransport
     private let tokens: TokenStore
 
     public init(baseURL: URL, transport: HTTPTransport = URLSession.shared, tokens: TokenStore) {

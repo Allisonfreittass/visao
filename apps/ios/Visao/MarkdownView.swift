@@ -6,11 +6,20 @@ import VisaoKit
 /// scales everything, and code that keeps its lines (scrolls sideways) and has a copy button.
 struct MarkdownView: View {
     let text: String
+    /// Still being written: parsed each time (not cached), and stable as it grows: an open code
+    /// block is already code, an unfinished list is already a list.
+    var live = false
+    /// While it is written, the newest characters of the last paragraph come in faded.
+    var freshTail = 0
+    @Environment(\.palette) private var palette
 
     var body: some View {
+        let blocks = live ? Markdown.blocks(text) : MarkdownCache.blocks(text)
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(MarkdownCache.blocks(text).enumerated()), id: \.offset) { _, block in
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
                 switch block {
+                case .paragraph(let body) where freshTail > 0 && index == blocks.count - 1:
+                    fresh(body)
                 case .paragraph(let body):
                     Text(Markdown.inline(body))
                 case .heading(let body):
@@ -27,6 +36,21 @@ struct MarkdownView: View {
         }
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The last paragraph with its newest characters lighter, in two steps, so the words that
+    /// just arrived fade in as the text moves on. Only plain text: a half-written ** or link is
+    /// shown as it is.
+    private func fresh(_ body: String) -> Text {
+        guard body.count > freshTail, body.rangeOfCharacter(from: CharacterSet(charactersIn: "*`[")) == nil else {
+            return Text(Markdown.inline(body))
+        }
+        let newest = body.suffix(freshTail / 2)
+        let newer = body.dropLast(freshTail / 2).suffix(freshTail - freshTail / 2)
+        let settled = body.dropLast(freshTail)
+        return Text(String(settled))
+            + Text(String(newer)).foregroundStyle(palette.bolhaDeleTinta.opacity(0.6))
+            + Text(String(newest)).foregroundStyle(palette.bolhaDeleTinta.opacity(0.3))
     }
 }
 

@@ -16,6 +16,18 @@ struct ChatScreen: View {
     @State private var benchOpen = false
     /// Whether you are at the end of the conversation: new things only pull the list down then.
     @State private var atBottom = true
+    /// Following the end: set when you send, kept while the reply grows, and decided again only
+    /// when you scroll yourself (a growing reply never counts as you leaving the end).
+    @State private var stick = true
+    /// Haptics: a light tap when you send, a very soft one when the reply has all arrived.
+    @State private var sentCount = 0
+    @State private var settledCount = 0
+    /// The message box's real height (it grows with lines, a quote, files): the list keeps that
+    /// much room at its end, so the last message is never behind it.
+    @State private var composerHeight: CGFloat = 76
+    /// The first load is placed at the end without the entrance animation: animated, the list
+    /// was still moving when it scrolled, and the conversation opened at its start.
+    @State private var opened = false
     @State private var shownCount = ChatScreen.page
     private static let page = 60
     @State private var call: CallController?
@@ -67,7 +79,7 @@ struct ChatScreen: View {
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
                     }
-                    ForEach(store.messages.suffix(shownCount)) { message in
+                    ForEach(store.messages.suffix(shownCount).filter { $0.id != store.settlingId }) { message in
                         MessageRow(
                             message: message,
                             speaker: session.speakerName,
@@ -88,8 +100,20 @@ struct ChatScreen: View {
                         .id(message.id)
                         .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity))
                     }
-                    if store.sending {
-                        LiveStatusView(step: store.liveStep, canStop: store.canStop, onStop: store.stop)
+                    if store.sending || store.settlingId != nil {
+                        LiveBubble(
+                            step: store.liveStep,
+                            text: store.liveText ?? "",
+                            settling: store.settlingId != nil && !store.sending,
+                            canStop: store.canStop,
+                            onStop: store.stop,
+                            onSettled: {
+                                store.finishSettling()
+                                if scenePhase == .active && isActive { settledCount += 1 }
+                            }
+                        )
+                        .id("live")
+                        .transition(.opacity)
                     }
                     ForEach(session.pending.asks(in: store.conversationId)) { ask in
                         ActionCard(ask: ask, busy: session.pending.deciding.contains(ask.id)) { approve in
@@ -106,17 +130,26 @@ struct ChatScreen: View {
                             .padding(.vertical, 10)
                             .glass(palette, cornerRadius: 16, strong: true, shadow: false)
                     }
-                    Color.clear.frame(height: 1).id(Self.bottomId)
+                    // The room for the message box, as part of the content: "the end" is below it.
+                    Color.clear.frame(height: composerHeight).id(Self.bottomId)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 12)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .modifier(BottomAnchor(atBottom: $atBottom))
+            // Real case (14/11/2026): with the box in safeAreaInset the list did not get the room,
+            // and the end of the last reply stayed behind the box. The box now floats over the
+            // list, and the list ends with a spacer as tall as the box (measured).
+            .contentMargins(.bottom, composerHeight, for: .scrollIndicators)
+            .modifier(BottomAnchor(atBottom: $atBottom, stick: stick))
+            .onScrollPhaseChange { old, new in
+                // Only your own scrolling decides whether the list follows the end.
+                if new == .idle, old == .interacting || old == .decelerating { stick = atBottom }
+            }
             .scrollDismissesKeyboard(.interactively)
-            .animation(.spring(response: 0.35, dampingFraction: 0.9), value: store.messages.count)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .animation(opened ? .spring(response: 0.35, dampingFraction: 0.9) : nil, value: store.messages.count)
+            .overlay(alignment: .bottom) {
                 Composer(
                     text: $text,
                     replyTo: $replyTo,
@@ -129,7 +162,14 @@ struct ChatScreen: View {
                     onCall: { startCall() },
                     onSend: send
                 )
+                // A box that grows (more lines, a quote, files) never covers the end.
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    composerHeight = height
+                    scrollToBottom(proxy, force: stick)
+                }
             }
+            .sensoryFeedback(.impact(weight: .light), trigger: sentCount)
+            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.4), trigger: settledCount)
             // The messages arrive after the screen opens: once loaded, open at the last one.
             .onChange(of: store.loading) { _, loading in
                 if !loading { jumpToEnd(proxy) }
@@ -145,7 +185,7 @@ struct ChatScreen: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 16)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, composerHeight + 8)
                     .transition(.scale.combined(with: .opacity))
                     .accessibilityLabel("Ir para a última mensagem")
                 }
@@ -156,8 +196,10 @@ struct ChatScreen: View {
                 let mine = new > old && store.messages.last?.local == .sending
                 scrollToBottom(proxy, force: mine)
             }
+            .onChange(of: store.liveText) { scrollToBottom(proxy, force: stick) }
+            .onChange(of: store.settlingId) { scrollToBottom(proxy, force: stick) }
             .onChange(of: store.sending) { _, sending in
-                scrollToBottom(proxy)
+                scrollToBottom(proxy, force: stick)
                 if !sending { speakReplyIfAsked() }
                 followOnLockScreen(sending: sending)
                 // A turn can leave an email or Mac work waiting for a tap.
@@ -239,11 +281,14 @@ struct ChatScreen: View {
         }
         .task {
             store.onError = { session.handle($0) }
+            store.onAction = { Task { await session.pending.refresh() } }
             store.onConversationCreated = { conversation in
                 session.added(conversation)
                 onCreated(conversation)
             }
             await store.load()
+            // A new conversation has nothing to place: what comes next animates in.
+            if store.messages.isEmpty { opened = true }
             await speaker.prepare(api: session.api)
             await session.pending.refresh()
             // What he said on his own is right here: it stops counting as a notice.
@@ -278,6 +323,8 @@ struct ChatScreen: View {
 
     private func send() {
         guard canSend else { return }
+        stick = true
+        sentCount += 1
         store.send(text, attachments: draft.ready, replyTo: replyTo)
         text = ""
         replyTo = nil
@@ -356,11 +403,15 @@ struct ChatScreen: View {
             if animated {
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.bottomId, anchor: .bottom) }
             } else {
-                proxy.scrollTo(Self.bottomId, anchor: .bottom)
-                try? await Task.sleep(for: .milliseconds(120))
-                proxy.scrollTo(Self.bottomId, anchor: .bottom)
+                // Again as long replies and the box finish measuring.
+                for wait in [0, 120, 350] {
+                    if wait > 0 { try? await Task.sleep(for: .milliseconds(wait)) }
+                    proxy.scrollTo(Self.bottomId, anchor: .bottom)
+                }
             }
             atBottom = true
+            stick = true
+            opened = true
         }
     }
 
@@ -397,58 +448,6 @@ private struct EmptyConversation: View {
     }
 }
 
-/// "Pensando" or the step the server says it is on, in his bubble, with Parar; the detail (the
-/// term searched, the site) in a glass pill below.
-struct LiveStatusView: View {
-    let step: ProgressStep?
-    let canStop: Bool
-    let onStop: () -> Void
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                ThinkingDots(color: palette.tintaFraca)
-                Text(step?.label ?? "Pensando")
-                    .font(Typo.text(.subheadline))
-                    .foregroundStyle(palette.tintaFraca)
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut, value: step?.label)
-                if canStop {
-                    Button(action: onStop) {
-                        Image(systemName: "xmark")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(palette.tintaSuave)
-                            .frame(width: 28, height: 28)
-                            .background(palette.fundoHover, in: Circle())
-                            .frame(width: 44, height: 44) // touch target: 44 pt (HIG), drawn at 28
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Parar")
-                }
-            }
-            .padding(.leading, 20)
-            .padding(.trailing, canStop ? 2 : 20)
-            .padding(.vertical, canStop ? 2 : 16)
-            .background(palette.bolhaDele, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: palette.sombra, radius: 11, y: 6)
-
-            if let detail = step?.detail, !detail.isEmpty {
-                Text(detail)
-                    .font(Typo.text(.subheadline))
-                    .foregroundStyle(palette.tintaSuave)
-                    .lineLimit(2)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-                    .glass(palette, cornerRadius: 999, shadow: false)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(step?.label ?? "Pensando")
-    }
-}
-
 private struct CallBox: Identifiable {
     let controller: CallController
     var id: ObjectIdentifier { ObjectIdentifier(controller) }
@@ -458,13 +457,14 @@ private struct CallBox: Identifiable {
 /// list keeps its place when something above grows, instead of re-pinning to the bottom.
 private struct BottomAnchor: ViewModifier {
     @Binding var atBottom: Bool
+    let stick: Bool
 
     func body(content: Content) -> some View {
         if #available(iOS 18.0, *) {
             content
                 .defaultScrollAnchor(.bottom, for: .initialOffset)
                 // At the end, growth keeps you at the end; reading above, nothing moves.
-                .defaultScrollAnchor(atBottom ? .bottom : nil, for: .sizeChanges)
+                .defaultScrollAnchor(atBottom || stick ? .bottom : nil, for: .sizeChanges)
                 .onScrollGeometryChange(for: Bool.self) { geometry in
                     let distance = geometry.contentSize.height - geometry.visibleRect.maxY
                     return distance < 80

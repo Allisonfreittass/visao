@@ -17,11 +17,22 @@ public final class ChatStore {
     public private(set) var liveSteps: [ProgressStep] = []
     /// In a voice call, the reply written so far, so the call can start speaking before it ends.
     public private(set) var liveDraft: String?
+    /// The reply as the stream has written it so far (docs/decisions/0011); nil: none on the way.
+    public private(set) var liveText: String?
+    /// The reply that arrived while its text is still coming in on screen: the screen shows it in
+    /// the live bubble and calls `finishSettling()` when it is all there.
+    public private(set) var settlingId: String?
+    /// Called when the stream says something now waits for a tap (the cards refresh).
+    public var onAction: (() -> Void)?
     public var error: String?
     public private(set) var loading = false
     /// Set by the screen from the scene phase: progress is only asked for while you look, so the
     /// server notices a locked phone and also sends the reply as a notification (docs/STATUS.md).
-    public var isVisible = true
+    public var isVisible = true {
+        // Off the screen the stream goes (so the server knows nobody is looking); the polling
+        // for the lock-screen card takes over.
+        didSet { if !isVisible, oldValue { dropStream() } }
+    }
     /// The lock-screen card (Live Activity) keeps following the turn for the little time the
     /// iPhone gives an app after it leaves the screen; the server still notifies once it stops.
     public var followInBackground = false
@@ -35,6 +46,7 @@ public final class ChatStore {
     private var queue: [Queued] = []
     private var turnTask: Task<Turn, Error>?
     private var watchTask: Task<Void, Never>?
+    private var streamTask: Task<Void, Never>?
     private var counter = 0
 
     struct Queued {
@@ -183,6 +195,8 @@ public final class ChatStore {
         sending = true
         defer {
             turnTask = nil
+            streamTask?.cancel()
+            streamTask = nil
             watchTask?.cancel()
             watchTask = nil
             liveStep = nil
@@ -201,8 +215,15 @@ public final class ChatStore {
             return
         }
         liveDraft = nil
-        // Spoken: asked more often, since every sentence of the draft is heard as soon as it ends.
-        startWatching(id, every: spoken ? .milliseconds(300) : progressInterval)
+        if spoken {
+            // A call speaks the draft from /progress, asked often: every sentence is heard as soon
+            // as it ends.
+            startWatching(id, every: .milliseconds(300))
+        } else if isVisible {
+            startStream(id)
+        } else {
+            startWatching(id, every: progressInterval)
+        }
         let api = self.api
         let attachmentIds = attachments.map(\.id)
         let task = Task { try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id) }
@@ -211,12 +232,23 @@ public final class ChatStore {
             let turn = try await task.value
             var reply = turn.assistantMessage
             reply.sources = turn.sources
+            streamTask?.cancel()
+            // The bubble that was writing becomes the reply: its text finishes coming in, then
+            // it is the message itself, without a jump.
+            if isVisible && !spoken {
+                liveText = reply.content
+                settlingId = reply.id
+            } else {
+                liveText = nil
+            }
             let waiting = messages.filter { $0.local == .queued }
             messages = messages.filter { $0.id != localId && $0.local != .queued } + [turn.userMessage, reply] + waiting
             if reply.artifact?.status == "pending" { watchPages() }
         } catch {
             let stopped = error is CancellationError || (error as? APIError)?.isStoppedByOwner == true
             if !stopped { report(error) }
+            liveText = nil
+            settlingId = nil
             let state: Message.LocalState = stopped ? .stopped : .failed
             mark(localId, state)
             // The message may have been stored even if the reply failed: reload, keeping the one
@@ -254,6 +286,59 @@ public final class ChatStore {
         }
         onConversationCreated?(created)
         return created.id
+    }
+
+    /// The live bubble has shown all of the reply: it becomes the message.
+    public func finishSettling() {
+        settlingId = nil
+        liveText = nil
+    }
+
+    private func startStream(_ id: String) {
+        liveText = ""
+        let api = self.api
+        streamTask = Task { [weak self] in
+            do {
+                let end = try await api.followTurn(conversationId: id) { [weak self] event in
+                    self?.apply(event)
+                }
+                if end == .empty { self?.fallBack(id) }
+            } catch is CancellationError {
+                // Stopped on purpose: the reply arrived, or the app left the screen.
+            } catch {
+                self?.fallBack(id)
+            }
+        }
+    }
+
+    private func apply(_ event: TurnEvent) {
+        guard sending else { return }
+        switch event {
+        case .step(let step):
+            liveStep = step
+            liveSteps.append(step)
+        case .delta(let text):
+            liveText = (liveText ?? "") + text
+        case .replace(let text):
+            liveText = text
+        case .action:
+            onAction?()
+        case .done, .failed:
+            break // the POST brings the same reply, or the same error
+        }
+    }
+
+    /// The stream is not there: ask /progress, as before.
+    private func fallBack(_ id: String) {
+        guard sending, watchTask == nil else { return }
+        startWatching(id, every: progressInterval)
+    }
+
+    private func dropStream() {
+        guard let streamTask else { return }
+        streamTask.cancel()
+        self.streamTask = nil
+        if sending, let conversationId { fallBack(conversationId) }
     }
 
     private func startWatching(_ id: String, every interval: Duration) {
