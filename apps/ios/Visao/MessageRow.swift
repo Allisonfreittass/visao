@@ -19,7 +19,9 @@ struct MessageRow: View, Equatable {
     /// Rates a reply; answers what to say back ("Valeu…"), nil when it failed.
     var onFeedback: ((Bool, [String]) async -> String?)?
     @Environment(\.palette) private var palette
+    /// Rating lives in the menu (hold the bubble), not under every reply.
     @State private var feedbackOpen = false
+    @State private var sourcesOpen = false
 
     /// Past this, letting go answers the message (as SwipeReply.tsx on the web).
     private let trigger: CGFloat = 56
@@ -54,9 +56,39 @@ struct MessageRow: View, Equatable {
         .sensoryFeedback(.impact(weight: .light), trigger: armed) { _, isArmed in isArmed }
     }
 
+    /// One bubble per part (ADR-0010); a message without parts is one bubble. What belongs to the
+    /// whole message goes on the edges: the quote and the files on the first bubble, the page and
+    /// the sources on the last. The menu (hold a bubble) is the same on every bubble.
     private var bubble: some View {
+        let texts = message.bubbles
+        let count = max(texts.count, 1)
+        return VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
+            ForEach(0..<count, id: \.self) { index in
+                single(text: texts.indices.contains(index) ? texts[index] : "", first: index == 0, last: index == count - 1)
+                    .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: 8)), removal: .opacity))
+            }
+        }
+        .offset(x: offset)
+        .sheet(isPresented: $feedbackOpen) {
+            FeedbackSheet(send: { positive, tags in await onFeedback?(positive, tags) })
+                .presentationDetents([.height(240)])
+        }
+        .sheet(isPresented: $sourcesOpen) {
+            SourcesSheet(sources: message.sources, at: message.createdAt)
+                .presentationDetents([.medium, .large])
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(isUser ? "Você" : speaker): \(message.content)")
+        .accessibilityAction(named: "Responder") { if canReply { onReply() } }
+        .accessibilityAction(named: "Avaliar resposta") { if canRate { feedbackOpen = true } }
+        .accessibilityAction(named: "Ver fontes") { if !message.sources.isEmpty { sourcesOpen = true } }
+    }
+
+    private var canRate: Bool { !isUser && message.local == nil && onFeedback != nil }
+
+    private func single(text: String, first: Bool, last: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let tag = tag {
+            if first, let tag = tag {
                 Text(tag.text)
                     .font(Typo.text(.caption))
                     .foregroundStyle(tag.isProblem ? palette.erro : palette.tintaSuave)
@@ -64,7 +96,7 @@ struct MessageRow: View, Equatable {
                     .padding(.vertical, 3)
                     .background(palette.fundoHover, in: Capsule())
             }
-            if let quote = message.replyTo {
+            if first, let quote = message.replyTo {
                 Button { onQuoteTap(quote.id) } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(quote.role == .assistant ? speaker : "Você")
@@ -89,22 +121,19 @@ struct MessageRow: View, Equatable {
                 .accessibilityLabel("Respondendo a \(quote.role == .assistant ? speaker : "você"): \(quote.excerpt)")
                 .accessibilityHint("Vai para a mensagem")
             }
-            if !message.attachments.isEmpty {
+            if first, !message.attachments.isEmpty {
                 MessageAttachments(attachments: message.attachments)
             }
-            if !message.content.isEmpty {
-                MarkdownView(text: message.content)
+            if !text.isEmpty {
+                MarkdownView(text: text)
             }
-            if let artifact = message.artifact {
+            if last, let artifact = message.artifact {
                 ArtifactCard(artifact: artifact) { onOpenPage(artifact) }
                     .padding(.horizontal, -6)
                     .padding(.top, 4)
             }
-            if !message.sources.isEmpty {
-                SourcesList(sources: message.sources)
-            }
-            if !isUser, message.local == nil, let onFeedback {
-                FeedbackBar(open: $feedbackOpen, send: onFeedback)
+            if last, !message.sources.isEmpty {
+                SourcesPill(sources: message.sources, at: message.createdAt) { sourcesOpen = true }
             }
         }
         .font(Typo.text(.body))
@@ -113,7 +142,6 @@ struct MessageRow: View, Equatable {
         .padding(.vertical, isUser ? 12 : 14)
         .background(background)
         .opacity(opacity)
-        .offset(x: offset)
         .contextMenu {
             if canReply {
                 Button("Responder", systemImage: "arrowshape.turn.up.left", action: onReply)
@@ -121,10 +149,13 @@ struct MessageRow: View, Equatable {
             if !message.content.isEmpty {
                 Button("Copiar", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }
             }
+            if canRate {
+                Button("Avaliar resposta", systemImage: "hand.thumbsup") { feedbackOpen = true }
+            }
+            if !message.sources.isEmpty {
+                Button("Ver fontes", systemImage: "link") { sourcesOpen = true }
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(isUser ? "Você" : speaker): \(message.content)")
-        .accessibilityAction(named: "Responder") { if canReply { onReply() } }
     }
 
     @ViewBuilder
@@ -194,33 +225,91 @@ struct MessageRow: View, Equatable {
     }
 }
 
-private struct SourcesList: View {
+/// "ao vivo · google.com · 10:14" when it read prices live, else "3 fontes" (SourcesPill.tsx).
+func sourcesLabel(_ sources: [Source], at: Date) -> String {
+    let live = sources.filter { $0.source == "ao vivo" }
+    guard !live.isEmpty else { return sources.count == 1 ? "1 fonte" : "\(sources.count) fontes" }
+    var hosts: [String] = []
+    for source in live {
+        let host = (URL(string: source.url)?.host() ?? source.url).replacingOccurrences(of: "www.", with: "")
+        if !hosts.contains(host) { hosts.append(host) }
+    }
+    let time = at.formatted(date: .omitted, time: .shortened)
+    let others = sources.count - live.count
+    return "ao vivo · " + hosts.prefix(2).joined(separator: ", ") + (hosts.count > 2 ? "…" : "") + " · \(time)"
+        + (others > 0 ? " · +\(others)" : "")
+}
+
+/// The sources out of the way: a small pill that opens the list in a sheet.
+private struct SourcesPill: View {
     let sources: [Source]
+    let at: Date
+    let open: () -> Void
     @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Rotulo("Fontes")
-            ForEach(Array(sources.enumerated()), id: \.offset) { index, source in
-                if let url = URL(string: source.url), ["http", "https"].contains(url.scheme ?? "") {
-                    Link(destination: url) {
-                        (Text("\(index + 1). \(source.title)").underline(color: palette.linhaForte)
-                            + Text(" · \(source.source)").foregroundColor(palette.tintaFraca))
-                            .font(Typo.text(.footnote))
-                            .multilineTextAlignment(.leading)
-                    }
-                    .foregroundStyle(palette.tinta)
-                }
-            }
+        Button(action: open) {
+            Text(sourcesLabel(sources, at: at))
+                .font(Typo.mono(.caption2))
+                .foregroundStyle(palette.tintaFraca)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .overlay(Capsule().strokeBorder(palette.linha))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .padding(.top, 4)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Fontes pesquisadas")
+        .buttonStyle(.plain)
+        .accessibilityLabel("Fontes: \(sourcesLabel(sources, at: at))")
+        .accessibilityHint("Abre a lista")
     }
 }
 
-/// "Como foi essa resposta?": thumbs and a few tags, the only evidence its way of answering
+private struct SourcesSheet: View {
+    let sources: [Source]
+    let at: Date
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        NavigationStack {
+            List(Array(sources.enumerated()), id: \.offset) { _, source in
+                if let url = URL(string: source.url), ["http", "https"].contains(url.scheme ?? "") {
+                    Link(destination: url) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(source.title).font(Typo.text(.body)).foregroundStyle(palette.tinta)
+                            Text(source.source == "ao vivo"
+                                 ? "ao vivo · \(url.host() ?? "") · \(at.formatted(date: .omitted, time: .shortened))"
+                                 : source.source)
+                                .font(Typo.text(.footnote)).foregroundStyle(palette.tintaFraca)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Fontes")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+/// Rating a reply, from its menu: thumbs and a few tags, the only evidence its way of answering
 /// learns from (FeedbackBar.tsx).
+private struct FeedbackSheet: View {
+    let send: (Bool, [String]) async -> String?
+    @Environment(\.palette) private var palette
+    @Environment(\.dismiss) private var dismiss
+    @State private var open = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Como foi essa resposta?").font(Typo.text(.headline))
+            FeedbackBar(open: $open, send: send)
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Thumbs and tags (inside FeedbackSheet).
 private struct FeedbackBar: View {
     @Binding var open: Bool
     let send: (Bool, [String]) async -> String?

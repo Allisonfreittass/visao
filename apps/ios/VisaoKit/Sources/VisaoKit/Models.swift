@@ -148,11 +148,19 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
     /// Only known for replies received in this session (the transcript does not keep them).
     public var sources: [Source]
     public var local: LocalState?
+    /// The same text as `content` in 2 or 3 bubbles (ADR-0010); nil is one bubble.
+    public let parts: [String]?
+
+    /// What goes on screen: one text per bubble.
+    public var bubbles: [String] {
+        if let parts, parts.count > 1 { return parts }
+        return content.isEmpty ? [] : [content]
+    }
 
     public init(
         id: String, role: Role, content: String, createdAt: Date, origin: String = "turn",
         attachments: [Attachment] = [], artifact: Artifact? = nil, replyTo: Quoted? = nil,
-        sources: [Source] = [], local: LocalState? = nil
+        sources: [Source] = [], local: LocalState? = nil, parts: [String]? = nil
     ) {
         self.id = id
         self.role = role
@@ -164,10 +172,11 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         self.replyTo = replyTo
         self.sources = sources
         self.local = local
+        self.parts = parts
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, role, content, origin, attachments, artifact
+        case id, role, content, origin, attachments, artifact, parts
         case createdAt = "created_at"
         case replyTo = "reply_to"
     }
@@ -182,6 +191,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
         artifact = try c.decodeIfPresent(Artifact.self, forKey: .artifact)
         replyTo = try c.decodeIfPresent(Quoted.self, forKey: .replyTo)
+        parts = try c.decodeIfPresent([String].self, forKey: .parts)
         sources = []
         local = nil
     }
@@ -196,6 +206,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         try c.encode(attachments, forKey: .attachments)
         try c.encodeIfPresent(artifact, forKey: .artifact)
         try c.encodeIfPresent(replyTo, forKey: .replyTo)
+        try c.encodeIfPresent(parts, forKey: .parts)
     }
 
     /// How a reply quotes this message: one line, as the web does (160 characters).
