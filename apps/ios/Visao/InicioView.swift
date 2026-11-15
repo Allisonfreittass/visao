@@ -5,6 +5,8 @@ import VisaoKit
 struct InicioView: View {
     let currentConversation: String?
     let onOpenConversation: (String) -> Void
+    /// Opens the chat with this text in the box (a suggestion, "Criar um novo painel").
+    let onDraft: (String) -> Void
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
@@ -17,6 +19,7 @@ struct InicioView: View {
             italic: pending.count == 0 ? "por você." : "de você.",
             lede: "Eu só proponho. Nada roda sem o seu sim."
         ) {
+            PanelsSection(nothingPending: pending.count == 0, onDraft: onDraft)
             let mac = pending.asks.filter { if case .arm = $0.source { true } else { false } }
             let google = pending.asks.filter { if case .google = $0.source { true } else { false } }
             let panels = pending.asks.filter { if case .panel = $0.source { true } else { false } }

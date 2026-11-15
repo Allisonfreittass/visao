@@ -121,7 +121,14 @@ struct Shell: View {
     private var other: some View {
         switch place {
         case .inicio:
-            InicioView(currentConversation: target?.conversationId) { open(conversation: $0) }
+            InicioView(
+                currentConversation: target?.conversationId,
+                onOpenConversation: { open(conversation: $0) },
+                onDraft: { text in
+                    session.chatDraft = text
+                    go(.chat)
+                }
+            )
         case .projetos:
             ProjectsView(
                 currentConversation: target?.conversationId,

@@ -197,6 +197,12 @@ struct ChatScreen: View {
                 scrollToBottom(proxy, force: mine)
             }
             .onChange(of: store.liveText) { scrollToBottom(proxy, force: stick) }
+            .onChange(of: session.chatDraft) { _, draftText in
+                guard let draftText else { return }
+                text = draftText
+                composerFocused = true
+                session.chatDraft = nil
+            }
             .onChange(of: store.settlingId) { scrollToBottom(proxy, force: stick) }
             .onChange(of: store.sending) { _, sending in
                 scrollToBottom(proxy, force: stick)

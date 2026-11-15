@@ -102,6 +102,9 @@ final class Session {
         if let list = try? await api.conversations() { conversations = list }
     }
 
+    /// Text Início puts in the chat's message box (a suggestion, "Criar um novo painel").
+    var chatDraft: String?
+
     func added(_ conversation: Conversation) {
         conversations.removeAll { $0.id == conversation.id }
         conversations.insert(conversation, at: 0)
