@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction } from "../api";
+import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction, PanelOffer } from "../api";
 
 const POLL_MS = 15_000;
 
@@ -9,6 +9,8 @@ export interface Pending {
   armProposals: ArmTask[];
   /** Email to send or events to schedule, waiting for a yes. */
   googleActions: GoogleAction[];
+  /** After a live quote, the panel it offered to keep on the home screen. */
+  panelOffers: PanelOffer[];
   goals: Goal[];
   /** Notices that live only here (an opening is already a message in the chat). */
   notices: AppNotification[];
@@ -20,6 +22,7 @@ export interface Pending {
   decideArm: (task: ArmTask, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<boolean>;
   decideGoogle: (action: GoogleAction, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
+  decidePanelOffer: (offer: PanelOffer, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   dismiss: (notice: AppNotification) => Promise<boolean>;
   reply: (notice: AppNotification, conversationId: string | null) => Promise<string | null>;
 }
@@ -35,13 +38,17 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   const [devices, setDevices] = useState<ArmDevice[]>([]);
   const [tasks, setTasks] = useState<ArmTask[]>([]);
   const [google, setGoogle] = useState<GoogleAction[]>([]);
+  const [offers, setOffers] = useState<PanelOffer[]>([]);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
   const refresh = useCallback(() => {
     if (!enabled) return;
-    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions()])
-      .then(([g, n, d, t, o]) => {
+    // An older server without panel offers answers 404: that is just none.
+    const panelOffers = api.panelOffers().catch(() => [] as PanelOffer[]);
+    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions(), panelOffers])
+      .then(([g, n, d, t, o, p]) => {
+        setOffers(p);
         setGoals(g);
         setNotifications(n);
         setDevices(d);
@@ -83,15 +90,17 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   return {
     armProposals,
     googleActions: google,
+    panelOffers: offers,
     goals,
     notices,
     devices,
     tasks,
-    count: armProposals.length + google.length + goals.length + notices.length,
+    count: armProposals.length + google.length + offers.length + goals.length + notices.length,
     refresh,
     decideArm: (task, decision, via) => act(() => api.decideArm(task.id, decision, via)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),
     decideGoogle: (action, decision, via) => act(() => api.decideGoogle(action.id, decision, via)),
+    decidePanelOffer: (offer, decision, via) => act(() => api.decidePanelOffer(offer.id, decision, via)),
     dismiss: (notice) => act(() => api.markRead(notice.id)),
     reply: async (notice, conversationId) => {
       try {

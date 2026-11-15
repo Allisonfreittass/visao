@@ -2,7 +2,7 @@
 // and waits for a clear yes. Decided by fixed rules, never by a model: a misheard or mixed answer
 // decides nothing and goes on as an ordinary message.
 
-import type { ArmTask, GoogleAction } from "../api";
+import type { ArmTask, GoogleAction, PanelOffer } from "../api";
 
 export type Verdict = "approve" | "reject" | null;
 
@@ -65,5 +65,13 @@ export function spokenArm(task: ArmTask): SpokenAsk {
     id: task.id,
     question: `Montei um pedido para o Mac, no projeto ${task.project}: ${clip(task.prompt, 140)}. Para rodar, diga "pode rodar". Para cancelar, diga "não".`,
     done: "Pronto, mandei para o Mac. Aviso quando terminar.",
+  };
+}
+
+export function spokenPanelOffer(offer: PanelOffer): SpokenAsk {
+  return {
+    id: offer.id,
+    question: `Quer que eu deixe ${clip(offer.title, 60)} no seu Início, conferindo o preço todo dia? Para criar, diga "pode criar". Para deixar pra lá, diga "não".`,
+    done: "Pronto, estou montando.",
   };
 }

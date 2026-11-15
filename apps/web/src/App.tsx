@@ -42,7 +42,7 @@ import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { Sky } from "./sky/SkyCanvas";
-import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, VOICE_ANSWER_MS } from "./voice/approval";
+import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, spokenPanelOffer, VOICE_ANSWER_MS } from "./voice/approval";
 import { MAX_FILES } from "./attachments";
 
 interface TurnLatency {
@@ -291,6 +291,21 @@ export function App() {
         spoken: spokenGoogle(a),
         decide: (d: "approve" | "reject", via: "toque" | "voz") =>
           pending.decideGoogle(a, d, via).then((ok) => {
+            if (ok && d === "approve") reloadRef.current();
+            return ok;
+          }),
+      })),
+    ...pending.panelOffers
+      .filter((o) => o.conversation_id === current)
+      .map((o) => ({
+        id: o.id,
+        label: "Painel no Início",
+        text: o.summary,
+        onApprove: () => void pending.decidePanelOffer(o, "approve").then(() => reloadRef.current()),
+        onReject: () => void pending.decidePanelOffer(o, "reject"),
+        spoken: spokenPanelOffer(o),
+        decide: (d: "approve" | "reject", via: "toque" | "voz") =>
+          pending.decidePanelOffer(o, d, via).then((ok) => {
             if (ok && d === "approve") reloadRef.current();
             return ok;
           }),

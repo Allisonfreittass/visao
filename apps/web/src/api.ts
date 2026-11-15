@@ -204,6 +204,20 @@ export interface GoogleAction {
   created_at: string;
 }
 
+/** After a live quote: keep it on the home screen and check the price daily (docs/PAINEIS.md). */
+export interface PanelOffer {
+  id: string;
+  conversation_id: string;
+  message_id: string | null;
+  title: string;
+  goal_amount: string | null;
+  currency: string;
+  status: string;
+  summary: string;
+  artifact?: ArtifactSummary | null;
+  created_at: string;
+}
+
 export interface GoogleState {
   connected: boolean;
   email: string;
@@ -623,6 +637,14 @@ export class Api {
 
   decideGoogle(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<GoogleAction> {
     return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  }
+
+  panelOffers(): Promise<PanelOffer[]> {
+    return this.request("/panels/offers");
+  }
+
+  decidePanelOffer(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<PanelOffer> {
+    return this.request(`/panels/offers/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
   }
 
   pushState(): Promise<PushState> {

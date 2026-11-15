@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { heardVerdict, spokenArm, spokenGoogle } from "./approval";
+import { heardVerdict, spokenArm, spokenGoogle, spokenPanelOffer } from "./approval";
 
 describe("a spoken yes or no to an action", () => {
   it.each([
@@ -41,5 +41,13 @@ describe("a spoken yes or no to an action", () => {
       result: "", error: "", cost_usd: null, claude_session_id: null, conversation_id: null,
     } as never);
     expect(mac.question).toContain("projeto visao: rode os testes");
+  });
+});
+
+describe("spokenPanelOffer", () => {
+  it("asks for a clear yes the verdict rules understand", () => {
+    const ask = spokenPanelOffer({ id: "o", conversation_id: "c", message_id: "m", title: "Combo Santiago", goal_amount: "6000.00", currency: "BRL", status: "proposed", summary: "", created_at: "" });
+    expect(ask.question).toContain("Combo Santiago");
+    expect(heardVerdict("pode criar")).toBe("approve");
   });
 });
