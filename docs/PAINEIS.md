@@ -1,8 +1,8 @@
 # Painéis vivos no Início
 
-Depois de uma cotação ao vivo ([NAVEGADOR.md](NAVEGADOR.md)), ele oferece deixar o resultado
-num painel no Início que se atualiza sozinho. A oferta já existe (Fase 1); o painel nativo, a
-recotação diária e os avisos são a Fase 3.
+Depois de uma cotação ao vivo ([NAVEGADOR.md](NAVEGADOR.md)), ele oferece deixar o resultado num
+painel no Início que se confere sozinho uma vez por dia e avisa quando algo importante muda
+([ADR-0012](decisions/0012-paineis-vivos.md)).
 
 ## A oferta (Fase 1)
 
@@ -18,10 +18,9 @@ recotação diária e os avisos são a Fase 3.
    "depois" não aprovam.
 4. Uma cotação nova na mesma conversa substitui a oferta anterior (`superseded`).
 
-Enquanto o painel nativo não existe, aprovar escreve uma **página** ([ARTEFATOS.md](ARTEFATOS.md))
-com o título da cotação ("Combo Santiago"), feita a partir das páginas lidas ao vivo nessa
-conversa. Cada decisão fica na auditoria (`panel_offer.approve` / `panel_offer.reject`, com `via`
-toque, voz ou texto).
+Aprovar cria o painel na hora, antes da resposta, então "o Combo Santiago está no Início" é
+verdade quando é dito. Criar o painel **é aprovar a conferência diária**. Fica na auditoria como
+`panel.create`, com `recurring_check: daily` e o `via` (toque, voz ou texto).
 
 | Peça | Onde |
 |---|---|
@@ -31,9 +30,89 @@ toque, voz ou texto).
 | Tabela `panel_offers` (com RLS no esquema privado) | migração `0027` |
 | Cartão no web e no iPhone | `apps/web/src/App.tsx`, `VisaoKit/Pending.swift` |
 
-## O painel vivo (Fase 3, ainda não feito)
+## O painel
 
-Card nativo no Início com o total em destaque, a distância da meta, os itens (voo, hospedagem),
-a hora da última conferência e a variação. Recotação uma vez por dia no worker, dentro do
-orçamento e das regras de autonomia, e aviso só em mudança relevante. Nenhum preço sem uma página
-lida que o sustente. Detalhes no ADR da Fase 3.
+**No Início** (web e iPhone, cards nativos), cada painel mostra:
+- o título e o total para o grupo, em destaque;
+- a distância da meta ("R$ 555 acima da meta de R$ 6.000", ou abaixo, em verde);
+- a variação desde a conferência anterior;
+- cada item (voo, hospedagem) com o provedor, o trecho ou o bairro, as datas, as conexões e o
+  preço;
+- a hora da última conferência.
+
+Tocar abre o histórico, os links dos sites, **Pausar** e **Apagar**. No lugar de logos, a inicial
+do provedor (não há fonte de logos com licença clara). **Criar um novo painel** abre o chat com
+"Quero acompanhar…".
+
+**De onde vêm os números:**
+- Uma chamada curta extrai os itens das páginas lidas, em JSON validado
+  (`core/panels/extract.py`). O código confere cada um:
+  - item que não aponta para uma página lida agora é descartado;
+  - preço que não aparece no texto daquela página vira "a confirmar".
+- O total e a distância da meta são calculados no servidor (`core/panels/model.py`). Faltando um
+  preço, o total fica "a confirmar".
+- A meta é o seu número, lido nas suas palavras.
+
+**Nunca há preço inventado, nem preço velho como atual:**
+- o card diz "conferido hoje, 10:14";
+- ou "conferido em 13/11, 10:14 · não conferido hoje", com o motivo.
+
+## Editar pela conversa
+
+"Troca o hotel pra Lastarria", "muda a meta pra R$ 5.500" ou "melhora esse painel" editam o
+**mesmo** painel:
+- uma chamada curta devolve só o que muda (validado); a meta vem das suas palavras;
+- a versão anterior fica em `panel_versions`;
+- se a mudança afeta a busca (bairro, datas, pessoas), ele confere os preços de novo na hora;
+- a resposta diz em uma ou duas bolhas o que mudou.
+
+## A conferência diária
+
+- **Quando:** o worker roda o job `panel_recheck` às 9h do seu horário, todo dia.
+- **O que abre:** Google Voos e Google Hotéis, montados do `spec` em código, sem chamada de
+  planejamento (`core/panels/urls.py`).
+- **Custo:** uma chamada de extração, que conta como **autônoma** (propósito `panel_recheck`, no
+  teto diário de chamadas e de dólares da autonomia).
+
+Quando não confere:
+
+| Situação | O que acontece |
+|---|---|
+| Autonomia pausada | não confere; o card diz "a autonomia está pausada" |
+| Sem orçamento no dia | não confere; o card mantém a última conferência, com a hora |
+| Site pediu verificação de robô | "não consegui conferir hoje"; tenta amanhã; nunca contorna |
+| Datas da viagem passaram | o painel expira e sai do Início |
+| Limite de painéis ativos | aprovar não cria; a resposta diz para pausar ou apagar um |
+
+**Avisos** (Web Push):
+- só quando o total ficou abaixo da meta, caiu mais que `VISION_PANEL_ALERT_DROP_PERCENT` (10%)
+  ou um item sumiu;
+- no máximo um por painel por dia, e fora do horário silencioso.
+
+**Limites** (`.env.example`):
+- `VISION_PANELS_MAX_ACTIVE`, padrão 3;
+- `VISION_PANEL_MAX_PAGES`, padrão 2 páginas por conferência.
+
+**Rede:** o worker entrou na rede `browsing` para alcançar o container `browser`, que continua sem
+segredos e sem banco.
+
+## Sugestões
+
+Sem pendências nem painéis, o Início mostra até 3 sugestões tiradas em código dos títulos das
+conversas recentes (sobre viagem ou preço) e dos projetos. Tocar põe a frase no chat. Assuntos
+sensíveis (saúde, religião, sexualidade, política, finanças pessoais, documentos) ficam de fora.
+
+## Peças
+
+| Peça | Onde |
+|---|---|
+| Esquemas, total e meta | [`core/panels/model.py`](../core/panels/model.py) |
+| Extração conferida | [`core/panels/extract.py`](../core/panels/extract.py) |
+| Criar, conferir, avisar, expirar, cartão | [`core/panels/service.py`](../core/panels/service.py) |
+| Editar pela conversa | [`core/panels/editing.py`](../core/panels/editing.py) |
+| Sugestões | [`core/panels/suggestions.py`](../core/panels/suggestions.py) |
+| `GET/PATCH/DELETE /panels`, `/panels/suggestions` | [`apps/api/routes/panels.py`](../apps/api/routes/panels.py) |
+| Job `panel_recheck` | [`apps/worker/handlers.py`](../apps/worker/handlers.py) |
+| Tabelas `panels`, `panel_snapshots`, `panel_versions` | migração `0029` |
+| Cards no web e no iPhone | `PanelsBoard.tsx`, `PanelCards.swift` |
+| Páginas gravadas para os testes | `tests/fixtures/panels/` (texto no formato que o Google mostra, escrito à mão, não baixado) |

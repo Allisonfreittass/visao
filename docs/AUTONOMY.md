@@ -132,3 +132,17 @@ códigos e métricas: `outcome`, `model_reason`, `model_send`, `idle_seconds`, `
 (`model_declined`) de resposta inválida, limite de tamanho, erro de provedor, nova mensagem
 ou pausa durante a geração e limite de avisos. `decisions` também recebe o motivo específico.
 Resultados anteriores a este registro não permitem recuperar retrospectivamente o motivo.
+
+## Painéis vivos (conferência diária)
+
+Criar um painel no Início ([PAINEIS.md](PAINEIS.md)) é aprovar uma ação recorrente: conferir os
+preços uma vez por dia. Fica na auditoria (`panel.create`, `recurring_check: daily`) e pode ser
+desfeito a qualquer momento (**Pausar** ou **Apagar** no card).
+
+A conferência roda no worker (job `panel_recheck`) e segue as mesmas regras do ciclo autônomo:
+- **Pausa global:** não confere, e o card diz isso.
+- **Orçamento de autonomia:** cada conferência é uma chamada com o propósito `panel_recheck`, em
+  `AUTONOMOUS_PURPOSES`. Sem espaço no dia, não confere, e o card mantém a hora da última.
+- **Horário silencioso:** nenhum aviso nesse horário; no máximo um aviso por painel por dia, e só
+  quando algo importante muda.
+- **Verificação de robô:** reporta e tenta no dia seguinte; nunca contorna.

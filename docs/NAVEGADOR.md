@@ -31,7 +31,8 @@ verificação ou respondem 403); ele reporta isso e não insiste.
 
 Quando ele abriu pelo menos uma página com preço (R$, US$, €...), a resposta termina oferecendo
 deixar a cotação num painel no Início que confere o preço todo dia. Se você disse um orçamento
-("até R$ 6 mil"), a oferta já cita a meta, lida no código a partir das suas palavras. Ver
+("até R$ 6 mil"), a oferta já cita a meta, lida no código a partir das suas palavras. Aprovando, o
+painel aparece no Início e é conferido todo dia pelo worker, que também usa este navegador. Ver
 [PAINEIS.md](PAINEIS.md).
 
 Todo preço que ele der vem com o site e a hora em que foi lido, mesmo na resposta mais curta. Essa
@@ -59,7 +60,8 @@ resposta, então não podem ser citadas. Caso real (14/11/2026): "Cecília Meire
 
 Em produção, o Chromium roda no container `browser` do
 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml) (`mcr.microsoft.com/playwright:v1.62.0`
-com `playwright run-server`): **sem segredos, sem banco e numa rede (`browsing`) só com a API**.
+com `playwright run-server`): **sem segredos, sem banco e numa rede (`browsing`) só com a API e o worker** (o worker confere os
+painéis do Início).
 Se uma página maliciosa explorar o Chromium, ela fica presa num container sem nada de valor. A
 API só conecta (`VISION_BROWSER_WS_URL=ws://browser:3000/`). A versão do container tem de ser a
 mesma do pacote `playwright` do `pyproject.toml`. O container fica limitado a 700 MB de memória (o servidor tem 2 GB, sem swap).

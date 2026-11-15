@@ -115,6 +115,12 @@ registra em `core/conversation/progress.py`, sempre com a versão conferida pela
 fim ([ADR-0011](decisions/0011-streaming-da-resposta.md)). Como o `/progress`, isso depende de a API
 rodar num processo só.
 
+Painéis vivos ([ADR-0012](decisions/0012-paineis-vivos.md), [PAINEIS.md](PAINEIS.md)):
+- `core/panels` guarda o que cotar e o último resultado, em dados validados;
+- o worker confere uma vez por dia, pela fila (`panel_recheck`), dentro do orçamento e da pausa da
+  autonomia;
+- o Início mostra cards nativos.
+
 Inspeção: `GET /decisions`, `GET /cognition/metrics`, `GET /identity/name`,
 `GET|PUT /autonomy/permissions`. Ver [AUTONOMY.md](AUTONOMY.md) e
 [research/curiosity_evaluation.md](research/curiosity_evaluation.md).

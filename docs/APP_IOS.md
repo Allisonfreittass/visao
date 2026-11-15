@@ -385,6 +385,18 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
 - **Haptics:** um toque leve ao enviar e um bem suave quando a resposta termina de aparecer, só com
   o app na tela e na conversa.
 
+### Painéis vivos no Início (Fase 3, 15/11/2026)
+
+`PanelCards.swift` mostra os painéis ativos em cards nativos.
+- O total muda de número com `contentTransition(.numericText())`, e um card novo entra com spring
+  (sem animação com Reduzir Movimento).
+- Tocar abre o histórico, os sites, **Pausar** e **Apagar**.
+- A oferta aparece também em "Painéis" nas pendências.
+- **Criar um novo painel** e as sugestões abrem o chat com o texto no composer
+  (`Session.chatDraft`).
+
+O modelo está em `VisaoKit/Panels.swift`. Ver [PAINEIS.md](PAINEIS.md).
+
 ### Pendências da voz (para retomar)
 
 - **Interromper falando ainda não interrompe.** O áudio em via dupla já liga e ouve (diário de

@@ -24,6 +24,22 @@ No Haiku 5.5 o título custa bem menos de US$ 0,001, mas conta **uma chamada** n
 chamadas por dia e por hora (`VISION_LLM_BUDGET_CALLS_*`, padrão 30/dia e 10/hora). Um turno com
 navegador já usa de 3 a 5 chamadas (planejar, responder, conferir as regras...).
 
+## Painéis vivos (conferência diária)
+
+Por painel ativo e por dia:
+- 2 páginas no navegador (`VISION_PANEL_MAX_PAGES`), sem custo de API;
+- 1 chamada de extração: entrada de até ~4 mil tokens (2 páginas de até 7 mil caracteres), saída
+  de até 900 tokens.
+
+No Haiku 5.5 (US$ 0,10 / 0,50 por milhão), o pior caso é cerca de US$ 0,0009 por conferência.
+Com 3 painéis (o padrão), dá menos de US$ 0,003 por dia, ou ~US$ 0,09 por mês.
+
+O que pesa mais é o **limite de chamadas**: cada conferência gasta 1 das chamadas diárias da
+autonomia (`VISION_AUTONOMY_LLM_CALLS_PER_DAY`) e 1 das chamadas por dia e por hora do razão.
+
+Criar ou editar um painel pela conversa gasta 1 chamada a mais (extração ou edição), no orçamento
+da conversa.
+
 ## Infraestrutura existente
 
 | Item | Custo informado | Verificado? |
