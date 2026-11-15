@@ -21,6 +21,8 @@ from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 
 AUTONOMOUS_PURPOSES = (
     "code_proposal",
+    # The daily check of a live panel (core/panels/service.py).
+    "panel_recheck",
     "mind_review",
     "mind_think",
     "name_deliberation",

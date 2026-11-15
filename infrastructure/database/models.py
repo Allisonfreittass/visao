@@ -965,3 +965,68 @@ class PanelOffer(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Panel(Base):
+    """A live card on the home screen (docs/PAINEIS.md, ADR-0012): what to quote (`spec`), the
+    last structured result (`snapshot`) and when it was checked. Approved once, checked daily."""
+
+    __tablename__ = "panels"
+    __table_args__ = (Index("ix_panels_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    offer_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("panel_offers.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), default="travel_quote")
+    title: Mapped[str] = mapped_column(String(120))
+    spec: Mapped[dict[str, Any]] = mapped_column(JSON)
+    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # active | paused | error | expired
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    # What the card says when the last check could not be done ("o site pediu verificação").
+    check_note: Mapped[str] = mapped_column(String(200), default="")
+    last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PanelSnapshot(Base):
+    """Every check of a panel, for the change since the last one and the history."""
+
+    __tablename__ = "panel_snapshots"
+    __table_args__ = (Index("ix_panel_snapshots_panel_checked", "panel_id", "checked_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    panel_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("panels.id", ondelete="CASCADE"))
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
+    total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PanelVersion(Base):
+    """What a panel was before an edit in the conversation: kept, never lost."""
+
+    __tablename__ = "panel_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    panel_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("panels.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(120))
+    spec: Mapped[dict[str, Any]] = mapped_column(JSON)
+    reason: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
