@@ -19,6 +19,18 @@ struct InicioView: View {
         ) {
             let mac = pending.asks.filter { if case .arm = $0.source { true } else { false } }
             let google = pending.asks.filter { if case .google = $0.source { true } else { false } }
+            let panels = pending.asks.filter { if case .panel = $0.source { true } else { false } }
+            if !panels.isEmpty {
+                PageGroup(label: "Painéis") {
+                    ForEach(panels) { ask in
+                        if case .panel(let offer) = ask.source {
+                            item(id: ask.id, title: "Deixo isto no Início?", lines: [offer.summary], date: offer.createdAt) { approve in
+                                Task { await pending.decide(ask, approve: approve) }
+                            }
+                        }
+                    }
+                }
+            }
             if !mac.isEmpty {
                 PageGroup(label: "No Mac") {
                     ForEach(mac) { ask in

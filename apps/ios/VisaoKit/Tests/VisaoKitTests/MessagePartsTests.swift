@@ -19,3 +19,16 @@ final class MessagePartsTests: XCTestCase {
         XCTAssertNil(m.parts)
     }
 }
+
+/// The panel offer card after a live quote (docs/PAINEIS.md).
+final class PanelOfferTests: XCTestCase {
+    func testAnOfferBecomesACardInItsConversation() throws {
+        let json = #"{"id":"o","conversation_id":"c","message_id":"m","title":"Combo Santiago","goal_amount":"6000.00","currency":"BRL","status":"proposed","summary":"Deixar “Combo Santiago” no Início","created_at":"2026-11-15T13:14:00Z"}"#
+        let offer = try APIDate.decoder.decode(PanelOffer.self, from: Data(json.utf8))
+        let ask = PendingAsk(source: .panel(offer))
+        XCTAssertEqual(ask.label, "Painel no Início")
+        XCTAssertEqual(ask.conversationId, "c")
+        XCTAssertTrue(ask.reportsInChat)
+        XCTAssertTrue(VoiceRules.question(for: ask).contains("pode criar"))
+    }
+}

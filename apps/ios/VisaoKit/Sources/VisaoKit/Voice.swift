@@ -76,6 +76,8 @@ public enum VoiceRules {
             return "Preparei um evento na sua agenda: \(clip(action.payload.title ?? action.summary, 90)). Para marcar, diga \"pode marcar\". Para cancelar, diga \"não\"."
         case .arm(let task):
             return "Montei um pedido para o Mac, no projeto \(task.project): \(clip(task.prompt, 140)). Para rodar, diga \"pode rodar\". Para cancelar, diga \"não\"."
+        case .panel(let offer):
+            return "Quer que eu deixe \(clip(offer.title, 60)) no seu Início, conferindo o preço todo dia? Para criar, diga \"pode criar\". Para deixar pra lá, diga \"não\"."
         }
     }
 
@@ -87,6 +89,7 @@ public enum VoiceRules {
         case .google(let action) where action.kind == "send_email": return "Pronto, mandei o email."
         case .google: return "Pronto, marquei na agenda."
         case .arm: return "Pronto, mandei para o Mac. Aviso quando terminar."
+        case .panel: return "Pronto, estou montando."
         }
     }
 }

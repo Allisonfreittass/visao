@@ -50,6 +50,28 @@ public struct ArmTask: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// After a live quote, the offer to keep it on the home screen and check the price daily
+/// (docs/PAINEIS.md; apps/api/routes/panels.py).
+public struct PanelOffer: Codable, Sendable, Identifiable, Hashable {
+    public let id: String
+    public let conversationId: String
+    public let messageId: String?
+    public let title: String
+    public let goalAmount: String?
+    public let status: String
+    /// Said by the server ("Deixar “Combo Santiago” no Início…").
+    public let summary: String
+    public let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, status, summary
+        case conversationId = "conversation_id"
+        case messageId = "message_id"
+        case goalAmount = "goal_amount"
+        case createdAt = "created_at"
+    }
+}
+
 /// How a decision was given; the server records it in the audit log.
 public enum DecisionVia: String, Sendable {
     case toque
@@ -65,6 +87,17 @@ extension APIClient {
     public func decideGoogle(id: String, approve: Bool, via: DecisionVia = .toque) async throws {
         _ = try await raw(
             "/google/actions/\(id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? id)/\(approve ? "approve" : "reject")",
+            method: "POST", query: [URLQueryItem(name: "via", value: via.rawValue)]
+        )
+    }
+
+    public func panelOffers() async throws -> [PanelOffer] {
+        try await request("/panels/offers")
+    }
+
+    public func decidePanelOffer(id: String, approve: Bool, via: DecisionVia = .toque) async throws {
+        _ = try await raw(
+            "/panels/offers/\(id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? id)/\(approve ? "approve" : "reject")",
             method: "POST", query: [URLQueryItem(name: "via", value: via.rawValue)]
         )
     }
@@ -86,6 +119,7 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
     public enum Source: Hashable, Sendable {
         case google(GoogleAction)
         case arm(ArmTask)
+        case panel(PanelOffer)
     }
 
     public let source: Source
@@ -94,6 +128,7 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
         switch source {
         case .google(let a): a.id
         case .arm(let t): t.id
+        case .panel(let o): o.id
         }
     }
 
@@ -101,6 +136,7 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
         switch source {
         case .google(let a): a.conversationId
         case .arm(let t): t.conversationId
+        case .panel(let o): o.conversationId
         }
     }
 
@@ -109,6 +145,7 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
         switch source {
         case .google(let a): a.kind == "send_email" ? "Email" : "Agenda"
         case .arm(let t): "Mac · \(t.project)"
+        case .panel: "Painel no Início"
         }
     }
 
@@ -116,6 +153,7 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
         switch source {
         case .google(let a): a.summary
         case .arm(let t): t.prompt
+        case .panel(let o): o.summary
         }
     }
 
@@ -127,8 +165,10 @@ public struct PendingAsk: Identifiable, Hashable, Sendable {
 
     /// Approving this one posts a message in the conversation (what was sent or scheduled).
     var reportsInChat: Bool {
-        if case .google = source { return true }
-        return false
+        switch source {
+        case .google, .panel: return true
+        case .arm: return false
+        }
     }
 }
 
@@ -167,13 +207,16 @@ public final class PendingStore {
         async let arm = attempt { try await api.armTasks() }
         async let wanted = attempt { try await api.approvals() }
         async let notes = attempt { try await api.notices() }
-        let (actions, tasks, goalList, noticeList) = await (google, arm, wanted, notes)
+        async let panels = attempt { try await api.panelOffers() }
+        let (actions, tasks, goalList, noticeList, offers) = await (google, arm, wanted, notes, panels)
 
         var next: [PendingAsk] = []
         if case .success(let list) = actions { next += list.map { PendingAsk(source: .google($0)) } }
         else { next += asks.filter { if case .google = $0.source { true } else { false } } }
         if case .success(let list) = tasks { next += list.filter { $0.status == "proposed" }.map { PendingAsk(source: .arm($0)) } }
         else { next += asks.filter { if case .arm = $0.source { true } else { false } } }
+        if case .success(let list) = offers { next += list.map { PendingAsk(source: .panel($0)) } }
+        else { next += asks.filter { if case .panel = $0.source { true } else { false } } }
         asks = next
         if case .success(let list) = goalList { goals = list }
         if case .success(let list) = noticeList {
@@ -243,6 +286,7 @@ public final class PendingStore {
             switch ask.source {
             case .google(let action): try await api.decideGoogle(id: action.id, approve: approve, via: via)
             case .arm(let task): try await api.decideArm(id: task.id, approve: approve, via: via)
+            case .panel(let offer): try await api.decidePanelOffer(id: offer.id, approve: approve, via: via)
             }
             asks.removeAll { $0.id == ask.id }
             await refresh()
