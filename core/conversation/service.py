@@ -265,6 +265,9 @@ def reply(
         response = _write(provider, prompt, max_output_tokens, modality)
     except LLMError as exc:
         _record_failure(session, conversation, provider, exc.kind)
+        if exc.kind == "cancelled":
+            # Parar mid-stream: recorded, nothing kept (the ledger keeps the reservation charged).
+            raise progress.TurnCancelled() from exc
         if exc.kind not in REJECTED_INPUT or not any(m.images for m in prompt):
             raise
         # The model in use does not take pictures: answer without them, and say so, instead of
@@ -332,6 +335,8 @@ def reply(
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
         if parts:
             parts[-1] = parts[-1].rstrip() + f"\n\n{TRUNCATION_NOTICE}"
+    # What the stream showed grows into, or is replaced by, the text that is kept.
+    progress.final(content)
     assistant_message = Message(
         conversation_id=conversation.id, role="assistant", content=content, parts=parts
     )
@@ -347,12 +352,10 @@ def reply(
 def _write(
     provider: LLMProvider, prompt: list[ChatMessage], max_output_tokens: int, modality: str
 ) -> LLMResponse:
-    """The reply. In a voice call it streams into the turn's progress, so the phone can start
-    speaking the first sentence while the rest is written (a provider that cannot stream answers
-    whole, as before)."""
-    if modality != "voice":
-        return provider.complete(prompt, max_output_tokens=max_output_tokens)
-    with drafting(progress.draft):
+    """The reply, streamed into the turn's progress: the chat shows it as it is written
+    (docs/decisions/0011) and a voice call speaks the first sentence while the rest is written. A
+    provider that cannot stream answers whole, as before. Parar stops the stream."""
+    with drafting(progress.draft, stop=progress.cancelled):
         return provider.complete(prompt, max_output_tokens=max_output_tokens)
 
 

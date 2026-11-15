@@ -1,10 +1,14 @@
+import asyncio
+import json
 import logging
+import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -485,6 +489,58 @@ def turn_progress(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) 
     return ProgressOut(**live) if live else ProgressOut(active=False)
 
 
+STREAM_WAIT_SECONDS = 15.0
+STREAM_BEAT_SECONDS = 15.0
+STREAM_TICK_SECONDS = 0.05
+
+
+def sse(event: progress.Event) -> str:
+    """One event in text/event-stream form; the data is one JSON line."""
+    data = json.dumps(event.data, ensure_ascii=False)
+    return f"id: {event.id}\nevent: {event.kind}\ndata: {data}\n\n"
+
+
+@router.get("/{conversation_id}/stream")
+def turn_stream(
+    conversation_id: uuid.UUID,
+    request: Request,
+    db: DbSession,
+    user: CurrentUser,
+    last_event_id: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
+    """The turn in flight as server-sent events (docs/decisions/0011): its steps, the text as it is
+    written, a `replace` when the kept text differs, `sources`, `action` and the closing `done`
+    (the same reply the POST returns) or `error`. Waits up to 15 s for a turn to start."""
+    conversation = _own_conversation(db, user, conversation_id)
+    after = int(last_event_id) if last_event_id and last_event_id.isdigit() else None
+
+    async def events():
+        opened = time.monotonic()
+        last = after
+        beat = opened
+        yield "retry: 2000\n\n"
+        while True:
+            if await request.is_disconnected():
+                return
+            batch, state = progress.follow(conversation.id, last, opened)
+            for event in batch:
+                last = event.id
+                yield sse(event)
+            now = time.monotonic()
+            if state == "over" or (state == "waiting" and now - opened > STREAM_WAIT_SECONDS):
+                return
+            if now - beat > STREAM_BEAT_SECONDS:
+                beat = now
+                yield ": aqui\n\n"
+            await asyncio.sleep(STREAM_TICK_SECONDS)
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 def notify_reply(
     db: Session, user: User, conversation_id: uuid.UUID, name: str | None, text: str
 ) -> None:
@@ -549,7 +605,7 @@ def send_message(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
     try:
-        with progress.tracking(conversation.id):
+        with progress.tracking(conversation.id, body.modality):
             turn = run_turn(
                 db,
                 conversation=conversation,
@@ -568,20 +624,29 @@ def send_message(
         result, outcome = turn.result, turn.curiosity
     except progress.TurnCancelled as exc:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Parado por você") from exc
+        raise _stream_error(conversation.id, status.HTTP_409_CONFLICT, "Parado por você") from exc
     except BudgetExceededError as exc:
         scope = "diário" if exc.scope == "daily" else "desta conversa"
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, f"Orçamento {scope} de LLM esgotado"
+        raise _stream_error(
+            conversation.id,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Orçamento {scope} de LLM esgotado",
         ) from exc
     except LLMError as exc:
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, f"Falha no provedor de LLM ({exc.kind}); sem resposta"
+        raise _stream_error(
+            conversation.id,
+            status.HTTP_502_BAD_GATEWAY,
+            f"Falha no provedor de LLM ({exc.kind}); sem resposta",
         ) from exc
     except EmptyReplyError as exc:
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, "O provedor de LLM devolveu resposta vazia"
+        raise _stream_error(
+            conversation.id,
+            status.HTTP_502_BAD_GATEWAY,
+            "O provedor de LLM devolveu resposta vazia",
         ) from exc
+    except Exception:
+        progress.publish(conversation.id, "error", {"status": 500, "message": "Erro no servidor"})
+        raise
 
     page = None
     if result.page is not None:
@@ -642,7 +707,7 @@ def send_message(
 
     usage = result.usage
     gap = outcome.gap
-    return TurnOut(
+    out = TurnOut(
         curiosity=CuriosityOut(
             action=gap.chosen_action,
             reason=gap.decision_reason,
@@ -678,3 +743,22 @@ def send_message(
             latency_ms=usage.latency_ms,
         ),
     )
+    # The stream ends with the same reply the POST returns (docs/decisions/0011).
+    if out.sources:
+        progress.publish(
+            conversation.id, "sources", {"sources": [s.model_dump() for s in out.sources]}
+        )
+    if set(turn.plan.executed()) & WAITING_FOR_A_TAP:
+        progress.publish(conversation.id, "action", {})
+    progress.publish(conversation.id, "done", out.model_dump(mode="json"))
+    return out
+
+
+# A turn that leaves something waiting for the owner's tap: the app refreshes its cards.
+WAITING_FOR_A_TAP = {"mac_proposed", "google_proposed", "panel_offered", "panel_accepted"}
+
+
+def _stream_error(conversation_id: uuid.UUID, code: int, message: str) -> HTTPException:
+    """The turn failed: the stream says so and closes; the POST answers with the same error."""
+    progress.publish(conversation_id, "error", {"status": code, "message": message})
+    return HTTPException(code, message)

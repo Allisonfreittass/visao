@@ -307,7 +307,8 @@ class BudgetGuard:
                 circuit["failures"] = circuit.get("failures", 0) + 1
                 if circuit["failures"] >= self.limits.failure_threshold:
                     circuit["until"] = now.timestamp() + self.limits.cooldown_seconds
-                if error in {"timeout", "network", "bad_response", "unknown"}:
+                # Stopped mid-stream (Parar) is like a timeout: what was spent is not known.
+                if error in {"timeout", "network", "bad_response", "unknown", "cancelled"}:
                     active[reservation] = {**item, "state": "unknown", "error": error}
                 else:
                     del active[reservation]

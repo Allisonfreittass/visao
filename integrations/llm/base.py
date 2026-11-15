@@ -80,17 +80,33 @@ class LLMProvider(Protocol):
 # and a provider that cannot stream simply ignores it and answers whole, as before. Calls made on
 # other threads (the rule check) do not see it.
 _draft_sink: ContextVar[Callable[[str], None] | None] = ContextVar("llm_draft_sink", default=None)
+# Asked between streamed pieces: true when the owner tapped Parar (docs/decisions/0011).
+_draft_stop: ContextVar[Callable[[], bool] | None] = ContextVar("llm_draft_stop", default=None)
 
 
 @contextmanager
-def drafting(sink: Callable[[str], None]) -> Iterator[None]:
+def drafting(sink: Callable[[str], None], stop: Callable[[], bool] | None = None) -> Iterator[None]:
     """Inside this block, a streaming provider calls `sink` with the whole text so far, each time
-    it grows. A new attempt (a fallback provider) starts over from the beginning."""
+    it grows. A new attempt (a fallback provider) starts over from the beginning. When `stop`
+    says so, a streaming provider closes the stream and fails with the kind "cancelled"."""
     token = _draft_sink.set(sink)
+    stop_token = _draft_stop.set(stop)
     try:
         yield
     finally:
+        _draft_stop.reset(stop_token)
         _draft_sink.reset(token)
+
+
+def should_stop() -> bool:
+    """Never lets a broken check stop a reply."""
+    stop = _draft_stop.get()
+    if stop is None:
+        return False
+    try:
+        return bool(stop())
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def tell_draft(text: str) -> None:

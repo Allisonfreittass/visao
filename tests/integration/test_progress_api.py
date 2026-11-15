@@ -195,7 +195,8 @@ def test_in_a_voice_call_the_reply_shows_up_while_it_is_written(client, db):
     )
 
     assert turn.status_code == 200, turn.text
-    assert seen == ["Camberra é a capital. ", "Camberra é a capital. Fica no sudeste."]
+    # Trailing spaces wait for the next piece (one may be a bubble break).
+    assert seen == ["Camberra é a capital.", "Camberra é a capital. Fica no sudeste."]
     assert turn.json()["assistant_message"]["content"] == "Camberra é a capital. Fica no sudeste."
     after = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
     assert after["draft"] == "Camberra é a capital. Fica no sudeste."
@@ -217,7 +218,7 @@ def test_in_the_text_chat_nothing_is_shown_before_the_reply(client, db):
 
 
 def test_a_page_marker_is_not_part_of_what_is_spoken():
-    with progress.tracking(CONVERSATION):
+    with progress.tracking(CONVERSATION, "voice"):
         progress.draft("Vou montar. [[página: Roteiro]] resto")
-        assert progress.snapshot(CONVERSATION)["draft"] == "Vou montar. "
+        assert progress.snapshot(CONVERSATION)["draft"] == "Vou montar."
     progress.draft("fora de uma resposta")

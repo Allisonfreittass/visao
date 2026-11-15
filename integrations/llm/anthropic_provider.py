@@ -16,6 +16,7 @@ from integrations.llm.base import (
     LLMError,
     LLMResponse,
     Pricing,
+    should_stop,
     tell_draft,
     wants_draft,
 )
@@ -141,6 +142,10 @@ class AnthropicProvider:
         written = ""
         with self._client.messages.stream(**request) as stream:
             for piece in stream.text_stream:
+                if should_stop():
+                    # Closing the stream stops the generation; the tokens already spent are not
+                    # known, so the reservation stays charged (budget.py, like a timeout).
+                    raise LLMError("cancelled", "the owner stopped the reply")
                 written += piece
                 tell_draft(written)
             return stream.get_final_message()

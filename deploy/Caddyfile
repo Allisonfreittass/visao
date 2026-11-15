@@ -1,6 +1,8 @@
 # HTTPS automático (Let's Encrypt) para o domínio em /etc/visao/caddy.env (VISAO_DOMAIN).
 {$VISAO_DOMAIN} {
-	encode zstd gzip
+	# The reply stream (docs/decisions/0011) is never compressed: a compressor holds bytes back.
+	@compress not path /api/conversations/*/stream
+	encode @compress zstd gzip
 
 	# Rotas internas nunca ficam expostas (a nuvem antiga também as bloqueava).
 	# Em `handle` próprio: um `respond` solto rodaria só depois dos blocos abaixo.
@@ -16,6 +18,8 @@
 		reverse_proxy api:8000 {
 			# Sem a Cloudflare na frente, esse cabeçalho viria do próprio visitante: tira.
 			header_up -Cf-Connecting-Ip
+			# Each event of the reply stream goes out as soon as the API writes it.
+			flush_interval -1
 		}
 	}
 

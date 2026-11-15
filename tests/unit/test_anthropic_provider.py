@@ -248,3 +248,25 @@ def test_a_broken_draft_sink_never_costs_the_reply():
             [ChatMessage("user", "capital?")], max_output_tokens=50
         )
     assert response.text == "Camberra."
+
+
+def test_parar_closes_the_stream_and_fails_as_cancelled():
+    messages = StreamingMessages(["Cam", "berra", "."], reply("Camberra."))
+    seen: list[str] = []
+    stop_after_first = iter([False, True, True])
+    with drafting(seen.append, stop=lambda: next(stop_after_first)):
+        with pytest.raises(LLMError) as exc:
+            provider(messages).complete([ChatMessage("user", "capital?")], max_output_tokens=50)
+    assert exc.value.kind == "cancelled" and seen == ["Cam"]
+
+
+def test_a_broken_stop_check_never_stops_the_reply():
+    def boom():
+        raise RuntimeError("stop")
+
+    messages = StreamingMessages(["Cam", "berra."], reply("Camberra."))
+    with drafting(lambda _t: None, stop=boom):
+        response = provider(messages).complete(
+            [ChatMessage("user", "capital?")], max_output_tokens=50
+        )
+    assert response.text == "Camberra."

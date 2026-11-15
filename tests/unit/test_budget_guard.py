@@ -132,7 +132,8 @@ def test_success_retains_reservation_and_persists_quota_across_guard_restart(fac
     assert not other.prompts
 
 
-@pytest.mark.parametrize("kind", ["timeout", "network", "bad_response"])
+# "cancelled": Parar in the middle of a stream (docs/decisions/0011), like a timeout.
+@pytest.mark.parametrize("kind", ["timeout", "network", "bad_response", "cancelled"])
 def test_uncertain_failure_keeps_quota_charged_and_holds_the_slot_only_for_a_while(factory, kind):
     p = fake(fail_with=kind)
     guarded = GuardedLLMProvider(p, ENDPOINT, make_guard(factory))

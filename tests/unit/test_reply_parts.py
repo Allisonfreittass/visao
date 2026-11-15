@@ -36,6 +36,6 @@ def test_in_a_voice_call_a_bubble_break_is_a_pause_not_the_end(monkeypatch):
     import uuid
 
     conversation = uuid.uuid4()
-    with progress.tracking(conversation):
+    with progress.tracking(conversation, "voice"):
         progress.draft(f"Consigo ver.{MARK}De onde vocês saem?")
         assert progress.snapshot(conversation)["draft"] == "Consigo ver.\n\nDe onde vocês saem?"
