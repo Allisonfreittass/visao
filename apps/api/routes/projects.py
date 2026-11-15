@@ -131,7 +131,7 @@ def get_project(project_id: uuid.UUID, db: DbSession, user: CurrentUser) -> Proj
         **_out(db, project).model_dump(),
         conversation_list=[
             ProjectConversationOut(
-                id=c.id, created_at=c.created_at, title=names.get(c.id, "Conversa nova")
+                id=c.id, created_at=c.created_at, title=c.title or names.get(c.id, "Conversa nova")
             )
             for c in conversations
         ],

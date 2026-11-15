@@ -174,6 +174,9 @@ class Conversation(Base):
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # 3 to 6 words written after the first exchange (core/conversation/title.py); None: the menu
+    # shows the date.
+    title: Mapped[str | None] = mapped_column(String(80), nullable=True)
     # The project it belongs to; deleting the project keeps the conversation.
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True

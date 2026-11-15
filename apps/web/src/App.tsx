@@ -529,6 +529,8 @@ export function App() {
         ...list.filter((m) => m.local === "queued"),
       ]);
       pending.refresh(); // a request for the Mac may be waiting for a tap now
+      // The worker writes the conversation's title a few seconds after the first reply.
+      window.setTimeout(() => api.listConversations().then(setConversations, () => undefined), 12_000);
       if (spoken) setLatency({ sttMs: spoken.sttMs, llmMs, ttsFirstAudioMs: null, totalMs: null });
       if (willSpeak) {
         const ttsStarted = performance.now();

@@ -162,6 +162,7 @@ struct ChatScreen: View {
                 followOnLockScreen(sending: sending)
                 // A turn can leave an email or Mac work waiting for a tap.
                 if !sending { Task { await session.pending.refresh() } }
+                if !sending { titleSoon() }
             }
             .onChange(of: session.pending.asks(in: store.conversationId).count) { scrollToBottom(proxy) }
             .onChange(of: store.liveStep) { scrollToBottom(proxy) }
@@ -328,6 +329,17 @@ struct ChatScreen: View {
             let ok = await session.pending.decide(ask, approve: approve)
             // What was sent or scheduled comes back as his message in this conversation.
             if ok && approve { await store.refresh() }
+        }
+    }
+
+    /// The worker writes the conversation's title a few seconds after the first reply
+    /// (core/conversation/title.py): ask for the list again once, then the menu has it.
+    private func titleSoon() {
+        guard let id = store.conversationId,
+              session.conversations.first(where: { $0.id == id })?.title == nil else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(12))
+            await session.loadConversations()
         }
     }
 

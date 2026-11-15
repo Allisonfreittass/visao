@@ -11,6 +11,8 @@ from apps.worker.runner import Handler, HandlerResult
 from core.autonomy.budget import has_room
 from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.autonomy.cycle import _record as record_action
+from core.conversation import title as conversation_title
+from core.conversation.service import Budgets
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
@@ -183,6 +185,22 @@ def think_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     return handle
 
 
+def title_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    """A conversation's title for the menu (core/conversation/title.py). Answering the owner's
+    own conversation, so it counts against the chat budget, not the autonomy one."""
+
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        if provider is None:
+            return HandlerResult("done", {"skipped": "no_llm"})
+        budgets = Budgets(settings.llm_daily_budget_usd, settings.llm_conversation_budget_usd)
+        named = conversation_title.run_job(
+            session, uuid.UUID(job.payload["conversation_id"]), provider, budgets
+        )
+        return HandlerResult("done", {"titled": named is not None})
+
+    return handle
+
+
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
     # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
@@ -194,4 +212,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         "name_deliberation": name_handler(settings, provider),
         "mind_review": review_handler(settings, fast),
         "mind_think": think_handler(settings, provider),
+        conversation_title.JOB_KIND: title_handler(settings, fast),
     }

@@ -19,7 +19,7 @@ from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
-from core.conversation import artifacts, attachments, progress
+from core.conversation import artifacts, attachments, progress, title
 from core.conversation.links import LinkReader
 from core.conversation.service import (
     BudgetExceededError,
@@ -56,6 +56,8 @@ MAX_MESSAGE_CHARS = 8000
 class ConversationOut(BaseModel):
     id: uuid.UUID
     created_at: datetime
+    # 3 to 6 words after the first exchange; None: show the date.
+    title: str | None = None
     memory_status: str | None = None
     project_id: uuid.UUID | None = None
 
@@ -389,7 +391,7 @@ def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut
         .order_by(Conversation.created_at.desc())
     )
     return [
-        ConversationOut(id=c.id, created_at=c.created_at, project_id=c.project_id)
+        ConversationOut(id=c.id, created_at=c.created_at, project_id=c.project_id, title=c.title)
         for c in conversations
     ]
 
@@ -405,7 +407,10 @@ def move_to_project(
     conversation.project_id = body.project_id
     db.commit()
     return ConversationOut(
-        id=conversation.id, created_at=conversation.created_at, project_id=conversation.project_id
+        id=conversation.id,
+        created_at=conversation.created_at,
+        project_id=conversation.project_id,
+        title=conversation.title,
     )
 
 
@@ -623,6 +628,9 @@ def send_message(
             details={"via": "texto"},
         )
         db.commit()
+
+    # After the reply, never before it: the worker writes it (a small call of its own).
+    title.request(db, conversation)
 
     if progress.owner_left(conversation.id):
         # The app stopped watching while this ran (phone locked, app closed): the reply also goes

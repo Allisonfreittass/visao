@@ -97,6 +97,11 @@ final class Session {
         }
     }
 
+    /// Only the list (the title may have arrived); a failure keeps the one on screen.
+    func loadConversations() async {
+        if let list = try? await api.conversations() { conversations = list }
+    }
+
     func added(_ conversation: Conversation) {
         conversations.removeAll { $0.id == conversation.id }
         conversations.insert(conversation, at: 0)

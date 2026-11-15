@@ -50,12 +50,15 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     public let createdAt: Date
     public let memoryStatus: String?
     public let projectId: String?
+    /// 3 to 6 words after the first exchange; nil: the menu shows the date.
+    public let title: String?
 
-    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil) {
+    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil, title: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.memoryStatus = memoryStatus
         self.projectId = projectId
+        self.title = title
     }
 
     /// The server could not prepare memory for it: you can talk, it may forget details.
@@ -64,7 +67,7 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id
+        case id, title
         case createdAt = "created_at"
         case memoryStatus = "memory_status"
         case projectId = "project_id"

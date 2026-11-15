@@ -107,6 +107,8 @@ export interface Conversation {
   created_at: string;
   memory_status?: string | null;
   project_id?: string | null;
+  /** 3 to 6 words after the first exchange; null: the menu shows the date. */
+  title?: string | null;
 }
 
 /** A subject with its conversations, pages and files (Projetos). */

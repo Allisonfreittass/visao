@@ -411,7 +411,16 @@ struct Drawer: View {
                     ForEach(session.conversations) { conversation in
                         Button { onConversation(conversation.id) } label: {
                             HStack {
-                                Text(DayLabel.text(for: conversation.createdAt))
+                                if let title = conversation.title {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(title).lineLimit(1)
+                                        Text(DayLabel.text(for: conversation.createdAt))
+                                            .font(Typo.text(.caption2))
+                                            .foregroundStyle(palette.tintaFraca)
+                                    }
+                                } else {
+                                    Text(DayLabel.text(for: conversation.createdAt))
+                                }
                                 if conversation.projectId != nil {
                                     Image(systemName: "folder").font(.caption).foregroundStyle(palette.tintaFraca)
                                 }

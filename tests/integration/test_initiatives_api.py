@@ -16,6 +16,7 @@ from apps.api.search import get_search_provider
 from apps.api.settings import Settings, get_settings
 from apps.worker.handlers import research_followup_handler
 from apps.worker.runner import run_once
+from core.conversation import title as conversation_title
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.goals.followup import SUMMARY_INSTRUCTIONS
 from core.identity.genesis import run_genesis
@@ -57,7 +58,9 @@ class SwitchableSearch:
 
 
 @pytest.fixture
-def world(client: TestClient, engine: Engine) -> Iterator[dict]:
+def world(client: TestClient, engine: Engine, monkeypatch) -> Iterator[dict]:
+    # The conversation's title is a job of its own (core/conversation/title.py): not this queue.
+    monkeypatch.setattr(conversation_title, "request", lambda session, conversation: None)
     state = {"answered": True}
     search = SwitchableSearch()
 
