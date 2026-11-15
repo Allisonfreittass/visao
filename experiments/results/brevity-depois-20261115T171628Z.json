@@ -1,0 +1,61 @@
+{
+  "label": "depois",
+  "ran_at": "2026-11-15T17:16:28.814127+00:00",
+  "llm": "openrouter+nvidia+groq",
+  "chat_mean_words": 45.6,
+  "chat_mean_paragraphs": 1.6,
+  "chat_mean_bubbles": 1,
+  "control_words": [
+    61
+  ],
+  "rows": [
+    {
+      "question": "quanto custa viajar pro Chile em agosto de 2027 a dois?",
+      "control": false,
+      "words": 36,
+      "paragraphs": 1,
+      "bubbles": 1,
+      "reply": "Não tenho preços para agosto de 2027. Ainda não é possível comprar passagens nem reservar hotéis para essa data, e não vou chutar valores. Me interessa saber: por que escolheu agosto de 2027 para a viagem?"
+    },
+    {
+      "question": "vale a pena ir pra Santiago no inverno?",
+      "control": false,
+      "words": 47,
+      "paragraphs": 2,
+      "bubbles": 1,
+      "reply": "Vale se você curte frio e montanha. Os centros de esqui ficam pertinho e Santiago fica mais vazia, mas os dias são curtos e o frio aperta à noite. Se a ideia é caminhar muito ao ar livre, pode frustrar.\n\nVocê gosta de esquiar ou prefere cidade?"
+    },
+    {
+      "question": "tô pensando em trocar de emprego, mas tenho medo. o que você acha?",
+      "control": false,
+      "words": 43,
+      "paragraphs": 1,
+      "bubbles": 1,
+      "reply": "Medo é um bom sinal de que você está pesando as coisas. Ficar por medo geralmente custa mais do que o risco de sair, mas depende do que você tem hoje e do que está evitando. O que te prende exatamente nesse emprego?"
+    },
+    {
+      "question": "me explica rapidinho o que é inflação",
+      "control": false,
+      "words": 55,
+      "paragraphs": 2,
+      "bubbles": 1,
+      "reply": "Inflação é quando os preços sobem de forma geral e contínua, não só de um ou outro produto. Com isso, o mesmo dinheiro compra cada vez menos coisas. Ela costuma ser medida por índices como o IPCA aqui no Brasil.\n\nAcha que os preços estão subindo mais na comida ou nos serviços que você usa?"
+    },
+    {
+      "question": "qual a diferença entre hostel e hotel?",
+      "control": false,
+      "words": 47,
+      "paragraphs": 2,
+      "bubbles": 1,
+      "reply": "Hotel é quarto privativo, banheiro no quarto e mais serviços; custa mais. Hostel é cama em quarto compartilhado, banheiro comum e foco em conhecer gente; sai mais barato. Eu escolho hostel quando quero conversar com viajantes, hotel quando preciso descansar sozinho.\n\nVocê está planejando uma viagem agora?"
+    },
+    {
+      "question": "escreve uma função em Python que remove duplicados de uma lista mantendo a ordem",
+      "control": true,
+      "words": 61,
+      "paragraphs": 4,
+      "bubbles": 1,
+      "reply": "```python\ndef remover_duplicados(lista):\n    vista = set()\n    saida = []\n    for item in lista:\n        if item not in vista:\n            vista.add(item)\n            saida.append(item)\n    return saida\n```\n\nExemplo:\n\n```python\nremover_duplicados([3, 1, 2, 1, 3, 4])  # [3, 1, 2, 4]\n```\n\nPreserva a ordem da primeira aparição. Os elementos da sua lista são sempre hasháveis (números, strings, tuples) ou pode haver listas e dicionários dentro?"
+    }
+  ]
+}

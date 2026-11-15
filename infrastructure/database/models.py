@@ -203,6 +203,10 @@ class Message(Base):
     model_usage_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("model_usage.id", ondelete="SET NULL"), nullable=True
     )
+    # A reply in 2 or 3 bubbles (core/conversation/parts.py): the same text as `content`, cut
+    # where the bubbles break. None is one bubble. `content` stays whole for memory, quoting,
+    # feedback and voice.
+    parts: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

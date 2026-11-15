@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
 from core.conversation import attachments, progress
+from core.conversation import parts as bubbles
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
     RULE_CHECK_INSTRUCTIONS,
@@ -305,13 +306,16 @@ def reply(
     content, page = take_marker(response.text)
     if page is not None and not content.strip():
         content = f"Vou montar a página “{page.title}”. Ela aparece aqui quando ficar pronta."
+    content, parts = bubbles.split(content)
+    if modality == "voice":
+        parts = None
     if owner_rules and not truncated and modality != "voice":
         # Not in a voice call: the check is a second model call before anything can be spoken
         # (up to RULE_CHECK_DEADLINE_SECONDS), and the rules already ride in the system prompt.
         # Committed first: the call's admission ledger needs the write lock this session would hold.
         session.commit()
         progress.step("Conferindo as suas regras")
-        content = _obey_rules(
+        checked = _obey_rules(
             session,
             conversation=conversation,
             provider=provider,
@@ -321,9 +325,16 @@ def reply(
             draft=content,
             max_output_tokens=max_output_tokens,
         )
+        if checked != content:
+            # A rewrite has no bubble breaks of its own: it goes as one bubble.
+            content, parts = checked, None
     if truncated:
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
-    assistant_message = Message(conversation_id=conversation.id, role="assistant", content=content)
+        if parts:
+            parts[-1] = parts[-1].rstrip() + f"\n\n{TRUNCATION_NOTICE}"
+    assistant_message = Message(
+        conversation_id=conversation.id, role="assistant", content=content, parts=parts
+    )
     session.add(assistant_message)
     session.flush()
     assistant_message.model_usage_id = usage.id

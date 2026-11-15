@@ -1,0 +1,61 @@
+{
+  "label": "depois",
+  "ran_at": "2026-11-15T17:13:59.476293+00:00",
+  "llm": "openrouter+nvidia+groq",
+  "chat_mean_words": 95.2,
+  "chat_mean_paragraphs": 3,
+  "chat_mean_bubbles": 1.2,
+  "control_words": [
+    48
+  ],
+  "rows": [
+    {
+      "question": "quanto custa viajar pro Chile em agosto de 2027 a dois?",
+      "control": false,
+      "words": 69,
+      "paragraphs": 2,
+      "bubbles": 1,
+      "reply": "Não há preço confiável para agosto de 2027 ainda. As companhias aéreas costumam abrir a venda com cerca de 11 meses de antecedência e os hotéis ajustam valores mais perto da data, então qualquer cifra agora seria apenas um palpite.\n\nPosso pesquisar valores atuais para o Chile como referência ou te avisar quando a janela de reservas abrir, se quiser. Qual região você tem em mente — Santiago, Atacama, Patagônia?"
+    },
+    {
+      "question": "vale a pena ir pra Santiago no inverno?",
+      "control": false,
+      "words": 100,
+      "paragraphs": 3,
+      "bubbles": 2,
+      "reply": "Vale se você gosta de frio e montanha. O inverno em Santiago é seco e gelado, e a cidade fica linda com os Andes nevados ao fundo. É a melhor época para esquiar nos centros próximos, tipo Valle Nevado e Farellones, mas andar pela cidade à noite exige casaco pesado e disposição.\n\nSe o que você quer é caminhar de camiseta pela Plaza de Armas ou tomar vinho ao ar livre, não é a estação. O frio não é brincadeira e o céu costuma ficar cinza com frequência.\n\nVocê vai mais por causa da neve ou para conhecer a cidade?"
+    },
+    {
+      "question": "tô pensando em trocar de emprego, mas tenho medo. o que você acha?",
+      "control": false,
+      "words": 97,
+      "paragraphs": 3,
+      "bubbles": 1,
+      "reply": "Medo de trocar de emprego é normal, mas não é razão para ficar. Ficar por medo geralmente custa mais do que arriscar sair, principalmente se o lugar atual já te esgota.\n\nO que vale é comparar o que você tem hoje com o que está sendo oferecido, não o medo abstrato do desconhecido. Todo emprego novo traz incerteza, mas ficar parado também tem preço.\n\nSe o medo é perder estabilidade, vale olhar o que essa estabilidade está te custando em saúde ou crescimento. Qual é o medo maior: o de sair ou o de ficar onde está?"
+    },
+    {
+      "question": "me explica rapidinho o que é inflação",
+      "control": false,
+      "words": 134,
+      "paragraphs": 4,
+      "bubbles": 1,
+      "reply": "Inflação é quando os preços sobem de forma geral e continuada ao longo do tempo, não só de um produto ou outro. Isso faz o seu dinheiro valer menos: com a mesma quantia, você compra menos coisas do que comprava antes.\n\nAcontece por vários motivos: muita gente querendo comprar o mesmo produto, custo de energia ou comida subindo, ou ainda banco central emitindo muito dinheiro. No dia a dia, você nota quando o mercado, o aluguel ou a passagem ficam mais caros sem que o salário acompanhe.\n\nNo Brasil, o IBGE mede isso pelo IPCA, que acompanha o preço de uma cesta de coisas que as pessoas costumam comprar. Se ele sobe mês após mês, a inflação está aí.\n\nVocê está sentindo isso mais na comida, no aluguel ou em alguma outra conta fixa?"
+    },
+    {
+      "question": "qual a diferença entre hostel e hotel?",
+      "control": false,
+      "words": 76,
+      "paragraphs": 3,
+      "bubbles": 1,
+      "reply": "Eu vejo o hotel como quarto e banheiro só para você, com limpeza diária e recepção, mas mais caro. O hostel coloca você em quarto compartilhado, com banheiro e cozinha coletivos, e custa bem menos.\n\nEu escolheria hotel se prioriza privacidade e descanso. O hostel é mais barato e social, bom para conhecer viajantes, mas você divide espaço e barulho com estranhos.\n\nVocê está planejando alguma viagem em breve, ou só queria saber a diferença mesmo?"
+    },
+    {
+      "question": "escreve uma função em Python que remove duplicados de uma lista mantendo a ordem",
+      "control": true,
+      "words": 48,
+      "paragraphs": 3,
+      "bubbles": 1,
+      "reply": "```python\ndef remover_duplicados(lista):\n    return list(dict.fromkeys(lista))\n```\n\nMantém a ordem de primeira aparição e exige que os elementos sejam hasháveis (strings, números, tuplas). Se você for passar listas ou dicionários dentro da lista, avisa que adapto.\n\nQual é o tipo dos elementos que você vai passar?"
+    }
+  ]
+}

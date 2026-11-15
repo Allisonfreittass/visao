@@ -17,6 +17,8 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
+from core.conversation.parts import MARK
+
 # Steps kept per turn, and how long a finished turn stays readable.
 MAX_STEPS = 12
 KEEP_FINISHED_SECONDS = 30.0
@@ -137,11 +139,14 @@ def step(label: str, detail: str | None = None) -> None:
 
 def draft(text: str) -> None:
     """The reply written so far, for the phone to speak sentence by sentence while the rest is
-    written. A page marker (`[[página: …]]`) and what follows it are not speech. Outside a tracked
-    turn it does nothing."""
+        written. A page marker (`[[página: …]]`) and what follows it are not speech; a bubble break
+    (`[[+]]`) is a paragraph. Outside a tracked
+        turn it does nothing."""
     conversation_id = _current.get()
     if conversation_id is None:
         return
+    # A bubble break is a pause in speech, not the end of it.
+    text = text.replace(MARK, "\n\n")
     cut = text.find("[[")
     if cut >= 0:
         text = text[:cut]

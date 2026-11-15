@@ -13,6 +13,7 @@ para afirmar desempenho geral. Scripts em `experiments/`, resultados em `experim
 | 4 | `eval_curiosity.py` | fato público pesquisa e cita; pessoal pergunta; irrelevante não pesquisa; inconclusivo não inventa | 6/6 após corrigir a regra de terceiros |
 | 5 | `eval_initiative.py` | iniciativa útil por evento real, dentro das permissões | evento real ponta a ponta (recusa correta de avisar com fontes ruins); aviso útil verificado com lacuna semeada |
 | 9 | `phase9_eval.py` + `phase9_report.py` | sem negar autonomia, sem transferir o nome, sem falsa incapacidade, continuidade entre sessões | A/B/C em [research/curiosity_evaluation.md](research/curiosity_evaluation.md): C 0 transferências, 0 frases genéricas, retomou e citou a pesquisa do dia anterior sem mensagem nova |
+| 1.3 (2026-11) | `eval_brevity.py` | conversa comum curta, código sem corte | antes 82,2 palavras médias (5 perguntas de conversa); 1ª tentativa ("até 3 parágrafos") piorou para 95,2; com "2 a 4 frases, até ~60 palavras": 45,6 (−45%), 1,6 parágrafos; controle de código 42 → 61 palavras. Uma execução cada, Claude Haiku 5.5 ([ADR-0010](decisions/0010-respostas-em-varias-bolhas.md)) |
 | 6 | `eval_behavior.py` | mudança observável, atribuível e reversível | −69% palavras após 3 "muito longo" (versão 1, com os 3 retornos como evidência); revertido volta à faixa da linha de base |
 
 ## Experimentos comparativos da seção 19

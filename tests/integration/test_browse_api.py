@@ -260,3 +260,20 @@ def test_without_a_browser_the_missing_details_never_reach_the_reply(client, db)
     _send(client, headers, "quanto custa viajar pro Chile?")
     assert "falta:" not in _chat_prompt(llm)[0].content
     assert all(p[0].content != browse.INSTRUCTIONS for p in llm.prompts)
+
+
+def test_a_reply_in_bubbles_is_one_message_with_parts(client, db):
+    world(
+        client,
+        db,
+        plan={"browse": False, "missing": ["origem"]},
+        pages={},
+        reply="Consigo ver os preços de agora.\n[[+]]\nDe onde vocês saem?",
+    )
+    headers = _login(client, db)
+    conversation, turn = _send(client, headers, "quanto custa viajar pro Chile?")
+    message = turn["assistant_message"]
+    assert message["parts"] == ["Consigo ver os preços de agora.", "De onde vocês saem?"]
+    assert message["content"] == "Consigo ver os preços de agora.\n\nDe onde vocês saem?"
+    listed = client.get(f"/conversations/{conversation}/messages", headers=headers).json()
+    assert listed[-1]["parts"] == message["parts"]

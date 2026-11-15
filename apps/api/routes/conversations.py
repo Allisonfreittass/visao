@@ -80,6 +80,8 @@ class MessageOut(BaseModel):
     artifact: ArtifactOut | None = None
     # The earlier message this one answers (Responder).
     reply_to: QuotedOut | None = None
+    # The same text as `content` in 2 or 3 bubbles; None is one bubble (docs/decisions/0010).
+    parts: list[str] | None = None
 
 
 class MessageIn(BaseModel):
@@ -158,6 +160,7 @@ def _message_out(
         attachments=[attachment_out(a) for a in files or []],
         artifact=artifact_out(page) if page is not None else None,
         reply_to=_quoted(quoted),
+        parts=message.parts,
     )
 
 
