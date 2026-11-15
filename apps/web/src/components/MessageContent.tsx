@@ -36,15 +36,39 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   );
 }
 
-export function MessageContent({ text }: { text: string }) {
-  // An unclosed fence (a reply cut short) still renders as code, not as a stray ```.
-  return <div className="message-content">{text.split(/(```[\s\S]*?(?:```|$))/g).map((part, i) => {
+const INLINE_MARK = /\*\*|`|\[[^\]]*\]\(/;
+
+/** The last paragraph while the text comes in: the newest chunks fade in (stream.ts). Only plain
+ * text is split, so a half-written ** or link is never torn apart. */
+function freshParagraph(block: string, start: number, chunks: number[], key: string): ReactNode {
+  const cuts = chunks.map((c) => c - start).filter((c) => c > 0 && c < block.length);
+  if (cuts.length === 0 || INLINE_MARK.test(block)) return <p key={key}>{inline(block)}</p>;
+  const edges = [0, ...cuts, block.length];
+  return (
+    <p key={key}>
+      {edges.slice(0, -1).map((from, n) => (
+        <span key={start + from} className={n === 0 ? undefined : "reveal-fresh"}>
+          {block.slice(from, edges[n + 1])}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** Stable while it grows: an open code block is already a code block, an unfinished list is a
+ * list, so nothing jumps from one shape to another as the text comes in. */
+export function MessageContent({ text, chunks }: { text: string; chunks?: number[] }) {
+  const segments = text.split(/(```[\s\S]*?(?:```|$))/g);
+  // An unclosed fence (a reply cut short, or still being written) renders as code, not as ```.
+  return <div className="message-content">{segments.map((part, i) => {
     if (part.startsWith("```")) {
       const language = (part.match(/^```([\w+#.-]*)/)?.[1] ?? "").toLowerCase();
       const code = part.replace(/^```[^\n]*\n?/, "").replace(/\n?```$/, "");
       return <CodeBlock key={i} language={language} code={code} />;
     }
-    return part.split(/\n\s*\n/).filter(Boolean).map((block, j) => {
+    const blocks = part.split(/\n\s*\n/).filter(Boolean);
+    const lastSegment = i === segments.length - 1 || segments.slice(i + 1).every((s) => !s);
+    return blocks.map((block, j) => {
       const lines = block.split("\n");
       if (lines.every((line) => /^\s*[-*]\s+/.test(line))) {
         return <ul key={`${i}-${j}`}>{lines.map((line, k) => <li key={k}>{inline(line.replace(/^\s*[-*]\s+/, ""))}</li>)}</ul>;
@@ -53,6 +77,9 @@ export function MessageContent({ text }: { text: string }) {
         return <ol key={`${i}-${j}`}>{lines.map((line, k) => <li key={k}>{inline(line.replace(/^\s*\d+\.\s+/, ""))}</li>)}</ol>;
       }
       if (/^#{1,6}\s+/.test(block)) return <h4 key={`${i}-${j}`}>{inline(block.replace(/^#{1,6}\s+/, ""))}</h4>;
+      if (chunks && lastSegment && j === blocks.length - 1) {
+        return freshParagraph(block, text.lastIndexOf(block), chunks, `${i}-${j}`);
+      }
       return <p key={`${i}-${j}`}>{inline(block)}</p>;
     });
   })}</div>;

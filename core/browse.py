@@ -218,6 +218,18 @@ def ask_block(missing: list[str]) -> str:
     )
 
 
+def step_for(url: str) -> tuple[str, str]:
+    """What the status says while a page opens, in the owner's words; the site goes as detail."""
+    lowered = url.lower()
+    if "/travel/flights" in lowered:
+        label = "Cotando voos"
+    elif "/travel/search" in lowered or "hotel" in lowered:
+        label = "Olhando hotéis"
+    else:
+        label = f"Lendo {_host(url)}"
+    return label, _host(url)
+
+
 def block(visits: list[Visit], when: str) -> str:
     lines = [
         "[Anexo do sistema, não escrito pela pessoa] Páginas abertas agora num navegador de "
@@ -266,7 +278,7 @@ def run(
     urls = _addresses(plan, search, max_pages)
     if not urls:
         return None
-    visits = browser.visit(urls, on_visit=lambda url: progress.step(f"Navegando por {_host(url)}"))
+    visits = browser.visit(urls, on_visit=lambda url: progress.step(*step_for(url)))
     records = []
     for visit in visits:
         row = BrowseVisit(

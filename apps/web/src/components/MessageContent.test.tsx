@@ -38,3 +38,19 @@ describe("code blocks", () => {
     expect(html).not.toContain("```");
   });
 });
+
+describe("MessageContent while the text comes in", () => {
+  it("fades in the newest chunks of the last paragraph only", () => {
+    const text = "Primeiro parágrafo.\n\nSegundo que cresce";
+    const html = renderToStaticMarkup(<MessageContent text={text} chunks={[0, text.length - 6]} />);
+    expect(html).toContain("<p>Primeiro parágrafo.</p>");
+    expect(html).toContain('<span class="reveal-fresh">cresce</span>');
+  });
+
+  it("never splits a half-written mark, and an open code block is already code", () => {
+    const html = renderToStaticMarkup(<MessageContent text={"Veja **isso"} chunks={[5]} />);
+    expect(html).not.toContain("reveal-fresh");
+    const code = renderToStaticMarkup(<MessageContent text={"Assim:\n\n```python\nx = 1"} chunks={[3]} />);
+    expect(code).toContain("<pre><code>x = 1</code></pre>");
+  });
+});

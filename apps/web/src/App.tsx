@@ -43,6 +43,7 @@ import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { Sky } from "./sky/SkyCanvas";
 import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, spokenPanelOffer, VOICE_ANSWER_MS } from "./voice/approval";
+import { followTurn } from "./stream";
 import { MAX_FILES } from "./attachments";
 
 interface TurnLatency {
@@ -146,6 +147,10 @@ export function App() {
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
   // What the turn in flight is doing now, shown in place of "Pensando".
   const [liveStep, setLiveStep] = useState<ProgressStep | null>(null);
+  /** The reply as the stream has written it so far (null: no reply on the way). */
+  const [liveText, setLiveText] = useState<string | null>(null);
+  /** The reply that arrived while its text is still coming in on screen. */
+  const [settling, setSettling] = useState<string | null>(null);
   const [liveSteps, setLiveSteps] = useState<ProgressStep[]>([]);
   // On a computer: three columns, and pages open beside the chat instead of over it.
   const wide = useWide();
@@ -500,12 +505,15 @@ export function App() {
     };
     setMessages((list) => [...list, optimistic]);
     setSending(true);
+    navigator.vibrate?.(6);
     let watch = 0;
+    let streamStop: AbortController | null = null;
+    let hidden: (() => void) | null = null;
     try {
       conversationId ??= await openConversation();
       const watching = conversationId;
-      // Polled only while you look: when the phone locks, the server sees it and also sends the
-      // reply as a notification.
+      // Polled only while you look, and only when the stream is not there: when the phone
+      // locks, the server sees it and also sends the reply as a notification.
       const look = () => {
         if (document.hidden) return;
         api.progress(watching).then((p) => {
@@ -514,17 +522,64 @@ export function App() {
           if (p.active) setLiveSteps(p.steps);
         }).catch(() => undefined);
       };
-      look();
-      watch = window.setInterval(look, PROGRESS_POLL_MS);
+      const poll = () => {
+        if (watch) return;
+        look();
+        watch = window.setInterval(look, PROGRESS_POLL_MS);
+      };
+      // The reply as it is written (docs/decisions/0011). A tab going to the background drops
+      // it (so the server knows nobody is looking) and the polling above takes over.
+      streamStop = new AbortController();
+      const stop = streamStop;
+      const steps: ProgressStep[] = [];
+      let written = "";
+      setLiveText("");
+      followTurn(
+        (last, signal) => api.openStream(watching, last, signal),
+        (event) => {
+          const data = (event.data ?? {}) as { label?: string; detail?: string | null; text?: string };
+          if (event.kind === "step" && data.label) {
+            const step = { label: data.label, detail: data.detail ?? null };
+            steps.push(step);
+            setLiveStep(step);
+            setLiveSteps([...steps]);
+          } else if (event.kind === "delta" && data.text) {
+            written += data.text;
+            setLiveText(written);
+          } else if (event.kind === "replace" && typeof data.text === "string") {
+            written = data.text;
+            setLiveText(written);
+          } else if (event.kind === "action") {
+            pending.refresh();
+          }
+        },
+        stop.signal,
+      ).then(
+        (end) => {
+          if (end === "empty" && !stop.signal.aborted) poll();
+        },
+        () => {
+          if (!stop.signal.aborted || document.hidden) poll();
+        },
+      );
+      hidden = () => {
+        if (document.hidden) stop.abort();
+      };
+      document.addEventListener("visibilitychange", hidden);
       const llmStarted = performance.now();
       const controller = new AbortController();
       turnRef.current = { conversationId, controller };
       const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal);
       const llmMs = performance.now() - llmStarted;
+      streamStop?.abort();
+      // The bubble that was writing becomes the reply: its text finishes coming in, then it is
+      // the message itself (ChatView), without a jump.
+      setLiveText(turn.assistant_message.content);
+      setSettling(turn.assistant_message.id);
       setMessages((list) => [
         ...list.filter((m) => m.id !== localId && m.local !== "queued"),
         turn.user_message,
-        { ...turn.assistant_message, sources: turn.sources },
+        { ...turn.assistant_message, sources: turn.sources, streamed: true },
         // What was written while it answered stays below the reply, waiting its turn.
         ...list.filter((m) => m.local === "queued"),
       ]);
@@ -545,6 +600,8 @@ export function App() {
     } catch (e) {
       const stopped = (e instanceof DOMException && e.name === "AbortError") || (e instanceof ApiError && e.status === 409 && e.message === "Parado por você");
       if (!stopped) handleError(e);
+      setLiveText(null);
+      setSettling(null);
       const mark: Message["local"] = stopped ? "stopped" : "failed";
       setMessages((list) => list.map((m) => (m.id === localId ? { ...m, local: mark } : m)));
       // The user message may have been stored even if the reply failed: reload the transcript,
@@ -565,6 +622,8 @@ export function App() {
       }
     } finally {
       turnRef.current = null;
+      streamStop?.abort();
+      if (hidden) document.removeEventListener("visibilitychange", hidden);
       clearInterval(watch);
       setLiveStep(null);
       setLiveSteps([]);
@@ -863,6 +922,13 @@ export function App() {
               asks={liveAsks}
               sending={sending || preparing}
               status={liveStep}
+              liveText={liveText}
+              settlingId={settling}
+              onSettled={() => {
+                setSettling(null);
+                setLiveText(null);
+                if (!document.hidden) navigator.vibrate?.(4);
+              }}
               onStop={stopTurn}
               error={voice.inCall ? null : error}
               onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}

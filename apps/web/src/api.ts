@@ -66,6 +66,8 @@ export interface Message {
   sources?: Source[];
   /** The same text as `content` in 2 or 3 bubbles; null or missing is one bubble. */
   parts?: string[] | null;
+  /** Only here: it was shown as it was written, so it does not come in again. */
+  streamed?: boolean;
   attachments?: Attachment[];
   /** A page this reply said it would write. */
   artifact?: ArtifactSummary | null;
@@ -433,6 +435,13 @@ export class Api {
   /** Parar: the turn in flight stops at its next step. */
   cancel(conversationId: string): Promise<{ cancelled: boolean }> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/cancel`, { method: "POST" });
+  }
+
+  /** The turn in flight as server-sent events (docs/decisions/0011). */
+  openStream(conversationId: string, lastEventId: number | null, signal: AbortSignal): Promise<Response> {
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (lastEventId !== null) headers["Last-Event-ID"] = String(lastEventId);
+    return this.sendRaw(`/conversations/${encodeURIComponent(conversationId)}/stream`, { headers, signal });
   }
 
   progress(conversationId: string): Promise<TurnProgress> {

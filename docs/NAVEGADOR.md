@@ -2,8 +2,8 @@
 
 Quando a mensagem é sobre algo que muda com o tempo (passagens, hotéis, preços, disponibilidade,
 cotações, horários), ele abre os sites num Chromium de verdade, lê o que eles mostram agora e
-responde a partir disso, dizendo em que site viu e de quando é. No chat aparece "Navegando por
-google.com" enquanto ele lê, e os sites entram nas fontes como "ao vivo". O que ele leu fica
+responde a partir disso, dizendo em que site viu e de quando é. No chat aparece "Cotando voos",
+"Olhando hotéis" ou "Lendo latam.com" enquanto ele lê, e os sites entram nas fontes como "ao vivo". O que ele leu fica
 guardado para as páginas que ele escreve depois ([ARTEFATOS.md](ARTEFATOS.md)).
 
 ## Como decide

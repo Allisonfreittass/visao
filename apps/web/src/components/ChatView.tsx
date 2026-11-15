@@ -17,6 +17,7 @@ import { Icon } from "./Icon";
 import { SwipeReply } from "./SwipeReply";
 import { DraftAttachments, MessageAttachments } from "./Attachments";
 import { MessageContent } from "./MessageContent";
+import { commonPrefix, revealStep } from "../stream";
 import { FeedbackBar } from "./FeedbackBar";
 import { SourcesPill } from "./SourcesPill";
 
@@ -35,6 +36,12 @@ interface ChatViewProps {
   status?: ProgressStep | null;
   /** Parar the turn in flight. */
   onStop?: () => void;
+  /** The reply as it is being written (the stream); null when none is on the way. */
+  liveText?: string | null;
+  /** The reply that arrived while its text is still coming in: shown in the live bubble. */
+  settlingId?: string | null;
+  /** The live bubble finished showing the reply: it becomes the message. */
+  onSettled?: () => void;
   error: string | null;
   onSend: (text: string, attachments: Attachment[], replyTo: Message | null) => void;
   onUpload: (file: Blob, filename: string) => Promise<Attachment>;
@@ -55,7 +62,83 @@ function uploadError(e: unknown): string {
   return e instanceof Error && e.message ? e.message : "Não deu para enviar";
 }
 
-export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+/** A new chunk of words starts (and fades in) this often while the text comes in. */
+const CHUNK_MS = 140;
+
+/** The text that came in bursts, let out at a steady pace (stream.ts) with where each recent
+ * chunk starts, for the fade. With Reduzir movimento, it is all there at once. */
+function useReveal(target: string) {
+  const [shown, setShown] = useState(target.length);
+  const state = useRef({ shown: target.length, target, chunks: [] as number[], chunkAt: 0 });
+  useEffect(() => {
+    const s = state.current;
+    const keep = commonPrefix(s.target, target);
+    s.target = target;
+    if (s.shown > keep) s.shown = keep;
+    if (reducedMotion()) {
+      s.shown = target.length;
+      setShown(target.length);
+      return;
+    }
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const next = revealStep(s.shown, s.target.length, dt);
+      if (now - s.chunkAt > CHUNK_MS && next > s.shown) {
+        s.chunks = [...s.chunks.filter((c) => c < next && c >= next - 400), Math.floor(s.shown)];
+        s.chunkAt = now;
+      }
+      s.shown = next;
+      setShown(Math.floor(next));
+      if (next < s.target.length) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+  return { text: target.slice(0, shown), chunks: state.current.chunks, done: shown >= target.length };
+}
+
+/** The assistant's bubble while it works: it breathes with the current step, then the text comes
+ * in where the dots were, and when the reply has arrived and finished showing it hands over to
+ * the message itself (the same bubble, no jump). */
+function LiveBubble({ text, status, onStop, settling, onSettled }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void }) {
+  const reveal = useReveal(text);
+  useEffect(() => {
+    if (settling && reveal.done) onSettled?.();
+  }, [settling, reveal.done, onSettled]);
+  if (!reveal.text) {
+    return (
+      <div className="live-status" role="status" aria-live="polite">
+        <div className="bubble assistant pending">
+          <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
+          <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Pensando"}</span>
+          {onStop && (
+            <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
+        </div>
+        {status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
+      </div>
+    );
+  }
+  return (
+    <div className="bubble assistant bubble--live" aria-live="off">
+      {!settling && status && <span key={status.label} className="live-status-label live-status-label--inline">{status.label}</span>}
+      <MessageContent text={reveal.text} chunks={reveal.chunks} />
+      {!settling && onStop && (
+        <button type="button" className="live-status-stop live-status-stop--inline" onClick={onStop} aria-label="Parar" title="Parar">
+          <span aria-hidden="true">×</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -65,12 +148,21 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [rating, setRating] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  /** Whether you are at the end of the conversation: only then does it follow the new text. */
+  const atEnd = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
 
+  const lastIsYours = messages.at(-1)?.role === "user";
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, sending, status?.label, asks.length]);
+    // What you just sent always shows; the rest follows only if you are at the end.
+    if (atEnd.current || lastIsYours) endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length, sending, status?.label, asks.length, lastIsYours]);
+  useEffect(() => {
+    const list = listRef.current;
+    if (list && atEnd.current && liveText) list.scrollTop = list.scrollHeight;
+  });
 
   useEffect(() => {
     if (focusRequest) textareaRef.current?.focus();
@@ -163,7 +255,15 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
       onDrop={onDrop}
     >
       {header}
-      <div className="messages" aria-live="polite">
+      <div
+        className="messages"
+        aria-live="polite"
+        ref={listRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
+      >
         {messages.length === 0 && !sending && (
           <div className="empty-conversation">
             <span className="rotulo">Conversa nova</span>
@@ -171,11 +271,11 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             <p>Um bug, uma ideia pela metade, um plano. Pode escrever, colar código, mandar uma foto ou um arquivo, ou me ligar.</p>
           </div>
         )}
-        {messages.map((m, i) => (
+        {messages.filter((m) => m.id !== settlingId).map((m, i, shown) => (
           <SwipeReply
             key={m.id}
             id={`msg-${m.id}`}
-            className={`bubble ${m.role}${i === messages.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}`}
+            className={`bubble ${m.role}${i === shown.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}${m.streamed ? " bubble--streamed" : ""}`}
             disabled={!!m.local}
             onReply={() => {
               setReplyTo(m);
@@ -242,19 +342,8 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             )}
           </SwipeReply>
         ))}
-        {sending && (
-          <div className="live-status" role="status" aria-live="polite">
-            <div className="bubble assistant pending">
-              <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
-              <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Pensando"}</span>
-              {onStop && (
-                <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
-                  <span aria-hidden="true">×</span>
-                </button>
-              )}
-            </div>
-            {status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
-          </div>
+        {(sending || settlingId) && (
+          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} />
         )}
         {asks.map((ask) => (
           <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>

@@ -64,3 +64,12 @@ def test_ordinary_talk_is_not_a_candidate(text):
 def test_thanks_after_talk_about_fares_is_not_a_candidate():
     assert not candidate("valeu, obrigado!", TRAVEL_TALK)
     assert not candidate("legal", TRAVEL_TALK)
+
+
+def test_the_status_says_what_it_does_in_the_owners_words():
+    from core.browse import step_for
+
+    flights = "https://www.google.com/travel/flights?q=Flights%20to%20SCL"
+    assert step_for(flights) == ("Cotando voos", "google.com")
+    assert step_for("https://www.google.com/travel/search?q=hot%C3%A9is")[0] == "Olhando hotéis"
+    assert step_for("https://www.latam.com/pt-br/") == ("Lendo latam.com", "latam.com")
