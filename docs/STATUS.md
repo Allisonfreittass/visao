@@ -14,14 +14,37 @@ embaixo quando há (o termo pesquisado, os sites, os arquivos). Só aparece o qu
 | Escrevendo a resposta | a chamada ao modelo que gera a resposta |
 | Conferindo as suas regras | há regras suas a checar na resposta |
 
+## A resposta aparecendo aos poucos (stream)
+
+Desde 15/11/2026 o app abre `GET /conversations/{id}/stream` (SSE) junto com o envio e recebe o
+turno ao vivo ([ADR-0011](decisions/0011-streaming-da-resposta.md)):
+- os mesmos passos desta tabela, um por vez, na bolha que respira;
+- o texto conforme é escrito, solto num ritmo constante;
+- no fim, a versão conferida pelas regras do dono (`replace`, se a checagem mudou algo) e um
+  `done` com a mesma resposta do POST.
+
+Se o stream cair, o app retoma de onde parou (`Last-Event-ID`). Se não der para abrir, volta a
+consultar o `/progress` como antes. O POST continua sendo quem cria a resposta.
+
+**Conferir em produção depois do deploy** (o Caddy não pode segurar os eventos):
+
+```bash
+curl -N -H "Authorization: Bearer $TOKEN" https://SEU-DOMINIO/api/conversations/ID/stream
+```
+
+Com uma mensagem sendo respondida nessa conversa, os eventos devem aparecer um a um, não todos no
+fim.
+
 ## Peças
 
 - [`core/conversation/progress.py`](../core/conversation/progress.py): cada passo chama
   `progress.step(...)`; a rota de mensagem abre `progress.tracking(conversa)` em volta do turno.
   Fica só no processo da API, fora do banco (é uma vista ao vivo, não um registro; o registro é o
   plano do turno).
-- `GET /conversations/{id}/progress`: o app consulta a cada 0,9 s enquanto espera, **só com a tela
-  visível**.
+- `GET /conversations/{id}/stream`: os mesmos passos e o texto como eventos numerados
+  (`core/conversation/progress.py` guarda a lista; um turno terminado fica 30 s legível).
+- `GET /conversations/{id}/progress`: plano B do stream, e o caminho da ligação por voz e da Live
+  Activity; consultado a cada 0,9 s, **só com a tela visível**.
 
 ## Aviso no celular
 

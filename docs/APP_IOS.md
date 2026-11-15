@@ -363,6 +363,28 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
 - **Títulos:** o menu lateral mostra o título da conversa (3 a 6 palavras), com a data embaixo.
   Chega uns segundos depois da primeira resposta; sem título, fica a data.
 
+### Fluidez (Fase 2, 15/11/2026)
+
+- **Texto aos poucos:** com o app na tela, o chat segue a resposta pelo stream
+  (`VisaoKit/Stream.swift`, `URLSession.bytes`, [ADR-0011](decisions/0011-streaming-da-resposta.md)).
+  O texto entra num ritmo constante, mais rápido quando atrasa, com as letras mais novas
+  esmaecidas. Com Reduzir Movimento ligado, entra direto, sem fade nem respiração.
+- **Plano B:** se o stream não abrir, cair de vez ou o app sair da tela, volta ao `/progress` (que
+  também alimenta a Live Activity). A ligação por voz continua no `/progress`.
+- **Uma bolha só:** "Pensando" vira a resposta na mesma bolha (`LiveBubble.swift`), com o passo
+  atual em cima ("Cotando voos"). Quando a resposta chega e termina de aparecer, vira a mensagem,
+  sem pulo.
+- **Rolagem:** a lista acompanha o texto só se você estiver no fim. Se você rolou para cima, nada
+  te puxa de volta.
+- **Composer:** fica por cima da lista, e a lista termina com um espaço da altura real dele
+  (medida), que cresce junto com as linhas, a citação e os anexos.
+  - Caso real: a conversa abria no começo (a animação de entrada ainda movia a lista quando ela
+    rolava para o fim), e a última resposta ficava atrás do composer.
+  - Agora a primeira carga entra sem animação e rola para o fim três vezes enquanto as respostas
+    longas terminam de medir.
+- **Haptics:** um toque leve ao enviar e um bem suave quando a resposta termina de aparecer, só com
+  o app na tela e na conversa.
+
 ### Pendências da voz (para retomar)
 
 - **Interromper falando ainda não interrompe.** O áudio em via dupla já liga e ouve (diário de

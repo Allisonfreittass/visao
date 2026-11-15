@@ -110,6 +110,11 @@ worker (a cada VISION_AUTONOMY_CYCLE_MINUTES, 1 job idempotente por janela)
          cada ação -> Decision(origin=autonomous)
 ```
 
+A resposta sai ao vivo por SSE (`GET /conversations/{id}/stream`), a partir dos eventos que o turno
+registra em `core/conversation/progress.py`, sempre com a versão conferida pelas regras do dono no
+fim ([ADR-0011](decisions/0011-streaming-da-resposta.md)). Como o `/progress`, isso depende de a API
+rodar num processo só.
+
 Inspeção: `GET /decisions`, `GET /cognition/metrics`, `GET /identity/name`,
 `GET|PUT /autonomy/permissions`. Ver [AUTONOMY.md](AUTONOMY.md) e
 [research/curiosity_evaluation.md](research/curiosity_evaluation.md).
