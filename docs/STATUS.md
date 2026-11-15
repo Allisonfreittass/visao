@@ -31,5 +31,6 @@ abrindo a conversa ao tocar. Um turno que ninguém acompanhou (app antigo, scrip
 aviso. É resposta ao que você acabou de pedir, então não conta no limite de mensagens que ele puxa
 sozinho.
 
-O cartão com barra de progresso na tela de bloqueio do iPhone (Live Activity) só existe para app
-nativo de iOS; o Visão é um PWA, então lá chega uma notificação comum quando termina.
+O cartão com barra de progresso na tela de bloqueio (Live Activity) existe no app nativo do iPhone
+([APP_IOS.md](APP_IOS.md), Etapa 7). No web, que é um PWA, chega uma notificação comum quando
+termina.

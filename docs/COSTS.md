@@ -13,6 +13,17 @@
 > Valores **propostos**, não medidos. Nenhum custo foi observado ainda. Atualizar com dados
 > reais de `model_usage` a partir da Fase 1.
 
+## Chamadas pequenas por conversa (15/11/2026)
+
+| Chamada | Quando | Tamanho | Orçamento |
+|---|---|---|---|
+| Título da conversa (`conversation_title`) | uma vez, depois da primeira troca, pelo worker; tenta de novo nos turnos seguintes até 8 mensagens | ~4 mensagens de até 600 caracteres na entrada, 24 tokens de saída | reserva no `budget.py` e no orçamento da conversa; sem orçamento, fica a data |
+| Página da oferta de painel | só quando você aprova | como qualquer página (`VISION_ARTIFACT_MAX_OUTPUT_TOKENS`) | igual às páginas |
+
+No Haiku 5.5 o título custa bem menos de US$ 0,001, mas conta **uma chamada** no limite de
+chamadas por dia e por hora (`VISION_LLM_BUDGET_CALLS_*`, padrão 30/dia e 10/hora). Um turno com
+navegador já usa de 3 a 5 chamadas (planejar, responder, conferir as regras...).
+
 ## Infraestrutura existente
 
 | Item | Custo informado | Verificado? |

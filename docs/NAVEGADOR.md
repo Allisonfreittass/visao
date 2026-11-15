@@ -27,6 +27,25 @@ Testado em 13/11/2026: Google Voos e Google Hotéis devolvem preços reais. A bu
 o Google Shopping, o Mercado Livre e o DuckDuckGo recusam navegador automático (pedem
 verificação ou respondem 403); ele reporta isso e não insiste.
 
+## Depois de ler preços: a oferta de painel
+
+Quando ele abriu pelo menos uma página com preço (R$, US$, €...), a resposta termina oferecendo
+deixar a cotação num painel no Início que confere o preço todo dia. Se você disse um orçamento
+("até R$ 6 mil"), a oferta já cita a meta, lida no código a partir das suas palavras. Ver
+[PAINEIS.md](PAINEIS.md).
+
+Todo preço que ele der vem com o site e a hora em que foi lido, mesmo na resposta mais curta. Essa
+exigência fica no bloco do navegador, fora do arquivo de estilo que a evolução de código pode
+reescrever.
+
+## Fontes sem relação saem antes
+
+As fontes da pesquisa genérica (curiosidade) passam por um filtro barato, sem chamada ao modelo
+([`core/research/relevance.py`](../core/research/relevance.py)): fica a fonte cujo título e trecho
+dividem pelo menos duas palavras de assunto com a pergunta. As que saem não chegam ao prompt da
+resposta, então não podem ser citadas. Caso real (14/11/2026): "Cecília Meireles · Wikipédia" e
+"AM Best Affirms Credit Ratings of Chubb Seguros" saíram; a matéria sobre custos no Chile ficou.
+
 ## O que ele nunca faz
 
 - Login, cadastro, carrinho, pagamento ou enviar formulário: só abre e lê.

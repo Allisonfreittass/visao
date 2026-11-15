@@ -21,6 +21,9 @@ A página só é tão boa quanto o material. Entram também as páginas que ele 
 navegador nesta conversa (Google Voos, Google Hotéis...), com a hora em que foram lidas
 ([NAVEGADOR.md](NAVEGADOR.md)).
 
+Aprovar a oferta de painel depois de uma cotação ao vivo também cria uma página, com o título da
+cotação, até o painel nativo existir ([PAINEIS.md](PAINEIS.md)).
+
 ## Segurança
 
 A página é escrita por um modelo a partir de conteúdo de terceiros, então é tratada como não

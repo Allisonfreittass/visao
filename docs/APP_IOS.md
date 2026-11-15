@@ -193,9 +193,9 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
   chave do estudo autônomo. Atualiza a cada 15 s com a tela aberta.
 - **Mac**: os Macs pareados (ligado ou não, projetos liberados), desconectar, **parear** (o token
   aparece uma vez, com Copiar) e o que ele fez lá. `/mac projeto pedido` no chat pede ao Mac.
-- **No chat**: "Como foi essa resposta?" embaixo das respostas dele (polegar e etiquetas, como no
-  web) e a **Bancada** no botão do canto: o passo atual, as páginas, os sites lidos ao vivo e o
-  que ele fez de verdade, tirado do registro.
+- **No chat**: a **Bancada** no botão do canto: o passo atual, as páginas, os sites lidos ao vivo e
+  o que ele fez de verdade, tirado do registro. Avaliar uma resposta (polegar e etiquetas, como no
+  web) fica no menu da bolha (segure a bolha → **Avaliar resposta**).
 - **Boas-vindas**: na primeira vez, os três passos do web (como funciona, perguntas, permissões),
   sempre dá para pular; refazer em Ajustes → Memória.
 - **Ajustes** ("Do seu jeito."): Aparência (floresta e movimento), Autonomia (agir por conta
@@ -347,6 +347,21 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
 - Só pelo botão, só durante a ligação; desliga quando a ligação acaba ou o app sai da tela.
 - Ele só enxerga se o servidor tiver um modelo com visão (`VISION_LLM_MODEL`, ver
   [ANEXOS.md](ANEXOS.md)); cada foto reserva cerca de 1600 tokens no orçamento.
+
+### Respostas enxutas (Fase 1, 15/11/2026)
+
+- **Bolhas:** uma resposta pode vir em 2 ou 3 bolhas (`message.parts`, [ADR-0010](decisions/0010-respostas-em-varias-bolhas.md)).
+  É uma mensagem só: segurar qualquer bolha abre o mesmo menu (Responder, Copiar, Avaliar
+  resposta, Ver fontes). A citação e os anexos ficam na primeira bolha; a página e as fontes, na
+  última.
+- **Fontes recolhidas:** no lugar da lista, uma pílula discreta ("3 fontes", ou "ao vivo ·
+  google.com · 10:14" quando ele leu preços), que abre uma folha com os links.
+- **Avaliação no menu:** "Como foi essa resposta?" saiu de baixo de cada resposta e abre numa folha
+  pelo menu da bolha. O retorno continua indo para a adaptação versionada.
+- **Painel no Início:** depois de uma cotação ao vivo aparece o cartão **Painel no Início** (no
+  chat, no Início e lido em voz na ligação, "pode criar"). Ver [PAINEIS.md](PAINEIS.md).
+- **Títulos:** o menu lateral mostra o título da conversa (3 a 6 palavras), com a data embaixo.
+  Chega uns segundos depois da primeira resposta; sem título, fica a data.
 
 ### Pendências da voz (para retomar)
 
