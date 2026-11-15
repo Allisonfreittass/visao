@@ -151,6 +151,12 @@ export function App() {
   const [liveText, setLiveText] = useState<string | null>(null);
   /** The reply that arrived while its text is still coming in on screen. */
   const [settling, setSettling] = useState<string | null>(null);
+  /** Text a suggestion or "Criar um novo painel" puts in the message box. */
+  const [draftRequest, setDraftRequest] = useState<{ text: string; n: number } | null>(null);
+  const draftInChat = (text: string) => {
+    setDraftRequest((d) => ({ text, n: (d?.n ?? 0) + 1 }));
+    setView("conversation");
+  };
   const [liveSteps, setLiveSteps] = useState<ProgressStep[]>([]);
   // On a computer: three columns, and pages open beside the chat instead of over it.
   const wide = useWide();
@@ -805,6 +811,7 @@ export function App() {
               onOpen={showView}
               onSelect={(id) => { setCurrent(id); showView("conversation"); }}
               onNewConversation={() => void newConversation()}
+              onDraft={draftInChat}
             />
           )}
           <Rail
@@ -833,6 +840,8 @@ export function App() {
             )}
             {view === "inbox" && (
               <InboxView
+                api={api}
+                onDraft={draftInChat}
                 pending={pending}
                 current={current}
                 onReplied={(conversationId) => {
@@ -922,6 +931,7 @@ export function App() {
               asks={liveAsks}
               sending={sending || preparing}
               status={liveStep}
+              draftRequest={draftRequest}
               liveText={liveText}
               settlingId={settling}
               onSettled={() => {

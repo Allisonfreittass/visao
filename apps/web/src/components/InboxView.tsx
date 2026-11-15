@@ -1,15 +1,19 @@
-import { utcDate } from "../api";
+import { type Api, utcDate } from "../api";
 import type { Pending } from "../hooks/usePending";
 import { dayLabel } from "../labels";
+import { PanelsBoard } from "./PanelsBoard";
 
 interface InboxViewProps {
+  api: Api;
+  /** Opens the chat with this text in the box (a suggestion, "Criar um novo painel"). */
+  onDraft: (text: string) => void;
   pending: Pending;
   current: string | null;
   onReplied: (conversationId: string) => void;
 }
 
 /** Everything that waits for a yes, a no or a read, in one list. */
-export function InboxView({ pending, current, onReplied }: InboxViewProps) {
+export function InboxView({ api, onDraft, pending, current, onReplied }: InboxViewProps) {
   const empty = pending.count === 0;
   return (
     <section className="page" aria-labelledby="inbox-title">
@@ -19,6 +23,24 @@ export function InboxView({ pending, current, onReplied }: InboxViewProps) {
         <p className="lede">Eu só proponho. Nada roda sem o seu sim.</p>
       </header>
       <div className="page-body">
+        <PanelsBoard api={api} nothingPending={empty} onDraft={onDraft} />
+        {pending.panelOffers.length > 0 && (
+          <section className="list-group">
+            <h2 className="rotulo">Painéis para aprovar</h2>
+            {pending.panelOffers.map((o) => (
+              <article className="list-item" key={o.id}>
+                <div className="list-item-text">
+                  <strong>Deixo isto no Início?</strong>
+                  <p className="note">{o.summary}</p>
+                </div>
+                <div className="row">
+                  <button type="button" onClick={() => void pending.decidePanelOffer(o, "approve")}>Aprovar</button>
+                  <button type="button" className="ghost" onClick={() => void pending.decidePanelOffer(o, "reject")}>Recusar</button>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
         {pending.armProposals.length > 0 && (
           <section className="list-group">
             <h2 className="rotulo">No Mac</h2>

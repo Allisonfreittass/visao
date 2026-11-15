@@ -222,6 +222,50 @@ export interface PanelOffer {
   created_at: string;
 }
 
+/** One thing a live panel quotes, as a page read live showed it (docs/PAINEIS.md). */
+export interface PanelItem {
+  kind: "flight" | "hotel";
+  provider: string;
+  where: string;
+  dates: string;
+  connections: number | null;
+  price: string | null;
+  price_basis: "per_person" | "total";
+  /** What it costs the whole party (computed on the server). */
+  cost: string | null;
+  currency: string;
+  site: string;
+  url: string;
+  read_at: string | null;
+}
+
+/** A live card on the home screen: checked once a day by the server. */
+export interface Panel {
+  id: string;
+  kind: string;
+  title: string;
+  status: "active" | "paused" | "error" | "expired";
+  spec: { travelers?: number; depart?: string | null; back?: string | null; destination?: string };
+  total: string | null;
+  goal: string | null;
+  goal_gap: string | null;
+  goal_words: string | null;
+  change: string | null;
+  items: PanelItem[];
+  checked_at: string | null;
+  checked_today: boolean;
+  next_check_at: string | null;
+  note: string;
+  conversation_id: string | null;
+  created_at: string;
+  history?: Array<{ total: string | null; checked_at: string }>;
+}
+
+export interface PanelSuggestion {
+  text: string;
+  draft: string;
+}
+
 export interface GoogleState {
   connected: boolean;
   email: string;
@@ -648,6 +692,29 @@ export class Api {
 
   decideGoogle(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<GoogleAction> {
     return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  }
+
+  panels(): Promise<Panel[]> {
+    return this.request("/panels");
+  }
+
+  panel(id: string): Promise<Panel> {
+    return this.request(`/panels/${encodeURIComponent(id)}`);
+  }
+
+  panelSuggestions(): Promise<PanelSuggestion[]> {
+    return this.request("/panels/suggestions");
+  }
+
+  setPanelStatus(id: string, status: "active" | "paused"): Promise<Panel> {
+    return this.request(`/panels/${encodeURIComponent(id)}`, {
+      method: "PATCH", body: JSON.stringify({ status }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  deletePanel(id: string): Promise<void> {
+    return this.request(`/panels/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   panelOffers(): Promise<PanelOffer[]> {

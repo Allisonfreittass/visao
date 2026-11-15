@@ -31,6 +31,8 @@ interface ChatViewProps {
   hidden?: boolean;
   /** Changes when something outside wants the person typing here, e.g. answering a notice. */
   focusRequest?: number;
+  /** Text put in the box from outside (a suggestion on Início); `n` changes each time. */
+  draftRequest?: { text: string; n: number } | null;
   sending: boolean;
   /** What the turn in flight is doing now; null shows "Pensando". */
   status?: ProgressStep | null;
@@ -138,7 +140,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
   );
 }
 
-export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
+export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -167,6 +169,12 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
   useEffect(() => {
     if (focusRequest) textareaRef.current?.focus();
   }, [focusRequest]);
+
+  useEffect(() => {
+    if (!draftRequest) return;
+    setDraft(draftRequest.text);
+    textareaRef.current?.focus();
+  }, [draftRequest]);
 
   function update(key: string, change: Partial<DraftFile>) {
     setFiles((list) => list.map((f) => (f.key === key ? { ...f, ...change } : f)));
