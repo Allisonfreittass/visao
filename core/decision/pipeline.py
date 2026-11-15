@@ -43,10 +43,12 @@ from core.mind import questions as mind_questions
 from core.mind import review as mind_review
 from core.mind import state as mind_state
 from core.mind import temperament as mind_temperament
+from core.panels import offers as panel_offers
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import (
     AgentIdentity,
+    Artifact,
     Attachment,
     Conversation,
     Decision,
@@ -88,6 +90,8 @@ class TurnOutcome:
     decision: Decision
     links: tuple[conversation_links.LinkRead, ...] = ()
     browsed: tuple[Visit, ...] = ()
+    # The page an accepted panel offer is writing (the route builds it after the reply).
+    accepted_page: Artifact | None = None
 
 
 def run_turn(
@@ -225,8 +229,18 @@ def run_turn(
                     action_ids=[str(a.id) for a in helped.proposed],
                 )
 
+    # "pode", "por favor" right after it offered a panel: that answers the card.
+    accepted = panel_offers.answered_by(session, conversation.id, text)
+    if accepted is not None:
+        plan.add(
+            "panel_accepted", executed=True, reason="owner_said_yes", offer_id=str(accepted.id)
+        )
+        blocks.append(panel_offers.accepted_block(accepted.title))
+
     browsed = None
-    if browser is not None and not read:
+    offering = False
+    budget_goal = None
+    if browser is not None and not read and accepted is None:
         browsed = browse.run(
             session,
             owner=owner,
@@ -252,6 +266,18 @@ def run_turn(
             )
             blocks.append(browsed.block)
         elif browsed is not None:
+            offering = panel_offers.has_prices([v.text for v in browsed.opened])
+            if offering:
+                # "até R$ 6 mil", said now or earlier in this conversation.
+                budget_goal = panel_offers.goal_from(
+                    *(
+                        m.content
+                        for m in conversation_history(session, conversation)
+                        if m.role == "user"
+                    ),
+                    text,
+                )
+                blocks.append(panel_offers.offer_block(budget_goal))
             plan.add(
                 "browsed",
                 executed=True,
@@ -454,6 +480,22 @@ def run_turn(
                     reason="open_conversation_thread",
                     gap_id=str(outcome.gap.id),
                 )
+    accepted_page = None
+    if accepted is not None:
+        accepted_page = panel_offers.accept(
+            session, accepted, owner, conversation, result.assistant_message.id
+        )
+    if offering and browsed is not None:
+        offer = panel_offers.propose(
+            session,
+            owner=owner,
+            conversation_id=conversation.id,
+            message_id=result.assistant_message.id,
+            title=browsed.title,
+            goal=budget_goal,
+            visit_ids=browsed.records,
+        )
+        plan.add("panel_offered", executed=True, reason="live_prices", offer_id=str(offer.id))
     plan.add(
         "recall_memory",
         executed=bool(result.recalled),
@@ -506,4 +548,5 @@ def run_turn(
         decision=decision,
         links=read,
         browsed=tuple(browsed.visits) if browsed else (),
+        accepted_page=accepted_page,
     )

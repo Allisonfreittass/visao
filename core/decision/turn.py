@@ -44,6 +44,10 @@ _DESCRIBE = {
         "páginas abertas agora num navegador de verdade; o que elas mostram está acima, com as"
         " que não abriram e o motivo"
     ),
+    "panel_accepted": (
+        "a pessoa aceitou o painel que você ofereceu; a página com a cotação começou a ser montada"
+        " e aparece num cartão quando ficar pronta (ainda não está)"
+    ),
     "read_attachments": (
         "as fotos e arquivos que a pessoa mandou nesta mensagem estão nela, acima; fale só do"
         " que eles mostram"

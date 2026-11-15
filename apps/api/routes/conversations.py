@@ -39,6 +39,7 @@ from core.memory.curator import (
 )
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import ReflectionResult, reflect
+from infrastructure.database.audit import record_audit
 from infrastructure.database.models import Artifact, BrowseVisit, Conversation, Message, User
 from integrations.browser.base import Browser
 from integrations.llm.base import LLMError, LLMProvider
@@ -600,6 +601,28 @@ def send_message(
             identity.chosen_name,
             read_pages,
         )
+
+    if turn.accepted_page is not None:
+        # "pode" to the panel offer: the page from the live quote, written like any other page.
+        page = page or turn.accepted_page
+        background.add_task(
+            build_in_background,
+            factory,
+            turn.accepted_page.id,
+            provider,
+            settings,
+            _budgets(settings),
+            identity.chosen_name,
+            "",
+        )
+        record_audit(
+            db,
+            "panel_offer.approve",
+            "success",
+            actor_user_id=user.id,
+            details={"via": "texto"},
+        )
+        db.commit()
 
     if progress.owner_left(conversation.id):
         # The app stopped watching while this ran (phone locked, app closed): the reply also goes

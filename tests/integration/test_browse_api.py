@@ -13,7 +13,7 @@ from core import browse
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.decision import record
 from core.identity.genesis import run_genesis
-from infrastructure.database.models import BrowseVisit
+from infrastructure.database.models import BrowseVisit, PanelOffer
 from integrations.browser.base import Visit
 from integrations.browser.playwright_browser import allowed_request
 from tests.fakes import FakeLLMProvider
@@ -277,3 +277,80 @@ def test_a_reply_in_bubbles_is_one_message_with_parts(client, db):
     assert message["content"] == "Consigo ver os preços de agora.\n\nDe onde vocês saem?"
     listed = client.get(f"/conversations/{conversation}/messages", headers=headers).json()
     assert listed[-1]["parts"] == message["parts"]
+
+
+def _offer_world(client, db):
+    page = Visit(
+        url=FLIGHTS, ok=True, final_url=FLIGHTS, title="Google Voos", text="LATAM R$ 2.195"
+    )
+
+    def respond(messages):
+        if messages[0].content == browse.INSTRUCTIONS:
+            return json.dumps({"browse": True, "urls": [FLIGHTS], "title": "Combo Santiago"})
+        if "A pessoa aceitou o painel" in messages[0].content:
+            return "Pronto, estou montando o Combo Santiago."
+        return "LATAM a R$ 2.195 no Google Voos, agora. Quer que eu deixe isso num painel?"
+
+    llm = FakeLLMProvider(responder=respond)
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    client.app.dependency_overrides[get_browser] = lambda: FakeBrowser({FLIGHTS: page})
+    client.app.dependency_overrides[get_settings] = lambda: Settings(curiosity_enabled=False)
+    run_genesis(db)
+    db.commit()
+    return llm
+
+
+def test_a_live_quote_ends_with_a_panel_offer_that_cites_the_budget(client, db):
+    llm = _offer_world(client, db)
+    headers = _login(client, db)
+    conversation, turn = _send(
+        client, headers, "quanto tá a passagem de Confins pra Santiago? quero gastar até R$ 6 mil"
+    )
+    assert "Quer que eu deixe" in turn["assistant_message"]["content"]
+    assert "meta de R$ 6.000" in _chat_prompt(llm)[0].content
+    offers = client.get("/panels/offers", headers=headers).json()
+    assert len(offers) == 1 and offers[0]["title"] == "Combo Santiago"
+    assert offers[0]["goal_amount"] == "6000.00"
+    assert offers[0]["message_id"] == turn["assistant_message"]["id"]
+    assert offers[0]["conversation_id"] == conversation
+
+
+def test_a_plain_yes_accepts_the_offer_and_a_page_is_written(client, db):
+    llm = _offer_world(client, db)
+    headers = _login(client, db)
+    conversation, _ = _send(client, headers, "quanto tá a passagem pra Santiago?")
+    _, turn = _send(client, headers, "por favor", conversation)
+    assert any("A pessoa aceitou o painel" in prompt[0].content for prompt in llm.prompts)
+    assert turn["assistant_message"]["artifact"]["title"] == "Combo Santiago"
+    assert client.get("/panels/offers", headers=headers).json() == []
+    assert db.query(PanelOffer).one().status == "accepted"
+
+
+def test_a_tap_accepts_and_another_owner_cannot(client, db):
+    _offer_world(client, db)
+    headers = _login(client, db)
+    other = _login(client, db, "b@exemplo.com")
+    _send(client, headers, "quanto tá a passagem pra Santiago?")
+    offer = client.get("/panels/offers", headers=headers).json()[0]
+    assert client.post(f"/panels/offers/{offer['id']}/approve", headers=other).status_code == 404
+    done = client.post(f"/panels/offers/{offer['id']}/approve", headers=headers).json()
+    assert done["status"] == "accepted" and done["artifact"]["title"] == "Combo Santiago"
+    again = client.post(f"/panels/offers/{offer['id']}/approve", headers=headers)
+    assert again.status_code == 404
+
+
+def test_a_yes_to_something_else_does_not_accept_an_old_offer(client, db):
+    _offer_world(client, db)
+    headers = _login(client, db)
+    conversation, _ = _send(client, headers, "quanto tá a passagem pra Santiago?")
+    _send(client, headers, "legal, obrigado", conversation)
+    _send(client, headers, "pode", conversation)
+    assert db.query(PanelOffer).one().status == "proposed"
+
+
+def test_pages_without_prices_make_no_offer(client, db):
+    page = Visit(url=FLIGHTS, ok=True, final_url=FLIGHTS, title="Voos", text="Sem voos.")
+    world(client, db, plan={"browse": True, "urls": [FLIGHTS]}, pages={FLIGHTS: page})
+    headers = _login(client, db)
+    _send(client, headers, "quanto tá a passagem pra Santiago?")
+    assert client.get("/panels/offers", headers=headers).json() == []

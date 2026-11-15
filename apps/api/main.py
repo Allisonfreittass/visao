@@ -18,6 +18,7 @@ from apps.api.routes import (
     memory,
     mind,
     onboarding,
+    panels,
     projects,
     push,
     study,
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(evolution.router)
     app.include_router(arm.router)
     app.include_router(google.router)
+    app.include_router(panels.router)
     return app
 
 

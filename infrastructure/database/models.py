@@ -929,3 +929,36 @@ class GoogleAction(Base):
     result: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PanelOffer(Base):
+    """An offer, after a live quote, to keep it on the home screen and check the price daily.
+    Only proposed: nothing is created until the owner says yes (docs/PAINEIS.md)."""
+
+    __tablename__ = "panel_offers"
+    __table_args__ = (Index("ix_panel_offers_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    # The reply that made the offer.
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(120))
+    # "até R$ 6 mil": the owner's own number, read in code, never a model's guess.
+    goal_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="BRL")
+    # The pages read live that the quote stands on (browse_visits).
+    visit_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # proposed | accepted | rejected | superseded
+    status: Mapped[str] = mapped_column(String(16), default="proposed")
+    artifact_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
