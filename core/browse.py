@@ -30,14 +30,30 @@ PURPOSE = "browse_plan"
 PAGE_CHARS = 9_000
 KEPT_FOR_PAGES = 8
 
+# Words that by themselves make a message about prices, fares or availability.
 _TOPIC = re.compile(
-    r"pre[çc]o|quanto (?:custa|sai|fica|t[áa])|passage(?:m|ns)|\bvoos?\b|a[ée]reo|hot[ée]is|"
-    r"\bhotel\b|hospedage|pousada|hostel|airbnb|aluguel|alugar|dispon[íi]ve|disponibilidade|"
-    r"cota[çc][ãa]o|c[âa]mbio|d[óo]lar|hor[áa]rios?|ingressos?|pacotes?|promo[çc]|frete|"
-    r"card[áa]pio|reserv|\bvagas?\b|comprar|mais barat|compar|em sites?|nos sites|na internet|"
-    r"online|ao vivo|agora no site",
+    r"pre[çc]o|quanto (?:custa|sai|fica|t[áa]|est[áa])|passage(?:m|ns)|\bvoos?\b|a[ée]reo|"
+    r"hot[ée]is|\bhotel\b|hospedage|pousada|hostel|airbnb|aluguel|alugar|dispon[íi]ve|"
+    r"disponibilidade|cota[çc][ãa]o|\bcot(?:ar|e|o|ando|ou)\b|or[çc]amento|\bor[çc]ar\b|"
+    r"c[âa]mbio|d[óo]lar|hor[áa]rios?|ingressos?|pacotes?|promo[çc]|frete|card[áa]pio|reserv|"
+    r"\bvagas?\b|comprar|mais barat|compar|em sites?|nos sites|na internet|\bvalor(?:es)?\b|"
+    r"\btarifas?\b|di[áa]rias?|ida e volta|s[óo] ida|agora no site",
     re.IGNORECASE,
 )
+# Words that ask for "now" but say nothing about prices alone: "agora" or "hoje" in plain talk
+# must not cost a planning call. They count when the message or the recent talk is about prices.
+_LIVE = re.compile(
+    r"tempo real|ao vivo|atualizad|\bhoje\b|\bagora\b|\bonline\b|neste momento", re.IGNORECASE
+)
+# A short reply in a conversation about prices that brings what was missing (dates, a city) or
+# asks again: "saindo de BH, 10 a 20 de agosto", "e em tempo real?".
+_FOLLOW_UP = re.compile(
+    r"\d|\?|\b(?:janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|"
+    r"novembro|dezembro)\b|\bsa(?:indo|io|ida)\b|\bpartindo\b|\bde \w+ (?:pra|para|a)\b|"
+    r"\bdo \w+ (?:pra|para|a)\b|\bpessoas?\b|\bdois\b|\bduas\b|\bnoites?\b",
+    re.IGNORECASE,
+)
+FOLLOW_UP_CHARS = 300
 
 INSTRUCTIONS = """Você decide se esta mensagem precisa de páginas AO VIVO, abertas agora num \
 navegador de verdade: preços de passagens e hotéis, disponibilidade, cotações, horários, preços de \
@@ -69,8 +85,18 @@ class Browsed:
         return [v for v in self.visits if v.ok]
 
 
-def candidate(text: str) -> bool:
-    return len(text) <= 4000 and not text.lstrip().startswith("/") and bool(_TOPIC.search(text))
+def candidate(text: str, recent: str = "") -> bool:
+    """Worth a planning call. `recent` is the last messages of this conversation (the same text
+    the planner reads), so a short follow-up to talk about fares counts without a keyword."""
+    if len(text) > 4000 or text.lstrip().startswith("/"):
+        return False
+    if _TOPIC.search(text):
+        return True
+    if not recent or not _TOPIC.search(recent):
+        return False
+    return bool(_LIVE.search(text)) or (
+        len(text) <= FOLLOW_UP_CHARS and bool(_FOLLOW_UP.search(text))
+    )
 
 
 def _host(url: str) -> str:
@@ -185,7 +211,7 @@ def run(
     max_pages: int,
 ) -> Browsed | None:
     """None when the message does not need live pages (or the plan failed)."""
-    if not candidate(text):
+    if not candidate(text, recent):
         return None
     check_budgets(session, conversation, budgets)
     plan = _plan(session, conversation, provider, owner, text, recent)

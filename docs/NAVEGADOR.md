@@ -8,8 +8,11 @@ guardado para as páginas que ele escreve depois ([ARTEFATOS.md](ARTEFATOS.md)).
 
 ## Como decide
 
-1. Um filtro de palavras (preço, passagem, voo, hotel, disponível, cotação...) evita gastar uma
-   chamada em conversa comum.
+1. Um filtro de palavras (preço, passagem, voo, hotel, cotar, orçamento, diárias, ida e volta...)
+   evita gastar uma chamada em conversa comum. "Agora", "hoje", "tempo real" e "ao vivo" sozinhos
+   não bastam: contam quando a conversa recente (as mesmas 6 mensagens que o planejador lê) é sobre
+   preço ou viagem. Nessa conversa, uma resposta curta com o que faltava ("saindo de BH, 10 a 20
+   de agosto") ou um "e em tempo real?" também passam.
 2. Uma chamada curta ao modelo planeja até 4 endereços, com modelos que funcionam:
    Google Voos (`/travel/flights?q=Flights to SCL from CNF on 2027-10-01 through 2027-10-08`) e
    Google Hotéis (`/travel/search?q=hotéis em … datas`). Sem endereço certo, ele usa a busca que já
