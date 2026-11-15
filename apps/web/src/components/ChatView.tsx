@@ -18,6 +18,7 @@ import { SwipeReply } from "./SwipeReply";
 import { DraftAttachments, MessageAttachments } from "./Attachments";
 import { MessageContent } from "./MessageContent";
 import { FeedbackBar } from "./FeedbackBar";
+import { SourcesPill } from "./SourcesPill";
 
 interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
@@ -60,6 +61,9 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
   const [dragging, setDragging] = useState(false);
   const [viewing, setViewing] = useState<ArtifactSummary | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  /** The message whose menu is open (long press, right click or the ⋯ button). */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [rating, setRating] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -177,6 +181,7 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
               setReplyTo(m);
               textareaRef.current?.focus();
             }}
+            onMenu={() => setMenuFor(m.id)}
           >
             {!m.local && (
               <button
@@ -205,24 +210,35 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             )}
             <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
-            {m.content && <MessageContent text={m.content} />}
+            {m.parts && m.parts.length > 1
+              ? m.parts.map((part, n) => (
+                  <div key={n} className="bubble-part" style={{ animationDelay: `${n * 0.35}s` }}>
+                    <MessageContent text={part} />
+                  </div>
+                ))
+              : m.content && <MessageContent text={m.content} />}
             {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={onOpenPage ?? setViewing} />}
-            {m.sources && m.sources.length > 0 && (
-              <ol className="sources" aria-label="Fontes pesquisadas">
-                {m.sources.map((s) => (
-                  <li key={s.url}>
-                    <a href={s.url} target="_blank" rel="noopener noreferrer">
-                      {s.title}
-                    </a>{" "}
-                    <span>· {s.source}</span>
-                  </li>
-                ))}
-              </ol>
+            {m.sources && m.sources.length > 0 && <SourcesPill sources={m.sources} at={m.created_at} />}
+            {!m.local && (
+              <button type="button" className="bubble-more" onClick={() => setMenuFor(menuFor === m.id ? null : m.id)} aria-label="Mais opções desta mensagem" aria-expanded={menuFor === m.id} title="Mais">
+                <span aria-hidden="true">⋯</span>
+              </button>
             )}
-            {m.role === "assistant" && (
-              <details className="message-feedback"><summary>Como foi essa resposta?</summary>
-                <FeedbackBar onSend={(rating, tags) => onFeedback(m.id, rating, tags)} />
-              </details>
+            {menuFor === m.id && (
+              <div className="message-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setReplyTo(m); setMenuFor(null); textareaRef.current?.focus(); }}>Responder</button>
+                <button type="button" role="menuitem" onClick={() => { void navigator.clipboard?.writeText(m.content); setMenuFor(null); }}>Copiar texto</button>
+                {m.role === "assistant" && (
+                  <button type="button" role="menuitem" onClick={() => { setRating(m.id); setMenuFor(null); }}>Avaliar resposta</button>
+                )}
+                <button type="button" role="menuitem" className="message-menu-close" onClick={() => setMenuFor(null)}>Fechar</button>
+              </div>
+            )}
+            {rating === m.id && m.role === "assistant" && (
+              <div className="message-feedback">
+                <span className="message-feedback-title">Como foi essa resposta?</span>
+                <FeedbackBar onSend={(value, tags) => onFeedback(m.id, value, tags)} />
+              </div>
             )}
           </SwipeReply>
         ))}

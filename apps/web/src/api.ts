@@ -64,6 +64,8 @@ export interface Message {
   origin?: string;
   /** Sources the reply was given (only known for replies received in this session). */
   sources?: Source[];
+  /** The same text as `content` in 2 or 3 bubbles; null or missing is one bubble. */
+  parts?: string[] | null;
   attachments?: Attachment[];
   /** A page this reply said it would write. */
   artifact?: ArtifactSummary | null;

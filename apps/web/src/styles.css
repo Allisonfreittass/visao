@@ -401,15 +401,28 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* The feedback line under each reply stays out of the way until you point at the reply. */
-@media (hover: hover) {
-  .message-feedback { opacity: 0; transition: opacity .2s; }
-  .bubble:hover .message-feedback, .message-feedback:focus-within, .message-feedback[open] { opacity: 1; }
-}
-/* On a phone there is no pointing: ask only about the latest reply. */
+/* Rating a reply lives in its menu (long press, right click or ⋯), not under every reply. */
+.message-feedback-title { display: block; margin-bottom: 6px; font: 500 13px/1.2 var(--font-sans); color: var(--tinta-fraca); }
+.bubble-more { position: absolute; top: 40px; right: -38px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--linha-forte); border-radius: 50%; background: var(--fundo-elevado); color: var(--tinta-suave); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
+.bubble.user .bubble-more { right: auto; left: -38px; }
+.bubble:hover .bubble-more, .bubble-more:focus-visible, .bubble-more[aria-expanded="true"] { opacity: 1; }
 @media (hover: none) {
-  .bubble:not(.bubble--last) .message-feedback { display: none; }
+  /* On a phone you hold the message; the button stays for VoiceOver. */
+  .bubble-more { width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 1; }
+  .bubble { -webkit-touch-callout: none; }
 }
+.message-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.message-menu button { padding: 6px 12px; border: 1px solid var(--linha-forte); border-radius: 999px; background: var(--fundo-elevado); color: var(--tinta); font: 500 13px/1.2 var(--font-sans); }
+.message-menu .message-menu-close { color: var(--tinta-fraca); }
+/* A reply in 2 or 3 bubbles: each part its own block, coming in one after the other. */
+.bubble-part + .bubble-part { margin-top: 14px; }
+.bubble--last .bubble-part { animation: bubble-part-in .35s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes bubble-part-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Sources out of the way: one small pill that opens the list. */
+.sources-pill { margin-top: 10px; }
+.sources-pill-button { padding: 3px 10px; border: 1px solid var(--linha); border-radius: 999px; background: transparent; color: var(--tinta-fraca); font: 400 12px/1.5 var(--font-mono); }
+.sources-pill-button:hover, .sources-pill-button[aria-expanded="true"] { color: var(--tinta-suave); border-color: var(--linha-forte); }
+.sources-pill .sources { margin-top: 8px; }
 .presence--compacta .state-label { display: block; }
 @media (max-width: 560px) {
   .composer-note { display: none; }
