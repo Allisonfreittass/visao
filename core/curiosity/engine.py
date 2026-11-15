@@ -25,6 +25,7 @@ from core.goals.followup import propose_followup
 from core.memory.retrieval import retrieve
 from core.memory.text import fold, jaccard, tokens
 from core.research.budget import searches_today
+from core.research.relevance import relevant
 from core.research.service import run_research
 from infrastructure.database.models import (
     Conversation,
@@ -452,6 +453,8 @@ def consider(
             search=search,
             max_results=limits.max_results,
         )
+        # What has nothing to do with the question is dropped here, before the reply sees it.
+        sources = relevant(sources, user_text, assessment.question, assessment.search_query)
         gap.status = "RESEARCHED" if sources else "INCONCLUSIVE"
         gap.resolution_summary = (
             f"{len(sources)} fonte(s) de {research.provider}"
