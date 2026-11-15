@@ -41,7 +41,7 @@ import type { OrbState } from "./orb/orbModel";
 import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
-import { Sky } from "./sky/Sky";
+import { Sky } from "./sky/SkyCanvas";
 import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, VOICE_ANSWER_MS } from "./voice/approval";
 import { MAX_FILES } from "./attachments";
 
