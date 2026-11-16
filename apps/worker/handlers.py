@@ -268,6 +268,7 @@ def briefing_handler(settings: Settings, provider: LLMProvider | None) -> Handle
             limits=panel_limits(settings),
             has_room=lambda: autonomy_room(session, settings),
             asked=bool(job.payload.get("asked")),
+            backup_dir=settings.backup_status_dir,
         )
         record_action(
             session,

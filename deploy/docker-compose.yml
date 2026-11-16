@@ -8,6 +8,12 @@ x-visao: &visao
   env_file:
     - /etc/visao/app.env
     - ./release.env
+  # O status do último backup do banco (deploy/backup.sh, docs/BACKUP.md), só leitura: o resumo
+  # da manhã avisa quando falha. As cópias em si ficam fora do alcance dos containers.
+  environment:
+    VISION_BACKUP_STATUS_DIR: /backup-status
+  volumes:
+    - /var/backups/visao/status:/backup-status:ro
   logging:
     driver: json-file
     options: { max-size: "10m", max-file: "5" }

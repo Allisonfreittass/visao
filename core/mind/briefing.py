@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core import backup_status
 from core.autonomy.budget import AutonomyBudget, complete_json
 from core.conversation import segments
 from core.identity.genesis import get_identity
@@ -46,9 +47,10 @@ primeira mensagem do dia dela. Recebe em JSON os fatos de hoje, juntados pelo si
 
 Regras:
 - Comece com um bom dia curto, no seu jeito, e o dia da semana.
-- Depois, só o que veio nos fatos, do mais importante para o menos: um painel abaixo da meta \
-primeiro, depois a agenda, o que espera o sim dela, o que o Mac terminou, os painéis, o que você \
-estudou e o que você marcou para hoje.
+- Depois, só o que veio nos fatos, do mais importante para o menos: um problema no backup do \
+banco primeiro (diga o que aconteceu e que ela pode conferir com make backup-verify), um painel \
+abaixo da meta, depois a agenda, o que espera o sim dela, o que o Mac terminou, os painéis, \
+o que você estudou e o que você marcou para hoje.
 - Uma linha curta por item, começando com "- ". Valores, horários e nomes exatamente como vieram. \
 Nunca invente compromisso, preço, email ou número.
 - Assunto sem fatos não aparece (sem agenda, não fale de agenda).
@@ -277,12 +279,14 @@ def facts(
     provider: LLMProvider | None = None,
     limits: panels.Limits | None = None,
     has_room: Callable[[], bool] = lambda: False,
+    backup_dir: str | None = None,
 ) -> dict:
     """What goes in today's briefing. Empty lists are left out, so "nothing new" is visible."""
     local = now.astimezone(_zone(owner))
     loops = agenda.open_loops(session, owner, now)
     today_end = datetime.combine(local.date() + timedelta(days=1), time(0), tzinfo=local.tzinfo)
     found: dict = {
+        "problema_no_backup": backup_status.problem(backup_dir, now),
         **_google(session, owner, google_secret, now),
         "paineis": _panels(
             session, owner, now, browser, provider, limits or panels.Limits(), has_room
@@ -334,6 +338,8 @@ def invented_money(said: str, given: dict) -> bool:
 
 def written_in_code(day: str, given: dict) -> str:
     lines = [f"Bom dia! Hoje é {day}."]
+    if given.get("problema_no_backup"):
+        lines.append(f"- Atenção: {given['problema_no_backup']}.")
     for item in given.get("paineis", []):
         if item["abaixo_da_meta_agora"]:
             lines.append(f"- {item['painel']}: {item['total']}, abaixo da meta!")
@@ -413,6 +419,7 @@ def run(
     limits: panels.Limits | None = None,
     has_room: Callable[[], bool] = lambda: False,
     asked: bool = False,
+    backup_dir: str | None = None,
 ) -> Report:
     now = now or datetime.now(UTC)
     if not asked:
@@ -432,6 +439,7 @@ def run(
         provider=provider,
         limits=limits,
         has_room=has_room,
+        backup_dir=backup_dir,
     )
     if not given:
         session.commit()

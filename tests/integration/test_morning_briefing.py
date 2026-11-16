@@ -176,3 +176,16 @@ def test_the_manifest_says_when_it_comes():
     said = "; ".join(Capabilities(morning_briefing="08:00").actions())
     assert "todo dia às 08:00" in said and "resumo da manhã" in said
     assert "resumo da manhã" not in "; ".join(Capabilities().actions())
+
+
+def test_a_broken_backup_is_said_even_with_nothing_else(client, db, tmp_path):
+    llm, _, browser = world(client, db)
+    _login(client, db)
+    owner = _owner(db)
+    (tmp_path / "last.json").write_text(
+        json.dumps({"ok": False, "at": MORNING.isoformat(), "step": "dump"})
+    )
+    report = _run(db, llm, browser, owner, backup_dir=str(tmp_path))
+    assert report.sent
+    text = _briefing_message(db).content
+    assert "falhou na etapa dump" in text  # the fake model answers no JSON: written in code

@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     panel_near_goal_percent: int = Field(default=15, ge=0, le=100)
     panel_near_goal_every_hours: int = Field(default=3, ge=1, le=12)
 
+    # Where deploy/backup.sh leaves the last backup's status, mounted read-only (docs/BACKUP.md).
+    # Empty: no backup on this server (development); the morning briefing says nothing about it.
+    backup_status_dir: str | None = None
+
     # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
     # human quality gate; which approved voice is the agent's own is the agent's decision.
     tts_models_dir: str = "models/tts"

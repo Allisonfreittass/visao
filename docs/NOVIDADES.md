@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 16/11/2026
 
+- **Backup do banco.** Toda madrugada, uma cópia do schema `visao`:
+  - conferida antes de ser guardada;
+  - criptografada com uma chave que só o dono tem;
+  - guardada 14 dias no servidor, com cópia opcional no R2.
+
+  `make backup-verify` restaura a cópia num Postgres temporário. Se o backup falhar, o resumo da
+  manhã avisa primeiro. [ADR-0019](decisions/0019-backup-do-banco.md), [BACKUP.md](BACKUP.md).
 - **Compartilhar do iPhone.** De qualquer app, pela folha de compartilhar: uma página, um
   trecho de texto, fotos, prints ou PDFs vão direto para a conversa contínua, e a resposta chega
   como aviso. Sem comentário, ele diz o que importa e propõe uma ação. O conteúdo compartilhado é

@@ -14,6 +14,7 @@ deixou de existir na conta ([CLOUDFLARE.md](CLOUDFLARE.md) fica como histórico)
 | Arquivos do deploy | `/opt/visao` (`docker-compose.yml`, `Caddyfile`, `activate.sh`, `releases/<sha>/web`) |
 | Segredos | `/etc/visao/app.env` (dono root, leitura do grupo `deploy`), modelo em [`deploy/app.env.example`](../deploy/app.env.example) |
 | Banco | o PostgreSQL de `VISION_DATABASE_URL` (o Supabase de sempre, schema `visao`) |
+| Backup do banco | timer `visao-backup` às 03:30, cópias criptografadas em `/var/backups/visao` ([BACKUP.md](BACKUP.md)) |
 
 ## Acesso
 

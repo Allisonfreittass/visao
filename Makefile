@@ -5,7 +5,7 @@ VENV ?= .venv
 PY := $(VENV)/bin
 WEB := apps/web
 
-.PHONY: help setup test test-api test-web lint check db-test start
+.PHONY: help setup test test-api test-web lint check db-test backup-test backup-verify start
 
 help:
 	@echo "make setup    cria .venv, instala o pacote com [dev] e as dependências do web"
@@ -39,6 +39,12 @@ check: lint test
 
 db-test:
 	scripts/db-test.sh
+
+backup-test:
+	scripts/backup-test.sh
+
+backup-verify:
+	scripts/backup-verify.sh
 
 start:
 	scripts/dev.sh
