@@ -43,6 +43,14 @@ for _ in $(seq 60); do
   docker exec "$name" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break
   sleep 1
 done
+# The policies name the app's own role (visao_app in production): it must exist to restore them.
+docker exec -i "$name" pg_restore -f - < "$work/visao.dump" \
+  | sed -n 's/^CREATE POLICY .* TO \([a-z_0-9]*\) .*/\1/p' | sort -u | while read -r role; do
+    exists=$(docker exec "$name" psql -h 127.0.0.1 -U postgres -Atc \
+      "select 1 from pg_roles where rolname = '$role'")
+    [ -n "$exists" ] || docker exec "$name" psql -h 127.0.0.1 -U postgres -qc \
+      "create role \"$role\" nologin" >/dev/null
+  done
 docker exec -i "$name" pg_restore -h 127.0.0.1 -U postgres -d postgres --no-owner --exit-on-error \
   < "$work/visao.dump"
 
