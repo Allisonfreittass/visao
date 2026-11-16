@@ -45,7 +45,9 @@ from core.mind import state as mind_state
 from core.mind import temperament as mind_temperament
 from core.panels import editing as panel_editing
 from core.panels import offers as panel_offers
+from core.panels import quote as panel_quote
 from core.panels import service as panels
+from core.panels.extract import extract as extract_prices
 from core.policies.autonomy import is_paused
 from core.study.service import related_context
 from infrastructure.database.models import (
@@ -302,6 +304,7 @@ def run_turn(
 
     browsed = None
     offering = False
+    quote_table = None
     budget_goal = None
     if browser is not None and not read and accepted is None and edited is None:
         browsed = browse.run(
@@ -342,6 +345,12 @@ def run_turn(
             blocks.append(browsed.block)
         elif browsed is not None:
             offering = panel_offers.has_prices([v.text for v in browsed.opened])
+            if offering and modality != "voice":
+                # The options as a table under the reply, from prices checked against the pages
+                # (docs/decisions/0015). Not in a call: a table is not read aloud.
+                quote_table = _quote_table(session, owner, conversation, provider, browsed)
+                if quote_table:
+                    blocks.append(panel_quote.reply_block(quote_table))
             if offering:
                 # "até R$ 6 mil", said now or earlier in this conversation.
                 budget_goal = panel_offers.goal_from(
@@ -556,6 +565,7 @@ def run_turn(
         files=files,
         reply_to_id=reply_to_id,
         browser_fallback=browser_fallback,
+        quote_table=quote_table,
     )
     if result.browser_guard:
         # It denied the browser and was fixed before anyone read it (docs/decisions/0013).
@@ -592,6 +602,7 @@ def run_turn(
             title=browsed.title,
             goal=budget_goal,
             visit_ids=browsed.records,
+            assumed=browsed.assumed,
         )
         plan.add("panel_offered", executed=True, reason="live_prices", offer_id=str(offer.id))
     plan.add(
@@ -647,4 +658,37 @@ def run_turn(
         links=read,
         browsed=tuple(browsed.visits) if browsed else (),
         panel=created or edited,
+    )
+
+
+def _quote_table(
+    session: Session,
+    owner: User,
+    conversation: Conversation,
+    provider: LLMProvider,
+    browsed: browse.Browsed,
+) -> dict | None:
+    """One extraction over the pages just read, then the table in code. None when nothing came
+    out with a price a page shows (the reply then answers from the pages, as before)."""
+    pages = panels.pages_read(session, browsed.records)
+    talk = "\n".join(
+        f"{m.role}: {m.content[:600]}" for m in conversation_history(session, conversation)[-8:]
+    )
+    progress.step("Montando as opções")
+    found = extract_prices(
+        session,
+        provider,
+        pages,
+        today=panels.local_today(owner, datetime.now(UTC)),
+        conversation=talk,
+        conversation_id=conversation.id,
+    )
+    if found is None or not found.items:
+        return None
+    return panel_quote.build(
+        found.items,
+        found.spec,
+        hint=browsed.title,
+        assumed=browsed.assumed,
+        home=browsed.home,
     )

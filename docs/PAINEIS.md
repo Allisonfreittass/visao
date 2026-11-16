@@ -32,6 +32,11 @@ verdade quando é dito. Criar o painel **é aprovar a conferência diária**. Fi
 
 ## O painel
 
+Desde 16/11/2026, um painel nascido de uma cotação com suposições guarda o que foi suposto
+(`spec.assumed`), e o card mostra "Considerando: Guarulhos (GRU)… · 2 adultos". A cotação no chat
+já vem com uma tabela de até 5 opções ([COTACAO_TABELA.md](COTACAO_TABELA.md)); a oferta de painel
+continua no fim dela.
+
 **No Início** (web e iPhone, cards nativos), cada painel mostra:
 - o título e o total para o grupo, em destaque;
 - a distância da meta ("R$ 555 acima da meta de R$ 6.000", ou abaixo, em verde);

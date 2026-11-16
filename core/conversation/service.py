@@ -212,6 +212,7 @@ def reply(
     files: list[Attachment] | None = None,
     reply_to_id: uuid.UUID | None = None,
     browser_fallback: str = "",
+    quote_table: dict | None = None,
 ) -> TurnResult:
     """`browser_fallback` is the sentence that closes a reply that denied the browser and could
     not be rewritten (browser_guard.FALLBACK when empty)."""
@@ -361,10 +362,21 @@ def reply(
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
         if parts:
             parts[-1] = parts[-1].rstrip() + f"\n\n{TRUNCATION_NOTICE}"
+    if quote_table and modality != "voice":
+        # The table's text is its own last bubble: an app that does not know `quote_table` shows
+        # it as text; one that does draws the table in its place (docs/COTACAO_TABELA.md).
+        parts = [*(parts or [content]), quote_table["text"]]
+        content = f"{content}\n\n{quote_table['text']}"
+    else:
+        quote_table = None
     # What the stream showed grows into, or is replaced by, the text that is kept.
     progress.final(content)
     assistant_message = Message(
-        conversation_id=conversation.id, role="assistant", content=content, parts=parts
+        conversation_id=conversation.id,
+        role="assistant",
+        content=content,
+        parts=parts,
+        quote_table=quote_table,
     )
     session.add(assistant_message)
     session.flush()

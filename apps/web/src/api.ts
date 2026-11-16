@@ -55,6 +55,20 @@ export interface Attachment {
   readable?: boolean | null;
 }
 
+/** A table of options under a live quote, built by the server from prices pages showed. */
+export interface QuoteTable {
+  version: number;
+  title: string;
+  travelers: number;
+  rows: Array<{ option: string; dates: string; total: string; total_text: string; currency: string; sites: string[] }>;
+  /** At most a sentence of neighbor dates and one of what the total leaves out. */
+  notes: string[];
+  /** What the quote assumed instead of asking. */
+  assumed: Record<string, string>;
+  /** The same table as plain text: what an app that does not know this field shows. */
+  text: string;
+}
+
 export interface Message {
   id: string;
   role: Role;
@@ -66,6 +80,8 @@ export interface Message {
   sources?: Source[];
   /** The same text as `content` in 2 or 3 bubbles; null or missing is one bubble. */
   parts?: string[] | null;
+  /** Options under a live quote; its `text` is also the last entry of `parts` (docs/COTACAO_TABELA.md). */
+  quote_table?: QuoteTable | null;
   /** Only here: it was shown as it was written, so it does not come in again. */
   streamed?: boolean;
   attachments?: Attachment[];
@@ -245,7 +261,7 @@ export interface Panel {
   kind: string;
   title: string;
   status: "active" | "paused" | "error" | "expired";
-  spec: { travelers?: number; depart?: string | null; back?: string | null; destination?: string };
+  spec: { travelers?: number; depart?: string | null; back?: string | null; destination?: string; assumed?: Record<string, string> };
   total: string | null;
   goal: string | null;
   goal_gap: string | null;

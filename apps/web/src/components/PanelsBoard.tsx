@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { type Api, type Panel, type PanelItem, type PanelSuggestion, utcDate } from "../api";
+import { assumedLine } from "./QuoteTable";
 
 const REFRESH_MS = 60_000;
 
@@ -59,6 +60,7 @@ function PanelCard({ api, panel, onChanged }: { api: Api; panel: Panel; onChange
         <h3>{panel.title}</h3>
         <span className="live-panel-total" key={panel.total ?? "x"}>{total ?? "a confirmar"}</span>
         {panel.spec.travelers && panel.spec.travelers > 1 && <span className="live-panel-sub">total para {panel.spec.travelers}</span>}
+        {assumedLine(panel.spec.assumed) && <span className="live-panel-sub">{assumedLine(panel.spec.assumed)}</span>}
         {panel.goal_words && <span className={`live-panel-goal${below ? " live-panel-goal--below" : ""}`}>{panel.goal_words}</span>}
         {change !== 0 && (
           <span className={`live-panel-change${change < 0 ? " live-panel-change--down" : ""}`}>

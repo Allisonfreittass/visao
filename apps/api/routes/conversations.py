@@ -5,7 +5,7 @@ import time
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
@@ -89,6 +89,9 @@ class MessageOut(BaseModel):
     reply_to: QuotedOut | None = None
     # The same text as `content` in 2 or 3 bubbles; None is one bubble (docs/decisions/0010).
     parts: list[str] | None = None
+    # A table of options under a live quote (docs/COTACAO_TABELA.md). Its `text` is also the last
+    # entry of `parts`: an app that does not know this field shows that text.
+    quote_table: dict[str, Any] | None = None
 
 
 class MessageIn(BaseModel):
@@ -168,6 +171,7 @@ def _message_out(
         artifact=artifact_out(page) if page is not None else None,
         reply_to=_quoted(quoted),
         parts=message.parts,
+        quote_table=message.quote_table,
     )
 
 

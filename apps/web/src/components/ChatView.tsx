@@ -17,6 +17,7 @@ import { Icon } from "./Icon";
 import { SwipeReply } from "./SwipeReply";
 import { DraftAttachments, MessageAttachments } from "./Attachments";
 import { MessageContent } from "./MessageContent";
+import { QuoteTable, tableBubble } from "./QuoteTable";
 import { commonPrefix, revealStep } from "../stream";
 import { FeedbackBar } from "./FeedbackBar";
 import { SourcesPill } from "./SourcesPill";
@@ -321,7 +322,9 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             {m.parts && m.parts.length > 1
               ? m.parts.map((part, n) => (
                   <div key={n} className="bubble-part" style={{ animationDelay: `${n * 0.35}s` }}>
-                    <MessageContent text={part} />
+                    {m.quote_table && n === tableBubble(m.parts, m.quote_table)
+                      ? <QuoteTable table={m.quote_table} />
+                      : <MessageContent text={part} />}
                   </div>
                 ))
               : m.content && <MessageContent text={m.content} />}

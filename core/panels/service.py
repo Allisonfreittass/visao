@@ -101,6 +101,12 @@ def schedule_next(session: Session, panel: Panel, owner: User, now: datetime | N
     _schedule(session, panel, next_check(owner, now or datetime.now(UTC)))
 
 
+def pages_read(session: Session, ids: list[uuid.UUID]) -> list[Page]:
+    """The pages read live with these ids, as the extraction sees them."""
+    rows = list(session.scalars(select(BrowseVisit).where(BrowseVisit.id.in_(ids)))) if ids else []
+    return _pages(rows)
+
+
 def _pages(rows: list[BrowseVisit]) -> list[Page]:
     return [
         Page(visit_id=r.id, url=r.url, title=r.title, text=r.text, read_at=r.created_at)
@@ -153,7 +159,13 @@ def create_from_offer(
         conversation_id=conversation.id,
     )
     spec = (found.spec if found and found.spec else None) or Spec(destination=offer.title)
-    spec = spec.model_copy(update={"goal": offer.goal_amount, "currency": offer.currency})
+    spec = spec.model_copy(
+        update={
+            "goal": offer.goal_amount,
+            "currency": offer.currency,
+            "assumed": {k: str(v)[:80] for k, v in (offer.assumed or {}).items()},
+        }
+    )
     panel = Panel(
         owner_user_id=owner.id,
         conversation_id=conversation.id,

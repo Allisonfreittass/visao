@@ -31,6 +31,18 @@ No Haiku 5.5 o título custa bem menos de US$ 0,001, mas conta **uma chamada** n
 chamadas por dia e por hora (`VISION_LLM_BUDGET_CALLS_*`, padrão 30/dia e 10/hora). Um turno com
 navegador já usa de 3 a 5 chamadas (planejar, responder, conferir as regras...).
 
+## Cotação com tabela de opções (16/11/2026)
+
+Por cotação ao vivo com preços ([ADR-0015](decisions/0015-cotacao-com-suposicoes-e-tabela.md)):
+- até 4 páginas no navegador (2 janelas de datas × voo e hotel, em `VISION_BROWSER_MAX_PAGES`),
+  sem custo de API;
+- 1 chamada de extração (`panel_extract`, Haiku): até 4 páginas de 7 mil caracteres na entrada e
+  até 900 tokens de saída, cerca de US$ 0,001 a 0,002;
+- o planejamento e a resposta, como antes. A tabela é montada no código, sem chamada.
+
+Um turno de cotação usa de 4 a 6 chamadas (planejar, extrair, responder e, se houver regras ou se
+a resposta negar o navegador, conferir).
+
 ## Painéis vivos (conferência diária)
 
 Por painel ativo e por dia:

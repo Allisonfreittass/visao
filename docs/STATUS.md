@@ -14,6 +14,7 @@ embaixo quando há (o termo pesquisado, os sites, os arquivos). Só aparece o qu
 | Escrevendo a resposta | a chamada ao modelo que gera a resposta |
 | Conferindo as suas regras | há regras suas a checar na resposta |
 | Conferindo a resposta | sem regras suas, a resposta negou o navegador ([ADR-0013](decisions/0013-nunca-negar-o-navegador.md)) |
+| Montando as opções | a cotação ao vivo achou preços e monta a tabela de opções ([ADR-0015](decisions/0015-cotacao-com-suposicoes-e-tabela.md)) |
 
 ## A resposta aparecendo aos poucos (stream)
 

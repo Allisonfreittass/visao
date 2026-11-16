@@ -210,6 +210,8 @@ class Message(Base):
     # where the bubbles break. None is one bubble. `content` stays whole for memory, quoting,
     # feedback and voice.
     parts: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # A table of options under a live quote (docs/decisions/0015); its text is also in content.
+    quote_table: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -955,6 +957,8 @@ class PanelOffer(Base):
     title: Mapped[str] = mapped_column(String(120))
     # "até R$ 6 mil": the owner's own number, read in code, never a model's guess.
     goal_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # What the quote assumed instead of asking ({"origem": "Guarulhos (GRU)…"}).
+    assumed: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
     # The pages read live that the quote stands on (browse_visits).
     visit_ids: Mapped[list[str]] = mapped_column(JSON, default=list)

@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
+from core.memory.text import fold
 from core.panels.model import Item, Spec
 from infrastructure.database.models import ModelUsage
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
@@ -43,7 +44,8 @@ items: até 4, o mais barato de cada tipo que fizer sentido para o pedido (um vo
 hospedagem). Cada um: {"kind": "flight" ou "hotel", "provider": "companhia ou hotel", "where": \
 "CNF → SCL" ou o bairro/endereço, "dates": "14–21 ago", "connections": número ou null, "price": \
 número ou null, "price_basis": "per_person" ou "total", "currency": "BRL", "visit_id": "o id da \
-página de onde tirou"}.
+página de onde tirou", "not_included": "o que a página diz que o preço não inclui, em poucas \
+palavras (ex.: \"bagagem de mão\"), ou vazio"}.
 Regras do preço: copie o número exatamente como está na página (sem converter moeda, sem somar, \
 sem estimar). Se a página não mostra o preço com clareza, price é null. Diga se o preço é por \
 pessoa ou o total, como a página diz; sem indicação, "total"."""
@@ -91,6 +93,16 @@ def numbers_in(text: str) -> set[Decimal]:
     return values
 
 
+_WORDS = re.compile(r"\w{4,}")
+
+
+def said_in(claim: str, text: str) -> bool:
+    """Every word of four letters or more in `claim` is in `text` (accents and case aside)."""
+    page = fold(text)
+    words = _WORDS.findall(fold(claim))
+    return bool(words) and all(w in page for w in words)
+
+
 def _host(url: str) -> str:
     return (urlsplit(url).hostname or "").removeprefix("www.")
 
@@ -117,6 +129,10 @@ def check(raw_items: list, pages: list[Page]) -> tuple[list[Item], int]:
             continue
         if item.price is not None and item.price.normalize() not in numbers_in(page.text):
             item = item.model_copy(update={"price": None})
+            rejected += 1
+        if item.not_included and not said_in(item.not_included, page.text):
+            # "não inclui bagagem" only when the page says so: never a hidden cost invented.
+            item = item.model_copy(update={"not_included": ""})
             rejected += 1
         kept.append(
             item.model_copy(

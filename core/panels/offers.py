@@ -107,6 +107,7 @@ def propose(
     title: str,
     goal: Decimal | None,
     visit_ids: list[uuid.UUID],
+    assumed: dict[str, str] | None = None,
 ) -> PanelOffer:
     """One offer waits per conversation: a newer quote replaces the older offer."""
     for old in session.scalars(
@@ -123,6 +124,7 @@ def propose(
         goal_amount=goal,
         currency="BRL",
         visit_ids=[str(v) for v in visit_ids],
+        assumed=assumed or None,
     )
     session.add(offer)
     session.flush()

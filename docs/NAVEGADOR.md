@@ -35,6 +35,21 @@ recusaram nos últimos 30 dias vão no plano seguinte como `refused`, para ele n
 resultados de busca deles são descartados antes de abrir. Caso real de 16/11/2026: tracxn.com e
 rocketreach.co responderam 403 e nada mais foi tentado.
 
+## Suposições e a tabela de opções
+
+Desde 16/11/2026 ([ADR-0015](decisions/0015-cotacao-com-suposicoes-e-tabela.md)):
+- **Qualquer preço concreto é ao vivo:** aula de esqui, aluguel, ingresso, passeio, transfer. O
+  plano usa a conversa recente para completar a pergunta.
+- **Suposições em vez de travar.** Sem origem, ele usa o primeiro aeroporto prático de onde você
+  mora (`core/travel_origins.py`, só com o consentimento da memória). Com mês e duração, usa até
+  2 janelas. Sem o número de pessoas, 2 adultos. A resposta diz o que supôs e pergunta se você
+  quer ajustar. Só o que não dá para supor (o destino, por exemplo) vira pergunta.
+- **Tabela de opções:** com preços conferidos nas páginas, a resposta leva até 5 opções, da mais
+  barata à mais cara, com o total do grupo somado no código. Também leva no máximo uma frase de
+  datas vizinhas e uma do que o total não inclui. O formato para os apps está em
+  [COTACAO_TABELA.md](COTACAO_TABELA.md).
+- **Nunca reserva nem compra:** se você pedir, ele explica que só avisa e manda o link do site.
+
 ## A resposta nunca nega o navegador
 
 Com o navegador configurado, a resposta é conferida em código depois de escrita

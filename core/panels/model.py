@@ -32,6 +32,8 @@ class Spec(BaseModel):
     include: list[ItemKind] = Field(default_factory=lambda: ["flight", "hotel"], min_length=1)
     currency: str = Field(default="BRL", pattern=r"^[A-Z]{3}$")
     goal: Decimal | None = Field(default=None, ge=0, le=10_000_000)
+    # What the quote assumed instead of asking, shown on the card ("considerando saída de GRU").
+    assumed: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("preferences")
     @classmethod
@@ -67,6 +69,8 @@ class Item(BaseModel):
     url: str = Field(default="", max_length=600)
     visit_id: str
     read_at: datetime | None = None
+    # What the page says the price leaves out ("bagagem de mão"), checked against its text.
+    not_included: str = Field(default="", max_length=80)
 
     def cost(self, travelers: int) -> Decimal | None:
         """What this item costs the whole party."""
