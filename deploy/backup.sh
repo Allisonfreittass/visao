@@ -122,4 +122,5 @@ fi
 step=done
 status true ", \"file\": \"$name\", \"bytes\": $bytes, \"tables\": $tables, \"rows\": $rows, \"offsite\": \"$offsite\""
 cp "$STATUS_DIR/last.json" "$STATUS_DIR/last_ok.json"
+chmod 644 "$STATUS_DIR/last_ok.json"  # umask 077: os containers não são root
 echo "backup ok: $name ($bytes bytes, $tables tabelas, $rows linhas, cópia fora: $offsite)"

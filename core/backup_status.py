@@ -40,9 +40,10 @@ def problem(directory: str | None, now: datetime | None = None) -> str | None:
     if last is not None and last.get("ok") is not True:
         return f"o backup do banco falhou na etapa {last.get('step', '?')} na última vez que rodou"
     good_at = _at(good)
-    if good_at is None or now - good_at > STALE:
-        when = f"{good_at:%d/%m}" if good_at else "nenhum"
-        return f"o último backup bom do banco é de {when}: o da madrugada não rodou"
+    if good_at is None:
+        return "não há registro de um backup bom do banco (ou o status não pôde ser lido)"
+    if now - good_at > STALE:
+        return f"o último backup bom do banco é de {good_at:%d/%m}: o da madrugada não rodou"
     if (good or {}).get("offsite") == "failed":
         return "o backup do banco foi feito no servidor, mas a cópia fora dele falhou"
     return None
