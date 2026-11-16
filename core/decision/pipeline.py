@@ -418,6 +418,7 @@ def run_turn(
                 executed=True,
                 reason="unanswered_public_fact",
                 goal_id=str(outcome.proposed_goal.id),
+                standing_permission=bool((owner.autonomy_permissions or {}).get("auto_research")),
             )
         if outcome.system_context:
             blocks.append(outcome.system_context)

@@ -84,7 +84,11 @@ _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
     "mac_proposed": lambda a: f"montou um pedido ao Mac em {a.get('project', '?')}, para aprovar",
     "read_own_code": lambda a: "leu trechos do próprio código",
     "recall_study": lambda a: "consultou o caderno de estudos",
-    "goal_proposed": lambda a: "propôs uma meta, que espera aprovação",
+    "goal_proposed": lambda a: (
+        "marcou pesquisar de novo mais tarde, sozinho (permissão permanente)"
+        if a.get("standing_permission")
+        else "propôs uma meta, que espera aprovação"
+    ),
 }
 
 

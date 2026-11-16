@@ -266,10 +266,21 @@ def decide(
     return Decision(IGNORE, "not_actionable")
 
 
+def _standing_research(owner: User) -> bool:
+    """The owner granted `auto_research`: research needs no click, in the chat or later."""
+    return bool((owner.autonomy_permissions or {}).get("auto_research"))
+
+
 def _research_budget_left(
     session: Session, owner: User, conversation: Conversation, limits: CuriosityLimits
 ) -> bool:
+    """The daily cap always holds (it is what the search provider costs). The per-conversation cap
+    keeps unasked research from piling up in one chat; with the standing permission it does not
+    apply. Real case (16/11/2026): "Quero sim" to "quer que eu pesquise?" became a goal waiting
+    for approval because the trip conversation had 9 searches, with auto_research on."""
     today = searches_today(session, owner.id)
+    if _standing_research(owner):
+        return (today or 0) < limits.research_per_day
     in_conversation = session.scalar(
         select(func.count())
         .select_from(ResearchSession)
@@ -469,8 +480,12 @@ def consider(
     goal = propose_followup(session, gap=gap, owner=owner, search_query=assessment.search_query)
     if goal is not None and goal.status == "EVALUATED":
         context = (context + "\n\n" if context else "") + (
-            "Foi registrada uma proposta de pesquisar isso de novo mais tarde; ela só será feita "
-            "se o interlocutor aprovar. Se fizer sentido, mencione isso em uma frase."
+            "Ficou marcado pesquisar isso de novo mais tarde, sozinho: o interlocutor deu "
+            "permissão permanente para pesquisar. Se fizer sentido, diga isso em uma frase, sem "
+            "pedir aprovação."
+            if _standing_research(owner)
+            else "Foi registrada uma proposta de pesquisar isso de novo mais tarde; ela só será "
+            "feita se o interlocutor aprovar. Se fizer sentido, mencione isso em uma frase."
         )
     session.commit()
     return CuriosityOutcome(gap=gap, system_context=context, sources=sources, proposed_goal=goal)

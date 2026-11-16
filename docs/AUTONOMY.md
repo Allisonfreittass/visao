@@ -93,7 +93,13 @@ Limites, todos aplicados em código:
   O orçamento conta só os propósitos autônomos (`name_deliberation`, `followup_summary`,
   `reflection`, `conversation_followup`). Com orçamento zero, nada que chama o modelo roda.
 - **`auto_research`:** desligado por padrão. Só o dono liga, pelo painel de iniciativas ou por
-  `PUT /autonomy/permissions`. Sem ele, a meta espera aprovação em `/approvals`.
+  `PUT /autonomy/permissions`. Sem ele, a meta espera aprovação em `/approvals`. Com ele, pesquisar
+  não depende de clique nenhum: a meta de pesquisar de novo não aparece em `/approvals` (o ciclo
+  a roda sozinho), a resposta não fala em aprovação, e no chat o limite de pesquisas por conversa
+  (`VISION_RESEARCH_PER_CONVERSATION`) deixa de valer. O limite do dia
+  (`VISION_RESEARCH_PER_DAY`) continua, porque é o custo do provedor de busca. Caso real de
+  16/11/2026: "Quero sim" para "quer que eu pesquise?" virou meta esperando aprovação, com
+  `auto_research` ligado, porque a conversa da viagem já tinha 9 pesquisas.
 - **Registro:** cada ação vira uma linha em `decisions` com `origin=autonomous`, visível em
   `GET /decisions`.
 

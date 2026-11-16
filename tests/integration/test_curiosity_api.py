@@ -16,7 +16,7 @@ from apps.api.search import get_search_provider
 from apps.api.settings import Settings, get_settings
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.identity.genesis import run_genesis
-from infrastructure.database.models import KnowledgeGap
+from infrastructure.database.models import KnowledgeGap, User
 from integrations.llm.base import ChatMessage
 from integrations.search.base import SearchError, SearchResult
 from tests.fakes import FakeLLMProvider
@@ -202,6 +202,33 @@ def test_research_budget_per_conversation_defers(client, db, world) -> None:
     assert first["curiosity"]["action"] == "WEB_RESEARCH"
     assert second["curiosity"]["action"] == "DEFER"
     assert len(world["search"].queries) == 1
+
+
+def test_with_the_standing_permission_the_conversation_cap_does_not_hold(client, db, world):
+    """Real case (2026-11-16): "Quero sim" to "quer que eu pesquise?" became a goal waiting for
+    approval, with auto_research on, because the trip conversation already had 9 searches."""
+    run_genesis(db)
+    headers = _login(client, db)
+    owner = db.scalar(select(User))
+    owner.autonomy_permissions = {"auto_research": True}
+    db.commit()
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        curiosity_enabled=True, research_per_conversation=1, research_per_day=2
+    )
+    conversation, first = _turn(client, headers, "Qual é a capital da Austrália?")
+    _, second = _turn(client, headers, "E a capital do Canadá?", conversation)
+    _, third = _turn(client, headers, "E a do Chile?", conversation)
+
+    assert [t["curiosity"]["action"] for t in (first, second, third)] == [
+        "WEB_RESEARCH",
+        "WEB_RESEARCH",
+        "DEFER",  # the daily cap still holds: it is what the search provider costs
+    ]
+    assert len(world["search"].queries) == 2
+    # Nothing waits for a click: the follow-up runs by the standing permission.
+    assert client.get("/approvals", headers=headers).json() == []
+    system = world["llm"].prompts[-1][0].content
+    assert "sem pedir aprovação" in system and "se o interlocutor aprovar" not in system
 
 
 def test_same_personal_question_is_not_repeated(client, db, world) -> None:

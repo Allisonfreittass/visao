@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
-from core.goals import lifecycle
+from core.goals import followup, lifecycle
 from core.mind import initiative
 from core.policies.autonomy import is_paused, set_paused
 from infrastructure.database.models import Conversation, Goal, Notification, ScheduledJob
@@ -162,13 +162,15 @@ def list_goals(db: DbSession, user: CurrentUser) -> list[GoalOut]:
 
 @router.get("/approvals")
 def pending_approvals(db: DbSession, user: CurrentUser) -> list[GoalOut]:
-    """Goals the agent proposed that passed evaluation and wait for the owner's decision."""
+    """Goals the agent proposed that passed evaluation and wait for the owner's decision. With
+    `auto_research` granted, a research follow-up waits for no one: the cycle runs it."""
     goals = db.scalars(
         select(Goal)
         .where(Goal.owner_user_id == user.id, Goal.status == lifecycle.EVALUATED)
         .order_by(Goal.created_at.desc())
     )
-    return [_goal_out(db, g) for g in goals]
+    standing = bool((user.autonomy_permissions or {}).get("auto_research"))
+    return [_goal_out(db, g) for g in goals if not (standing and g.kind == followup.KIND)]
 
 
 @router.post("/goals/{goal_id}/approve")
