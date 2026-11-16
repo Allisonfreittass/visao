@@ -91,6 +91,7 @@ def run_cycle(
     started = time.monotonic()
     report = CycleReport()
     report.llm_calls_today, report.tokens_today = usage_today(session, now)
+    _plan_mornings(session, now)
     report.skipped = _skip_reason(session, provider, budget, now)
     if report.skipped:
         return report
@@ -104,6 +105,15 @@ def run_cycle(
     _consider_the_name_question(cycle)
     report.llm_calls_today, report.tokens_today = usage_today(session, now)
     return report
+
+
+def _plan_mornings(session: Session, now: datetime) -> None:
+    """Each owner's next morning briefing is in the queue (idempotent, no model call)."""
+    from core.mind import briefing
+
+    for owner in session.scalars(select(User).where(User.is_active.is_(True))):
+        briefing.ensure_scheduled(session, owner, now)
+    session.commit()
 
 
 def _skip_reason(

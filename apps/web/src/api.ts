@@ -598,8 +598,21 @@ export class Api {
     });
   }
 
-  permissions(): Promise<{ auto_research: boolean }> {
+  permissions(): Promise<{ auto_research: boolean; morning_briefing?: boolean }> {
     return this.request("/autonomy/permissions");
+  }
+
+  setMorningBriefing(enabled: boolean): Promise<{ auto_research: boolean; morning_briefing?: boolean }> {
+    return this.request("/autonomy/permissions", {
+      method: "PUT",
+      body: JSON.stringify({ morning_briefing: enabled }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /** The morning briefing right now (ADR-0017): the worker sends it in a few seconds. */
+  briefingNow(): Promise<{ queued: boolean }> {
+    return this.request("/autonomy/briefing", { method: "POST" });
   }
 
   setAutoResearch(enabled: boolean): Promise<{ auto_research: boolean }> {

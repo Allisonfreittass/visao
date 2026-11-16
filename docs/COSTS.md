@@ -50,6 +50,13 @@ Uma chamada por trecho fechado (`segment_summary`), pelo worker, no orçamento d
 bem abaixo de US$ 0,001 por trecho. Sem orçamento, o trecho não é resumido e vai cru enquanto
 couber.
 
+## Resumo da manhã (16/11/2026)
+
+1 chamada por dia (`morning_briefing`, Haiku, orçamento da autonomia): os fatos do dia na entrada
+e até `VISION_LLM_CURATION_MAX_OUTPUT_TOKENS` na saída, bem abaixo de US$ 0,001. A conferência
+dos painéis feita para o resumo é a do dia, e a das 9h não roda de novo
+([RESUMO_DA_MANHA.md](RESUMO_DA_MANHA.md)).
+
 ## Painéis vivos (conferência diária)
 
 Por painel ativo e por dia:

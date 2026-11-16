@@ -32,12 +32,15 @@ export function SettingsView(props: SettingsViewProps) {
   const { api, onError } = props;
   const [paused, setPaused] = useState<boolean | null>(null);
   const [autoResearch, setAutoResearch] = useState<boolean | null>(null);
+  const [morning, setMorning] = useState<boolean | null>(null);
+  const [morningNote, setMorningNote] = useState("");
 
   useEffect(() => {
     Promise.all([api.autonomy(), api.permissions()])
       .then(([auto, perms]) => {
         setPaused(auto.paused);
         setAutoResearch(perms.auto_research);
+        setMorning(perms.morning_briefing ?? true);
       })
       .catch(onError);
   }, [api, onError]);
@@ -45,6 +48,23 @@ export function SettingsView(props: SettingsViewProps) {
   async function togglePause() {
     try {
       setPaused((await api.setAutonomyPaused(!paused)).paused);
+    } catch (e) {
+      onError(e);
+    }
+  }
+
+  async function toggleMorning() {
+    try {
+      setMorning((await api.setMorningBriefing(!morning)).morning_briefing ?? !morning);
+    } catch (e) {
+      onError(e);
+    }
+  }
+
+  async function morningNow() {
+    try {
+      const { queued } = await api.briefingNow();
+      setMorningNote(queued ? "Pedido. Chega na conversa em alguns segundos." : "A autonomia está pausada.");
     } catch (e) {
       onError(e);
     }
@@ -116,6 +136,18 @@ export function SettingsView(props: SettingsViewProps) {
             disabled={autoResearch === null || paused === true}
             onChange={() => void toggleAutoResearch()}
           />
+          <Setting
+            title="Resumo da manhã"
+            description="Quando o horário silencioso acaba: agenda do dia, painéis conferidos na hora, o que espera seu sim e o que eu estudei. Sem nada novo, não mando."
+            checked={morning === true}
+            disabled={morning === null || paused === true}
+            onChange={() => void toggleMorning()}
+          >
+            {morning && paused === false && (
+              <button type="button" className="link-button" onClick={() => void morningNow()}>Mandar agora</button>
+            )}
+            {morningNote && <p className="note">{morningNote}</p>}
+          </Setting>
         </section>
 
         <section className="settings-group" aria-labelledby="g-google">

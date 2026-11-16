@@ -7,6 +7,15 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 16/11/2026
 
+- **Resumo da manhã.** Todo dia, quando o horário silencioso do dono acaba, uma mensagem com:
+  - a agenda do dia;
+  - os painéis conferidos na hora;
+  - o que espera o sim dele;
+  - o que o Mac terminou, o que foi estudado e o que foi marcado para hoje.
+
+  Os valores são conferidos em código. Sem nada novo, não sai nada. Ele desliga ou pede um na
+  hora em Ajustes. [ADR-0017](decisions/0017-resumo-da-manha.md),
+  [RESUMO_DA_MANHA.md](RESUMO_DA_MANHA.md).
 - **Painel de olho perto da meta.**
   - Com o total até 15% acima da meta, ou já abaixo dela, o painel é conferido a cada 3 horas,
     fora do horário silencioso, em vez de uma vez por dia.

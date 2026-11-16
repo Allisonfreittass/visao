@@ -13,6 +13,7 @@ from core.autonomy.cycle import AUTONOMOUS_PURPOSES
 from core.behavior.metrics import GENERIC_PHRASES
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
+from core.mind import briefing
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import (
     Decision,
@@ -27,11 +28,14 @@ from infrastructure.database.models import (
 
 router = APIRouter(tags=["cognition"])
 
-ALLOWED_PERMISSIONS = {"auto_research"}
+ALLOWED_PERMISSIONS = {"auto_research", briefing.PERMISSION}
+# Permissions that are on until the owner turns them off.
+ON_BY_DEFAULT = {briefing.PERMISSION}
 
 
 class PermissionsIn(BaseModel):
-    auto_research: bool
+    auto_research: bool | None = None
+    morning_briefing: bool | None = None
 
 
 @router.get("/identity/name")
@@ -81,14 +85,29 @@ def request_deliberation(db: DbSession, user: CurrentUser) -> dict[str, bool]:
 @router.get("/autonomy/permissions")
 def get_permissions(user: CurrentUser) -> dict[str, bool]:
     current = user.autonomy_permissions or {}
-    return {name: bool(current.get(name)) for name in ALLOWED_PERMISSIONS}
+    return {
+        name: bool(current.get(name, name in ON_BY_DEFAULT)) for name in sorted(ALLOWED_PERMISSIONS)
+    }
 
 
 @router.put("/autonomy/permissions")
 def put_permissions(body: PermissionsIn, db: DbSession, user: CurrentUser) -> dict[str, bool]:
-    user.autonomy_permissions = {**(user.autonomy_permissions or {}), **body.model_dump()}
+    changed = body.model_dump(exclude_none=True)
+    user.autonomy_permissions = {**(user.autonomy_permissions or {}), **changed}
+    if changed.get(briefing.PERMISSION):
+        briefing.ensure_scheduled(db, user, datetime.now(UTC))
     db.commit()
     return get_permissions(user)
+
+
+@router.post("/autonomy/briefing", status_code=status.HTTP_202_ACCEPTED)
+def briefing_now(db: DbSession, user: CurrentUser) -> dict[str, bool]:
+    """The morning briefing right now, to try it: the worker sends it in a few seconds."""
+    if is_paused(db):
+        return {"queued": False}
+    briefing.request_now(db, user, datetime.now(UTC))
+    db.commit()
+    return {"queued": True}
 
 
 @router.get("/decisions")

@@ -19,6 +19,7 @@ from core.conversation.service import Budgets
 from core.goals.followup import research_count_today, run_followup
 from core.identity import name_deliberation
 from core.identity.genesis import get_identity
+from core.mind import briefing
 from core.mind.review import review_once
 from core.mind.think import MindConfig, think_once
 from core.panels import service as panels
@@ -249,6 +250,39 @@ def panel_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     return handle
 
 
+def briefing_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    """The morning briefing (core/mind/briefing.py, ADR-0017): the agent's own call, in the
+    autonomy budget; it checks the live panels first, in place of their 9h check."""
+
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        owner = session.get(User, uuid.UUID(job.payload["owner_id"]))
+        if owner is None:
+            return HandlerResult("done", {"skipped": "no_owner"})
+        report = briefing.run(
+            session,
+            owner,
+            provider=provider,
+            budget=autonomy_budget(settings),
+            google_secret=settings.secret_key,
+            browser=get_browser(),
+            limits=panel_limits(settings),
+            has_room=lambda: autonomy_room(session, settings),
+            asked=bool(job.payload.get("asked")),
+        )
+        record_action(
+            session,
+            owner.id,
+            action="morning_briefing",
+            executed=report.sent,
+            reason=report.reason,
+            items=report.items,
+            written_by=report.written_by,
+        )
+        return HandlerResult("done", {"reason": report.reason, "items": report.items})
+
+    return handle
+
+
 def build_handlers(settings: Settings) -> dict[str, Handler]:
     provider = build_llm_provider(settings)
     # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
@@ -263,4 +297,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         conversation_title.JOB_KIND: title_handler(settings, fast),
         panels.JOB_KIND: panel_handler(settings, fast),
         segments.JOB_KIND: segment_handler(settings, fast),
+        briefing.JOB_KIND: briefing_handler(settings, fast),
     }

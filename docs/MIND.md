@@ -68,6 +68,12 @@ quieto no horário silencioso, com a autonomia pausada e enquanto você está co
 para depois de 2 aberturas sem resposta até você responder, e manda no máximo
 `VISION_MIND_INITIATIVES_PER_DAY` por dia. O que ele quis dizer e não pôde fica no pensamento.
 
+### O resumo da manhã
+
+Além das aberturas soltas, uma mensagem por dia no fim do horário silencioso, com a agenda, os
+painéis conferidos na hora, o que espera o sim do dono e o que ele estudou
+([RESUMO_DA_MANHA.md](RESUMO_DA_MANHA.md)). Ela conta como uma abertura.
+
 ### Com o app fechado (Web Push)
 
 Uma abertura que passou por todas essas regras também vai como aviso para os aparelhos que você

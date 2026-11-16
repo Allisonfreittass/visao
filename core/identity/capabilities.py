@@ -39,6 +39,8 @@ class Capabilities:
     browser: bool = False
     # This is the owner's one continuous conversation (ADR-0014).
     continuous: bool = False
+    # "HH:MM" of the morning briefing (ADR-0017); None when the owner turned it off.
+    morning_briefing: str | None = None
     mac_projects: tuple[str, ...] = ()
     google: bool = False
     # Devices that get a push with the app closed; None when this was not looked up.
@@ -113,6 +115,14 @@ class Capabilities:
                 "o trecho recente vem inteiro e os trechos antigos chegam como resumos com data; "
                 "quando ele pergunta de algo antigo que não está nos resumos, dizer que não "
                 "lembra dos detalhes em vez de inventar"
+            )
+        if self.morning_briefing:
+            items.append(
+                f"mandar todo dia às {self.morning_briefing} (quando o horário silencioso dela "
+                "acaba) um resumo da manhã na conversa, com aviso no celular: a agenda do dia, "
+                "os painéis conferidos na hora, o que espera o sim dela, o que o Mac terminou, "
+                "o que você estudou e o que marcou para hoje; sem nada novo, não manda; ela "
+                "desliga ou pede um agora em Ajustes"
             )
         if self.name_deliberation:
             items.append("deliberar sobre o próprio nome pessoal (decidir, adiar ou recusar)")
@@ -215,6 +225,8 @@ class CapabilityInputs:
 
 
 def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) -> Capabilities:
+    from core.mind import briefing  # it reaches the conversation service, which imports this
+
     permissions = owner.autonomy_permissions or {}
     return Capabilities(
         memory=bool(owner.memory_consent),
@@ -236,6 +248,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         pages=inputs.pages,
         browser=inputs.browser,
         continuous=inputs.continuous,
+        morning_briefing=f"{briefing.hour(owner):%H:%M}" if briefing.enabled(owner) else None,
         push_devices=session.scalar(
             select(func.count())
             .select_from(PushSubscription)

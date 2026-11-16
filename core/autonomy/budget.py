@@ -25,6 +25,8 @@ AUTONOMOUS_PURPOSES = (
     "panel_recheck",
     # Closing and summarizing a stretch of the continuous conversation (ADR-0014).
     "segment_summary",
+    # The morning briefing's wording (core/mind/briefing.py, ADR-0017).
+    "morning_briefing",
     "mind_review",
     "mind_think",
     "name_deliberation",
