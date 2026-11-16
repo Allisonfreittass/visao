@@ -1,5 +1,3 @@
-import { type Conversation, utcDate } from "../api";
-import { dayLabel } from "../labels";
 import { useDragToClose } from "../hooks/useDragToClose";
 import { Icon, type IconName } from "./Icon";
 
@@ -17,24 +15,19 @@ const NAV: { view: WorkspaceView; label: string; icon: IconName }[] = [
 interface RailProps {
   open: boolean;
   view: WorkspaceView;
-  conversations: Conversation[];
-  current: string | null;
-  busy: boolean;
   preparing: boolean;
   online: boolean;
   pendingCount: number;
   /** null: no Mac paired yet. */
   macOnline: boolean | null;
   onView: (view: WorkspaceView) => void;
-  onNewConversation: () => void;
-  onSelect: (id: string) => void;
   /** Closes the drawer (dragging it left, on a phone). */
   onClose?: () => void;
 }
 
-/** Where everything is: the sections, then the conversations, then whether we're connected. */
+/** Where everything is: the sections ("Conversa" is the continuous one), then the connection. */
 export function Rail(props: RailProps) {
-  const { view, conversations, current, onView } = props;
+  const { view, onView } = props;
   const drag = useDragToClose("left", () => props.onClose?.(), 70);
   return (
     <aside
@@ -58,41 +51,7 @@ export function Rail(props: RailProps) {
           </button>
         ))}
       </nav>
-      <div className="rail-history">
-        <div className="rail-history-head">
-          <span className="rotulo">Conversas</span>
-          <button type="button" className="rail-new" onClick={props.onNewConversation} disabled={props.busy} aria-label="Nova conversa" title="Nova conversa">
-            <Icon name="plus" size={16} />
-          </button>
-        </div>
-        {props.preparing && <p className="note rail-preparing">Lembrando do que importa…</p>}
-        <ul className="conversation-list">
-          {conversations.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                aria-current={c.id === current && view === "conversation" ? "true" : undefined}
-                onClick={() => props.onSelect(c.id)}
-              >
-                {c.continuous ? (
-                  <>
-                    <span className="conversation-title">Conversa</span>
-                    <span className="conversation-date">contínua</span>
-                  </>
-                ) : c.title ? (
-                  <>
-                    <span className="conversation-title">{c.title}</span>
-                    <span className="conversation-date">{dayLabel(utcDate(c.created_at))}</span>
-                  </>
-                ) : (
-                  dayLabel(utcDate(c.created_at))
-                )}
-              </button>
-            </li>
-          ))}
-          {conversations.length === 0 && <li className="note">Nenhuma ainda.</li>}
-        </ul>
-      </div>
+      {props.preparing && <p className="note rail-preparing">Lembrando do que importa…</p>}
       <div className="rail-bottom">
         <span className={`connection ${props.online ? "on" : "off"}`}>{props.online ? "Conectado" : "Sem conexão"}</span>
       </div>

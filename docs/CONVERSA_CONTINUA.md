@@ -73,8 +73,12 @@ Os trechos fechados, do mais antigo para o mais novo:
 
 ## No chat (o que o web faz, e o iPhone deve fazer igual)
 
-- **Abrir a contínua:** ao entrar, o app abre a contínua (`GET /conversations/continuous`). No
-  menu ela aparece como "Conversa", no topo.
+- **Abrir a contínua:** ao entrar, o app abre a contínua (`GET /conversations/continuous`).
+- **Sem lista de conversas:** desde 16/11/2026, o menu não lista conversas nem tem "Nova
+  conversa". "Conversa", nas seções, abre a contínua. Conversas separadas só existem dentro de um
+  projeto, criadas e abertas pelos Projetos. Sem conversa aberta, enviar uma mensagem vai para a
+  contínua. As 8 conversas antigas do dono foram apagadas nesse dia, a pedido dele, depois de uma
+  última curadoria da memória.
 - **Carregar para trás:** o app carrega as últimas 100 mensagens e mostra "Carregar mensagens
   anteriores" quando veio uma página cheia. Ao recarregar, depois de enviar ou de um aviso,
   ele pede `limit = max(100, quantas já estão na tela)`.

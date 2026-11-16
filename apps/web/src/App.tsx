@@ -476,7 +476,14 @@ export function App() {
     );
   }
 
+  /** A project's new conversation; without a project, the continuous one (there is no other). */
   async function openConversation(projectId?: string | null): Promise<string> {
+    if (!projectId) {
+      const continuous = await api.continuousConversation();
+      setConversations((list) => (list.some((c) => c.id === continuous.id) ? list : [continuous, ...list]));
+      setCurrent(continuous.id);
+      return continuous.id;
+    }
     const conversation = await api.createConversation(projectId);
     checkMemoryPreparation(conversation);
     setConversations((list) => [conversation, ...list]);
@@ -756,6 +763,13 @@ export function App() {
     setMenuOpen(false);
   }
 
+  /** "Conversa" in the menu: the continuous conversation (a project's chats open from Projetos). */
+  function openChat() {
+    const continuous = conversationsRef.current.find((c) => c.continuous);
+    if (continuous) setCurrent(continuous.id);
+    showView("conversation");
+  }
+
   const orbState: OrbState = demo
     ? demoState
     : !online
@@ -845,28 +859,18 @@ export function App() {
               api={api}
               call={call}
               pending={pending}
-              conversations={conversations}
-              current={current}
-              busy={preparing || sending}
               onOpen={showView}
-              onSelect={(id) => { setCurrent(id); showView("conversation"); }}
-              onNewConversation={() => void newConversation()}
               onDraft={draftInChat}
             />
           )}
           <Rail
             open={menuOpen}
             view={view}
-            conversations={conversations}
-            current={current}
-            busy={preparing || sending}
             preparing={preparing}
             online={online}
             pendingCount={pending.count}
             macOnline={macOnline}
-            onView={showView}
-            onNewConversation={() => void newConversation()}
-            onSelect={(id) => { setCurrent(id); showView("conversation"); }}
+            onView={(next) => (next === "conversation" ? openChat() : showView(next))}
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
