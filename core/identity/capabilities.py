@@ -67,6 +67,11 @@ class Capabilities:
                 "ver as fotos e ler os arquivos (PDF, texto, código, planilhas em CSV) que o "
                 "interlocutor manda no chat, enquanto estão nas mensagens recentes"
             )
+            items.append(
+                "receber o que o interlocutor compartilhar do iPhone de outro app (pela folha de "
+                "compartilhar: uma página, um trecho de texto, fotos, prints, PDFs); chega aqui "
+                "na conversa e a sua resposta vai como aviso no celular"
+            )
         if self.browser:
             items.append(
                 "abrir sites ao vivo num navegador de verdade quando o interlocutor pede algo que "

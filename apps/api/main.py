@@ -21,6 +21,7 @@ from apps.api.routes import (
     panels,
     projects,
     push,
+    share,
     study,
     system,
     voice,
@@ -56,6 +57,7 @@ def create_app() -> FastAPI:
     app.include_router(arm.router)
     app.include_router(google.router)
     app.include_router(panels.router)
+    app.include_router(share.router)
     return app
 
 

@@ -7,6 +7,11 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 16/11/2026
 
+- **Compartilhar do iPhone.** De qualquer app, pela folha de compartilhar: uma página, um
+  trecho de texto, fotos, prints ou PDFs vão direto para a conversa contínua, e a resposta chega
+  como aviso. Sem comentário, ele diz o que importa e propõe uma ação. O conteúdo compartilhado é
+  dado, nunca instrução. [ADR-0018](decisions/0018-compartilhar-do-iphone.md),
+  [COMPARTILHAR.md](COMPARTILHAR.md).
 - **Resumo da manhã.** Todo dia, quando o horário silencioso do dono acaba, uma mensagem com:
   - a agenda do dia;
   - os painéis conferidos na hora;

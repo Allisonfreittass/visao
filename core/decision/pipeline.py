@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from core import browse, projects
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
-from core.conversation import browser_guard, progress
+from core.conversation import browser_guard, progress, share
 from core.conversation import links as conversation_links
 from core.conversation.service import Budgets, TurnResult, context_history, reply
 from core.curiosity.engine import (
@@ -115,10 +115,15 @@ def run_turn(
     files: list[Attachment] | None = None,
     browser: Browser | None = None,
     reply_to_id: uuid.UUID | None = None,
+    shared: bool = False,
 ) -> TurnOutcome:
     plan = TurnPlan()
     blocks: list[str] = []
     progress.step("Pensando")
+    if shared:
+        # Shared from another app on the phone (core/conversation/share.py, ADR-0018).
+        blocks.append(share.BLOCK)
+        plan.add("shared", executed=True, reason="owner_shared_from_phone")
     if files:
         photos = [f for f in files if f.kind == "image"]
         documents = [f for f in files if f.kind != "image"]
