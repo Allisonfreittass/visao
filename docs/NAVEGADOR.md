@@ -35,6 +35,16 @@ recusaram nos últimos 30 dias vão no plano seguinte como `refused`, para ele n
 resultados de busca deles são descartados antes de abrir. Caso real de 16/11/2026: tracxn.com e
 rocketreach.co responderam 403 e nada mais foi tentado.
 
+## A resposta nunca nega o navegador
+
+Com o navegador configurado, a resposta é conferida em código depois de escrita
+([ADR-0013](decisions/0013-nunca-negar-o-navegador.md), `core/conversation/browser_guard.py`).
+Frases como "não tenho preços atuais" ou "pesquisar nos sites" fazem a resposta passar pela
+mesma checagem curta das regras do dono. Se a reescrita ainda negar, a frase sai e entra uma
+frase verdadeira: o que falta, "tentei ver ao vivo agora e não consegui" ou "consigo ver os
+preços de agora nos sites". Fica registrado como `browser_denial_fixed` em `decisions`. Na
+ligação por voz não há essa conferência.
+
 ## Quando desiste, fica registrado
 
 Depois que o planejamento roda, ele nunca desiste em silêncio. Cada saída sem páginas vira uma

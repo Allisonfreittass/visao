@@ -121,6 +121,11 @@ Painéis vivos ([ADR-0012](decisions/0012-paineis-vivos.md), [PAINEIS.md](PAINEI
   autonomia;
 - o Início mostra cards nativos.
 
+Com o navegador configurado, a resposta é conferida em código depois de escrita, para nunca negar
+que ele existe ([ADR-0013](decisions/0013-nunca-negar-o-navegador.md),
+`core/conversation/browser_guard.py`). A conferência usa a mesma checagem curta das regras e o
+mesmo `replace` no stream.
+
 Inspeção: `GET /decisions`, `GET /cognition/metrics`, `GET /identity/name`,
 `GET|PUT /autonomy/permissions`. Ver [AUTONOMY.md](AUTONOMY.md) e
 [research/curiosity_evaluation.md](research/curiosity_evaluation.md).

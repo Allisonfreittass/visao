@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
-from core.conversation import attachments, progress
+from core.conversation import attachments, browser_guard, progress
 from core.conversation import parts as bubbles
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
@@ -95,6 +95,9 @@ class TurnResult:
     recalled: list[ScoredMemory]
     # The reply asked for a page (core/conversation/artifacts.py); the route records it.
     page: "PageRequest | None" = None
+    # The reply denied the browser and was fixed (core/conversation/browser_guard.py): "rewritten"
+    # by the check, "stripped" in code when the rewrite did not fix it; "" when it did not deny.
+    browser_guard: str = ""
 
 
 def _spent(session: Session, *conditions: object) -> Decimal:
@@ -201,7 +204,10 @@ def reply(
     attachment: str = "",
     files: list[Attachment] | None = None,
     reply_to_id: uuid.UUID | None = None,
+    browser_fallback: str = "",
 ) -> TurnResult:
+    """`browser_fallback` is the sentence that closes a reply that denied the browser and could
+    not be rewritten (browser_guard.FALLBACK when empty)."""
     check_budgets(session, conversation, budgets)
 
     user_message = Message(
@@ -312,18 +318,23 @@ def reply(
     content, parts = bubbles.split(content)
     if modality == "voice":
         parts = None
-    if owner_rules and not truncated and modality != "voice":
+    # With the browser there, a reply that denies it is checked like a broken owner rule
+    # (docs/decisions/0013). Not in a voice call: the words are spoken as they are written.
+    live = bool(capabilities and capabilities.browser) and modality != "voice" and not truncated
+    denied = live and bool(browser_guard.violations(content))
+    guarded = ""
+    if (owner_rules or denied) and not truncated and modality != "voice":
         # Not in a voice call: the check is a second model call before anything can be spoken
         # (up to RULE_CHECK_DEADLINE_SECONDS), and the rules already ride in the system prompt.
         # Committed first: the call's admission ledger needs the write lock this session would hold.
         session.commit()
-        progress.step("Conferindo as suas regras")
+        progress.step("Conferindo as suas regras" if owner_rules else "Conferindo a resposta")
         checked = _obey_rules(
             session,
             conversation=conversation,
             provider=provider,
             budgets=budgets,
-            rules=owner_rules,
+            rules="\n".join(r for r in (owner_rules, browser_guard.RULE if denied else "") if r),
             prompt=prompt,
             draft=content,
             max_output_tokens=max_output_tokens,
@@ -331,6 +342,12 @@ def reply(
         if checked != content:
             # A rewrite has no bubble breaks of its own: it goes as one bubble.
             content, parts = checked, None
+            guarded = "rewritten" if denied else ""
+    if live and browser_guard.violations(content):
+        # The check kept it (it said it obeys, failed, or its rewrite was refused): the sentence
+        # goes, and one true sentence takes its place. Removing adds no claim.
+        content = browser_guard.strip(content, browser_fallback or browser_guard.FALLBACK)
+        parts, guarded = None, "stripped"
     if truncated:
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
         if parts:
@@ -346,7 +363,7 @@ def reply(
     # Observable behavior, measured in code, tagged with the state version in force.
     behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
-    return TurnResult(user_message, assistant_message, usage, recalled, page)
+    return TurnResult(user_message, assistant_message, usage, recalled, page, browser_guard=guarded)
 
 
 def _write(

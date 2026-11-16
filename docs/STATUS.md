@@ -13,6 +13,7 @@ embaixo quando há (o termo pesquisado, os sites, os arquivos). Só aparece o qu
 | Lendo o próprio código | a pergunta é sobre ele mesmo |
 | Escrevendo a resposta | a chamada ao modelo que gera a resposta |
 | Conferindo as suas regras | há regras suas a checar na resposta |
+| Conferindo a resposta | sem regras suas, a resposta negou o navegador ([ADR-0013](decisions/0013-nunca-negar-o-navegador.md)) |
 
 ## A resposta aparecendo aos poucos (stream)
 
@@ -20,8 +21,8 @@ Desde 15/11/2026 o app abre `GET /conversations/{id}/stream` (SSE) junto com o e
 turno ao vivo ([ADR-0011](decisions/0011-streaming-da-resposta.md)):
 - os mesmos passos desta tabela, um por vez, na bolha que respira;
 - o texto conforme é escrito, solto num ritmo constante;
-- no fim, a versão conferida pelas regras do dono (`replace`, se a checagem mudou algo) e um
-  `done` com a mesma resposta do POST.
+- no fim, a versão conferida pelas regras do dono e pela regra de nunca negar o navegador
+  (`replace`, se a checagem mudou algo) e um `done` com a mesma resposta do POST.
 
 Se o stream cair, o app retoma de onde parou (`Last-Event-ID`). Se não der para abrir, volta a
 consultar o `/progress` como antes. O POST continua sendo quem cria a resposta.

@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 from core import browse, projects
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
+from core.conversation import browser_guard, progress
 from core.conversation import links as conversation_links
-from core.conversation import progress
 from core.conversation.service import Budgets, TurnResult, conversation_history, reply
 from core.curiosity.engine import (
     ASK_USER,
@@ -513,6 +513,17 @@ def run_turn(
     owner_profile, owner_rules = (
         mind_notes.for_prompt(session, owner) if config.mind_enabled else ("", "")
     )
+    # What closes a reply that denied the browser and could not be rewritten: what is missing,
+    # that it tried and failed, or that it can look (core/conversation/browser_guard.py).
+    if browsed is not None and browsed.missing:
+        browser_fallback = browser_guard.asks_for(browsed.missing)
+    elif browsed is not None and (
+        (browsed.skipped and browsed.skipped != "planner_declined")
+        or (browsed.visits and not browsed.opened)
+    ):
+        browser_fallback = browser_guard.TRIED
+    else:
+        browser_fallback = browser_guard.FALLBACK
     result = reply(
         session,
         conversation=conversation,
@@ -540,7 +551,11 @@ def run_turn(
         ),
         files=files,
         reply_to_id=reply_to_id,
+        browser_fallback=browser_fallback,
     )
+    if result.browser_guard:
+        # It denied the browser and was fixed before anyone read it (docs/decisions/0013).
+        plan.add("browser_denial_fixed", executed=True, reason=result.browser_guard)
     if outcome.gap is not None:
         outcome.gap.trigger_message_id = result.user_message.id
         if outcome.gap.depends_on == "conversation" and outcome.gap.status == "DEFERRED":
