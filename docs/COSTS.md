@@ -43,6 +43,13 @@ Por cotação ao vivo com preços ([ADR-0015](decisions/0015-cotacao-com-suposic
 Um turno de cotação usa de 4 a 6 chamadas (planejar, extrair, responder e, se houver regras ou se
 a resposta negar o navegador, conferir).
 
+## Conversa contínua: resumo de trechos (16/11/2026)
+
+Uma chamada por trecho fechado (`segment_summary`), pelo worker, no orçamento da autonomia: até
+40 mensagens de 700 caracteres na entrada e 450 tokens de saída, com o Haiku sem raciocínio. Fica
+bem abaixo de US$ 0,001 por trecho. Sem orçamento, o trecho não é resumido e vai cru enquanto
+couber.
+
 ## Painéis vivos (conferência diária)
 
 Por painel ativo e por dia:

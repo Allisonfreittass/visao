@@ -13,6 +13,7 @@ from apps.worker.runner import Handler, HandlerResult
 from core.autonomy.budget import has_room
 from core.autonomy.cycle import AutonomyBudget, run_cycle, usage_today
 from core.autonomy.cycle import _record as record_action
+from core.conversation import segments
 from core.conversation import title as conversation_title
 from core.conversation.service import Budgets
 from core.goals.followup import research_count_today, run_followup
@@ -204,6 +205,22 @@ def title_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     return handle
 
 
+def segment_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
+    """Closes and summarizes the continuous conversation's segments (ADR-0014): the agent's own
+    call, so it counts in the autonomy budget. Without room, a segment stays read raw."""
+
+    def handle(session: Session, job: ScheduledJob) -> HandlerResult:
+        closed = segments.run_job(
+            session,
+            uuid.UUID(job.payload["conversation_id"]),
+            provider,
+            has_room=lambda: autonomy_room(session, settings),
+        )
+        return HandlerResult("done", {"closed": closed})
+
+    return handle
+
+
 def panel_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
     """The daily check of a live panel (core/panels/service.py, ADR-0012): the agent's own call,
     so it counts in the autonomy budget and stops with the global pause."""
@@ -242,4 +259,5 @@ def build_handlers(settings: Settings) -> dict[str, Handler]:
         "mind_think": think_handler(settings, provider),
         conversation_title.JOB_KIND: title_handler(settings, fast),
         panels.JOB_KIND: panel_handler(settings, fast),
+        segments.JOB_KIND: segment_handler(settings, fast),
     }

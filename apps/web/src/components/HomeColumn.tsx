@@ -1,6 +1,6 @@
 import { type Api, type Conversation, utcDate } from "../api";
 import type { Pending } from "../hooks/usePending";
-import { dayLabel } from "../labels";
+import { conversationLabel } from "../labels";
 import { PanelsBoard } from "./PanelsBoard";
 import { type CallControls, PresencePanel } from "./Presence";
 
@@ -34,7 +34,7 @@ export function HomeColumn({ api, call, pending, conversations, current, busy, o
           {conversations.slice(0, 8).map((c) => (
             <li key={c.id}>
               <button type="button" aria-current={c.id === current ? "true" : undefined} onClick={() => onSelect(c.id)}>
-                {c.title ?? dayLabel(utcDate(c.created_at))}
+                {conversationLabel(c, utcDate)}
               </button>
             </li>
           ))}

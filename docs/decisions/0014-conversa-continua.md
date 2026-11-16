@@ -1,7 +1,8 @@
 # ADR-0014: Uma conversa contínua, com o passado resumido em trechos
 
 - Data: 2026-11-16
-- Estado: proposta (espera a aprovação do dono antes de virar código)
+- Estado: aceita (aprovada pelo dono em 16/11/2026; implementada no mesmo dia, ver
+  [CONVERSA_CONTINUA.md](../CONVERSA_CONTINUA.md))
 
 ## Contexto
 

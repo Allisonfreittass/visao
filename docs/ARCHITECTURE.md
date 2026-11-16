@@ -126,6 +126,11 @@ que ele existe ([ADR-0013](decisions/0013-nunca-negar-o-navegador.md),
 `core/conversation/browser_guard.py`). A conferência usa a mesma checagem curta das regras e o
 mesmo `replace` no stream.
 
+A conversa contínua ([ADR-0014](decisions/0014-conversa-continua.md),
+[CONVERSA_CONTINUA.md](CONVERSA_CONTINUA.md)) é uma por dono. O modelo lê o trecho aberto inteiro
+e os resumos dos trechos antigos (`core/conversation/segments.py`), que o worker escreve pelo job
+`segment_summary`.
+
 Inspeção: `GET /decisions`, `GET /cognition/metrics`, `GET /identity/name`,
 `GET|PUT /autonomy/permissions`. Ver [AUTONOMY.md](AUTONOMY.md) e
 [research/curiosity_evaluation.md](research/curiosity_evaluation.md).

@@ -9,6 +9,7 @@ import {
   type Bench as BenchData,
   type Conversation,
   type ProgressStep,
+  type Segment,
   type Message,
   type OnboardingStatus,
   type SystemStatus,
@@ -55,6 +56,8 @@ interface TurnLatency {
 }
 
 const HEALTH_INTERVAL_MS = 15_000;
+// The continuous conversation loads backwards, this many messages at a time.
+const MESSAGES_PAGE = 100;
 // An installed app on the phone is resumed, not reloaded, so the sync also runs on return.
 const PUSH_SYNC_MS = 60 * 60 * 1000;
 const INITIATIVE_POLL_MS = 15_000;
@@ -116,6 +119,9 @@ export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [current, setCurrent] = useState<string | null>(requestedConversation);
   const [messages, setMessages] = useState<Message[]>([]);
+  // The continuous conversation (docs/CONVERSA_CONTINUA.md): its stretches, and older pages.
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [olderLeft, setOlderLeft] = useState(false);
   const [sending, setSending] = useState(false);
   const [composerFocus, setComposerFocus] = useState(0);
   const [preparing, setPreparing] = useState(false);
@@ -167,6 +173,17 @@ export function App() {
   const messagesRef = useRef<Message[]>([]);
   sendingRef.current = sending;
   messagesRef.current = messages;
+  const conversationsRef = useRef<Conversation[]>([]);
+  conversationsRef.current = conversations;
+
+  // The continuous conversation loads only its last page (and as many as are already shown);
+  // the others load whole, as before.
+  const loadMessages = useCallback((id: string): Promise<Message[]> => {
+    const continuous = conversationsRef.current.find((c) => c.id === id)?.continuous;
+    if (!continuous) return loadMessages(id);
+    const shown = messagesRef.current.filter((m) => !m.local).length;
+    return api.messages(id, { limit: Math.max(MESSAGES_PAGE, shown) });
+  }, [api]);
 
   const handleError = useCallback((e: unknown) => {
     if (e instanceof ApiError && e.status === 401) {
@@ -230,12 +247,15 @@ export function App() {
   useEffect(() => {
     if (!loggedIn) return;
     api.voiceStatus().then(setVoiceStatus, () => setVoiceStatus(null));
-    Promise.all([api.status(), api.memorySettings(), api.listConversations()])
-      .then(([s, memory, list]) => {
+    // The continuous conversation is made the first time it is asked for, then opened by default.
+    Promise.all([api.status(), api.memorySettings(), api.continuousConversation().catch(() => null)])
+      .then(async ([s, memory, continuous]) => {
+        const list = await api.listConversations();
         setStatus(s);
         setMemoryEnabled(memory.enabled);
         setConversations(list);
-        setCurrent((c) => (c && list.some((x) => x.id === c) ? c : list[0]?.id ?? null));
+        conversationsRef.current = list;
+        setCurrent((c) => (c && list.some((x) => x.id === c) ? c : continuous?.id ?? list[0]?.id ?? null));
       })
       .catch(handleError);
   }, [api, loggedIn, handleError]);
@@ -270,8 +290,28 @@ export function App() {
     // A conversation opened by sending its first message is filled by that send, not by this
     // load (which would race it and hide the message that is showing).
     if (sendingRef.current) return;
-    api.messages(current).then(setMessages).catch(handleError);
-  }, [api, current, loggedIn, handleError]);
+    const continuous = conversationsRef.current.find((c) => c.id === current)?.continuous;
+    (continuous ? api.messages(current, { limit: MESSAGES_PAGE }) : api.messages(current))
+      .then((list) => {
+        setMessages(list);
+        setOlderLeft(!!continuous && list.length >= MESSAGES_PAGE);
+      })
+      .catch(handleError);
+    if (continuous) api.segments(current).then(setSegments, () => setSegments([]));
+    else setSegments([]);
+  }, [api, current, loggedIn, handleError, conversations.length]);
+
+  async function loadOlder() {
+    const first = messagesRef.current.find((m) => !m.local);
+    if (!current || !first) return;
+    try {
+      const page = await api.messages(current, { before: first.id, limit: MESSAGES_PAGE });
+      setMessages((list) => [...page.filter((m) => !list.some((x) => x.id === m.id)), ...list]);
+      setOlderLeft(page.length >= MESSAGES_PAGE);
+    } catch (e) {
+      handleError(e);
+    }
+  }
 
   const loadAttachment = useCallback((id: string) => api.attachmentBlob(id), [api]);
 
@@ -414,7 +454,7 @@ export function App() {
     let alive = true;
     const timer = setInterval(() => {
       if (sendingRef.current) return;
-      api.messages(current).then((next) => {
+      loadMessages(current).then((next) => {
         if (!alive || sendingRef.current) return;
         const known = new Set(messagesRef.current.map((m) => m.id));
         // What it says on its own, and the arm's reports, are read aloud in a call.
@@ -464,7 +504,7 @@ export function App() {
     try {
       const conversationId = current ?? (await openConversation());
       await api.askArm(command.project, command.prompt, conversationId);
-      setMessages(await api.messages(conversationId));
+      setMessages(await loadMessages(conversationId));
     } catch (e) {
       handleError(e);
     } finally {
@@ -748,7 +788,7 @@ export function App() {
     onOpenSettings: () => showView("settings"),
   };
   const currentConversation = conversations.find((c) => c.id === current);
-  const reload = () => { if (current) api.messages(current).then(setMessages).catch(handleError); };
+  const reload = () => { if (current) loadMessages(current).then(setMessages).catch(handleError); };
   reloadRef.current = reload;
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
@@ -847,7 +887,7 @@ export function App() {
                 onReplied={(conversationId) => {
                   setView("conversation");
                   setCurrent(conversationId);
-                  api.messages(conversationId).then(setMessages).catch(handleError);
+                  loadMessages(conversationId).then(setMessages).catch(handleError);
                   setComposerFocus((value) => value + 1);
                 }}
               />
@@ -905,6 +945,9 @@ export function App() {
             )}
             <ChatView
               hidden={view !== "conversation"}
+              segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
+              olderLeft={olderLeft}
+              onLoadOlder={() => void loadOlder()}
               placeholder={sky ? `Enviar mensagem para ${agentName ?? "o Visão"}` : undefined}
               composerStart={sky ? <SkyOrbButton state={orbState} canCall={call.canCall} hint={call.hint} onCall={call.onCall} /> : undefined}
               header={sky ? (

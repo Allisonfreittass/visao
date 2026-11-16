@@ -1,6 +1,7 @@
-import { type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ClipboardEvent, type DragEvent, type FormEvent, Fragment, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import { type ArtifactSummary, type Attachment, type ProgressStep, utcDate, type Message } from "../api";
+import { type ArtifactSummary, type Attachment, type ProgressStep, type Segment, utcDate, type Message } from "../api";
+import { dividers } from "../labels";
 import { ACCEPT, type DraftFile, draftKey, MAX_FILES, pastedName, prepareImage } from "../attachments";
 
 /** Something waiting for one tap, right above where you type. */
@@ -26,6 +27,11 @@ interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
   header?: ReactNode;
   messages: Message[];
+  /** The continuous conversation's closed stretches: a divider with the day and the subject. */
+  segments?: Segment[];
+  /** The continuous conversation loads backwards: there are older messages to bring. */
+  olderLeft?: boolean;
+  onLoadOlder?: () => void;
   /** What it put together from this conversation (Mac work, an email, an event). */
   asks?: Ask[];
   agentName?: string | null;
@@ -141,8 +147,10 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
   );
 }
 
-export function ChatView({ header, messages, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
+export function ChatView({ header, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
   const [draft, setDraft] = useState("");
+  // In the continuous conversation: a divider at each new day and at each stretch's start.
+  const divided = useMemo(() => (segments ? dividers(messages, segments, utcDate) : new Map<string, string>()), [messages, segments]);
   const [files, setFiles] = useState<DraftFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [viewing, setViewing] = useState<ArtifactSummary | null>(null);
@@ -280,9 +288,17 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
             <p>Um bug, uma ideia pela metade, um plano. Pode escrever, colar código, mandar uma foto ou um arquivo, ou me ligar.</p>
           </div>
         )}
+        {olderLeft && onLoadOlder && (
+          <button type="button" className="load-older" onClick={onLoadOlder}>Carregar mensagens anteriores</button>
+        )}
         {messages.filter((m) => m.id !== settlingId).map((m, i, shown) => (
+          <Fragment key={m.id}>
+          {segments && divided.get(m.id) && (
+            <div className="chat-divider" role="separator" aria-label={divided.get(m.id)}>
+              <span>{divided.get(m.id)}</span>
+            </div>
+          )}
           <SwipeReply
-            key={m.id}
             id={`msg-${m.id}`}
             className={`bubble ${m.role}${i === shown.length - 1 ? " bubble--last" : ""}${m.local ? ` bubble--${m.local}` : ""}${m.streamed ? " bubble--streamed" : ""}`}
             disabled={!!m.local}
@@ -352,6 +368,7 @@ export function ChatView({ header, messages, asks = [], agentName, hidden, focus
               </div>
             )}
           </SwipeReply>
+          </Fragment>
         ))}
         {(sending || settlingId) && (
           <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} />

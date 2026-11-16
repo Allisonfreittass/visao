@@ -645,3 +645,10 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
   .quote-table table { font-size: 12.5px; }
   .quote-table td:nth-child(2) { white-space: nowrap; }
 }
+
+/* The continuous conversation (docs/CONVERSA_CONTINUA.md): a divider per day and per stretch. */
+.chat-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0 6px; color: var(--tinta-fraca); font: 500 11px/1.2 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.chat-divider::before, .chat-divider::after { content: ""; flex: 1; height: 1px; background: var(--linha); }
+.chat-divider span { max-width: 70%; text-align: center; overflow-wrap: anywhere; }
+.load-older { align-self: center; margin: 4px auto 10px; display: block; background: none; border: 1px solid var(--linha); border-radius: var(--raio-pilula); padding: 6px 14px; font: 400 12.5px/1.2 var(--font-sans); color: var(--tinta-suave); cursor: pointer; }
+.load-older:hover { background: var(--fundo-hover); }

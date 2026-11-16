@@ -7,10 +7,19 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.browser import get_browser
@@ -24,7 +33,7 @@ from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
-from core.conversation import artifacts, attachments, progress, title
+from core.conversation import artifacts, attachments, progress, segments, title
 from core.conversation.links import LinkReader
 from core.conversation.service import (
     BudgetExceededError,
@@ -44,7 +53,14 @@ from core.memory.curator import (
 )
 from core.policies.autonomy import is_paused
 from core.reflection.reflect import ReflectionResult, reflect
-from infrastructure.database.models import Artifact, BrowseVisit, Conversation, Message, User
+from infrastructure.database.models import (
+    Artifact,
+    BrowseVisit,
+    Conversation,
+    ConversationSegment,
+    Message,
+    User,
+)
 from integrations.browser.base import Browser
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
@@ -64,6 +80,35 @@ class ConversationOut(BaseModel):
     title: str | None = None
     memory_status: str | None = None
     project_id: uuid.UUID | None = None
+    # The owner's one continuous conversation (docs/CONVERSA_CONTINUA.md); the app opens it.
+    continuous: bool = False
+
+
+class SegmentOut(BaseModel):
+    """A closed stretch of the continuous conversation, for the dividers in the chat."""
+
+    id: uuid.UUID
+    title: str
+    started_at: datetime
+    ended_at: datetime
+    first_message_id: uuid.UUID
+    last_message_id: uuid.UUID
+    messages: int
+    # "summarized", or "failed": then the title is empty and the app shows only the date.
+    status: str
+
+
+MESSAGES_PAGE_MAX = 500
+
+
+def _conversation_out(c: Conversation) -> ConversationOut:
+    return ConversationOut(
+        id=c.id,
+        created_at=c.created_at,
+        project_id=c.project_id,
+        title=c.title,
+        continuous=c.continuous,
+    )
 
 
 class ConversationProjectIn(BaseModel):
@@ -397,14 +442,45 @@ def curate(
 
 @router.get("")
 def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut]:
+    """The continuous conversation first, then the others, newest first."""
     conversations = db.scalars(
         select(Conversation)
         .where(Conversation.user_id == user.id)
-        .order_by(Conversation.created_at.desc())
+        .order_by(Conversation.continuous.desc(), Conversation.created_at.desc())
+    )
+    return [_conversation_out(c) for c in conversations]
+
+
+@router.get("/continuous")
+def continuous_conversation(db: DbSession, user: CurrentUser) -> ConversationOut:
+    """The owner's continuous conversation, made the first time (docs/decisions/0014)."""
+    try:
+        return _conversation_out(segments.continuous_for(db, user))
+    except LookupError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado") from None
+
+
+@router.get("/{conversation_id}/segments")
+def list_segments(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> list[SegmentOut]:
+    """The closed stretches of a continuous conversation, oldest first (empty for the others)."""
+    conversation = _own_conversation(db, user, conversation_id)
+    rows = db.scalars(
+        select(ConversationSegment)
+        .where(ConversationSegment.conversation_id == conversation.id)
+        .order_by(ConversationSegment.ended_at)
     )
     return [
-        ConversationOut(id=c.id, created_at=c.created_at, project_id=c.project_id, title=c.title)
-        for c in conversations
+        SegmentOut(
+            id=s.id,
+            title=s.title,
+            started_at=s.started_at,
+            ended_at=s.ended_at,
+            first_message_id=s.first_message_id,
+            last_message_id=s.last_message_id,
+            messages=s.messages,
+            status=s.status,
+        )
+        for s in rows
     ]
 
 
@@ -414,16 +490,14 @@ def move_to_project(
 ) -> ConversationOut:
     """Puts the conversation in a project, or takes it out (null)."""
     conversation = _own_conversation(db, user, conversation_id)
+    if conversation.continuous and body.project_id is not None:
+        # A project keeps a subject apart; the continuous conversation is everything else.
+        raise HTTPException(status.HTTP_409_CONFLICT, "A conversa contínua não entra em projeto")
     if body.project_id is not None:
         own_project(db, user.id, body.project_id)
     conversation.project_id = body.project_id
     db.commit()
-    return ConversationOut(
-        id=conversation.id,
-        created_at=conversation.created_at,
-        project_id=conversation.project_id,
-        title=conversation.title,
-    )
+    return _conversation_out(conversation)
 
 
 class ProgressStepOut(BaseModel):
@@ -568,12 +642,42 @@ def notify_reply(
 
 
 @router.get("/{conversation_id}/messages")
-def list_messages(conversation_id: uuid.UUID, db: DbSession, user: CurrentUser) -> list[MessageOut]:
+def list_messages(
+    conversation_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    before: uuid.UUID | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=MESSAGES_PAGE_MAX)] = None,
+) -> list[MessageOut]:
+    """The whole conversation, oldest first. With `limit` (and `before`, a message id), only the
+    `limit` messages before that one: the continuous conversation loads backwards in pages. Without
+    them, everything, as before (an app that does not page keeps working)."""
     conversation = _own_conversation(db, user, conversation_id)
-    history = conversation_history(db, conversation)
+    if limit is None and before is None:
+        history = conversation_history(db, conversation)
+    else:
+        query = select(Message).where(Message.conversation_id == conversation.id)
+        if before is not None:
+            anchor = db.get(Message, before)
+            if anchor is None or anchor.conversation_id != conversation.id:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "Mensagem não encontrada")
+            query = query.where(
+                or_(
+                    Message.created_at < anchor.created_at,
+                    and_(Message.created_at == anchor.created_at, Message.id < anchor.id),
+                )
+            )
+        page = db.scalars(
+            query.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit or 100)
+        )
+        history = list(reversed(list(page)))
     files = attachments.for_messages(db, [m.id for m in history if m.role == "user"])
     pages = artifacts.for_messages(db, [m.id for m in history if m.role == "assistant"])
     by_id = {m.id: m for m in history}
+    # A reply quoting a message outside this page still shows what it answers.
+    missing = {m.reply_to_id for m in history if m.reply_to_id and m.reply_to_id not in by_id}
+    if missing:
+        by_id.update({m.id: m for m in db.scalars(select(Message).where(Message.id.in_(missing)))})
     return [
         _message_out(m, files.get(m.id), pages.get(m.id), by_id.get(m.reply_to_id)) for m in history
     ]
@@ -682,6 +786,8 @@ def send_message(
 
     # After the reply, never before it: the worker writes it (a small call of its own).
     title.request(db, conversation)
+    # In the continuous conversation, the worker closes and summarizes what is due (ADR-0014).
+    segments.request(db, conversation, result.assistant_message.id)
 
     if progress.owner_left(conversation.id):
         # The app stopped watching while this ran (phone locked, app closed): the reply also goes

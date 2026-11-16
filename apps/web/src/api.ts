@@ -127,6 +127,20 @@ export interface Conversation {
   project_id?: string | null;
   /** 3 to 6 words after the first exchange; null: the menu shows the date. */
   title?: string | null;
+  /** The owner's one continuous conversation (docs/CONVERSA_CONTINUA.md): the app opens it. */
+  continuous?: boolean;
+}
+
+/** A closed stretch of the continuous conversation, for the dividers in the chat. */
+export interface Segment {
+  id: string;
+  title: string;
+  started_at: string;
+  ended_at: string;
+  first_message_id: string;
+  last_message_id: string;
+  messages: number;
+  status: "summarized" | "failed";
 }
 
 /** A subject with its conversations, pages and files (Projetos). */
@@ -451,8 +465,20 @@ export class Api {
     return this.request(`/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
-  messages(conversationId: string): Promise<Message[]> {
-    return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`);
+  /** With `limit`, only the last `limit` messages (before `before`, when given), oldest first. */
+  messages(conversationId: string, page?: { before?: string; limit: number }): Promise<Message[]> {
+    const query = page
+      ? `?${new URLSearchParams({ limit: String(page.limit), ...(page.before ? { before: page.before } : {}) })}`
+      : "";
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages${query}`);
+  }
+
+  continuousConversation(): Promise<Conversation> {
+    return this.request("/conversations/continuous");
+  }
+
+  segments(conversationId: string): Promise<Segment[]> {
+    return this.request(`/conversations/${encodeURIComponent(conversationId)}/segments`);
   }
 
   send(

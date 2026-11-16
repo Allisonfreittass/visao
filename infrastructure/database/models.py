@@ -181,6 +181,48 @@ class Conversation(Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    # The owner's one continuous conversation (ADR-0014): the app opens it, and its past goes to
+    # the model as segment summaries. At most one per owner (unique partial index).
+    continuous: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+    __table_args__ = (
+        Index(
+            "uq_conversations_one_continuous",
+            "user_id",
+            unique=True,
+            sqlite_where=text("continuous"),
+            postgresql_where=text("continuous"),
+        ),
+    )
+
+
+class ConversationSegment(Base):
+    """A closed stretch of the continuous conversation, summarized by the worker (ADR-0014)."""
+
+    __tablename__ = "conversation_segments"
+    __table_args__ = (
+        Index("ix_conversation_segments_conversation_ended", "conversation_id", "ended_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    first_message_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    last_message_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    messages: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(80))
+    summary: Mapped[str] = mapped_column(Text)
+    keywords: Mapped[list[str]] = mapped_column(JSON)
+    # "summarized", or "failed" (no budget, unusable answer): then title and summary are empty and
+    # the segment's messages are read raw while they fit.
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Message(Base):

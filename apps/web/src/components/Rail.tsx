@@ -74,7 +74,12 @@ export function Rail(props: RailProps) {
                 aria-current={c.id === current && view === "conversation" ? "true" : undefined}
                 onClick={() => props.onSelect(c.id)}
               >
-                {c.title ? (
+                {c.continuous ? (
+                  <>
+                    <span className="conversation-title">Conversa</span>
+                    <span className="conversation-date">contínua</span>
+                  </>
+                ) : c.title ? (
                   <>
                     <span className="conversation-title">{c.title}</span>
                     <span className="conversation-date">{dayLabel(utcDate(c.created_at))}</span>

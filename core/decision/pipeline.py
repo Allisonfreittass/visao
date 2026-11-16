@@ -18,7 +18,7 @@ from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import browser_guard, progress
 from core.conversation import links as conversation_links
-from core.conversation.service import Budgets, TurnResult, conversation_history, reply
+from core.conversation.service import Budgets, TurnResult, context_history, reply
 from core.curiosity.engine import (
     ASK_USER,
     DEFER,
@@ -203,7 +203,7 @@ def run_turn(
 
     if config.google_secret:
         recent = "\n".join(
-            f"{m.role}: {m.content[:300]}" for m in conversation_history(session, conversation)[-6:]
+            f"{m.role}: {m.content[:300]}" for m in context_history(session, conversation)[-6:]
         )
         helped = google_assist.run(
             session,
@@ -313,8 +313,7 @@ def run_turn(
             conversation=conversation,
             text=text,
             recent="\n".join(
-                f"{m.role}: {m.content[:300]}"
-                for m in conversation_history(session, conversation)[-6:]
+                f"{m.role}: {m.content[:300]}" for m in context_history(session, conversation)[-6:]
             ),
             provider=provider,
             budgets=config.budgets,
@@ -356,7 +355,7 @@ def run_turn(
                 budget_goal = panel_offers.goal_from(
                     *(
                         m.content
-                        for m in conversation_history(session, conversation)
+                        for m in context_history(session, conversation)
                         if m.role == "user"
                     ),
                     text,
@@ -672,7 +671,7 @@ def _quote_table(
     out with a price a page shows (the reply then answers from the pages, as before)."""
     pages = panels.pages_read(session, browsed.records)
     talk = "\n".join(
-        f"{m.role}: {m.content[:600]}" for m in conversation_history(session, conversation)[-8:]
+        f"{m.role}: {m.content[:600]}" for m in context_history(session, conversation)[-8:]
     )
     progress.step("Montando as opções")
     found = extract_prices(

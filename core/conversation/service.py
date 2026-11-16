@@ -125,6 +125,16 @@ def check_budgets(session: Session, conversation: Conversation, budgets: Budgets
             raise BudgetExceededError("conversation", per_conversation, budgets.conversation_usd)
 
 
+def context_history(session: Session, conversation: Conversation) -> list[Message]:
+    """The messages the model reads raw. In the continuous conversation, only the current
+    stretch (its past goes as summaries, docs/decisions/0014); elsewhere, the whole history."""
+    if conversation.continuous:
+        from core.conversation import segments  # segments builds on this module's models
+
+        return segments.window(session, conversation)
+    return conversation_history(session, conversation)
+
+
 def conversation_history(session: Session, conversation: Conversation) -> list[Message]:
     return list(
         session.scalars(
@@ -260,7 +270,13 @@ def reply(
     prompt = [ChatMessage(role="system", content=system_prompt)]
     from core.decision import record as deed_record
 
-    history = conversation_history(session, conversation)
+    history = context_history(session, conversation)
+    if conversation.continuous:
+        from core.conversation import segments
+
+        earlier = segments.block(segments.chosen(session, conversation, user_text, history), owner)
+        if earlier:
+            prompt[0] = replace(prompt[0], content=f"{prompt[0].content}\n\n{earlier}")
     prompt += build_context(
         history,
         context_char_budget,

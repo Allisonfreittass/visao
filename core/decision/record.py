@@ -9,7 +9,7 @@ happened; one missing here must not be claimed.
 import re
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 from infrastructure.database.models import Artifact, Conversation, Decision, Message, User
 
 RECORD_MESSAGES = 40
+# In the continuous conversation the record covers this much (docs/decisions/0014).
+CONTINUOUS_RECORD = timedelta(days=7)
 RECORD_LINES = 14
 
 HEADING = (
@@ -131,12 +133,14 @@ def _local(owner: User, moment: datetime) -> str:
 
 def conversation_block(session: Session, conversation: Conversation, owner: User) -> str:
     """The record for the prompt, or "" when it did nothing beyond talking."""
-    recent = session.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation.id, Message.role == "assistant")
-        .order_by(Message.created_at.desc())
-        .limit(RECORD_MESSAGES)
-    ).all()
+    query = select(Message).where(
+        Message.conversation_id == conversation.id, Message.role == "assistant"
+    )
+    if conversation.continuous:
+        # The continuous conversation never ends: its record covers the last days, the rest
+        # stays in decisions and the Bench (docs/decisions/0014).
+        query = query.where(Message.created_at >= datetime.now(UTC) - CONTINUOUS_RECORD)
+    recent = session.scalars(query.order_by(Message.created_at.desc()).limit(RECORD_MESSAGES)).all()
     done = by_message(session, [m.id for m in recent])
     lines = [
         f"- {_local(owner, m.created_at)}: " + "; ".join(done[m.id])
