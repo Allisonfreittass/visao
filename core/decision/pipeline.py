@@ -360,7 +360,10 @@ def run_turn(
                 urls=[v.final_url or v.url for v in browsed.visits],
                 opened=[v.final_url or v.url for v in browsed.opened],
                 failures=[v.failure for v in browsed.visits if not v.ok],
+                **({"assumed": browsed.assumed} if browsed.assumed else {}),
             )
+            if browsed.assumed and browsed.opened:
+                blocks.append(browse.assumed_block(browsed.assumed))
             if browsed.retry_skipped:
                 # A site refused and the budget did not allow planning another one.
                 plan.add(
