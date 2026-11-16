@@ -3,19 +3,22 @@ read only, given to the model as third-party data with the time read, listed as 
 on record. A site that asks to prove you are human is reported, never worked around."""
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 
 from apps.api.browser import get_browser
 from apps.api.llm import get_llm_provider
+from apps.api.search import get_search_provider
 from apps.api.settings import Settings, get_settings
 from core import browse
 from core.curiosity.engine import ASSESSMENT_INSTRUCTIONS
 from core.decision import record
 from core.identity.genesis import run_genesis
-from infrastructure.database.models import BrowseVisit, Panel, PanelOffer
+from infrastructure.database.models import BrowseVisit, Decision, Panel, PanelOffer
 from integrations.browser.base import Visit
 from integrations.browser.playwright_browser import allowed_request
+from integrations.search.base import SearchResult
 from tests.fakes import FakeLLMProvider
 from tests.integration.test_curiosity_api import _login
 
@@ -53,16 +56,36 @@ def offline(monkeypatch):
     )
 
 
-def world(client, db, *, plan, pages, reply="Achei voos a partir de R$ 2.195 por pessoa."):
+class FakeSearch:
+    name = "fake"
+
+    def __init__(self, urls):
+        self.urls, self.queries = urls, []
+
+    def search(self, query, max_results):
+        self.queries.append(query)
+        now = datetime.now(UTC)
+        return [SearchResult(u, u, "", "fake", now) for u in self.urls[:max_results]]
+
+
+def world(
+    client, db, *, plan, pages, reply="Achei voos a partir de R$ 2.195 por pessoa.", search=None
+):
+    """`plan` may be a list (one plan per planning call, in order) or a raw string."""
+    plans = list(plan) if isinstance(plan, list) else None
+
     def respond(messages):
         if messages[0].content == browse.INSTRUCTIONS:
-            return json.dumps(plan)
+            chosen = plans.pop(0) if plans else plan
+            return chosen if isinstance(chosen, str) else json.dumps(chosen)
         return reply
 
     llm = FakeLLMProvider(responder=respond)
     browser = FakeBrowser(pages)
     client.app.dependency_overrides[get_llm_provider] = lambda: llm
     client.app.dependency_overrides[get_browser] = lambda: browser
+    if search is not None:
+        client.app.dependency_overrides[get_search_provider] = lambda: search
     client.app.dependency_overrides[get_settings] = lambda: Settings(curiosity_enabled=False)
     run_genesis(db)
     db.commit()
@@ -142,6 +165,141 @@ def test_when_the_plan_says_no_nothing_opens(client, db):
     headers = _login(client, db)
     _send(client, headers, "quero ver passagem pra Santiago")
     assert browser.opened == []
+
+
+REFUSED = Visit(url="https://tracxn.com/d/casal", ok=False, failure="o site respondeu 403")
+OPEN = Visit(url="https://casal.com.br/sobre", ok=True, title="Casal", text="Fundada em 1998")
+
+
+def _plans(llm):
+    return [json.loads(p[-1].content) for p in llm.prompts if p[0].content == browse.INSTRUCTIONS]
+
+
+def _actions(db):
+    return [a for d in db.query(Decision).all() for a in d.actions]
+
+
+def test_a_site_that_refuses_the_robot_is_replaced_by_a_spare_search_result(client, db):
+    """Real case (2026-11-16): tracxn and rocketreach answered 403 and nothing else was tried."""
+    search = FakeSearch([REFUSED.url, "https://rocketreach.co/casal", OPEN.url])
+    pages = {
+        REFUSED.url: REFUSED,
+        "https://rocketreach.co/casal": Visit(
+            url="https://rocketreach.co/casal",
+            ok=False,
+            failure="o site pediu para provar que não é robô; não contornei isso",
+        ),
+        OPEN.url: OPEN,
+    }
+    plan = {"browse": True, "urls": [], "search": "Casal empresa"}
+    llm, browser = world(client, db, plan=plan, pages=pages, search=search)
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        curiosity_enabled=False, browser_max_pages=2
+    )
+    headers = _login(client, db)
+
+    _send(client, headers, "procura na internet o preço da Casal")
+
+    assert browser.opened == [REFUSED.url, "https://rocketreach.co/casal", OPEN.url]
+    assert len(_plans(llm)) == 1  # the spare was enough: no second plan
+    message = _chat_prompt(llm)[-1].content
+    assert "Fundada em 1998" in message and "abri outro site no lugar" in message
+
+
+def test_without_spares_a_second_plan_knows_which_sites_refused(client, db):
+    plans = [
+        {"browse": True, "urls": [REFUSED.url], "search": ""},
+        {"browse": True, "urls": [REFUSED.url, OPEN.url], "search": ""},
+    ]
+    llm, browser = world(client, db, plan=plans, pages={REFUSED.url: REFUSED, OPEN.url: OPEN})
+    headers = _login(client, db)
+
+    _send(client, headers, "procura na internet o preço da Casal")
+
+    assert _plans(llm)[1]["refused"] == ["tracxn.com"]
+    assert browser.opened == [REFUSED.url, OPEN.url]  # never the refused one twice
+
+
+def test_sites_that_refused_lately_are_named_in_the_next_plan(client, db):
+    search = FakeSearch([REFUSED.url, OPEN.url])
+    plan = {"browse": True, "urls": [], "search": "Casal"}
+    llm, browser = world(
+        client, db, plan=plan, pages={REFUSED.url: REFUSED, OPEN.url: OPEN}, search=search
+    )
+    headers = _login(client, db)
+    conversation, _ = _send(client, headers, "procura na internet o preço da Casal")
+    browser.opened.clear()
+
+    _send(client, headers, "e quanto tá agora no site?", conversation)
+
+    assert _plans(llm)[-1]["refused"] == ["tracxn.com"]
+    assert browser.opened == [OPEN.url]  # its search result is dropped before opening
+
+
+def test_a_page_that_is_only_broken_is_not_retried_elsewhere(client, db):
+    llm, browser = world(client, db, plan={"browse": True, "urls": [FLIGHTS]}, pages={})
+    headers = _login(client, db)
+    _send(client, headers, "quanto tá a passagem pra Santiago?")
+    assert browser.opened == [FLIGHTS] and len(_plans(llm)) == 1
+
+
+@pytest.mark.parametrize(
+    ("plan", "reason"),
+    [
+        ("não sei", "planner_invalid_json"),
+        ({"browse": False, "why": "dá para estimar", "missing": []}, "planner_said_no"),
+        ({"browse": True, "urls": [], "search": ""}, "no_addresses"),
+    ],
+)
+def test_giving_up_after_planning_is_on_record_with_the_reason(client, db, plan, reason):
+    llm, browser = world(client, db, plan=plan, pages={})
+    headers = _login(client, db)
+
+    _send(client, headers, "o preço sobe muito se eu pegar aulas de esqui?")
+
+    assert browser.opened == []
+    skipped = [a for a in _actions(db) if a["action"] == "browse_skipped"]
+    assert skipped == [
+        {"action": "browse_skipped", "executed": False, "reason": reason, "about_prices": True}
+    ]
+
+
+def test_a_price_question_it_gave_up_on_never_denies_the_browser(client, db):
+    """Real case (2026-11-16): "o preço sobe muito se eu pegar aulas?" got "não tenho preços
+    atuais" from the reply, with the browser working: the plan had said no, silently."""
+    llm, _ = world(client, db, plan={"browse": False, "missing": []}, pages={})
+    headers = _login(client, db)
+    _send(client, headers, "o preço sobe muito se eu pegar aulas de esqui?")
+    system = _chat_prompt(llm)[0].content
+    assert "Nunca diga que não tem acesso a preços atuais" in system
+
+    llm.responder = lambda messages: (
+        "não sei" if messages[0].content == browse.INSTRUCTIONS else "ok"
+    )
+    _send(client, headers, "e quanto custa a diária do hotel lá?")
+    system = _chat_prompt(llm)[0].content
+    assert "tentou consultar preços ao vivo agora" in system
+    assert "voltou ilegível" in system
+
+
+def test_a_cut_plan_is_told_apart_from_an_unreadable_one(client, db):
+    llm, _ = world(client, db, plan='{"browse": true, "urls": ["https://', pages={})
+    llm.finish_reason = "length"
+    headers = _login(client, db)
+    _send(client, headers, "quanto tá a passagem pra Santiago em agosto?")
+    reasons = [a["reason"] for a in _actions(db) if a["action"] == "browse_skipped"]
+    assert reasons == ["planner_truncated"]
+
+
+def test_a_skip_on_talk_that_is_not_about_prices_adds_nothing_to_the_reply(client, db):
+    llm, _ = world(client, db, plan={"browse": False, "missing": []}, pages={})
+    headers = _login(client, db)
+    _send(client, headers, "vou comprar o domínio hoje")
+    system = _chat_prompt(llm)[0].content
+    assert "nesta mensagem nada foi aberto" not in system
+    assert "tentou consultar preços ao vivo agora" not in system
+    reasons = [a["reason"] for a in _actions(db) if a["action"] == "browse_skipped"]
+    assert reasons == ["planner_said_no"]
 
 
 def test_login_pages_and_private_addresses_are_never_opened(client, db):

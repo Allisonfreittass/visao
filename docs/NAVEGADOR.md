@@ -27,6 +27,36 @@ Testado em 13/11/2026: Google Voos e Google Hotéis devolvem preços reais. A bu
 o Google Shopping, o Mercado Livre e o DuckDuckGo recusam navegador automático (pedem
 verificação ou respondem 403); ele reporta isso e não insiste.
 
+**Quando um site recusa o robô** (401, 403, 429 ou pedido de prova de humano), ele tenta outro
+site no lugar, uma vez só: primeiro um resultado da busca que sobrou e, se não sobrar nenhum, um
+segundo plano que já sabe quais sites recusaram (uma chamada a mais ao modelo, dentro do
+orçamento). Uma página que só quebrou (fora do ar, vazia) não troca de site. Os sites que
+recusaram nos últimos 30 dias vão no plano seguinte como `refused`, para ele nem tentar, e os
+resultados de busca deles são descartados antes de abrir. Caso real de 16/11/2026: tracxn.com e
+rocketreach.co responderam 403 e nada mais foi tentado.
+
+## Quando desiste, fica registrado
+
+Depois que o planejamento roda, ele nunca desiste em silêncio. Cada saída sem páginas vira uma
+ação `browse_skipped` em `decisions`, com o motivo:
+
+| Motivo | O que aconteceu |
+| --- | --- |
+| `planner_error` | o provedor falhou na chamada do plano |
+| `planner_invalid_json` | o plano voltou sem um JSON legível |
+| `planner_truncated` | o plano foi cortado no limite de tokens (agora 800) |
+| `planner_said_no` | o plano achou que não precisava abrir páginas, sem listar o que falta |
+| `no_addresses` | o plano não trouxe endereço nem termo de busca que servisse |
+
+Numa pergunta de preço, a resposta recebe um aviso. Se o plano falhou, ele diz que tentou ver ao
+vivo e não conseguiu agora. Se o plano disse não, ele pode oferecer olhar nos sites. Nos dois
+casos, nunca diz que não tem navegador. Uma mensagem que nem passou pela checagem de palavras
+(`candidate()`) não gera registro, senão toda conversa encheria `decisions`.
+
+Caso real de 16/11/2026: "o preço sobe muito se eu pegar aulas?" teve o plano dizendo não, e a
+resposta foi "não tenho preços atuais", com o navegador funcionando. O plano agora também trata
+preço de algo específico (aula, passeio, ingresso, aluguel) como busca ao vivo.
+
 ## Depois de ler preços: a oferta de painel
 
 Quando ele abriu pelo menos uma página com preço (R$, US$, €...), a resposta termina oferecendo

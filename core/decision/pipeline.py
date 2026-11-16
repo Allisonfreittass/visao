@@ -319,7 +319,18 @@ def run_turn(
             search=search,
             max_pages=config.browse_max_pages,
         )
-        if browsed is not None and browsed.missing:
+        if browsed is not None and browsed.skipped:
+            # It gave up after planning: on record with the reason, never silently. On a
+            # question about prices the reply says it tried (or can look), not that it can't.
+            plan.add(
+                "browse_skipped",
+                executed=False,
+                reason=browsed.skipped,
+                about_prices=browse.price_question(text),
+            )
+            if browse.price_question(text):
+                blocks.append(browse.skipped_block(browsed.skipped))
+        elif browsed is not None and browsed.missing:
             # Not an action: nothing opened. The reply asks for what is missing.
             plan.add(
                 "browse_needs_details",
@@ -513,7 +524,7 @@ def run_turn(
             part
             for part in (
                 conversation_links.context_block(list(read)) if read else "",
-                browsed.block if browsed and not browsed.missing else "",
+                browsed.block if browsed and browsed.visits else "",
             )
             if part
         ),
