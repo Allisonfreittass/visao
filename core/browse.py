@@ -124,6 +124,10 @@ class Browsed:
     title: str = ""
     # Why nothing was opened, when it gave up (SKIP_REASONS); "" when it browsed or asked.
     skipped: str = ""
+    # The planner's own words when it declined ("dá para estimar"), for the record.
+    why: str = ""
+    # Why no other site was tried after one refused ("budget"); "" when it tried or had no need.
+    retry_skipped: str = ""
 
     @property
     def opened(self) -> list[Visit]:
@@ -134,9 +138,11 @@ SKIP_REASONS = {
     "planner_error": "o planejamento da busca falhou no provedor",
     "planner_invalid_json": "o planejamento da busca voltou ilegível",
     "planner_truncated": "o planejamento da busca voltou cortado",
-    "planner_said_no": "o planejamento achou que não precisava abrir páginas",
+    "planner_declined": "o planejamento achou que não precisava abrir páginas",
     "no_addresses": "o planejamento não achou nenhum endereço para abrir",
+    "budget": "o orçamento do dia não deixou planejar outro site",
 }
+WHY_CHARS = 120
 
 
 def refused(failure: str) -> bool:
@@ -152,7 +158,7 @@ def skipped_block(reason: str) -> str:
     """For the reply when the browser was there but nothing opened, on a question about prices.
     Real case (16/11/2026): asked whether ski lessons raise the price, the plan said no and the
     reply said "não tenho preços atuais", with the browser working."""
-    if reason == "planner_said_no":
+    if reason == "planner_declined":
         return (
             "Você consegue consultar preços ao vivo num navegador de verdade (Google Voos, Google "
             "Hotéis e outros sites públicos), mas nesta mensagem nada foi aberto. Nunca diga que "
@@ -315,21 +321,22 @@ def _instead(
     avoid: set[str],
     tried: set[str],
     wanted: int,
-) -> list[str]:
-    """Other sites for the ones that refused: the spare search results, or, when none is left,
-    one more plan that knows which sites refused (a model call only when nothing else is left)."""
+) -> tuple[list[str], str]:
+    """(other sites for the ones that refused, why none: "budget" or ""). The spare search results
+    first; when none is left, one more plan that knows which sites refused (a model call only
+    when nothing else is left)."""
     chosen = [u for u in spares if _host(u) not in avoid and u not in tried][:wanted]
     if chosen:
-        return chosen
+        return chosen, ""
     try:
         check_budgets(session, conversation, budgets)
     except BudgetExceededError:
-        return []
+        return [], "budget"
     plan, _ = _plan(session, conversation, provider, owner, text, recent, avoid)
     if not plan or plan.get("browse") is not True:
-        return []
+        return [], ""
     more, rest = _addresses(plan, search, wanted, avoid=avoid, tried=tried)
-    return [u for u in more + rest if _host(u) not in avoid][:wanted]
+    return [u for u in more + rest if _host(u) not in avoid][:wanted], ""
 
 
 MISSING_ITEMS = 4
@@ -426,7 +433,8 @@ def run(
         missing = _missing(plan)
         if missing:
             return Browsed(missing=missing, block=ask_block(missing))
-        return Browsed(skipped="planner_said_no")
+        why = plan.get("why") if isinstance(plan.get("why"), str) else ""
+        return Browsed(skipped="planner_declined", why=" ".join(why.split())[:WHY_CHARS])
     urls, spares = _addresses(plan, search, max_pages, avoid=avoid)
     if not urls:
         return Browsed(skipped="no_addresses")
@@ -436,9 +444,10 @@ def run(
 
     visits = browser.visit(urls, on_visit=opening)
     turned_away = {_host(v.final_url or v.url) for v in visits if not v.ok and refused(v.failure)}
+    retry_skipped = ""
     if turned_away:
         progress.step(f"{', '.join(sorted(turned_away))[:60]} recusou robôs", "tentando outro site")
-        others = _instead(
+        others, retry_skipped = _instead(
             session,
             owner=owner,
             conversation=conversation,
@@ -473,6 +482,7 @@ def run(
     title = plan.get("title") if isinstance(plan.get("title"), str) else ""
     return Browsed(
         visits=visits,
+        retry_skipped=retry_skipped,
         block=block(visits, intentions.local(owner, datetime.now(UTC))),
         records=records,
         title=" ".join(title.split())[:60],

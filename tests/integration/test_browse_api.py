@@ -247,7 +247,7 @@ def test_a_page_that_is_only_broken_is_not_retried_elsewhere(client, db):
     ("plan", "reason"),
     [
         ("não sei", "planner_invalid_json"),
-        ({"browse": False, "why": "dá para estimar", "missing": []}, "planner_said_no"),
+        ({"browse": False, "why": "dá para estimar", "missing": []}, "planner_declined"),
         ({"browse": True, "urls": [], "search": ""}, "no_addresses"),
     ],
 )
@@ -259,9 +259,9 @@ def test_giving_up_after_planning_is_on_record_with_the_reason(client, db, plan,
 
     assert browser.opened == []
     skipped = [a for a in _actions(db) if a["action"] == "browse_skipped"]
-    assert skipped == [
-        {"action": "browse_skipped", "executed": False, "reason": reason, "about_prices": True}
-    ]
+    assert [(a["reason"], a["about_prices"]) for a in skipped] == [(reason, True)]
+    if reason == "planner_declined":
+        assert skipped[0]["why"] == "dá para estimar"
 
 
 def test_a_price_question_it_gave_up_on_never_denies_the_browser(client, db):
@@ -282,6 +282,25 @@ def test_a_price_question_it_gave_up_on_never_denies_the_browser(client, db):
     assert "voltou ilegível" in system
 
 
+def test_when_the_budget_stops_the_second_plan_it_is_on_record(client, db, monkeypatch):
+    calls = []
+
+    def budget_after_first(session, conversation, budgets):
+        calls.append(1)
+        if len(calls) > 1:
+            raise browse.BudgetExceededError("daily", 1, 1)
+
+    monkeypatch.setattr(browse, "check_budgets", budget_after_first)
+    _, browser = world(
+        client, db, plan={"browse": True, "urls": [REFUSED.url]}, pages={REFUSED.url: REFUSED}
+    )
+    headers = _login(client, db)
+    _send(client, headers, "procura na internet o preço da Casal")
+    assert browser.opened == [REFUSED.url]
+    skipped = [a for a in _actions(db) if a["action"] == "browse_skipped"]
+    assert [(a["reason"], a.get("retry")) for a in skipped] == [("budget", True)]
+
+
 def test_a_cut_plan_is_told_apart_from_an_unreadable_one(client, db):
     llm, _ = world(client, db, plan='{"browse": true, "urls": ["https://', pages={})
     llm.finish_reason = "length"
@@ -299,7 +318,7 @@ def test_a_skip_on_talk_that_is_not_about_prices_adds_nothing_to_the_reply(clien
     assert "nesta mensagem nada foi aberto" not in system
     assert "tentou consultar preços ao vivo agora" not in system
     reasons = [a["reason"] for a in _actions(db) if a["action"] == "browse_skipped"]
-    assert reasons == ["planner_said_no"]
+    assert reasons == ["planner_declined"]
 
 
 def test_login_pages_and_private_addresses_are_never_opened(client, db):

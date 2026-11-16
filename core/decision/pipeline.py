@@ -327,6 +327,7 @@ def run_turn(
                 executed=False,
                 reason=browsed.skipped,
                 about_prices=browse.price_question(text),
+                **({"why": browsed.why} if browsed.why else {}),
             )
             if browse.price_question(text):
                 blocks.append(browse.skipped_block(browsed.skipped))
@@ -360,6 +361,15 @@ def run_turn(
                 opened=[v.final_url or v.url for v in browsed.opened],
                 failures=[v.failure for v in browsed.visits if not v.ok],
             )
+            if browsed.retry_skipped:
+                # A site refused and the budget did not allow planning another one.
+                plan.add(
+                    "browse_skipped",
+                    executed=False,
+                    reason=browsed.retry_skipped,
+                    about_prices=browse.price_question(text),
+                    retry=True,
+                )
 
     outcome = NO_OUTCOME
     # A message with a link is about that link: searching the web for its words found unrelated

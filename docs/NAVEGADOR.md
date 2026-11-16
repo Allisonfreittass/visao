@@ -45,7 +45,8 @@ ação `browse_skipped` em `decisions`, com o motivo:
 | `planner_error` | o provedor falhou na chamada do plano |
 | `planner_invalid_json` | o plano voltou sem um JSON legível |
 | `planner_truncated` | o plano foi cortado no limite de tokens (agora 800) |
-| `planner_said_no` | o plano achou que não precisava abrir páginas, sem listar o que falta |
+| `planner_declined` | o plano achou que não precisava abrir páginas, sem listar o que falta (o `why` dele vai junto) |
+| `budget` | um site recusou e o orçamento do dia não deixou planejar outro (vai com `retry: true`) |
 | `no_addresses` | o plano não trouxe endereço nem termo de busca que servisse |
 
 Numa pergunta de preço, a resposta recebe um aviso. Se o plano falhou, ele diz que tentou ver ao
