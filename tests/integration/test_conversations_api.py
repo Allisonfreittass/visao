@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.cli import create_user
 from apps.api.llm import get_llm_provider
+from apps.api.settings import Settings, get_settings
 from core.identity.genesis import get_identity, run_genesis
 from infrastructure.database.models import Message, ModelUsage
 from tests.fakes import FakeLLMProvider
@@ -136,9 +137,11 @@ def test_provider_failure_returns_no_answer(
     assert (usage.outcome, usage.error_kind) == ("error", "timeout")
 
 
-def test_daily_budget_blocks_calls(
+def test_a_long_day_of_talk_has_no_daily_cap_in_the_chat(
     client: TestClient, db: Session, fake_llm: FakeLLMProvider
 ) -> None:
+    """The owner asked for no daily limit (16/11/2026): the chat answers whatever was spent today;
+    the money ceiling is the ledger's monthly cap. The autonomy keeps its own daily cap."""
     run_genesis(db)
     headers = _login(client, db, "a@exemplo.com")
     conversation_id = _new_conversation(client, headers)
@@ -156,15 +159,17 @@ def test_daily_budget_blocks_calls(
 
     response = _say(client, headers, conversation_id, "oi")
 
-    assert response.status_code == 429
-    assert "diário" in response.json()["detail"]
-    assert fake_llm.prompts == []
-    assert db.scalars(select(Message)).all() == []
+    assert response.status_code == 200
+    assert len(fake_llm.prompts) == 1
 
 
-def test_conversation_budget_blocks_calls(
+def test_a_conversation_cap_blocks_calls_only_when_set(
     client: TestClient, db: Session, fake_llm: FakeLLMProvider
 ) -> None:
+    """Unset by default: a long conversation must not stop answering."""
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        llm_conversation_budget_usd=Decimal("0.30")
+    )
     run_genesis(db)
     headers = _login(client, db, "a@exemplo.com")
     conversation_id = _new_conversation(client, headers)
@@ -178,6 +183,31 @@ def test_conversation_budget_blocks_calls(
     assert response.status_code == 429
     assert "conversa" in response.json()["detail"]
     assert len(fake_llm.prompts) == 1
+
+
+def test_a_long_conversation_fits_under_the_call_limit_instead_of_failing(
+    client: TestClient, db: Session, fake_llm: FakeLLMProvider
+) -> None:
+    """Real case (16/11/2026): "Falha no provedor de LLM (budget_denied); sem resposta" in a long
+    trip conversation, the prompt over the ledger's per-call input limit."""
+    run_genesis(db)
+    headers = _login(client, db, "a@exemplo.com")
+    conversation_id = _new_conversation(client, headers)
+    for n in range(12):
+        assert _say(client, headers, conversation_id, f"mensagem {n} " + "x" * 1500).status_code
+    limit = 12_000
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        llm_budget_input_tokens_per_call=limit
+    )
+
+    response = _say(client, headers, conversation_id, "e agora, o que você acha?")
+
+    assert response.status_code == 200
+    from integrations.llm.budget import input_estimate
+
+    sent = fake_llm.prompts[-1]
+    assert input_estimate(sent) <= limit
+    assert sent[-1].content == "e agora, o que você acha?" and sent[1].role == "user"
 
 
 def test_switching_llm_keeps_identity_and_history(client: TestClient, db: Session) -> None:

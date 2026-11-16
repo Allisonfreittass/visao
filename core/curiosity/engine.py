@@ -274,13 +274,13 @@ def _standing_research(owner: User) -> bool:
 def _research_budget_left(
     session: Session, owner: User, conversation: Conversation, limits: CuriosityLimits
 ) -> bool:
-    """The daily cap always holds (it is what the search provider costs). The per-conversation cap
-    keeps unasked research from piling up in one chat; with the standing permission it does not
-    apply. Real case (16/11/2026): "Quero sim" to "quer que eu pesquise?" became a goal waiting
-    for approval because the trip conversation had 9 searches, with auto_research on."""
-    today = searches_today(session, owner.id)
+    """The caps keep unasked research from piling up; with the standing permission none applies
+    in the chat. Real case (16/11/2026): "Quero sim" to "quer que eu pesquise?" became a goal
+    waiting for approval because the trip conversation had 9 searches, with auto_research on;
+    then the owner asked for no daily limit either."""
     if _standing_research(owner):
-        return (today or 0) < limits.research_per_day
+        return True
+    today = searches_today(session, owner.id)
     in_conversation = session.scalar(
         select(func.count())
         .select_from(ResearchSession)

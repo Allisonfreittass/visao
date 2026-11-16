@@ -155,7 +155,7 @@ def guard(daily="0.50", monthly="10"):
         [],
         limits,
         clock=clock,
-        paid_daily_usd=Decimal(daily),
+        paid_daily_usd=None if daily is None else Decimal(daily),
         paid_monthly_usd=Decimal(monthly),
     ), factory
 
@@ -187,6 +187,24 @@ def test_the_ledger_charges_the_real_cost_and_stops_at_the_daily_cap():
     # The worst case of a big call (4096 output tokens) no longer fits under $0.001 today.
     with pytest.raises(LLMError, match="paid spending cap"):
         guarded.complete([ChatMessage("user", "u" * 3000)], max_output_tokens=4096)
+
+
+def test_without_a_daily_cap_only_the_monthly_one_stops_it():
+    """The owner asked for no daily limit (16/11/2026): a long day of talk must not stop. The
+    monthly cap stays the money ceiling."""
+    budget, factory = guard(daily=None, monthly="0.001")
+    assert budget.admits_paid
+    guarded = GuardedLLMProvider(
+        provider(FakeMessages(reply())), "https://api.anthropic.com", budget
+    )
+    guarded.complete([ChatMessage("user", "u")], max_output_tokens=300)
+    with pytest.raises(LLMError, match="paid spending cap"):
+        guarded.complete([ChatMessage("user", "u" * 3000)], max_output_tokens=4096)
+
+
+def test_without_a_monthly_cap_a_paid_provider_is_still_refused():
+    budget, _ = guard(daily=None, monthly="0")
+    assert not budget.admits_paid
 
 
 def test_a_provider_reporting_more_than_it_reserved_freezes_the_ledger():

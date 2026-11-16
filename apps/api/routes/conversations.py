@@ -239,9 +239,12 @@ def turn_config(settings: Settings) -> TurnConfig:
 
 
 def _budgets(settings: Settings) -> Budgets:
+    # The chat has no daily cap (llm_daily_budget_usd stays the autonomy's): a long day of talk
+    # must not stop. The money ceiling is the ledger's monthly cap.
     return Budgets(
-        daily_usd=settings.llm_daily_budget_usd,
+        daily_usd=None,
         conversation_usd=settings.llm_conversation_budget_usd,
+        call_input_bytes=settings.llm_budget_input_tokens_per_call,
     )
 
 

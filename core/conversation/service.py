@@ -83,8 +83,13 @@ class EmptyReplyError(Exception):
 
 @dataclass(frozen=True)
 class Budgets:
-    daily_usd: Decimal
-    conversation_usd: Decimal
+    # None = no cap. The chat passes no daily cap (16/11/2026: a long day of talk must not
+    # stop); autonomous work keeps its own daily cap (core/autonomy/budget.py).
+    daily_usd: Decimal | None
+    conversation_usd: Decimal | None
+    # The ledger's per-call input limit, in its estimate (integrations/llm/budget.py): the reply
+    # makes its prompt fit under it instead of being refused. None = no fitting.
+    call_input_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -109,13 +114,15 @@ def _spent(session: Session, *conditions: object) -> Decimal:
 
 def check_budgets(session: Session, conversation: Conversation, budgets: Budgets) -> None:
     """Pre-call check. A single call can overshoot by at most one reply (bounded by max tokens)."""
-    start_of_day = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    daily = _spent(session, ModelUsage.created_at >= start_of_day)
-    if daily >= budgets.daily_usd:
-        raise BudgetExceededError("daily", daily, budgets.daily_usd)
-    per_conversation = _spent(session, ModelUsage.conversation_id == conversation.id)
-    if per_conversation >= budgets.conversation_usd:
-        raise BudgetExceededError("conversation", per_conversation, budgets.conversation_usd)
+    if budgets.daily_usd is not None:
+        start_of_day = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        daily = _spent(session, ModelUsage.created_at >= start_of_day)
+        if daily >= budgets.daily_usd:
+            raise BudgetExceededError("daily", daily, budgets.daily_usd)
+    if budgets.conversation_usd is not None:
+        per_conversation = _spent(session, ModelUsage.conversation_id == conversation.id)
+        if per_conversation >= budgets.conversation_usd:
+            raise BudgetExceededError("conversation", per_conversation, budgets.conversation_usd)
 
 
 def conversation_history(session: Session, conversation: Conversation) -> list[Message]:
@@ -265,6 +272,8 @@ def reply(
         # What came with this message (a page it opened) goes with the message itself, the last
         # thing read: in the system prompt it lost to earlier replies saying the opposite.
         prompt[-1] = replace(prompt[-1], content=f"{prompt[-1].content}\n\n{attachment}")
+    if budgets.call_input_bytes:
+        prompt = fit(prompt, budgets.call_input_bytes, attachment)
 
     progress.step("Escrevendo a resposta")
     try:
@@ -364,6 +373,45 @@ def reply(
     behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
     return TurnResult(user_message, assistant_message, usage, recalled, page, browser_guard=guarded)
+
+
+FIT_MARGIN_BYTES = 512
+CUT_NOTE = "\n[… o resto das páginas lidas foi cortado para caber]"
+
+
+def fit(prompt: list[ChatMessage], limit: int, attachment: str = "") -> list[ChatMessage]:
+    """The prompt under the ledger's per-call input limit, instead of a refused call. Real case
+    (16/11/2026): a long trip conversation got "Falha no provedor de LLM (budget_denied)". The
+    oldest history goes first (the conversation starts again at a message of the person); then
+    the pages attached to the latest message are cut. The system prompt and the person's own
+    words are never cut; if those alone do not fit, the call is refused as before."""
+    from integrations.llm.budget import input_estimate  # llm.budget imports core models
+
+    target = limit - FIT_MARGIN_BYTES
+    if input_estimate(prompt) <= target:
+        return prompt
+    fitted = list(prompt)
+    while input_estimate(fitted) > target and len(fitted) > 2:
+        del fitted[1]
+    while len(fitted) > 2 and fitted[1].role != "user":
+        del fitted[1]
+    last = fitted[-1]
+    if attachment and input_estimate(fitted) > target and last.content.endswith(attachment):
+        own = last.content[: len(last.content) - len(attachment)]
+        kept = attachment
+        while kept and input_estimate(fitted) > target:
+            kept = kept[: int(len(kept) * 0.8)] if len(kept) > 200 else ""
+            fitted[-1] = replace(last, content=own + (kept + CUT_NOTE if kept else CUT_NOTE))
+    logger.info(
+        "prompt fitted under the per-call limit",
+        extra={
+            "event": "prompt_fitted",
+            "dropped_messages": len(prompt) - len(fitted),
+            "bytes": input_estimate(fitted),
+            "limit": limit,
+        },
+    )
+    return fitted
 
 
 def _write(

@@ -97,6 +97,21 @@ def _deny(reason: str) -> LLMError:
     return LLMError("budget_denied", reason)
 
 
+def input_estimate(messages: list[ChatMessage]) -> int:
+    """What a call reserves for its input: a conservative proxy (bytes of the JSON), not a
+    universal tokenizer guarantee; the reported usage reconciles it. Shared with the reply, which
+    makes its prompt fit before calling instead of being refused."""
+    return (
+        len(
+            json.dumps(
+                [{"role": m.role, "content": m.content} for m in messages], ensure_ascii=False
+            ).encode()
+        )
+        + 1024
+        + IMAGE_TOKEN_ESTIMATE * sum(len(getattr(m, "images", ())) for m in messages)
+    )
+
+
 class BudgetGuard:
     def __init__(
         self,
@@ -106,15 +121,16 @@ class BudgetGuard:
         *,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
         trust_zero_price: bool = False,
-        paid_daily_usd: Decimal = Decimal(0),
+        paid_daily_usd: Decimal | None = None,
         paid_monthly_usd: Decimal = Decimal(0),
     ) -> None:
         # Local use: a configured zero price is taken at its word. A provider reporting any cost
         # still freezes the ledger in finish(), so this cannot turn into spending.
         self.trust_zero_price = trust_zero_price
-        # A priced provider (e.g. Claude) is admitted only with both caps set. Each call reserves
-        # its worst-case cost up front; the reported tokens, at the configured price, settle it.
-        self.paid_daily_usd = Decimal(paid_daily_usd)
+        # A priced provider (e.g. Claude) is admitted only with the monthly cap set; the daily one
+        # is optional (None = no daily cap: a long conversation must not stop mid-day). Each call
+        # reserves its worst-case cost up front; the reported tokens, at the price, settle it.
+        self.paid_daily_usd = None if paid_daily_usd is None else Decimal(paid_daily_usd)
         self.paid_monthly_usd = Decimal(paid_monthly_usd)
         self.factory = factory
         # Deep copies prevent mutation of a caller's prices dict after validation.
@@ -144,7 +160,8 @@ class BudgetGuard:
 
     @property
     def admits_paid(self) -> bool:
-        return self.paid_daily_usd > 0 and self.paid_monthly_usd > 0
+        daily_ok = self.paid_daily_usd is None or self.paid_daily_usd > 0
+        return daily_ok and self.paid_monthly_usd > 0
 
     @staticmethod
     def _paid(provider: LLMProvider) -> bool:
@@ -176,16 +193,7 @@ class BudgetGuard:
     def reserve(self, provider: LLMProvider, endpoint: str, messages, output: int) -> str:
         now = self.clock().astimezone(UTC)
         key = self._grant(provider, endpoint, now)
-        # Conservative proxy, not a universal tokenizer guarantee; reconcile reported usage.
-        input_tokens = (
-            len(
-                json.dumps(
-                    [{"role": m.role, "content": m.content} for m in messages], ensure_ascii=False
-                ).encode()
-            )
-            + 1024
-            + IMAGE_TOKEN_ESTIMATE * sum(len(getattr(m, "images", ())) for m in messages)
-        )
+        input_tokens = input_estimate(messages)
         if not 0 < output <= self.limits.output_tokens_per_call:
             raise _deny("output reservation exceeds per-call limit")
         if input_tokens > self.limits.input_tokens_per_call:
@@ -234,10 +242,10 @@ class BudgetGuard:
                 raise _deny("reservation would exceed shared quota")
             spent_day = Decimal(state.get("usd_day", "0"))
             spent_month = Decimal(state.get("usd_month", "0"))
-            if paid and (
-                spent_day + worst_case > self.paid_daily_usd
-                or spent_month + worst_case > self.paid_monthly_usd
-            ):
+            over_day = (
+                self.paid_daily_usd is not None and spent_day + worst_case > self.paid_daily_usd
+            )
+            if paid and (over_day or spent_month + worst_case > self.paid_monthly_usd):
                 raise _deny("reservation would exceed the paid spending cap")
             if paid:
                 state["usd_day"] = str(spent_day + worst_case)

@@ -1,8 +1,15 @@
 # Custos e limites
 
 > **Como é aplicado hoje (2026-11-12).** A produção usa o Claude Haiku 5.5 (US$ 0,10 / 0,50 por
-> milhão de tokens). Provedor pago só entra com os dois tetos acima de zero
-> (`VISION_LLM_PAID_DAILY_USD`, `VISION_LLM_PAID_MONTHLY_USD`; hoje US$ 0,50/dia e US$ 10/mês).
+> milhão de tokens). Provedor pago só entra com o teto mensal acima de zero
+> (`VISION_LLM_PAID_MONTHLY_USD`, hoje US$ 10/mês). Desde 16/11/2026 não há teto diário
+> (`VISION_LLM_PAID_DAILY_USD` ficou opcional) nem limite por conversa
+> (`VISION_LLM_CONVERSATION_BUDGET_USD`, opcional) no chat: um dia de muita conversa não para no
+> meio. O `VISION_LLM_DAILY_BUDGET_USD` vale só para o trabalho autônomo. O limite por chamada
+> (`VISION_LLM_BUDGET_INPUT_TOKENS_PER_CALL`, em bytes) continua, e a resposta encolhe o
+> contexto para caber nele: tira o histórico mais antigo e depois corta as páginas anexadas, em
+> vez de falhar com `budget_denied`. Com `auto_research` ligado, o chat também não tem limite de
+> pesquisas (`VISION_RESEARCH_PER_*` valem sem a permissão e para o estudo autônomo).
 > Antes de cada chamada o razão (`integrations/llm/budget.py`) reserva o pior caso (tokens de
 > entrada estimados e o máximo de saída, no preço configurado) e recusa se passar do teto; depois
 > acerta pelo custo real e devolve a sobra. Provedor que informa mais do que o reservado congela o

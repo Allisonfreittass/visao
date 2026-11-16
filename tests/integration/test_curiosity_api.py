@@ -219,13 +219,22 @@ def test_with_the_standing_permission_the_conversation_cap_does_not_hold(client,
     _, second = _turn(client, headers, "E a capital do Canadá?", conversation)
     _, third = _turn(client, headers, "E a do Chile?", conversation)
 
-    assert [t["curiosity"]["action"] for t in (first, second, third)] == [
-        "WEB_RESEARCH",
-        "WEB_RESEARCH",
-        "DEFER",  # the daily cap still holds: it is what the search provider costs
-    ]
-    assert len(world["search"].queries) == 2
-    # Nothing waits for a click: the follow-up runs by the standing permission.
+    # Neither the conversation cap nor the daily one holds: the owner asked for none.
+    assert [t["curiosity"]["action"] for t in (first, second, third)] == ["WEB_RESEARCH"] * 3
+    assert len(world["search"].queries) == 3
+    # Nothing waits for a click: a follow-up would run by the standing permission.
+    assert client.get("/approvals", headers=headers).json() == []
+
+
+def test_with_the_standing_permission_a_follow_up_is_not_put_to_approval(client, db, world):
+    run_genesis(db)
+    headers = _login(client, db)
+    owner = db.scalar(select(User))
+    owner.autonomy_permissions = {"auto_research": True}
+    db.commit()
+    world["search"].results = []  # nothing found: a follow-up is proposed
+    _turn(client, headers, "Qual é a capital da Austrália?")
+
     assert client.get("/approvals", headers=headers).json() == []
     system = world["llm"].prompts[-1][0].content
     assert "sem pedir aprovação" in system and "se o interlocutor aprovar" not in system
