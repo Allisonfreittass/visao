@@ -321,6 +321,24 @@ def test_a_skip_on_talk_that_is_not_about_prices_adds_nothing_to_the_reply(clien
     assert reasons == ["planner_declined"]
 
 
+def test_a_near_miss_in_a_price_conversation_is_logged_at_debug(client, db, caplog):
+    """Not a decision (every message passes the word check), but worth seeing: a follow-up in a
+    conversation about fares that did not even reach the planner. Never the message text."""
+    llm, browser = world(client, db, plan={"browse": False, "missing": []}, pages={})
+    headers = _login(client, db)
+    conversation, _ = _send(client, headers, "quanto custa a passagem pra Santiago?")
+
+    with caplog.at_level("DEBUG", logger="core.browse"):
+        _send(client, headers, "acho que vou gostar muito de lá", conversation)
+
+    near = [r for r in caplog.records if getattr(r, "event", "") == "browse_not_candidate"]
+    assert len(near) == 1 and near[0].levelname == "DEBUG"
+    assert near[0].recent_topic == "quanto custa" and near[0].chars == 31
+    assert "gostar" not in near[0].getMessage()
+    # Only the first turn reached the planner (and was declined): the near miss is no decision.
+    assert [a["action"] for a in _actions(db)].count("browse_skipped") == 1
+
+
 def test_login_pages_and_private_addresses_are_never_opened(client, db):
     plan = {
         "browse": True,

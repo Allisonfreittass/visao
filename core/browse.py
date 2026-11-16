@@ -16,6 +16,7 @@ for the reply, which must not then say there is no browser.
 """
 
 import json
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -35,6 +36,8 @@ from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 from integrations.search.base import SearchError, SearchProvider
 
 PURPOSE = "browse_plan"
+
+logger = logging.getLogger(__name__)
 PAGE_CHARS = 9_000
 KEPT_FOR_PAGES = 8
 # The plan is a short JSON; the title and missing fields made it longer than the first 600.
@@ -423,6 +426,19 @@ def run(
     """None when the message is not about live data at all (no planning call). After a planning
     call it never ends silently: pages, what is missing to look, or `skipped` with the reason."""
     if not candidate(text, recent):
+        topic = _TOPIC.search(recent) if recent else None
+        if topic:
+            # Not a decision (every message passes here), but the near miss worth seeing when a
+            # follow-up about prices did not browse. No message text in the log, only its size.
+            logger.debug(
+                "browse not a candidate in a conversation about prices",
+                extra={
+                    "event": "browse_not_candidate",
+                    "conversation_id": str(conversation.id),
+                    "chars": len(text),
+                    "recent_topic": topic.group(0).lower(),
+                },
+            )
         return None
     check_budgets(session, conversation, budgets)
     avoid = refusing_hosts(session, owner.id)

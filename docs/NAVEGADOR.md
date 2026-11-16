@@ -62,7 +62,10 @@ ação `browse_skipped` em `decisions`, com o motivo:
 Numa pergunta de preço, a resposta recebe um aviso. Se o plano falhou, ele diz que tentou ver ao
 vivo e não conseguiu agora. Se o plano disse não, ele pode oferecer olhar nos sites. Nos dois
 casos, nunca diz que não tem navegador. Uma mensagem que nem passou pela checagem de palavras
-(`candidate()`) não gera registro, senão toda conversa encheria `decisions`.
+(`candidate()`) não gera registro, senão toda conversa encheria `decisions`. Quando a conversa
+recente fala de preço e a mensagem não passou, sai um log em nível debug
+(`browse_not_candidate`, com o tamanho da mensagem e a palavra de preço da conversa, nunca o
+texto).
 
 Caso real de 16/11/2026: "o preço sobe muito se eu pegar aulas?" teve o plano dizendo não, e a
 resposta foi "não tenho preços atuais", com o navegador funcionando. O plano agora também trata
