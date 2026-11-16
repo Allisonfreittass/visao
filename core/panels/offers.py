@@ -26,6 +26,14 @@ _GOAL = re.compile(
     r"(mil\b|k\b)?\s*(reais)?",
     re.IGNORECASE,
 )
+# "me avisa se ficar abaixo de R$ 2.000", "me avisa se cair pra 2 mil": a goal said as a notice.
+_ALERT_GOAL = re.compile(
+    r"\b(?:avis\w*|alert\w*|notific\w*|me (?:fala|diz|chama))\b[^.?!\n]{0,40}?"
+    r"\b(?:abaixo d[eo]|menos d[eo]|baix(?:ar|ou|e|a)|ca(?:ir|iu|ia)|cheg(?:ar|ue|a))"
+    r"\s*(?:(?:a|em|de|pra|para|at[ée])\s*)?(R\$\s*)?"
+    r"(\d{1,3}(?:[.\s]\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)\s*(mil\b|k\b)?\s*(reais)?",
+    re.IGNORECASE,
+)
 _YES = re.compile(
     r"^(?:sim|claro|isso|ok|okay|beleza|pode|pode ser|pode sim|pode fazer|pode criar|quero|"
     r"quero sim|por favor|faz|faca|faz sim|bora|manda ver|com certeza|aceito|fechado|show|"
@@ -39,10 +47,18 @@ def has_prices(texts: list[str]) -> bool:
     return any(_PRICE.search(t) for t in texts)
 
 
+def alert_goal(text: str) -> str | None:
+    """What is left of the message around "me avisa se cair pra R$ 2 mil", or None without one."""
+    match = _ALERT_GOAL.search(text)
+    return None if match is None else (text[: match.start()] + " " + text[match.end() :]).strip()
+
+
 def goal_from(*texts: str) -> Decimal | None:
-    """The budget the owner named, in code: only with money in sight (R$, mil, reais)."""
+    """The budget the owner named, in code: only with money in sight (R$, mil, reais). "Me avisa
+    se ficar abaixo de R$ 2.000" names one too."""
     for text in reversed(texts):
-        for match in _GOAL.finditer(text):
+        matches = [*_ALERT_GOAL.finditer(text), *_GOAL.finditer(text)]
+        for match in matches:
             money, number, thousand, reais = match.groups()
             if not (money or thousand or reais):
                 continue

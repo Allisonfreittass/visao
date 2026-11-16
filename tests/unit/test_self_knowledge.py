@@ -49,3 +49,19 @@ def test_the_prompt_always_carries_the_map_and_lets_it_explain_when_asked(db):
     assert "initiative, intentions" in prompt
     assert "ler o próprio código-fonte" in prompt
     assert "sem que perguntem" in prompt and "dizendo o arquivo" in prompt
+
+
+def test_what_is_new_and_the_panels_are_found_in_its_own_docs():
+    assert "docs/NOVIDADES.md" in found("quais as novidades em você?")
+    panels = found("como funciona o painel com meta? você me avisa quando o preço cai?")
+    assert any(p in panels for p in ("docs/PAINEIS.md", "docs/NOVIDADES.md"))
+    assert self_knowledge.context_block("comprei um painel de madeira pra sala") is None
+
+
+def test_the_manifest_tells_it_what_it_can_do_now():
+    said = "; ".join(Capabilities(browser=True, continuous=True, auto_research=True).actions())
+    assert "tabela de até 5 opções" in said and "a cada 3 horas" in said
+    assert "me avisa se ficar abaixo de R$ X" in said
+    assert "conversa contínua" in said and "sem pedir aprovação" in said
+    plain = "; ".join(Capabilities().actions())
+    assert "painel" not in plain and "conversa contínua" not in plain

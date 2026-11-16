@@ -1,6 +1,10 @@
 """Live panels (docs/PAINEIS.md, ADR-0012): created when the owner approves the offer after a live
 quote, checked once a day by the worker, edited from the conversation, shown on the home screen.
 
+Near the owner's goal the check runs every few hours outside quiet hours, and dropping below the
+goal is the one urgent notice: it skips the one-a-day limit, once each time it goes below
+(ADR-0016).
+
 Creating one is approving its daily check (recorded in the audit log). The check respects the
 global pause and the autonomy budget; without them the card keeps its last check, with its hour,
 and never shows an old price as today's. A site that asks to prove you are human is reported on
@@ -52,6 +56,8 @@ class Limits:
     max_active: int = 3
     max_pages: int = 2
     alert_drop_percent: int = 10
+    near_goal_percent: int = 15
+    near_goal_every_hours: int = 3
 
 
 def _zone(owner: User) -> ZoneInfo:
@@ -72,6 +78,23 @@ def next_check(owner: User, now: datetime) -> datetime:
     return datetime.combine(tomorrow, time(CHECK_HOUR), tzinfo=zone).astimezone(UTC)
 
 
+def near_goal(value: Decimal | None, spec: Spec, limits: Limits) -> bool:
+    """Below the goal, or above it by at most `near_goal_percent`: worth watching closer."""
+    if value is None or spec.goal is None or limits.near_goal_percent <= 0:
+        return False
+    return value <= spec.goal * (1 + Decimal(limits.near_goal_percent) / 100)
+
+
+def check_after(owner: User, now: datetime, close: bool, limits: Limits) -> datetime:
+    """Near the goal: in a few hours, but never inside quiet hours (it waits for them to end).
+    Otherwise, and never later than, tomorrow at 9h."""
+    daily = next_check(owner, now)
+    if not close:
+        return daily
+    soon = deliver_after(owner, now + timedelta(hours=limits.near_goal_every_hours))
+    return min(soon, daily)
+
+
 def active_count(session: Session, owner_id: uuid.UUID) -> int:
     return (
         session.scalar(
@@ -89,12 +112,45 @@ def _schedule(session: Session, panel: Panel, when: datetime) -> None:
         session,
         kind=JOB_KIND,
         owner_user_id=panel.owner_user_id,
-        payload={"panel_id": str(panel.id)},
+        payload={"panel_id": str(panel.id), "at": when.astimezone(UTC).isoformat()},
         idempotency_key=f"panel-recheck:{panel.id}:{when:%Y-%m-%dT%H}",
-        reason="Conferir o painel do Início uma vez por dia",
+        reason="Conferir o painel do Início",
         run_after=when,
         max_attempts=1,
     )
+
+
+def stale(panel: Panel, at: str | None) -> bool:
+    """A job for a check that was moved since (edited, paused, resumed, closer to the goal)."""
+    if not at or panel.next_check_at is None:
+        return at is not None and panel.next_check_at is None
+    planned = panel.next_check_at
+    if planned.tzinfo is None:
+        planned = planned.replace(tzinfo=UTC)
+    return abs((planned - datetime.fromisoformat(at)).total_seconds()) > 60
+
+
+def rewatch(
+    session: Session,
+    panel: Panel,
+    owner: User,
+    limits: Limits,
+    *,
+    told: bool,
+    now: datetime | None = None,
+) -> None:
+    """After creating, editing or resuming: the next check by how close it is to the goal, and
+    whether being below it was already said (`told`: the chat reply says it right now)."""
+    now = now or datetime.now(UTC)
+    spec = spec_of(panel)
+    snapshot = snapshot_of(panel)
+    value = total(snapshot, spec) if snapshot else None
+    if spec.goal is None or (value is not None and value > spec.goal):
+        panel.goal_alerted_at = None
+    elif value is not None and told:
+        panel.goal_alerted_at = panel.goal_alerted_at or now
+    if panel.status in ("active", "error"):
+        _schedule(session, panel, check_after(owner, now, near_goal(value, spec, limits), limits))
 
 
 def schedule_next(session: Session, panel: Panel, owner: User, now: datetime | None = None) -> None:
@@ -189,7 +245,7 @@ def create_from_offer(
         actor_user_id=owner.id,
         details={"via": via, "panel_id": str(panel.id), "recurring_check": "daily"},
     )
-    _schedule(session, panel, next_check(owner, now))
+    rewatch(session, panel, owner, limits, told=True, now=now)
     session.commit()
     return panel
 
@@ -202,19 +258,30 @@ def snapshot_of(panel: Panel) -> Snapshot | None:
     return Snapshot(**panel.snapshot) if panel.snapshot else None
 
 
-def _drop_alert(
-    before: Decimal | None, after: Decimal | None, spec: Spec, limits: Limits, lost: list[str]
-) -> str | None:
-    """Only what changes a decision: below the goal now, a big drop, or something gone."""
+def _change(
+    before: Decimal | None,
+    after: Decimal | None,
+    spec: Spec,
+    limits: Limits,
+    lost: list[str],
+    *,
+    told_below: bool,
+) -> tuple[str | None, bool]:
+    """(notice, urgent). Only what changes a decision. Below the goal is urgent and said once
+    each time it goes below; a big drop or something gone is an ordinary notice."""
+    if spec.goal is not None and after is not None and after <= spec.goal and not told_below:
+        return (
+            f"Abaixo da sua meta de {money(spec.goal)}: {money(after)} agora. "
+            "Preço de site muda rápido.",
+            True,
+        )
     if lost:
-        return f"{', '.join(lost)} sumiu da cotação"
+        return f"{', '.join(lost)} sumiu da cotação", False
     if before is None or after is None:
-        return None
-    if spec.goal is not None and after <= spec.goal < before:
-        return f"ficou abaixo da meta: {money(after)}"
+        return None, False
     if before > 0 and (before - after) / before * 100 >= limits.alert_drop_percent:
-        return f"caiu de {money(before)} para {money(after)}"
-    return None
+        return f"caiu de {money(before)} para {money(after)}", False
+    return None, False
 
 
 def money(value: Decimal) -> str:
@@ -222,11 +289,14 @@ def money(value: Decimal) -> str:
     return "R$ " + whole.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _alert(session: Session, panel: Panel, owner: User, text: str, now: datetime) -> bool:
-    if panel.last_alert_at and local_today(owner, panel.last_alert_at) == local_today(owner, now):
-        return False  # one a day per panel at most
+def _alert(
+    session: Session, panel: Panel, owner: User, text: str, now: datetime, *, urgent: bool
+) -> bool:
+    last = panel.last_alert_at
+    if not urgent and last and local_today(owner, last) == local_today(owner, now):
+        return False  # one ordinary notice a day per panel at most
     if deliver_after(owner, now) > now:
-        return False  # quiet hours
+        return False  # quiet hours: an urgent one waits for the first check after them
     push.send_to_owner(
         session,
         owner.id,
@@ -252,6 +322,7 @@ def recheck(
     now: datetime | None = None,
     reschedule: bool = True,
     purpose: str = RECHECK_PURPOSE,
+    alerts: bool = True,
 ) -> str:
     """One check. Returns what happened (for the job result and the tests)."""
     now = now or datetime.now(UTC)
@@ -263,10 +334,10 @@ def recheck(
         session.commit()
         return "expired"
 
-    def later(note: str, outcome: str) -> str:
+    def later(note: str, outcome: str, close: bool = False) -> str:
         panel.check_note = note
         if reschedule:
-            _schedule(session, panel, next_check(owner, now))
+            _schedule(session, panel, check_after(owner, now, close, limits))
         session.commit()
         return outcome
 
@@ -322,9 +393,21 @@ def recheck(
     _save_snapshot(session, panel, snapshot, spec)
     panel.status = "active"
     panel.check_note = "" if after_total is not None else "alguns preços a confirmar"
-    change = _drop_alert(before_total, after_total, spec, limits, lost)
-    alerted = _alert(session, panel, owner, change, now) if change else False
-    return later(panel.check_note, "alerted" if alerted else "checked")
+    if spec.goal is None or (after_total is not None and after_total > spec.goal):
+        panel.goal_alerted_at = None  # above it again: the next drop below is news
+    change, urgent = _change(
+        before_total,
+        after_total,
+        spec,
+        limits,
+        lost,
+        told_below=panel.goal_alerted_at is not None,
+    )
+    alerted = bool(change) and alerts and _alert(session, panel, owner, change, now, urgent=urgent)
+    if alerted and urgent:
+        panel.goal_alerted_at = now
+    close = near_goal(after_total, spec, limits)
+    return later(panel.check_note, "alerted" if alerted else "checked", close)
 
 
 _KINDS = {"flight": "o voo", "hotel": "a hospedagem"}
@@ -340,10 +423,18 @@ def gap_words(gap: Decimal | None, goal: Decimal | None) -> str | None:
     return f"exatamente na meta de {money(goal)}"
 
 
-def card(session: Session, panel: Panel, owner: User, now: datetime | None = None) -> dict:
+def card(
+    session: Session,
+    panel: Panel,
+    owner: User,
+    now: datetime | None = None,
+    limits: Limits | None = None,
+) -> dict:
     """What the home screen shows, computed here: the total, the distance to the goal, the
-    change since the check before, and whether the last check is from today."""
+    change since the check before, whether the last check is from today, and how often it is
+    checked (every few hours near the goal)."""
     now = now or datetime.now(UTC)
+    limits = limits or Limits()
     spec = spec_of(panel)
     snapshot = snapshot_of(panel)
     value = total(snapshot, spec) if snapshot else None
@@ -372,6 +463,11 @@ def card(session: Session, panel: Panel, owner: User, now: datetime | None = Non
         "checked_at": panel.checked_at,
         "checked_today": checked_today,
         "next_check_at": panel.next_check_at,
+        "watch_every_hours": (
+            limits.near_goal_every_hours
+            if panel.status in ("active", "error") and near_goal(value, spec, limits)
+            else None
+        ),
         "note": panel.check_note,
         "conversation_id": panel.conversation_id,
         "created_at": panel.created_at,

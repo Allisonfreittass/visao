@@ -67,6 +67,8 @@ class PanelOut(BaseModel):
     # False: the numbers are from an earlier day; the card says when, never "agora".
     checked_today: bool
     next_check_at: datetime | None
+    # Near the goal it is checked every this many hours (outside quiet hours); null: once a day.
+    watch_every_hours: int | None = None
     note: str
     conversation_id: uuid.UUID | None
     created_at: datetime
@@ -110,8 +112,8 @@ def offer_out(offer: PanelOffer, panel_id: uuid.UUID | None = None) -> OfferOut:
     )
 
 
-def panel_out(db, panel: Panel, user) -> PanelOut:
-    shown = panels.card(db, panel, user)
+def panel_out(db, panel: Panel, user, limits: panels.Limits) -> PanelOut:
+    shown = panels.card(db, panel, user, limits=limits)
     return PanelOut(**shown, goal_words=panels.gap_words(shown["goal_gap"], shown["goal"]))
 
 
@@ -173,9 +175,10 @@ def decide(
 
 
 @router.get("")
-def list_panels(db: DbSession, user: CurrentUser) -> list[PanelOut]:
+def list_panels(db: DbSession, user: CurrentUser, settings: AppSettings) -> list[PanelOut]:
     rows = db.query(Panel).filter(Panel.owner_user_id == user.id).order_by(Panel.created_at)
-    return [panel_out(db, p, user) for p in rows if p.status != "expired"]
+    limits = panel_limits(settings)
+    return [panel_out(db, p, user, limits) for p in rows if p.status != "expired"]
 
 
 @router.get("/suggestions")
@@ -184,9 +187,11 @@ def list_suggestions(db: DbSession, user: CurrentUser) -> list[SuggestionOut]:
 
 
 @router.get("/{panel_id}")
-def panel_detail(panel_id: uuid.UUID, db: DbSession, user: CurrentUser) -> PanelDetailOut:
+def panel_detail(
+    panel_id: uuid.UUID, db: DbSession, user: CurrentUser, settings: AppSettings
+) -> PanelDetailOut:
     panel = _own(db, user.id, panel_id)
-    out = panel_out(db, panel, user)
+    out = panel_out(db, panel, user, panel_limits(settings))
     return PanelDetailOut(
         **out.model_dump(), history=[PointOut(**h) for h in panels.history(db, panel)]
     )
@@ -194,15 +199,16 @@ def panel_detail(panel_id: uuid.UUID, db: DbSession, user: CurrentUser) -> Panel
 
 @router.patch("/{panel_id}")
 def pause_or_resume(
-    panel_id: uuid.UUID, body: PanelPatch, db: DbSession, user: CurrentUser
+    panel_id: uuid.UUID, body: PanelPatch, db: DbSession, user: CurrentUser, settings: AppSettings
 ) -> PanelOut:
-    """Paused: no daily check, no notices. Resumed: checked again from the next morning."""
+    """Paused: no check, no notices. Resumed: checked again next morning, or in a few hours when
+    near the goal."""
     panel = _own(db, user.id, panel_id)
     if panel.status == "expired":
         raise HTTPException(status.HTTP_409_CONFLICT, "Esse painel já expirou")
     panel.status = body.status
     if body.status == "active":
-        panels.schedule_next(db, panel, user)
+        panels.rewatch(db, panel, user, panel_limits(settings), told=False)
     else:
         panel.next_check_at = None
     record_audit(
@@ -213,7 +219,7 @@ def pause_or_resume(
         details={"panel_id": str(panel.id)},
     )
     db.commit()
-    return panel_out(db, panel, user)
+    return panel_out(db, panel, user, panel_limits(settings))
 
 
 @router.delete("/{panel_id}", status_code=status.HTTP_204_NO_CONTENT)

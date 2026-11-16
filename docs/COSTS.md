@@ -60,6 +60,10 @@ Por painel ativo e por dia:
 No Haiku 5.5 (US$ 0,10 / 0,50 por milhão), o pior caso é cerca de US$ 0,0009 por conferência.
 Com 3 painéis (o padrão), dá menos de US$ 0,003 por dia, ou ~US$ 0,09 por mês.
 
+Perto da meta ([ADR-0016](decisions/0016-painel-de-olho-perto-da-meta.md)), a conferência é a cada
+3 h fora do horário silencioso: até ~5 por dia por painel, ~US$ 0,005. Mesmo com os 3 painéis
+perto da meta, fica em ~15 chamadas da autonomia por dia.
+
 O que pesa mais é o **limite de chamadas**: cada conferência gasta 1 das chamadas diárias da
 autonomia (`VISION_AUTONOMY_LLM_CALLS_PER_DAY`) e 1 das chamadas por dia e por hora do razão.
 

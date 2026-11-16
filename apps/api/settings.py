@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     panels_max_active: int = Field(default=3, ge=1, le=10)
     panel_max_pages: int = Field(default=2, ge=1, le=4)
     panel_alert_drop_percent: int = Field(default=10, ge=1, le=90)
+    # Near the goal (up to this % above it, or below it) the panel is checked every few hours
+    # outside quiet hours instead of once a day (docs/decisions/0016).
+    panel_near_goal_percent: int = Field(default=15, ge=0, le=100)
+    panel_near_goal_every_hours: int = Field(default=3, ge=1, le=12)
 
     # Speech synthesis (docs/VOICE.md). Empty approved list = voice disabled. The list is the
     # human quality gate; which approved voice is the agent's own is the agent's decision.

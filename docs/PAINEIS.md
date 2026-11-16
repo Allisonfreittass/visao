@@ -64,8 +64,9 @@ do provedor (não há fonte de logos com licença clara). **Criar um novo painel
 
 ## Editar pela conversa
 
-"Troca o hotel pra Lastarria", "muda a meta pra R$ 5.500" ou "melhora esse painel" editam o
-**mesmo** painel:
+"Troca o hotel pra Lastarria", "muda a meta pra R$ 5.500", "me avisa se ficar abaixo de R$
+5.500" ou "melhora esse painel" editam o **mesmo** painel. A frase de aviso só edita quando vem
+sozinha; dentro de um pedido de cotação novo, ela é a meta dessa cotação.
 - uma chamada curta devolve só o que muda (validado); a meta vem das suas palavras;
 - a versão anterior fica em `panel_versions`;
 - se a mudança afeta a busca (bairro, datas, pessoas), ele confere os preços de novo na hora;
@@ -73,7 +74,10 @@ do provedor (não há fonte de logos com licença clara). **Criar um novo painel
 
 ## A conferência diária
 
-- **Quando:** o worker roda o job `panel_recheck` às 9h do seu horário, todo dia.
+- **Quando:** o worker roda o job `panel_recheck` às 9h do seu horário, todo dia. **Perto da
+  meta** (até 15% acima, ou já abaixo), ele confere a cada 3 h, fora do horário silencioso
+  ([ADR-0016](decisions/0016-painel-de-olho-perto-da-meta.md)), e o card diz "perto da meta:
+  confiro a cada 3 h" (`watch_every_hours` no `GET /panels`).
 - **O que abre:** Google Voos e Google Hotéis, montados do `spec` em código, sem chamada de
   planejamento (`core/panels/urls.py`).
 - **Custo:** uma chamada de extração, que conta como **autônoma** (propósito `panel_recheck`, no
@@ -89,14 +93,18 @@ Quando não confere:
 | Datas da viagem passaram | o painel expira e sai do Início |
 | Limite de painéis ativos | aprovar não cria; a resposta diz para pausar ou apagar um |
 
-**Avisos** (Web Push):
-- só quando o total ficou abaixo da meta, caiu mais que `VISION_PANEL_ALERT_DROP_PERCENT` (10%)
-  ou um item sumiu;
-- no máximo um por painel por dia, e fora do horário silencioso.
+**Avisos** (Web Push), sempre fora do horário silencioso:
+- **Urgente:** o total ficou abaixo da meta. Sai na hora, mesmo que já tenha saído outro aviso no
+  dia, uma vez cada vez que fica abaixo. No horário silencioso, sai na primeira conferência depois
+  dele, se ainda estiver abaixo.
+- **Comum:** caiu mais que `VISION_PANEL_ALERT_DROP_PERCENT` (10%) ou um item sumiu. No máximo um
+  por painel por dia.
 
 **Limites** (`.env.example`):
 - `VISION_PANELS_MAX_ACTIVE`, padrão 3;
-- `VISION_PANEL_MAX_PAGES`, padrão 2 páginas por conferência.
+- `VISION_PANEL_MAX_PAGES`, padrão 2 páginas por conferência;
+- `VISION_PANEL_NEAR_GOAL_PERCENT` (15) e `VISION_PANEL_NEAR_GOAL_EVERY_HOURS` (3): o que é "perto
+  da meta" e de quanto em quanto tempo conferir.
 
 **Rede:** o worker entrou na rede `browsing` para alcançar o container `browser`, que continua sem
 segredos e sem banco.

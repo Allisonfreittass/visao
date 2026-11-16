@@ -285,6 +285,8 @@ export interface Panel {
   checked_at: string | null;
   checked_today: boolean;
   next_check_at: string | null;
+  /** Near the goal it is checked every this many hours (outside quiet hours); null: once a day. */
+  watch_every_hours?: number | null;
   note: string;
   conversation_id: string | null;
   created_at: string;

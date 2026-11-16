@@ -164,6 +164,7 @@ def run_turn(
             attachments=True,
             pages=True,
             browser=browser is not None,
+            continuous=bool(conversation.continuous),
         ),
     )
     if capabilities.mac_projects:
@@ -254,7 +255,7 @@ def run_turn(
         except panels.LimitReached:
             blocks.append(panel_offers.limit_block(config.panel_limits.max_active))
         else:
-            shown = panels.card(session, created, owner)
+            shown = panels.card(session, created, owner, limits=config.panel_limits)
             plan.add(
                 "panel_accepted", executed=True, reason="owner_said_yes", panel_id=str(created.id)
             )
@@ -290,8 +291,12 @@ def run_turn(
                         has_room=lambda: True,
                         reschedule=False,
                         purpose="panel_extract",
+                        alerts=False,  # the reply says it; no push while talking
                     )
                     rechecked = outcome_of_check in ("checked", "alerted")
+                panels.rewatch(session, target, owner, config.panel_limits, told=True)
+                session.commit()
+                shown = panels.card(session, target, owner, limits=config.panel_limits)
                 plan.add(
                     "panel_edited",
                     executed=True,
@@ -299,7 +304,17 @@ def run_turn(
                     panel_id=str(target.id),
                     changed=changed,
                 )
-                blocks.append(panel_editing.edited_block(target.title, changed, rechecked))
+                blocks.append(
+                    panel_editing.edited_block(
+                        target.title,
+                        changed,
+                        rechecked,
+                        goal=panels.gap_words(shown["goal_gap"], shown["goal"])
+                        if "a meta" in changed
+                        else None,
+                        every_hours=shown["watch_every_hours"] if "a meta" in changed else None,
+                    )
+                )
                 edited = target
 
     browsed = None

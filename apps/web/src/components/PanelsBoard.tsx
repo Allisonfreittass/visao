@@ -13,6 +13,12 @@ export function brl(value: string | null): string | null {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: n % 1 === 0 ? 0 : 2 });
 }
 
+/** How often it is checked: every few hours near the goal (ADR-0016), else nothing to say. */
+export function watchLabel(panel: Pick<Panel, "watch_every_hours" | "status">): string | null {
+  if (panel.status === "paused" || !panel.watch_every_hours) return null;
+  return `perto da meta: confiro a cada ${panel.watch_every_hours} h`;
+}
+
 /** When it was checked, never "agora" for a number from another day. */
 export function checkedLabel(panel: Pick<Panel, "checked_at" | "checked_today">): string {
   if (!panel.checked_at) return "ainda não conferido";
@@ -74,6 +80,7 @@ function PanelCard({ api, panel, onChanged }: { api: Api; panel: Panel; onChange
       </ul>
       <p className="live-panel-when">
         {checkedLabel(panel)}
+        {watchLabel(panel) && <span className="live-panel-watch"> · {watchLabel(panel)}</span>}
         {panel.note && <span> · {panel.note}</span>}
       </p>
       {open && (

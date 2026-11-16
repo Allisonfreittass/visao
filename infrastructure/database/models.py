@@ -1045,6 +1045,9 @@ class Panel(Base):
     # What the card says when the last check could not be done ("o site pediu verificação").
     check_note: Mapped[str] = mapped_column(String(200), default="")
     last_alert_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the owner was told it is below their goal; cleared when it goes back above, so the
+    # urgent notice comes once each time it drops below (docs/decisions/0016).
+    goal_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

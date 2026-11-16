@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from core.memory.text import fold
 from core.panels.model import Spec
-from core.panels.offers import goal_from
+from core.panels.offers import alert_goal, goal_from
 from infrastructure.database.models import ModelUsage, Panel
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 
@@ -49,8 +49,18 @@ title: só se ela pedir outro nome, ou "melhora"/"deixa mais descritivo" (2 a 5 
 o destino); senão null. Nunca invente data, cidade ou número de pessoas."""
 
 
+ALERT_EDIT_WORDS = 3
+
+
 def wants_edit(text: str) -> bool:
-    return len(text) <= 600 and bool(_EDIT.search(fold(text)))
+    """A change to the panel. "Me avisa se ficar abaixo de R$ 2.000" counts only when that is
+    about all the message says: inside a new quote it is that quote's goal, not the old panel's."""
+    if len(text) > 600:
+        return False
+    if _EDIT.search(fold(text)):
+        return True
+    rest = alert_goal(text)
+    return rest is not None and "?" not in text and len(rest.split()) <= ALERT_EDIT_WORDS
 
 
 def target(session: Session, owner_id: uuid.UUID, conversation_id: uuid.UUID) -> Panel | None:
@@ -135,14 +145,31 @@ def propose(
     return changes, title if isinstance(title, str) and title.strip() else None
 
 
-def edited_block(title: str, changed: list[str], rechecked: bool) -> str:
+def edited_block(
+    title: str,
+    changed: list[str],
+    rechecked: bool,
+    *,
+    goal: str | None = None,
+    every_hours: int | None = None,
+) -> str:
     what = ", ".join(changed)
     after = (
         " Já conferi os preços de novo com a mudança."
         if rechecked
         else " Os preços novos aparecem na próxima conferência."
     )
+    where = f" Agora está {goal}." if goal else ""
+    watch = (
+        f" Como está perto da meta, confiro a cada {every_hours} h (fora do horário silencioso) "
+        "e aviso na hora quando ficar abaixo dela."
+        if every_hours
+        else " Confiro uma vez por dia; quando chegar perto da meta, passo a conferir mais vezes "
+        "e aviso na hora quando ficar abaixo dela."
+        if goal
+        else ""
+    )
     return (
-        f"O painel “{title}” no Início foi atualizado agora: mudou {what}.{after} Confirme em "
-        "uma ou duas bolhas curtas o que mudou; não repita a cotação inteira."
+        f"O painel “{title}” no Início foi atualizado agora: mudou {what}.{after}{where}{watch} "
+        "Confirme em uma ou duas bolhas curtas o que mudou; não repita a cotação inteira."
     )

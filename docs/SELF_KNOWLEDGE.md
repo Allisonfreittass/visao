@@ -14,6 +14,9 @@ palpite: nada no prompt descrevia como ele é feito.
   uma função ou classe, com o caminho do arquivo.
 - **Estado de agora** (`core/identity/capabilities.py`): o que está ligado, se o servidor tem as
   chaves de Web Push, quantos aparelhos recebem aviso, se a autonomia está pausada.
+- **Novidades** ([NOVIDADES.md](NOVIDADES.md)): o que mudou nele, por data, para responder "o que
+  tem de novo em você?". Toda capacidade nova entra em dois lugares: uma linha no manifesto
+  (`actions()` em `capabilities.py`, que vai em todo prompt) e um item neste arquivo.
 
 A busca é por palavras, sem chamada de modelo: palavras raras pesam mais, o nome de um arquivo ou
 de uma função pesa muito, e um pequeno dicionário liga o português da conversa ao inglês do código

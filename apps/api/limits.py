@@ -9,4 +9,6 @@ def panel_limits(settings: Settings) -> Limits:
         max_active=settings.panels_max_active,
         max_pages=settings.panel_max_pages,
         alert_drop_percent=settings.panel_alert_drop_percent,
+        near_goal_percent=settings.panel_near_goal_percent,
+        near_goal_every_hours=settings.panel_near_goal_every_hours,
     )

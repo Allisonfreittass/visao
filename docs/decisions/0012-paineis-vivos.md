@@ -2,6 +2,7 @@
 
 - Data: 2026-11-15
 - Estado: aceita
+- Ampliada por: [ADR-0016](0016-painel-de-olho-perto-da-meta.md) (de olho perto da meta, aviso urgente abaixo dela)
 
 ## Contexto
 

@@ -132,6 +132,8 @@ def world(client, db, prices=None, browser=None):
         if system == extract.INSTRUCTIONS:
             return prices.answer(messages)
         if system == editing.INSTRUCTIONS:
+            if "Lastarria" not in messages[-1].content:
+                return json.dumps({"changes": {}, "title": None})
             return json.dumps({"changes": {"hotel_area": "Lastarria"}, "title": None})
         if "já está no Início" in system:
             return "Pronto, o Combo Santiago está no Início."
@@ -204,7 +206,8 @@ def test_the_daily_check_reads_both_pages_and_computes_the_goal(client, db):
     headers = _login(client, db)
     make_panel(client, db, headers)
 
-    assert recheck_now(db, llm, browser) == "checked"
+    # The total is known for the first time, and below the goal: the urgent notice.
+    assert recheck_now(db, llm, browser) == "alerted"
 
     card = client.get("/panels", headers=headers).json()[0]
     assert card["total"] == "5945.00"
@@ -215,7 +218,10 @@ def test_the_daily_check_reads_both_pages_and_computes_the_goal(client, db):
     assert db.query(PanelSnapshot).count() == 2
 
 
-def test_a_relevant_drop_sends_one_notice_a_day(client, db, monkeypatch):
+BELOW = "Abaixo da sua meta de R$ 6.000: R$ 5.945 agora. Preço de site muda rápido."
+
+
+def test_below_the_goal_is_urgent_once_each_time_and_drops_once_a_day(client, db, monkeypatch):
     llm, prices, browser = world(client, db)
     sent = []
     monkeypatch.setattr(panels.push, "send_to_owner", lambda *a, **k: sent.append(k["body"]) or 1)
@@ -224,11 +230,105 @@ def test_a_relevant_drop_sends_one_notice_a_day(client, db, monkeypatch):
     prices.flight, prices.hotel = 4812, 1555  # 6367: above the goal
     recheck_now(db, llm, browser)
     assert sent == []
-    prices.flight = 4390  # 5945: crossed below the goal
+    prices.flight = 4390  # 5945: below the goal
     assert recheck_now(db, llm, browser) == "alerted"
-    assert sent == ["ficou abaixo da meta: R$ 5.945"]
-    prices.hotel = 1388  # another drop the same day: no second notice
+    assert sent == [BELOW]
+    prices.hotel = 1388  # another drop the same day, still below: no second notice
     assert recheck_now(db, llm, browser) == "checked" and len(sent) == 1
+    prices.flight, prices.hotel = 4812, 1555  # back above...
+    assert recheck_now(db, llm, browser) == "checked"
+    prices.flight = 4390  # ...and below again, the same day: urgent skips the one-a-day limit
+    assert recheck_now(db, llm, browser) == "alerted" and sent[-1] == BELOW and len(sent) == 2
+
+
+# 12:00 in São Paulo; quiet hours 22:00 to 08:00 (the default).
+NOON = datetime(2026, 11, 17, 15, 0, tzinfo=UTC)
+
+
+def _sao_paulo(db):
+    owner = db.query(User).one()
+    owner.timezone, owner.quiet_start, owner.quiet_end = "America/Sao_Paulo", "22:00", "08:00"
+    db.commit()
+
+
+def test_near_the_goal_it_checks_every_few_hours_outside_quiet_hours(client, db, monkeypatch):
+    llm, prices, browser = world(client, db)
+    monkeypatch.setattr(panels.push, "send_to_owner", lambda *a, **k: 1)
+    headers = _login(client, db)
+    make_panel(client, db, headers)
+    _sao_paulo(db)
+    panel = db.query(Panel).one()
+
+    prices.flight = 9000  # far above the goal: once a day, tomorrow at 9h
+    recheck_now(db, llm, browser, now=NOON)
+    assert panel.next_check_at.replace(tzinfo=UTC) == datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+    assert client.get("/panels", headers=headers).json()[0]["watch_every_hours"] is None
+
+    prices.flight = 4812  # 6% above the goal: in 3 hours
+    recheck_now(db, llm, browser, now=NOON)
+    assert panel.next_check_at.replace(tzinfo=UTC) == NOON + timedelta(hours=3)
+    assert client.get("/panels", headers=headers).json()[0]["watch_every_hours"] == 3
+
+    evening = datetime(2026, 11, 18, 0, 0, tzinfo=UTC)  # 21:00: 3 hours later is quiet
+    recheck_now(db, llm, browser, now=evening)
+    assert panel.next_check_at.replace(tzinfo=UTC) == datetime(2026, 11, 18, 11, 0, tzinfo=UTC)
+    jobs = db.query(ScheduledJob).filter_by(kind=panels.JOB_KIND).all()
+    assert len(jobs) == 4  # one per check: the moved ones do nothing when they come
+    first = min(jobs, key=lambda j: j.created_at)
+    assert panels.stale(panel, first.payload["at"])
+
+
+def test_an_urgent_notice_in_quiet_hours_waits_for_the_first_check_after(client, db, monkeypatch):
+    llm, prices, browser = world(client, db)
+    sent = []
+    monkeypatch.setattr(panels.push, "send_to_owner", lambda *a, **k: sent.append(k["body"]) or 1)
+    headers = _login(client, db)
+    make_panel(client, db, headers)
+    _sao_paulo(db)
+    night = datetime(2026, 11, 18, 4, 0, tzinfo=UTC)  # 01:00 in São Paulo
+
+    assert recheck_now(db, llm, browser, now=night) == "checked" and sent == []
+    panel = db.query(Panel).one()
+    assert panel.goal_alerted_at is None
+    morning = panel.next_check_at.replace(tzinfo=UTC)
+    assert morning == datetime(2026, 11, 18, 11, 0, tzinfo=UTC)  # 08:00, when quiet hours end
+    assert recheck_now(db, llm, browser, now=morning) == "alerted" and sent == [BELOW]
+
+
+@pytest.mark.parametrize(
+    ("text", "goal"),
+    [
+        ("me avisa se ficar abaixo de R$ 5.500", Decimal("5500.00")),
+        ("me avisa se cair pra 5 mil", Decimal("5000.00")),
+        ("me alerta quando chegar a R$ 4.800,50", Decimal("4800.50")),
+        ("quanto custa um hotel por menos de R$ 500?", None),
+        ("me avisa amanhã", None),
+    ],
+)
+def test_a_notice_said_with_a_number_is_a_goal(text, goal):
+    from core.panels.offers import goal_from
+
+    assert goal_from(text) == goal
+
+
+def test_asking_for_a_notice_sets_the_goal_of_the_panel(client, db):
+    llm, prices, browser = world(client, db)
+    headers = _login(client, db)
+    conversation, panel, _ = make_panel(client, db, headers)
+    recheck_now(db, llm, browser)  # 5945
+
+    _, turn = send(client, headers, "me avisa se ficar abaixo de R$ 5.500", conversation)
+
+    db.refresh(panel)
+    assert panel.spec["goal"] == "5500.00" and panel.spec["hotel_area"] == "Providencia"
+    system = llm.prompts[-1][0].content
+    assert "Agora está R$ 445 acima da meta de R$ 5.500" in system
+    assert "confiro a cada 3 h" in system
+    assert client.get("/panels", headers=headers).json()[0]["watch_every_hours"] == 3
+    # Inside a new quote, the same words are that quote's goal, not the old panel's.
+    assert not editing.wants_edit(
+        "quero ver voo pra Lima em março, de BH, 2 pessoas, e me avisa se cair pra R$ 3 mil"
+    )
 
 
 def test_a_robot_check_is_reported_and_never_worked_around(client, db):
@@ -320,9 +420,11 @@ def test_the_worker_job_runs_the_check(client, db, monkeypatch):
     monkeypatch.setattr("apps.worker.handlers.autonomy_room", lambda session, settings: True)
     job = db.query(ScheduledJob).filter_by(kind=panels.JOB_KIND).one()
     result = panel_handler(Settings(), llm)(db, job)
-    assert result.result["outcome"] == "checked"
+    assert result.result["outcome"] == "alerted"  # 5945: below the goal of 6000
     # Counted as the agent's own call, in the autonomy budget.
     assert db.query(ModelUsage).filter_by(purpose="panel_recheck").count() == 1
+    # The first job was for a check that has since moved: it does nothing.
+    assert panel_handler(Settings(), llm)(db, job).result == {"skipped": "moved"}
 
 
 def test_suggestions_come_from_recent_titles_and_skip_sensitive_ones(client, db):

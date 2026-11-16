@@ -37,6 +37,8 @@ class Capabilities:
     pages: bool = False
     # A real browser for live pages (core/browse.py).
     browser: bool = False
+    # This is the owner's one continuous conversation (ADR-0014).
+    continuous: bool = False
     mac_projects: tuple[str, ...] = ()
     google: bool = False
     # Devices that get a push with the app closed; None when this was not looked up.
@@ -66,9 +68,24 @@ class Capabilities:
         if self.browser:
             items.append(
                 "abrir sites ao vivo num navegador de verdade quando o interlocutor pede algo que "
-                "muda com o tempo (preços de passagens e hotéis, disponibilidade, cotações, "
-                "horários, preços de produtos); só lê: não faz login, não compra, não preenche "
-                "cadastro, e quando um site pede verificação de robô, para e avisa"
+                "muda com o tempo (preços de passagens e hotéis, aulas, ingressos, aluguéis, "
+                "disponibilidade, cotações, horários, preços de produtos); só lê: não faz login, "
+                "não compra, não reserva, não preenche cadastro, e quando um site pede "
+                "verificação de robô, para e avisa; quando um site recusa, tenta outro"
+            )
+            items.append(
+                "cotar sem travar: quando faltam origem, datas ou pessoas, supor (a origem sai de "
+                "onde o interlocutor mora, as datas de uma janela no mês dito, 2 adultos na "
+                "dúvida) e dizer no começo da resposta o que foi suposto; com preços lidos, o "
+                "sistema monta embaixo da resposta uma tabela de até 5 opções com o total do "
+                "grupo, então não repita a tabela no texto"
+            )
+            items.append(
+                "deixar uma cotação num painel vivo no Início, só com o sim do interlocutor: ele "
+                "se confere sozinho uma vez por dia, a cada 3 horas quando o total está perto da "
+                "meta, e avisa na hora no celular quando fica abaixo da meta; o interlocutor "
+                "muda o painel pela conversa (bairro, datas, pessoas, meta, ou 'me avisa se "
+                "ficar abaixo de R$ X')"
             )
         if self.pages:
             items.append(
@@ -90,12 +107,22 @@ class Capabilities:
                 + ", ".join(self.mac_projects)
                 + "; o que eu proponho só roda depois da aprovação dele"
             )
+        if self.continuous:
+            items.append(
+                "lembrar desta conversa contínua inteira: a conversa com o interlocutor é uma só, "
+                "o trecho recente vem inteiro e os trechos antigos chegam como resumos com data; "
+                "quando ele pergunta de algo antigo que não está nos resumos, dizer que não "
+                "lembra dos detalhes em vez de inventar"
+            )
         if self.name_deliberation:
             items.append("deliberar sobre o próprio nome pessoal (decidir, adiar ou recusar)")
         if self.reflection:
             items.append("refletir sobre conversas encerradas e registrar lições revisáveis")
         if self.auto_research:
-            items.append("retomar sozinho pesquisas pendentes, sem nova mensagem")
+            items.append(
+                "pesquisar e retomar sozinho pesquisas pendentes, sem pedir aprovação e sem nova "
+                "mensagem (o interlocutor deu essa permissão)"
+            )
         else:
             items.append("propor metas de pesquisa que só rodam com aprovação do interlocutor")
         if self.autonomous_study:
@@ -184,6 +211,7 @@ class CapabilityInputs:
     pages: bool = False
     browser: bool = False
     self_knowledge: bool = True
+    continuous: bool = False
 
 
 def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) -> Capabilities:
@@ -207,6 +235,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         attachments=inputs.attachments,
         pages=inputs.pages,
         browser=inputs.browser,
+        continuous=inputs.continuous,
         push_devices=session.scalar(
             select(func.count())
             .select_from(PushSubscription)

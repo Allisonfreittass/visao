@@ -222,8 +222,9 @@ def segment_handler(settings: Settings, provider: LLMProvider | None) -> Handler
 
 
 def panel_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
-    """The daily check of a live panel (core/panels/service.py, ADR-0012): the agent's own call,
-    so it counts in the autonomy budget and stops with the global pause."""
+    """The check of a live panel (core/panels/service.py, ADR-0012 and 0016): the agent's own
+    call, so it counts in the autonomy budget and stops with the global pause. A job for a check
+    that was moved since (edit, pause, closer to the goal) does nothing."""
 
     def handle(session: Session, job: ScheduledJob) -> HandlerResult:
         panel = session.get(Panel, uuid.UUID(job.payload["panel_id"]))
@@ -232,6 +233,8 @@ def panel_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
         owner = session.get(User, panel.owner_user_id)
         if owner is None:
             return HandlerResult("done", {"skipped": "no_owner"})
+        if panels.stale(panel, job.payload.get("at")):
+            return HandlerResult("done", {"skipped": "moved"})
         outcome = panels.recheck(
             session,
             panel,
