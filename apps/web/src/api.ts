@@ -1,3 +1,5 @@
+import type { Position } from "./location";
+
 // Thin typed client for the VISÃO API. In development, /api is proxied by Vite.
 
 // API timestamps are UTC, including older SQLite rows serialized without an offset.
@@ -490,11 +492,18 @@ export class Api {
     attachmentIds: string[] = [],
     replyToId: string | null = null,
     signal?: AbortSignal,
+    location: Position | null = null,
   ): Promise<Turn> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
       signal,
-      body: JSON.stringify({ content, modality, attachment_ids: attachmentIds, reply_to_id: replyToId }),
+      body: JSON.stringify({
+        content,
+        modality,
+        attachment_ids: attachmentIds,
+        reply_to_id: replyToId,
+        ...(location ? { location } : {}),
+      }),
       headers: { "Content-Type": "application/json" },
     });
   }

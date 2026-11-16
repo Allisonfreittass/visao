@@ -33,6 +33,7 @@ from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
+from core import location
 from core.conversation import artifacts, attachments, progress, segments, title
 from core.conversation.links import LinkReader
 from core.conversation.service import (
@@ -139,6 +140,20 @@ class MessageOut(BaseModel):
     quote_table: dict[str, Any] | None = None
 
 
+class LocationIn(BaseModel):
+    """The phone's position, sent only when the owner turned it on and the message looks like a
+    question about somewhere nearby (docs/LOCALIZACAO.md). Never stored."""
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    accuracy_m: float | None = Field(default=None, ge=0)
+    # When the phone measured it; older than 30 min is not "here".
+    at: datetime | None = None
+
+    def here(self) -> location.Here | None:
+        return location.parse(self.lat, self.lon, self.accuracy_m, self.at)
+
+
 class MessageIn(BaseModel):
     content: str = Field(default="", max_length=MAX_MESSAGE_CHARS)
     # "voice" when the turn came from a voice session: the reply is spoken, so kept short.
@@ -147,6 +162,7 @@ class MessageIn(BaseModel):
     reply_to_id: uuid.UUID | None = None
     # Uploaded first through POST /attachments; a photo alone is a whole message.
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=attachments.MAX_PER_MESSAGE)
+    location: LocationIn | None = None
 
     @model_validator(mode="after")
     def _says_something(self) -> "MessageIn":
@@ -732,6 +748,7 @@ def send_message(
                 files=files,
                 browser=browser,
                 reply_to_id=body.reply_to_id,
+                position=body.location.here() if body.location else None,
             )
         result, outcome = turn.result, turn.curiosity
     except progress.TurnCancelled as exc:

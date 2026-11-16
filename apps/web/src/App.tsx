@@ -1,3 +1,4 @@
+import { positionFor } from "./location";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -622,7 +623,9 @@ export function App() {
       const llmStarted = performance.now();
       const controller = new AbortController();
       turnRef.current = { conversationId, controller };
-      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal);
+      // Only for "near here" questions with the switch on (docs/LOCALIZACAO.md); never stored.
+      const where = await positionFor(text);
+      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal, where);
       const llmMs = performance.now() - llmStarted;
       streamStop?.abort();
       // The bubble that was writing becomes the reply: its text finishes coming in, then it is

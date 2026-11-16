@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 16/11/2026
 
+- **Localização para "perto de mim".** "Tem farmácia aberta aqui perto?":
+  - com "Usar minha localização" ligado, ele abre o Google Maps onde o dono está e responde com
+    nome, endereço e se está aberto;
+  - a posição vai só com essa mensagem, o modelo nunca vê as coordenadas e nada as guarda;
+  - sem a posição, ele pergunta o bairro.
+
+  [ADR-0020](decisions/0020-localizacao.md), [LOCALIZACAO.md](LOCALIZACAO.md).
 - **Backup do banco.** Toda madrugada, uma cópia do schema `visao`:
   - conferida antes de ser guardada;
   - criptografada com uma chave que só o dono tem;

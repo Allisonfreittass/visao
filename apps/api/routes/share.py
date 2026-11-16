@@ -20,6 +20,7 @@ from apps.api.links import get_link_reader
 from apps.api.llm import missing_llm_settings
 from apps.api.routes.artifacts import build_in_background
 from apps.api.routes.conversations import (
+    LocationIn,
     OptionalProvider,
     _budgets,
     notify_reply,
@@ -27,6 +28,7 @@ from apps.api.routes.conversations import (
 )
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
+from core import location
 from core.conversation import artifacts, attachments, progress, segments, share, title
 from core.conversation.links import LinkReader
 from core.decision.pipeline import run_turn
@@ -53,6 +55,8 @@ class ShareIn(BaseModel):
     # Selected text; longer text is cut to MAX_TEXT_CHARS.
     text: str | None = Field(default=None, max_length=20_000)
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=attachments.MAX_PER_MESSAGE)
+    # "How do I get here?" with a screenshot: the phone's position, as in the chat.
+    location: LocationIn | None = None
 
     @model_validator(mode="after")
     def _something(self) -> "ShareIn":
@@ -103,6 +107,7 @@ def share_in(
         conversation.id,
         content,
         list(body.attachment_ids),
+        body.location.here() if body.location else None,
         provider,
         search,
         links,
@@ -118,6 +123,7 @@ def answer(
     conversation_id: uuid.UUID,
     content: str,
     attachment_ids: list[uuid.UUID],
+    position: location.Here | None,
     provider: LLMProvider,
     search: SearchProvider,
     links: LinkReader,
@@ -147,6 +153,7 @@ def answer(
                     files=files,
                     browser=browser,
                     shared=True,
+                    position=position,
                 )
         except Exception:  # noqa: BLE001 - whoever shared is gone; tell them on the phone
             db.rollback()

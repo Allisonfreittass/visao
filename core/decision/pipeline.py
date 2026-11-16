@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
-from core import browse, projects
+from core import browse, location, projects
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import browser_guard, progress, share
@@ -116,6 +116,7 @@ def run_turn(
     browser: Browser | None = None,
     reply_to_id: uuid.UUID | None = None,
     shared: bool = False,
+    position: location.Here | None = None,
 ) -> TurnOutcome:
     plan = TurnPlan()
     blocks: list[str] = []
@@ -322,6 +323,13 @@ def run_turn(
                 )
                 edited = target
 
+    # "Is there a pharmacy open near here?": the phone's position, used only for that and never
+    # kept or shown to the model (core/location.py, ADR-0020).
+    asked_near = location.asks_nearby(text)
+    here = position if asked_near else None
+    if asked_near and here is None:
+        blocks.append(location.MISSING_BLOCK)
+        plan.add("location_missing", executed=False, reason="no_position_sent")
     browsed = None
     offering = False
     quote_table = None
@@ -340,6 +348,7 @@ def run_turn(
             browser=browser,
             search=search,
             max_pages=config.browse_max_pages,
+            here=here,
         )
         if browsed is not None and browsed.skipped:
             # It gave up after planning: on record with the reason, never silently. On a
@@ -401,6 +410,18 @@ def run_turn(
                     about_prices=browse.price_question(text),
                     retry=True,
                 )
+    if here is not None:
+        mapped = browsed is not None and any(
+            v.ok and "/maps/" in (v.final_url or v.url) for v in browsed.visits
+        )
+        blocks.append(location.used_block(here, mapped))
+        # That it was used and how precise, never where.
+        plan.add(
+            "location_used",
+            executed=mapped,
+            reason="owner_asked_nearby",
+            accuracy=location.accuracy_words(here),
+        )
 
     outcome = NO_OUTCOME
     # A message with a link is about that link: searching the web for its words found unrelated

@@ -41,6 +41,7 @@ do chat). Cada um devolve `{"id": "…"}`.
 | `note` | até 1.000 caracteres |
 | `title` | até 200 caracteres |
 | `text` | até 20.000 caracteres; só os primeiros 4.000 vão para a conversa |
+| `location` | opcional, como no chat ([LOCALIZACAO.md](LOCALIZACAO.md)): para "como chego aqui?" com um print |
 
 Resposta **202**, sem esperar a resposta do Visão:
 

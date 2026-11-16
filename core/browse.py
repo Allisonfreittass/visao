@@ -19,13 +19,14 @@ import json
 import logging
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core import location
 from core.conversation import progress
 from core.conversation.service import BudgetExceededError, Budgets, check_budgets
 from core.mind import intentions
@@ -92,6 +93,12 @@ passeios, transfer, restaurante, produto ou serviço. Mesmo que a pessoa só que
 número de agora num site vale mais que uma estimativa. browse é false só para opinião, conversa e \
 fatos estáveis ou históricos.
 
+Lugar perto dela: quando perto_dela for true e a pergunta é sobre um lugar perto de onde ela está \
+agora (farmácia aberta, restaurante, posto, mercado, caixa eletrônico, hospital, padaria...), \
+browse é true e você devolve "nearby": até 2 termos curtos em português do que procurar (ex.: \
+["farmácia"], ["restaurante japonês"]), sem urls para isso: o sistema abre o mapa no lugar dela. \
+Nunca pergunte a cidade nesse caso. Sem perto_dela, nunca use nearby.
+
 Junte a mensagem com recent_conversation: "o preço sobe muito se eu pegar aulas?" numa conversa \
 sobre esquiar em Santiago é "preço de aulas de esqui para iniciantes nos centros perto de \
 Santiago". Se a pessoa pediu a viagem antes e agora manda a origem ou as datas, planeje o pedido \
@@ -99,7 +106,7 @@ inteiro.
 
 Responda SOMENTE JSON:
 {"browse": true, "why": "uma frase", "urls": ["https://..."], "search": "termo ou vazio", \
-"missing": [], "assumed": {}, "title": "nome curto"}
+"missing": [], "assumed": {}, "title": "nome curto", "nearby": []}
 
 urls: até 4 endereços HTTPS que mostram a resposta sem login e sem preencher formulário. Use estes
 modelos quando servirem (datas AAAA-MM-DD, no futuro; códigos IATA dos aeroportos):
@@ -256,6 +263,7 @@ def _plan(
     recent: str,
     refused_hosts: set[str] = frozenset(),
     home: Home | None = None,
+    nearby: bool = False,
 ) -> tuple[dict | None, str]:
     """(plan, why it failed). The reason is one of SKIP_REASONS when the plan is None."""
     prompt = [
@@ -273,6 +281,8 @@ def _plan(
                         if home
                         else None
                     ),
+                    # Only that the owner's position is known; never the position itself.
+                    "perto_dela": nearby,
                 },
                 ensure_ascii=False,
             ),
@@ -486,10 +496,12 @@ def run(
     browser: Browser,
     search: SearchProvider | None,
     max_pages: int,
+    here: location.Here | None = None,
 ) -> Browsed | None:
     """None when the message is not about live data at all (no planning call). After a planning
-    call it never ends silently: pages, what is missing to look, or `skipped` with the reason."""
-    if not candidate(text, recent):
+    call it never ends silently: pages, what is missing to look, or `skipped` with the reason.
+    `here`: the owner asked about somewhere nearby and sent the phone's position (ADR-0020)."""
+    if here is None and not candidate(text, recent):
         topic = _TOPIC.search(recent) if recent else None
         if topic:
             # Not a decision (every message passes here), but the near miss worth seeing when a
@@ -507,9 +519,15 @@ def run(
     check_budgets(session, conversation, budgets)
     avoid = refusing_hosts(session, owner.id)
     home = home_of(session, owner)
-    plan, failed = _plan(session, conversation, provider, owner, text, recent, avoid, home)
+    plan, failed = _plan(
+        session, conversation, provider, owner, text, recent, avoid, home, nearby=here is not None
+    )
     if not plan:
         return Browsed(skipped=failed)
+    if here is not None and location.terms(plan):
+        # The map around the owner, built here: the model never sees the coordinates.
+        maps = [location.maps_url(t, here) for t in location.terms(plan)]
+        plan = {**plan, "browse": True, "urls": maps + list(plan.get("urls") or [])}
     if plan.get("browse") is not True:
         missing = _missing(plan)
         if missing:
@@ -544,6 +562,12 @@ def run(
         )
         if others:
             visits += browser.visit(others, on_visit=opening)
+    if here is not None:
+        # What is kept and shown has no coordinates (core/location.py).
+        visits = [
+            replace(v, url=location.scrub(v.url), final_url=location.scrub(v.final_url))
+            for v in visits
+        ]
     records = []
     for visit in visits:
         row = BrowseVisit(

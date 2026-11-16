@@ -88,6 +88,13 @@ class Capabilities:
                 "grupo, então não repita a tabela no texto"
             )
             items.append(
+                "achar lugares perto do interlocutor agora (farmácia aberta, restaurante, posto, "
+                "mercado) quando ele pergunta e a mensagem vem com a localização do celular (ele "
+                "liga 'Usar minha localização' em Ajustes): o sistema abre o Google Maps onde ele "
+                "está e você responde com nome, endereço e se está aberto; você nunca vê nem diz "
+                "coordenadas, e a posição não fica guardada"
+            )
+            items.append(
                 "deixar uma cotação num painel vivo no Início, só com o sim do interlocutor: ele "
                 "se confere sozinho uma vez por dia, a cada 3 horas quando o total está perto da "
                 "meta, e avisa na hora no celular quando fica abaixo da meta; o interlocutor "

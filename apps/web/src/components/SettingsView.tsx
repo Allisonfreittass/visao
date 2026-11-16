@@ -1,3 +1,4 @@
+import { currentPosition, locationOn, setLocationOn } from "../location";
 import { useEffect, useState } from "react";
 
 import type { Api } from "../api";
@@ -34,6 +35,8 @@ export function SettingsView(props: SettingsViewProps) {
   const [autoResearch, setAutoResearch] = useState<boolean | null>(null);
   const [morning, setMorning] = useState<boolean | null>(null);
   const [morningNote, setMorningNote] = useState("");
+  const [here, setHere] = useState(locationOn());
+  const [hereNote, setHereNote] = useState("");
 
   useEffect(() => {
     Promise.all([api.autonomy(), api.permissions()])
@@ -68,6 +71,24 @@ export function SettingsView(props: SettingsViewProps) {
     } catch (e) {
       onError(e);
     }
+  }
+
+  async function toggleHere() {
+    if (here) {
+      setLocationOn(false);
+      setHere(false);
+      setHereNote("");
+      return;
+    }
+    // Asks the permission now, while the owner is looking, not in the middle of a question.
+    const position = await currentPosition(10_000);
+    if (!position) {
+      setHereNote("O navegador não deixou. No iPhone: Ajustes > Privacidade > Serviços de Localização > Safari (ou o app) > Ao Usar.");
+      return;
+    }
+    setLocationOn(true);
+    setHere(true);
+    setHereNote("");
   }
 
   async function toggleAutoResearch() {
@@ -147,6 +168,18 @@ export function SettingsView(props: SettingsViewProps) {
               <button type="button" className="link-button" onClick={() => void morningNow()}>Mandar agora</button>
             )}
             {morningNote && <p className="note">{morningNote}</p>}
+          </Setting>
+        </section>
+
+        <section className="settings-group" aria-labelledby="g-local">
+          <h2 id="g-local" className="rotulo">Localização</h2>
+          <Setting
+            title="Usar minha localização"
+            description="Só quando você pergunta de algo perto (“tem farmácia aberta aqui perto?”). Vai só com essa mensagem, nunca fica guardada e o modelo não vê as coordenadas. Vale só neste aparelho."
+            checked={here}
+            onChange={() => void toggleHere()}
+          >
+            {hereNote && <p className="note">{hereNote}</p>}
           </Setting>
         </section>
 
