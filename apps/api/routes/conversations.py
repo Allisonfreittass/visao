@@ -33,7 +33,7 @@ from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
-from core import location
+from core import location, projects
 from core.conversation import artifacts, attachments, progress, segments, title
 from core.conversation.links import LinkReader
 from core.conversation.service import (
@@ -138,6 +138,8 @@ class MessageOut(BaseModel):
     # A table of options under a live quote (docs/COTACAO_TABELA.md). Its `text` is also the last
     # entry of `parts`: an app that does not know this field shows that text.
     quote_table: dict[str, Any] | None = None
+    # The reply did something in this project: the app shows "abrir o projeto" (ADR-0021).
+    project_id: uuid.UUID | None = None
 
 
 class LocationIn(BaseModel):
@@ -233,6 +235,7 @@ def _message_out(
         reply_to=_quoted(quoted),
         parts=message.parts,
         quote_table=message.quote_table,
+        project_id=message.project_id,
     )
 
 
@@ -471,20 +474,12 @@ def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut
 def project_chat(project_id: uuid.UUID, db: DbSession, user: CurrentUser) -> ConversationOut:
     """The project's own chat: its latest conversation, made the first time (docs/ACOES.md).
     The project page opens this instead of a new conversation each time."""
-    own_project(db, user.id, project_id)
-    found = db.scalar(
-        select(Conversation)
-        .where(Conversation.user_id == user.id, Conversation.project_id == project_id)
-        .order_by(Conversation.created_at.desc())
-        .limit(1)
-    )
-    if found is None:
-        identity = get_identity(db)
-        if identity is None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado")
-        found = Conversation(user_id=user.id, identity_id=identity.id, project_id=project_id)
-        db.add(found)
-        db.commit()
+    project = own_project(db, user.id, project_id)
+    try:
+        found = projects.chat_for(db, user, project)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado") from exc
+    db.commit()
     return _conversation_out(found)
 
 

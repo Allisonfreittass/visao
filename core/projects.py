@@ -134,3 +134,44 @@ def notes_block(session: Session, owner: User, conversation: Conversation, text:
             + project.notes[-NOTES_IN_REPLY:]
         )
     return "\n".join(lines)
+
+
+def chat_for(session: Session, owner: User, project: Project) -> Conversation:
+    """The project's own chat: its latest conversation, made the first time with an opening
+    message of its own saying what the project holds (like the first page of a notebook)."""
+    found = session.scalar(
+        select(Conversation)
+        .where(Conversation.user_id == owner.id, Conversation.project_id == project.id)
+        .order_by(Conversation.created_at.desc())
+        .limit(1)
+    )
+    if found is not None:
+        return found
+    from core.identity.genesis import get_identity
+
+    identity = get_identity(session)
+    if identity is None:
+        raise LookupError("no identity yet")
+    found = Conversation(user_id=owner.id, identity_id=identity.id, project_id=project.id)
+    session.add(found)
+    session.flush()
+    noted = project.notes.strip()
+    opening = (
+        f"Aqui fica tudo de «{project.name}». O que está anotado até agora:\n{noted}"
+        if noted
+        else f"Aqui fica tudo de «{project.name}». Pode me pedir aqui o que quiser cotar, "
+        "acompanhar ou anotar."
+    )
+    session.add(
+        Message(conversation_id=found.id, role="assistant", content=opening, origin="project")
+    )
+    session.flush()
+    return found
+
+
+def log_in_chat(session: Session, owner: User, project: Project, text: str) -> None:
+    """What it did to the project from elsewhere, said in the project's own chat, so the chat is
+    the project's record (the notes card shows the same)."""
+    chat = chat_for(session, owner, project)
+    session.add(Message(conversation_id=chat.id, role="assistant", content=text, origin="project"))
+    session.flush()

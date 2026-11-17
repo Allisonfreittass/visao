@@ -16,14 +16,23 @@ Peça na conversa, e ele faz antes de responder
 **Um "sim" para a oferta dele também vale.** Quando ele pergunta "quer que eu acrescente essas
 informações?", um "por favor" faz a ação.
 
-## Dentro do projeto
+## O projeto é o chat dele
 
-- **Chat do projeto:** cada projeto tem o seu chat, aberto por "Abrir o chat do projeto". É
-  sempre o mesmo e nasce na primeira vez. Em cima dele, uma barra mostra o projeto e
-  "← Conversa principal". "Conversa", em qualquer menu, também volta para a conversa principal.
-- **Painéis do projeto:** os painéis postos no projeto aparecem nele como no Início, com preço,
-  meta, Pausar e Apagar.
-- **Anotações:** ficam no topo, com Editar.
+Desde 17/11/2026, a organização segue o que o Hark faz (o comportamento, não o visual):
+
+- **"Chat | Projetos" no topo.** "Chat" é sempre a conversa principal. "Projetos" fica marcado
+  enquanto você está num projeto.
+- **Tocar num projeto abre o chat dele**, sem página intermediária. Ele é sempre o mesmo chat e
+  nasce com uma mensagem dizendo o que o projeto guarda ("Aqui fica tudo de «…». O que está
+  anotado até agora: …").
+- **No topo do chat do projeto** ficam o nome e um cartão que abre e fecha: "3 anotações ·
+  1 painel". Aberto, ele mostra as anotações (com Editar), os painéis do projeto como no Início,
+  as páginas, os arquivos, Renomear e Apagar projeto. "Conversa principal" volta.
+- **No computador**, a coluna da esquerda vira a lista de projetos enquanto você está num
+  projeto. **No celular**, "‹ Projetos" volta para a lista.
+- **Da conversa principal:** quando ele cria ou anota um projeto, a resposta traz o botão "Abrir
+  o projeto «…» →". O que ele anota dali também aparece no chat do projeto ("Anotei: …"), então
+  o chat do projeto é o registro dele.
 
 **Regras:**
 - **Anotações:** uma linha por fato, com os valores como apareceram na conversa. Um número que
@@ -45,8 +54,10 @@ informações?", um "por favor" faz a ação.
   muda.
 - **Apagar:** `DELETE /projects/{id}` mantém as conversas, as páginas e os painéis, fora de
   projeto.
-- **Chat do projeto:** `GET /conversations/project/{project_id}` devolve o chat do projeto e o
-  cria na primeira vez.
+- **Chat do projeto:** `GET /conversations/project/{project_id}` devolve o chat do projeto. Na
+  primeira vez, ele é criado com uma mensagem de abertura (`origin: "project"`).
+- **Mensagens:** cada uma traz `project_id` quando a resposta mexeu num projeto. O app mostra
+  "Abrir o projeto". Migração `0034`.
 - **Painéis:** `GET /panels` traz `project_id` em cada painel.
 
 ## Peças

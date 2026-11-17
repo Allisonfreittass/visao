@@ -90,6 +90,7 @@ class Deed:
     said: str  # in the owner's words, for the reply ("criei o projeto «Viagem para o Chile»")
     done: bool
     waiting: bool = False  # deleting, until the owner says yes
+    project_id: uuid.UUID | None = None  # the project it touched, for "abrir o projeto"
 
 
 def candidate(text: str, last_reply: str = "") -> bool:
@@ -227,6 +228,8 @@ def execute(
     item: it becomes a deed that says what could not be done."""
     now = now or datetime.now(UTC)
     deeds: list[Deed] = []
+    created: list[Project] = []
+    noted: dict[uuid.UUID, list[str]] = {}
     for item in [a for a in asked if isinstance(a, dict)][:MAX_ACTIONS]:
         kind = item.get("do")
         owned = _projects(session, owner)
@@ -234,8 +237,11 @@ def execute(
             name = projects.clean_name(str(item.get("name") or ""))
             if not name:
                 continue
-            if _find(owned, name, lambda p: p.name) is not None:
-                deeds.append(Deed(kind, f"o projeto «{name}» já existia", done=True))
+            existing = _find(owned, name, lambda p: p.name)
+            if existing is not None:
+                deeds.append(
+                    Deed(kind, f"o projeto «{name}» já existia", True, project_id=existing.id)
+                )
                 continue
             if len(owned) >= MAX_PROJECTS:
                 deeds.append(Deed(kind, "não criei: projetos demais", done=False))
@@ -244,7 +250,8 @@ def execute(
             session.add(project)
             session.flush()
             _audit(session, owner, "project.create", project_id=str(project.id), via="chat")
-            deeds.append(Deed(kind, f"criei o projeto «{name}»", done=True))
+            created.append(project)
+            deeds.append(Deed(kind, f"criei o projeto «{name}»", True, project_id=project.id))
             continue
         if kind in ("rename_project", "delete_project", "add_notes"):
             project = _find(owned, item.get("project"), lambda p: p.name)
@@ -257,7 +264,9 @@ def execute(
                     continue
                 old, project.name = project.name, name
                 _audit(session, owner, "project.rename", project_id=str(project.id), via="chat")
-                deeds.append(Deed(kind, f"renomeei o projeto «{old}» para «{name}»", done=True))
+                deeds.append(
+                    Deed(kind, f"renomeei «{old}» para «{name}»", True, project_id=project.id)
+                )
             elif kind == "delete_project":
                 deeds.append(
                     _wait(
@@ -275,11 +284,18 @@ def execute(
                 added = add_notes(project, kept, now)
                 if added:
                     _audit(session, owner, "project.notes", project_id=str(project.id), lines=added)
+                    noted.setdefault(project.id, []).extend(kept[-added:])
                     deeds.append(
-                        Deed(kind, f"anotei {added} linha(s) no projeto «{project.name}»", True)
+                        Deed(
+                            kind,
+                            f"anotei {added} linha(s) no projeto «{project.name}»",
+                            True,
+                            project_id=project.id,
+                        )
                     )
                 elif kept:
-                    deeds.append(Deed(kind, f"já estava anotado em «{project.name}»", done=True))
+                    already = f"já estava anotado em «{project.name}»"
+                    deeds.append(Deed(kind, already, True, project_id=project.id))
                 if refused:
                     deeds.append(
                         Deed(
@@ -302,7 +318,7 @@ def execute(
             label = "o painel" if what == "panel" else "a página"
             _audit(session, owner, "project.move", project_id=str(project.id), what=str(what))
             moved = f"pus {label} «{thing.title}» no projeto «{project.name}»"
-            deeds.append(Deed(kind, moved, done=True))
+            deeds.append(Deed(kind, moved, done=True, project_id=project.id))
             continue
         if kind in ("pause_panel", "resume_panel", "delete_panel"):
             panel = _find(_panels(session, owner), item.get("panel"), lambda p: p.title)
@@ -321,6 +337,17 @@ def execute(
                 panels.rewatch(session, panel, owner, limits, told=False, now=now)
                 _audit(session, owner, "panel.resume", panel_id=str(panel.id), via="chat")
                 deeds.append(Deed(kind, f"retomei o painel «{panel.title}»", done=True))
+    # The project's own chat is its record: a new one opens with what was noted; notes added
+    # from elsewhere are said there too (not when this already is that chat).
+    for project in created:
+        projects.chat_for(session, owner, project)
+    for project_id, lines in noted.items():
+        project = session.get(Project, project_id)
+        if project is None or project in created or conversation.project_id == project_id:
+            continue
+        projects.log_in_chat(
+            session, owner, project, "Anotei:\n" + "\n".join(f"- {line}" for line in lines)
+        )
     session.commit()
     return deeds
 

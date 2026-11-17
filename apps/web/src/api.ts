@@ -84,6 +84,8 @@ export interface Message {
   parts?: string[] | null;
   /** Options under a live quote; its `text` is also the last entry of `parts` (docs/COTACAO_TABELA.md). */
   quote_table?: QuoteTable | null;
+  /** The reply did something in this project: "abrir o projeto" (ADR-0021). */
+  project_id?: string | null;
   /** Only here: it was shown as it was written, so it does not come in again. */
   streamed?: boolean;
   attachments?: Attachment[];

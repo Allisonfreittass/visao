@@ -26,6 +26,9 @@ import { SourcesPill } from "./SourcesPill";
 interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
   header?: ReactNode;
+  /** A reply that changed a project offers to open it (ADR-0021). */
+  onOpenProject?: (id: string) => void;
+  projectName?: (id: string) => string | undefined;
   messages: Message[];
   /** The continuous conversation's closed stretches: a divider with the day and the subject. */
   segments?: Segment[];
@@ -147,7 +150,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
   );
 }
 
-export function ChatView({ header, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
+export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   // In the continuous conversation: a divider at each new day and at each stretch's start.
   const divided = useMemo(() => (segments ? dividers(messages, segments, utcDate) : new Map<string, string>()), [messages, segments]);
@@ -345,6 +348,11 @@ export function ChatView({ header, messages, segments, olderLeft, onLoadOlder, a
                 ))
               : m.content && <MessageContent text={m.content} />}
             {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={onOpenPage ?? setViewing} />}
+            {m.project_id && onOpenProject && (
+              <button type="button" className="project-link" onClick={() => onOpenProject(m.project_id as string)}>
+                Abrir o projeto{projectName?.(m.project_id) ? ` «${projectName(m.project_id)}»` : ""} →
+              </button>
+            )}
             {m.sources && m.sources.length > 0 && <SourcesPill sources={m.sources} at={m.created_at} />}
             {!m.local && (
               <button type="button" className="bubble-more" onClick={() => setMenuFor(menuFor === m.id ? null : m.id)} aria-label="Mais opções desta mensagem" aria-expanded={menuFor === m.id} title="Mais">

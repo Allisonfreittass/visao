@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 17/11/2026
 
+- **O projeto é o chat dele (como o Hark organiza).**
+  - "Chat | Projetos" no topo.
+  - Tocar num projeto abre o chat dele, que nasce com o que está anotado.
+  - Em cima do chat fica um cartão com anotações, painéis, páginas e arquivos.
+  - No computador, a lista de projetos fica ao lado.
+  - Quando ele mexe num projeto pela conversa principal, a resposta traz "Abrir o projeto", e o
+    que foi anotado aparece também no chat do projeto. [ACOES.md](ACOES.md).
 - **Projeto com chat e painéis próprios.**
   - "Abrir o chat do projeto" abre sempre o mesmo chat.
   - Os painéis do projeto aparecem nele.

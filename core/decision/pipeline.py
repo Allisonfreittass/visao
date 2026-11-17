@@ -655,6 +655,18 @@ def run_turn(
         or accepted is not None
         or edited is not None,
     )
+    linked = next(
+        (
+            d.project_id
+            for d in deeds
+            if d.done and d.project_id and d.project_id != conversation.project_id
+        ),
+        None,
+    )
+    if linked is not None:
+        # The reply points to the project it changed: "abrir o projeto" in the app.
+        result.assistant_message.project_id = linked
+        session.commit()
     if result.claimed_undone:
         # It said it did something in the app that was not done; the sentence went (ADR-0021).
         plan.add("claim_removed", executed=True, reason="said_done_in_app_without_doing")

@@ -344,3 +344,45 @@ def test_handing_it_over_is_removed_when_nothing_was_done(client, db):
     conversation = _continuous(client, headers)
     turn = _send(client, headers, conversation, "como está a viagem?")
     assert turn["assistant_message"]["content"] == "Boa viagem para vocês!"
+
+
+def test_the_project_chat_opens_with_what_was_noted_and_the_reply_points_to_it(client, db):
+    world(
+        client,
+        db,
+        actions_answer=[
+            [
+                {"do": "create_project", "name": CHILE},
+                {"do": "add_notes", "project": CHILE, "lines": NOTES},
+            ],
+            [{"do": "add_notes", "project": CHILE, "lines": ["Hotel em Providencia"]}],
+        ],
+        reply="Anotei no projeto.",
+    )
+    headers = _login(client, db)
+    conversation = _continuous(client, headers)
+    _said_before(db, conversation)
+
+    turn = _send(client, headers, conversation, ASKED)
+
+    project = db.query(Project).one()
+    assert turn["assistant_message"]["project_id"] == str(project.id)
+    chat = client.get(f"/conversations/project/{project.id}", headers=headers).json()
+    said = client.get(f"/conversations/{chat['id']}/messages", headers=headers).json()
+    assert len(said) == 1 and said[0]["origin"] == "project"
+    assert said[0]["content"].startswith("Aqui fica tudo de «Viagem para o Chile»")
+    assert "R$ 2.047 para 2 pessoas" in said[0]["content"]
+
+    # More notes from the main conversation are said in the project's chat too.
+    _send(client, headers, conversation, "anota no projeto que o hotel é em Providencia")
+    said = client.get(f"/conversations/{chat['id']}/messages", headers=headers).json()
+    assert said[-1]["content"] == "Anotei:\n- Hotel em Providencia"
+
+
+def test_a_project_made_by_the_button_opens_its_chat_with_a_hello(client, db):
+    world(client, db)
+    headers = _login(client, db)
+    project = client.post("/projects", headers=headers, json={"name": "Casa nova"}).json()
+    chat = client.get(f"/conversations/project/{project['id']}", headers=headers).json()
+    said = client.get(f"/conversations/{chat['id']}/messages", headers=headers).json()
+    assert said[0]["content"].startswith("Aqui fica tudo de «Casa nova». Pode me pedir")

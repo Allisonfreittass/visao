@@ -27,6 +27,8 @@ import { ProjectsView } from "./components/ProjectsView";
 import { ArtifactViewer } from "./components/ArtifactCard";
 import { Bench } from "./components/Bench";
 import { HomeColumn } from "./components/HomeColumn";
+import { ProjectColumn } from "./components/ProjectColumn";
+import { ProjectHeader } from "./components/ProjectHeader";
 import { useWide } from "./hooks/useWide";
 import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
@@ -177,6 +179,8 @@ export function App() {
   const conversationsRef = useRef<Conversation[]>([]);
   // Project names for the bar on top of a project's chat.
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
+  const [projectsKey, setProjectsKey] = useState(0);
+  const [lastProject, setLastProject] = useState<string | null>(null);
   conversationsRef.current = conversations;
 
   // The continuous conversation loads only its last page (and as many as are already shown);
@@ -761,6 +765,7 @@ export function App() {
       const chat = await api.projectChat(projectId);
       setConversations((list) => (list.some((c) => c.id === chat.id) ? list : [chat, ...list]));
       setCurrent(chat.id);
+      setLastProject(projectId);
       showView("conversation");
     } catch (e) {
       handleError(e);
@@ -809,21 +814,45 @@ export function App() {
   };
   const currentConversation = conversations.find((c) => c.id === current);
   const currentProjectId = currentConversation?.project_id ?? null;
+  // Names for "abrir o projeto «…»", listed again when a reply points to one not known yet.
+  const linkedUnknown = messages.some((m) => m.project_id && !projectNames[m.project_id]);
   useEffect(() => {
-    if (!currentProjectId || projectNames[currentProjectId]) return;
+    if (!loggedIn) return;
     api.projects().then(
       (list) => setProjectNames(Object.fromEntries(list.map((p) => [p.id, p.name]))),
       () => undefined,
     );
-  }, [api, currentProjectId, projectNames]);
-  // In a project's chat: which project, and the way back to the main conversation.
-  const inProject = currentProjectId;
+  }, [api, loggedIn, projectsKey, linkedUnknown]);
+  // In a project's chat: its card on top (name, notes, panels, files) and the way back.
+  const inProject = view === "conversation" ? currentProjectId : null;
   const projectBar = inProject ? (
-    <div className="project-chat-bar" role="navigation" aria-label="Chat do projeto">
-      <span>Chat do projeto{projectNames[inProject] ? <> <strong>{projectNames[inProject]}</strong></> : null}</span>
-      <button type="button" className="link-button" onClick={openChat}>← Conversa principal</button>
-    </div>
+    <ProjectHeader
+      api={api}
+      projectId={inProject}
+      refreshKey={messages.length + projectsKey}
+      showBack={!desk}
+      onBack={() => showView("projects")}
+      onMain={openChat}
+      onDeleted={() => {
+        setConversations((list) => list.map((c) => (c.project_id === inProject ? { ...c, project_id: null } : c)));
+        setLastProject(null);
+        setProjectsKey((k) => k + 1);
+        openChat();
+      }}
+      onRenamed={(name) => {
+        setProjectNames((names) => ({ ...names, [inProject]: name }));
+        setProjectsKey((k) => k + 1);
+      }}
+      onError={handleError}
+    />
   ) : null;
+  /** The pill and the menu: "Chat" is the main conversation; "Projetos" on a computer goes back
+   * to the last project's chat (the list is beside it), on a phone to the list. */
+  function go(next: WorkspaceView) {
+    if (next === "conversation") return openChat();
+    if (next === "projects" && desk && lastProject) return void openProjectChat(lastProject);
+    showView(next);
+  }
 
   const reload = () => { if (current) loadMessages(current).then(setMessages).catch(handleError); };
   reloadRef.current = reload;
@@ -835,12 +864,12 @@ export function App() {
       {sky && ready && !firstRun && (
         <SkyNav
           wide={wide}
-          view={view}
           pendingCount={pending.count}
           agentName={agentName}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
-          onView={(next) => (next === "conversation" ? openChat() : showView(next))}
+          view={inProject ? "projects" : view}
+          onView={go}
         />
       )}
       <header className={`topbar ${ready ? "topbar--app" : ""}`}>
@@ -877,7 +906,10 @@ export function App() {
 
       {!firstRun && ready && (
         <div className="layout">
-          {desk && (
+          {desk && inProject && (
+            <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
+          )}
+          {desk && !inProject && (
             <HomeColumn
               api={api}
               call={call}
@@ -888,12 +920,12 @@ export function App() {
           )}
           <Rail
             open={menuOpen}
-            view={view}
+            view={inProject ? "projects" : view}
             preparing={preparing}
             online={online}
             pendingCount={pending.count}
             macOnline={macOnline}
-            onView={(next) => (next === "conversation" ? openChat() : showView(next))}
+            onView={go}
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
@@ -920,15 +952,7 @@ export function App() {
               />
             )}
             {view === "projects" && (
-              <ProjectsView
-                api={api}
-                current={current}
-                currentProjectId={currentConversation?.project_id ?? null}
-                onOpenConversation={(id) => { setCurrent(id); showView("conversation"); }}
-                onNewConversation={(projectId) => void openProjectChat(projectId)}
-                onMoved={(id, projectId) => setConversations((list) => list.map((c) => (c.id === id ? { ...c, project_id: projectId } : c)))}
-                onError={handleError}
-              />
+              <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
             )}
             {view === "study" && (
               <section className="page page--caderno" aria-labelledby="study-title">
@@ -972,6 +996,8 @@ export function App() {
             )}
             <ChatView
               hidden={view !== "conversation"}
+              onOpenProject={(id) => void openProjectChat(id)}
+              projectName={(id) => projectNames[id]}
               segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
               olderLeft={olderLeft}
               onLoadOlder={() => void loadOlder()}
@@ -983,6 +1009,8 @@ export function App() {
                   {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
                 </>
               ) : (
+                <>
+                {projectBar}
                 <div className="chat-head">
                   <div className="chat-head-text">
                     <span className="rotulo">{currentConversation ? dayLabel(utcDate(currentConversation.created_at)) : "Conversa nova"}</span>
@@ -997,6 +1025,7 @@ export function App() {
                   </div>
                   <Presence call={call} compact />
                 </div>
+                </>
               )}
               focusRequest={composerFocus}
               agentName={agentName}

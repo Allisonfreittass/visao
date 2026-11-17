@@ -259,6 +259,10 @@ class Message(Base):
     parts: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     # A table of options under a live quote (docs/decisions/0015); its text is also in content.
     quote_table: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # A reply that did something in a project points to it ("abrir o projeto", ADR-0021).
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
