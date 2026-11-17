@@ -16,7 +16,7 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
   - O botão de ligar, ao lado do campo de mensagem, virou uma onda de voz em vez de um ponto
     vermelho.
   - As sugestões de painel no Início dizem o que acontece ao tocar.
-  - Abertura de menos de 2 segundos, uma vez por dia: as partículas viram o orbe, "V.I.S.A.O."
+  - Abertura de 4 segundos, uma vez por dia: as partículas viram o orbe, "V.I.S.A.O."
     aparece ao lado com um cumprimento, e o app aparece. Um toque pula, e quem pediu menos
     movimento no aparelho não vê.
 - **O projeto é o chat dele (como o Hark organiza).**

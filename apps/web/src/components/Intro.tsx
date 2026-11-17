@@ -5,7 +5,7 @@ import { Orb } from "../orb/Orb";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end (the CSS timeline in styles.css adds up to this). */
-export const INTRO_MS = 1900;
+export const INTRO_MS = 4000;
 const DAY_KEY = "intro-day";
 
 /** "Bom dia" / "Boa tarde" / "Boa noite", by the hour on this device. */
@@ -48,7 +48,7 @@ function scatter(count: number): Dot[] {
         "--fy": `${Math.sin(angle) * far}vmax`,
         "--tx": `${Math.cos(turn) * near}px`,
         "--ty": `${Math.sin(turn) * near}px`,
-        "--d": `${Math.round(Math.random() * 200)}ms`,
+        "--d": `${Math.round(Math.random() * 350)}ms`,
         width: size,
         height: size,
       } as CSSProperties,

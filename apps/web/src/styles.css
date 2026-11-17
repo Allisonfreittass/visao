@@ -687,27 +687,27 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 .project-link-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-link:focus-visible { outline: 2px solid currentColor; }
 
-/* The opening (components/Intro.tsx): ~1.9 s, once a day, skipped by a tap, a key or reduced motion. */
+/* The opening (components/Intro.tsx): 4 s to take in, once a day, skipped by a tap, a key or reduced motion. */
 .intro { position: fixed; inset: 0; z-index: calc(var(--camada-sobreposicao) + 20); display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer;
   background:
     radial-gradient(42vmax 42vmax at 8% 12%, var(--lanterna-luz), transparent 70%),
     radial-gradient(48vmax 48vmax at 96% 60%, color-mix(in srgb, var(--estanho) 22%, transparent), transparent 70%),
     radial-gradient(30vmax 30vmax at 40% 104%, color-mix(in srgb, var(--lanterna) 7%, transparent), transparent 70%),
     var(--intro-base, var(--fundo));
-  animation: intro-sai .4s ease-in 1.5s forwards; }
+  animation: intro-sai .6s ease-in 3.4s forwards; }
 /* The sky theme's --fundo is see-through glass; the opening needs a solid floor. */
 [data-theme="ceu"] .intro { --intro-base: #eef2f3; }
 [data-theme="ceu"][data-ceu="noite"] .intro { --intro-base: #141828; }
 .intro-stage { display: flex; align-items: center; gap: 0; }
 .intro-orb { position: relative; width: 132px; height: 132px; flex-shrink: 0; }
 .intro-dot { position: absolute; left: 50%; top: 50%; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--estanho); opacity: 0;
-  animation: intro-junta .7s cubic-bezier(.2, .8, .2, 1) var(--d) forwards, intro-some .25s ease-out calc(.62s + var(--d)) forwards; }
+  animation: intro-junta 1.2s cubic-bezier(.2, .8, .2, 1) var(--d) forwards, intro-some .4s ease-out calc(1.1s + var(--d)) forwards; }
 .intro-dot--warm { background: var(--lanterna); }
-.intro-ring { position: absolute; inset: 0; border: 1.5px solid var(--estanho); border-radius: 50%; opacity: 0; animation: intro-anel .75s ease-out .5s forwards; }
-.intro-core { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.6); animation: intro-nasce .4s cubic-bezier(.2, .8, .2, 1) .55s forwards; }
-.intro-words { display: grid; gap: 6px; overflow: hidden; max-width: 0; white-space: nowrap; animation: intro-abre .55s cubic-bezier(.2, .8, .2, 1) .75s forwards; }
+.intro-ring { position: absolute; inset: 0; border: 1.5px solid var(--estanho); border-radius: 50%; opacity: 0; animation: intro-anel 1.1s ease-out 1.05s forwards; }
+.intro-core { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.6); animation: intro-nasce .7s cubic-bezier(.2, .8, .2, 1) 1.05s forwards; }
+.intro-words { display: grid; gap: 6px; overflow: hidden; max-width: 0; white-space: nowrap; animation: intro-abre .9s cubic-bezier(.2, .8, .2, 1) 1.8s forwards; }
 .intro-brand { padding-left: 18px; font: 400 44px/1 var(--font-display); letter-spacing: -.02em; color: var(--tinta); }
-.intro-hello { margin: 0; padding-left: 20px; font: 400 16px/1.3 var(--font-sans); color: var(--tinta-suave); opacity: 0; transform: translateY(6px); animation: intro-sobe .35s ease-out 1s forwards; }
+.intro-hello { margin: 0; padding-left: 20px; font: 400 16px/1.3 var(--font-sans); color: var(--tinta-suave); opacity: 0; transform: translateY(6px); animation: intro-sobe .6s ease-out 2.4s forwards; }
 .intro-hello em { font-style: normal; color: var(--tinta); }
 @keyframes intro-junta { from { opacity: 0; transform: translate(var(--fx), var(--fy)); } 20% { opacity: .9; } to { opacity: .9; transform: translate(var(--tx), var(--ty)); } }
 @keyframes intro-some { to { opacity: 0; transform: translate(0, 0) scale(.4); } }
@@ -718,7 +718,7 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 @keyframes intro-sai { to { opacity: 0; visibility: hidden; } }
 @media (max-width: 560px) {
   .intro-stage { flex-direction: column; gap: 18px; }
-  .intro-words { max-width: none; justify-items: center; opacity: 0; animation: intro-sobe .4s ease-out .75s forwards; }
+  .intro-words { max-width: none; justify-items: center; opacity: 0; animation: intro-sobe .7s ease-out 1.8s forwards; }
   .intro-brand, .intro-hello { padding-left: 0; }
   .intro-brand { font-size: 38px; }
   .intro-hello { white-space: normal; text-align: center; }
