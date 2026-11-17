@@ -350,7 +350,8 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             {m.artifact && <ArtifactCard artifact={m.artifact} onOpen={onOpenPage ?? setViewing} />}
             {m.project_id && onOpenProject && (
               <button type="button" className="project-link" onClick={() => onOpenProject(m.project_id as string)}>
-                Abrir o projeto{projectName?.(m.project_id) ? ` «${projectName(m.project_id)}»` : ""} →
+                <span className="project-link-text">Abrir o projeto{projectName?.(m.project_id) ? ` «${projectName(m.project_id)}»` : ""}</span>
+                <span aria-hidden="true">→</span>
               </button>
             )}
             {m.sources && m.sources.length > 0 && <SourcesPill sources={m.sources} at={m.created_at} />}

@@ -18,7 +18,7 @@ export function InboxView({ api, onDraft, pending, current, onReplied }: InboxVi
   return (
     <section className="page" aria-labelledby="inbox-title">
       <header className="page-head">
-        <span className="rotulo">Pendências</span>
+        <span className="rotulo">Início</span>
         <h1 id="inbox-title">{empty ? <>Nada esperando <em>por você.</em></> : <>O que precisa <em>de você.</em></>}</h1>
         <p className="lede">Eu só proponho. Nada roda sem o seu sim.</p>
       </header>

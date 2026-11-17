@@ -7,6 +7,18 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 17/11/2026
 
+- **Telas mais fáceis de usar e uma abertura.**
+  - Os menus usam os mesmos nomes: Início, Chat e Projetos. O menu lateral só tem o que não está
+    no topo (Caderno, Mac e Ajustes).
+  - No projeto, a barra mostra o nome inteiro e tem uma seta para voltar. A mensagem de abertura
+    não repete as anotações, que ficam no cartão de cima.
+  - Botões e links com pelo menos 44 px para o dedo.
+  - O botão de ligar, ao lado do campo de mensagem, virou uma onda de voz em vez de um ponto
+    vermelho.
+  - As sugestões de painel no Início dizem o que acontece ao tocar.
+  - Abertura de menos de 2 segundos, uma vez por dia: as partículas viram o orbe, "V.I.S.A.O."
+    aparece ao lado com um cumprimento, e o app aparece. Um toque pula, e quem pediu menos
+    movimento no aparelho não vê.
 - **O projeto é o chat dele (como o Hark organiza).**
   - "Chat | Projetos" no topo.
   - Tocar num projeto abre o chat dele, que nasce com o que está anotado.

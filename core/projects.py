@@ -155,12 +155,17 @@ def chat_for(session: Session, owner: User, project: Project) -> Conversation:
     found = Conversation(user_id=owner.id, identity_id=identity.id, project_id=project.id)
     session.add(found)
     session.flush()
-    noted = project.notes.strip()
+    # The notes live in the card on top of this chat; repeating them here showed them twice.
+    lines = sum(1 for line in project.notes.splitlines() if line.strip())
     opening = (
-        f"Aqui fica tudo de «{project.name}». O que está anotado até agora:\n{noted}"
-        if noted
-        else f"Aqui fica tudo de «{project.name}». Pode me pedir aqui o que quiser cotar, "
-        "acompanhar ou anotar."
+        f"Aqui fica tudo de «{project.name}». "
+        + (
+            f"{'A anotação' if lines == 1 else f'As {lines} anotações'} até agora "
+            f"{'fica' if lines == 1 else 'ficam'} no cartão aqui em cima. "
+            if lines
+            else ""
+        )
+        + "Pode me pedir aqui o que quiser cotar, acompanhar ou anotar."
     )
     session.add(
         Message(conversation_id=found.id, role="assistant", content=opening, origin="project")

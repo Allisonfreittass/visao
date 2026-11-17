@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Api, ProjectDetail } from "../api";
 import { attachmentUrl, formatSize } from "../attachments";
+import { Icon } from "./Icon";
 import { PanelsBoard } from "./PanelsBoard";
 import { projectSummary } from "./ProjectsView";
 
@@ -13,7 +14,6 @@ interface ProjectHeaderProps {
   /** On a phone the list is not beside the chat: a way back to it. */
   showBack: boolean;
   onBack: () => void;
-  onMain: () => void;
   onDeleted: () => void;
   onRenamed: (name: string) => void;
   onError: (e: unknown) => void;
@@ -21,7 +21,7 @@ interface ProjectHeaderProps {
 
 /** On top of a project's chat: its name, and what it holds (notes, panels, pages, files) in a
  * card that opens and closes (ADR-0021). */
-export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, onMain, onDeleted, onRenamed, onError }: ProjectHeaderProps) {
+export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, onDeleted, onRenamed, onError }: ProjectHeaderProps) {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
@@ -84,9 +84,12 @@ export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, on
   return (
     <div className="project-head">
       <div className="project-head-bar">
-        {showBack && <button type="button" className="link-button" onClick={onBack}>‹ Projetos</button>}
+        {showBack && (
+          <button type="button" className="project-head-back" onClick={onBack} aria-label="Voltar para Projetos" title="Projetos">
+            <Icon name="back" size={20} />
+          </button>
+        )}
         <strong className="project-head-name">{project.name}</strong>
-        <button type="button" className="link-button" onClick={onMain}>Conversa principal</button>
       </div>
       <button type="button" className="project-head-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         {projectSummary(project)} <span aria-hidden="true">{open ? "▴" : "▾"}</span>
@@ -102,7 +105,7 @@ export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, on
                 ) : (
                   <p className="note">Nada anotado ainda. Peça aqui: “anota isso”.</p>
                 )}
-                <button type="button" className="link-button" onClick={() => setEditing(project.notes ?? "")}>Editar</button>
+                <button type="button" className="ghost project-head-edit" onClick={() => setEditing(project.notes ?? "")}>Editar anotações</button>
               </>
             ) : (
               <>

@@ -157,11 +157,14 @@ export function PanelsBoard({ api, nothingPending, onDraft, projectId }: PanelsB
       <h2 className="rotulo">Painéis</h2>
       {panels.map((panel) => <PanelCard key={panel.id} api={api} panel={panel} onChanged={load} />)}
       {panels.length === 0 && nothingPending && suggested.length > 0 && (
+        <>
+        <p className="note panel-suggestions-hint">Sugestões: tocar escreve o pedido na conversa, e nada roda antes de você mandar.</p>
         <ul className="panel-suggestions">
           {suggested.map((s) => (
             <li key={s.text}><button type="button" className="ghost" onClick={() => onDraft(s.draft)}>{s.text}</button></li>
           ))}
         </ul>
+        </>
       )}
       <button type="button" className="panel-new ghost" onClick={() => onDraft("Quero acompanhar ")}>+ Criar um novo painel</button>
     </section>

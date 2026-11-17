@@ -4,8 +4,8 @@ import { Icon, type IconName } from "./Icon";
 export type WorkspaceView = "conversation" | "inbox" | "projects" | "study" | "mac" | "settings";
 
 const NAV: { view: WorkspaceView; label: string; icon: IconName }[] = [
-  { view: "conversation", label: "Conversa", icon: "chat" },
-  { view: "inbox", label: "Pendências", icon: "inbox" },
+  { view: "inbox", label: "Início", icon: "inbox" },
+  { view: "conversation", label: "Chat", icon: "chat" },
   { view: "projects", label: "Projetos", icon: "folder" },
   { view: "study", label: "Caderno", icon: "notebook" },
   { view: "mac", label: "Mac", icon: "laptop" },
@@ -20,12 +20,14 @@ interface RailProps {
   pendingCount: number;
   /** null: no Mac paired yet. */
   macOnline: boolean | null;
+  /** Sections already in the pill at the top: the drawer leaves them out (same names, one place). */
+  inPill?: WorkspaceView[];
   onView: (view: WorkspaceView) => void;
   /** Closes the drawer (dragging it left, on a phone). */
   onClose?: () => void;
 }
 
-/** Where everything is: the sections ("Conversa" is the continuous one), then the connection. */
+/** Where everything is: the sections ("Chat" is the continuous one), then the connection. */
 export function Rail(props: RailProps) {
   const { view, onView } = props;
   const drag = useDragToClose("left", () => props.onClose?.(), 70);
@@ -38,7 +40,7 @@ export function Rail(props: RailProps) {
     >
       <a className="brand rail-brand" href="/" aria-label="V.I.S.A.O., início">V.I.S.A.O.</a>
       <nav className="rail-nav" aria-label="Seções">
-        {NAV.map((item) => (
+        {NAV.filter((item) => !props.inPill?.includes(item.view)).map((item) => (
           <button key={item.view} type="button" aria-current={view === item.view ? "page" : undefined} onClick={() => onView(item.view)}>
             <Icon name={item.icon} />
             <span>{item.label}</span>

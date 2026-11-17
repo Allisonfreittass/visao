@@ -89,7 +89,7 @@ html[data-theme="ceu"] { background: var(--ceu-chao); }
 .sky-avatar { background: var(--estanho); border-color: transparent; color: #f4f7f8; font: 500 16px/1 var(--font-sans); letter-spacing: .02em; }
 .sky-avatar:hover, .sky-avatar[aria-current] { background: var(--pilula-ativa); box-shadow: 0 0 0 3px var(--vidro-forte); }
 .sky-tabs { display: flex; gap: 2px; padding: 4px; border: 1px solid var(--vidro-borda); border-radius: var(--raio-pilula); background: var(--vidro); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 2px 12px rgb(29 29 31 / .06); }
-.sky-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 20px; border: 0; border-radius: var(--raio-pilula); background: transparent; color: var(--tinta-fraca); font: 400 16px/1 var(--font-sans); transition: background .24s ease-in-out, color .24s ease-in-out; }
+.sky-tabs button { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 20px; border: 0; border-radius: var(--raio-pilula); background: transparent; color: var(--tinta-fraca); font: 400 16px/1 var(--font-sans); transition: background .24s ease-in-out, color .24s ease-in-out; }
 .sky-tabs button:hover { color: var(--tinta); }
 .sky-tabs button[aria-current] { background: var(--pilula-ativa); color: var(--pilula-ativa-tinta); }
 .sky-badge { min-width: 18px; height: 18px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--raio-pilula); background: #e0483f; color: #fff; font: 500 11px/1 var(--font-sans); }
@@ -150,11 +150,18 @@ html[data-theme="ceu"] { background: var(--ceu-chao); }
 .sky-orb { position: relative; width: 58px; height: 58px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--vidro-borda); border-radius: 50%; background: var(--vidro-forte); -webkit-backdrop-filter: var(--vidro-desfoque); backdrop-filter: var(--vidro-desfoque); box-shadow: 0 .8rem 3.2rem rgb(29 29 31 / .1); }
 .sky-orb:hover:not(:disabled) { transform: scale(1.04); }
 .sky-orb:disabled { opacity: 1; cursor: default; }
-.sky-orb-core { width: 12px; height: 12px; border-radius: 50%; background: #e0483f; box-shadow: 0 0 12px 2px rgb(224 72 63 / .45); transition: transform .3s, opacity .3s; }
-.sky-orb[data-state="IDLE"] .sky-orb-core { opacity: .55; }
-.sky-orb[data-state="THINKING"] .sky-orb-core { animation: orbe-pensa 1.1s ease-in-out infinite; }
-.sky-orb[data-state="LISTENING"] .sky-orb-core, .sky-orb[data-state="SPEAKING"] .sky-orb-core { transform: scale(1.5); }
-.sky-orb[data-state="DISCONNECTED"] .sky-orb-core { background: var(--tinta-fraca); box-shadow: none; }
+/* The call button: a small voice wave (not a red dot, which reads as "recording" or an error). */
+.sky-orb-wave { display: inline-flex; align-items: center; gap: 3px; height: 20px; transition: opacity .3s; }
+.sky-orb-wave span { width: 3px; height: 8px; border-radius: 2px; background: var(--estanho); transition: height .3s, background .3s; }
+.sky-orb-wave span:nth-child(2) { height: 16px; }
+.sky-orb-wave span:nth-child(3) { height: 11px; }
+.sky-orb[data-state="IDLE"] .sky-orb-wave { opacity: .8; }
+.sky-orb[data-state="THINKING"] .sky-orb-wave span { animation: onda 1.1s ease-in-out infinite; }
+.sky-orb[data-state="LISTENING"] .sky-orb-wave span, .sky-orb[data-state="SPEAKING"] .sky-orb-wave span { background: #e0483f; animation: onda .8s ease-in-out infinite; }
+.sky-orb-wave span:nth-child(2) { animation-delay: .15s !important; }
+.sky-orb-wave span:nth-child(3) { animation-delay: .3s !important; }
+.sky-orb[data-state="DISCONNECTED"] .sky-orb-wave { opacity: .4; }
+@keyframes onda { 50% { transform: scaleY(.45); } }
 @keyframes orbe-pensa { 50% { transform: scale(1.6); opacity: .7; } }
 
 /* Ask bars and pages float as glass cards. */
@@ -170,8 +177,8 @@ html[data-theme="ceu"] { background: var(--ceu-chao); }
 
 @media (max-width: 560px) {
   .sky-nav { padding: 10px 12px 4px; gap: 8px; }
-  .sky-round, .sky-avatar { width: 42px; height: 42px; }
-  .sky-tabs button { padding: 0 14px; min-height: 38px; font-size: 15px; }
+  .sky-round, .sky-avatar { width: 44px; height: 44px; }
+  .sky-tabs button { padding: 0 14px; min-height: 44px; font-size: 15px; }
   .app--ceu .main { padding: 4px 10px 8px; }
   .app--ceu .bubble { font-size: 16px; }
   .app--ceu .bubble.assistant { max-width: 92%; }

@@ -19,6 +19,7 @@ import {
 import { useCallCamera } from "./call/camera";
 import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
+import { Intro, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
 import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
@@ -133,6 +134,9 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The opening animation, once a day (components/Intro.tsx).
+  const [intro, setIntro] = useState(() => introDue());
+  const endIntro = useCallback(() => setIntro(false), []);
   // A notification about Mac work opens the list of what waits for a yes (`/?mac=1`).
   const [view, setView] = useState<WorkspaceView>(() =>
     new URLSearchParams(window.location.search).get("mac") ? "inbox" : "conversation",
@@ -832,7 +836,6 @@ export function App() {
       refreshKey={messages.length + projectsKey}
       showBack={!desk}
       onBack={() => showView("projects")}
-      onMain={openChat}
       onDeleted={() => {
         setConversations((list) => list.map((c) => (c.project_id === inProject ? { ...c, project_id: null } : c)));
         setLastProject(null);
@@ -861,6 +864,7 @@ export function App() {
   return (
     <div className={`app${sky ? " app--ceu" : ""}${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
       {sky && <Sky onNight={setSkyNight} />}
+      {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {sky && ready && !firstRun && (
         <SkyNav
           wide={wide}
@@ -925,6 +929,7 @@ export function App() {
             online={online}
             pendingCount={pending.count}
             macOnline={macOnline}
+            inPill={sky ? (wide ? ["conversation", "projects"] : ["inbox", "conversation", "projects"]) : undefined}
             onView={go}
             onClose={() => setMenuOpen(false)}
           />

@@ -45,7 +45,7 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
 
   const form = (
     <form className="projects-new" onSubmit={(e) => void create(e)}>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Novo projeto, ex.: Viagem a Santiago" maxLength={80} aria-label="Nome do novo projeto" />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome do novo projeto" maxLength={80} aria-label="Nome do novo projeto" />
       <button type="submit" className="projects-primary" disabled={!name.trim()}>Criar</button>
     </form>
   );

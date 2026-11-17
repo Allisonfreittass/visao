@@ -55,7 +55,7 @@ export function SkyNav({ wide, view, pendingCount, agentName, menuOpen, onMenu, 
   );
 }
 
-/** The round button left of the message box: Visão's core, and a tap calls it. */
+/** The round button left of the message box: a voice wave, and a tap calls it. */
 export function SkyOrbButton({ state, canCall, hint, onCall }: { state: OrbState; canCall: boolean; hint: string | null; onCall: () => void }) {
   return (
     <button
@@ -67,7 +67,7 @@ export function SkyOrbButton({ state, canCall, hint, onCall }: { state: OrbState
       aria-label={canCall ? `Ligar · ${STATE_LABELS[state]}` : hint ?? "Ligar"}
       title={canCall ? "Ligar" : hint ?? undefined}
     >
-      <span className="sky-orb-core" aria-hidden="true" />
+      <span className="sky-orb-wave" aria-hidden="true"><span /><span /><span /></span>
     </button>
   );
 }

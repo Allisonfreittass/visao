@@ -371,7 +371,9 @@ def test_the_project_chat_opens_with_what_was_noted_and_the_reply_points_to_it(c
     said = client.get(f"/conversations/{chat['id']}/messages", headers=headers).json()
     assert len(said) == 1 and said[0]["origin"] == "project"
     assert said[0]["content"].startswith("Aqui fica tudo de «Viagem para o Chile»")
-    assert "R$ 2.047 para 2 pessoas" in said[0]["content"]
+    # The notes are in the card on top; the opening points there instead of repeating them.
+    assert "no cartão aqui em cima" in said[0]["content"]
+    assert "R$ 2.047" not in said[0]["content"]
 
     # More notes from the main conversation are said in the project's chat too.
     _send(client, headers, conversation, "anota no projeto que o hotel é em Providencia")
