@@ -46,6 +46,9 @@ public final class ChatStore {
     public var followInBackground = false
     /// Called when a conversation is created by the first message (the list adds it).
     public var onConversationCreated: ((Conversation) -> Void)?
+    /// The phone's position for this message's text, or nil (docs/LOCALIZACAO.md). The screen sets
+    /// it; it decides by the switch and the text, and the position goes only with that message.
+    public var locate: ((String) async -> SentLocation?)?
     /// Called with every API error, so a 401 can send the app back to the login screen.
     public var onError: ((Error) -> Void)?
 
@@ -260,7 +263,11 @@ public final class ChatStore {
         }
         let api = self.api
         let attachmentIds = attachments.map(\.id)
-        let task = Task { try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id) }
+        let locate = self.locate
+        let task = Task {
+            let location = await locate?(text)
+            return try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id, location: location)
+        }
         turnTask = task
         do {
             let turn = try await task.value

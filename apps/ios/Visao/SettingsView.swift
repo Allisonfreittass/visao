@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var confirmGoogle = false
     @State private var notice: String?
     @State private var morningNote: String?
+    @State private var location = LocationPermission()
     @State private var speakReplies = VoicePrefs.speakReplies
     @State private var sampleVoice = VoiceEngine()
     @State private var voiceApproval = VoicePrefs.voiceApproval
@@ -114,6 +115,19 @@ struct SettingsView: View {
                             }
                         }
                     }
+                }
+            }
+            PageGroup(label: "Localização") {
+                SettingRow(
+                    title: "Usar minha localização",
+                    description: "Só quando você pergunta de algo perto (“tem farmácia aberta aqui perto?”). Vai só com essa mensagem, nunca fica guardada e o modelo não vê as coordenadas. Vale só neste aparelho.",
+                    isOn: Binding(get: { location.on }, set: { location.set($0) })
+                )
+                if let note = location.note {
+                    Text(note)
+                        .font(Typo.text(.footnote))
+                        .foregroundStyle(palette.tintaSuave)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             PageGroup(label: "Google") {

@@ -294,6 +294,11 @@ struct ChatScreen: View {
         }
         .task {
             store.onError = { session.handle($0) }
+            // Only with the switch on and a "perto de mim" text; the position goes with that one
+            // message and is kept nowhere.
+            store.locate = { text in
+                await LocationPrefs.position(for: text, enabled: LocationPrefs.enabled(), source: DevicePosition())
+            }
             store.onAction = { Task { await session.pending.refresh() } }
             store.onConversationCreated = { conversation in
                 session.added(conversation)

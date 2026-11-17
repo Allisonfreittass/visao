@@ -29,6 +29,8 @@
 	<string>Para entender o que você fala na ligação. Quando o iPhone permite, o reconhecimento roda no próprio aparelho.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tirar uma foto e mandar na conversa, e para ele ver o que a câmera mostra numa ligação, só quando você liga a câmera.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Para achar lugares perto de você quando você pergunta, como uma farmácia aberta. A posição vai só com essa mensagem e não fica guardada.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -71,7 +71,10 @@ final class ShareModel {
     }
 
     func send() async {
-        await sender.send(content, note: note)
+        // The same switch as the app's (App Group); without "Durante o uso", nothing is asked.
+        await sender.send(content, note: note) { text in
+            await LocationPrefs.position(for: text, enabled: LocationPrefs.enabled(), source: DevicePosition())
+        }
         switch sender.state {
         case .sent:
             try? await Task.sleep(for: .seconds(1))

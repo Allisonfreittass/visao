@@ -113,7 +113,8 @@ public final class ShareSender {
     public static let sentText = "Enviado. A resposta chega como aviso."
     public static let signedOutText = "Abra o Visão e entre de novo"
 
-    public func send(_ content: ShareContent, note: String, location: SentLocation? = nil) async {
+    /// `locate` gets the comment and the text; with the switch off it never asks for a position.
+    public func send(_ content: ShareContent, note: String, locate: ((String) async -> SentLocation?)? = nil) async {
         guard api.isAuthenticated else {
             state = .signedOut
             return
@@ -130,6 +131,9 @@ public final class ShareSender {
                 uploaded[index] = attachment.id
                 ids.append(attachment.id)
             }
+            // The comment is the question; a shared text can be long, so only its start counts.
+            let asked = Nearby.asks(note) ? note : String((content.text ?? "").prefix(1000))
+            let location = await locate?(asked)
             let body = ShareRequest(
                 note: note, url: content.url?.absoluteString, title: content.title, text: content.text,
                 attachmentIds: ids, location: location

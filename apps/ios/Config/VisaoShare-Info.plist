@@ -10,6 +10,8 @@
 	<string>$(VISAO_KEYCHAIN_GROUP)</string>
 	<key>VisaoTokenService</key>
 	<string>$(VISAO_BUNDLE_ID).auth</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Para achar lugares perto de você quando você pergunta, como uma farmácia aberta. A posição vai só com essa mensagem e não fica guardada.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
