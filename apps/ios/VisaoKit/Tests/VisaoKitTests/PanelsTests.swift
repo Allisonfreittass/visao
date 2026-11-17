@@ -20,4 +20,17 @@ final class PanelsTests: XCTestCase {
         XCTAssertEqual(PanelText.brl("4250.50"), "R$ 4.250,50")
         XCTAssertTrue(PanelText.checked(panel).hasSuffix("· não conferido hoje"))
     }
+
+    func testNearTheGoalShowsHowOftenItChecks() throws {
+        func panel(watch: String, status: String = "active") throws -> LivePanel {
+            let text = json.replacingOccurrences(of: #""next_check_at":null"#, with: #""next_check_at":null,"watch_every_hours":\#(watch)"#)
+                .replacingOccurrences(of: #""status":"active""#, with: #""status":"\#(status)""#)
+            return try XCTUnwrap(APIDate.decoder.decode([LivePanel].self, from: Data(text.utf8)).first)
+        }
+        XCTAssertEqual(PanelText.watch(try panel(watch: "3")), "perto da meta: confiro a cada 3 h")
+        XCTAssertNil(PanelText.watch(try panel(watch: "null")), "once a day: nothing")
+        XCTAssertNil(PanelText.watch(try panel(watch: "3", status: "paused")), "paused: it is not checking")
+        let older = try XCTUnwrap(APIDate.decoder.decode([LivePanel].self, from: Data(json.utf8)).first)
+        XCTAssertNil(older.watchEveryHours, "an older server has no field")
+    }
 }

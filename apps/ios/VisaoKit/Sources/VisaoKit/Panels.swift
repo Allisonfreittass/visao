@@ -53,9 +53,12 @@ public struct LivePanel: Codable, Sendable, Identifiable, Hashable {
     public let checkedToday: Bool
     public let note: String
     public let history: [PanelPoint]?
+    /// Near the goal it checks every few hours (3); nil: once a day (ADR-0016).
+    public let watchEveryHours: Int?
 
     enum CodingKeys: String, CodingKey {
         case id, title, status, spec, total, goal, change, items, note, history
+        case watchEveryHours = "watch_every_hours"
         case goalGap = "goal_gap"
         case goalWords = "goal_words"
         case checkedAt = "checked_at"
@@ -88,6 +91,13 @@ public enum PanelText {
         formatter.maximumFractionDigits = whole ? 0 : 2
         formatter.minimumFractionDigits = whole ? 0 : 2
         return formatter.string(from: number as NSDecimalNumber)?.replacingOccurrences(of: "\u{00A0}", with: " ")
+    }
+
+    /// "perto da meta: confiro a cada 3 h", next to when it was checked; nothing when paused or
+    /// once a day (watchLabel in PanelsBoard.tsx).
+    public static func watch(_ panel: LivePanel) -> String? {
+        guard panel.status != "paused", let hours = panel.watchEveryHours, hours > 0 else { return nil }
+        return "perto da meta: confiro a cada \(hours) h"
     }
 
     /// When it was checked; a number from another day never reads as today's.

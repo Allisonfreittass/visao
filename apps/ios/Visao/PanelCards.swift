@@ -75,7 +75,7 @@ private struct PanelCard: View {
                     Text("Os preços ainda estão a confirmar.").font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
                 }
             }
-            Text(PanelText.checked(panel) + (panel.note.isEmpty ? "" : " · \(panel.note)"))
+            Text([PanelText.checked(panel), PanelText.watch(panel), panel.note.isEmpty ? nil : panel.note].compactMap { $0 }.joined(separator: " · "))
                 .font(Typo.mono(.caption2))
                 .foregroundStyle(palette.tintaFraca)
             if open { details }
