@@ -26,11 +26,15 @@ final class Session {
     var listError: String?
 
     private let tokens: TokenStore
-    private static let serverKey = "serverURL"
+    /// The App Group and Keychain group shared with the share extension (docs/COMPARTILHAR.md).
+    static let shared = SharedConfig.main
 
     init() {
-        tokens = KeychainTokenStore(service: (Bundle.main.bundleIdentifier ?? "visao") + ".auth")
-        let url = Session.savedServer ?? Session.configuredServer
+        // The token saved before 17/11/2026 moves into the shared group on this first read.
+        let store = Session.shared.tokens()
+        store.migrateIfNeeded()
+        tokens = store
+        let url = Session.shared.server
         let client = APIClient(baseURL: url, tokens: tokens)
         api = client
         loader = AttachmentLoader(api: client)
@@ -44,16 +48,7 @@ final class Session {
     }
 
     /// From Config/Local.xcconfig (VISAO_API_BASE_URL), through Info.plist.
-    static var configuredServer: URL {
-        let raw = Bundle.main.object(forInfoDictionaryKey: "VisaoAPIBaseURL") as? String ?? ""
-        return URL(string: raw) ?? URL(string: "https://visao.example.com/api")!
-    }
-
-    /// The address typed on the login screen, when it differs from the configured one. It is not
-    /// a secret, so UserDefaults is fine; the token stays in the Keychain.
-    static var savedServer: URL? {
-        UserDefaults.standard.string(forKey: serverKey).flatMap(URL.init(string:))
-    }
+    static var configuredServer: URL { shared.configuredServer }
 
     var serverAddress: String { api.baseURL.absoluteString }
 
@@ -66,7 +61,8 @@ final class Session {
             api = APIClient(baseURL: url, tokens: tokens)
         }
         try await api.login(email: email.trimmingCharacters(in: .whitespaces), password: password)
-        UserDefaults.standard.set(url == Session.configuredServer ? nil : url.absoluteString, forKey: Session.serverKey)
+        // Not a secret: the group's defaults, so the share extension knows where to send.
+        Session.shared.saveServer(url)
         loggedIn = true
     }
 

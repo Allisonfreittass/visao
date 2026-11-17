@@ -4,6 +4,12 @@
 <dict>
 	<key>VisaoAPIBaseURL</key>
 	<string>$(VISAO_API_BASE_URL)</string>
+	<key>VisaoAppGroup</key>
+	<string>$(VISAO_APP_GROUP)</string>
+	<key>VisaoKeychainGroup</key>
+	<string>$(VISAO_KEYCHAIN_GROUP)</string>
+	<key>VisaoTokenService</key>
+	<string>$(VISAO_BUNDLE_ID).auth</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>InstrumentSerif-Regular.ttf</string>
