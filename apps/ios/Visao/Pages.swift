@@ -120,6 +120,8 @@ struct VisaoSwitch: ToggleStyle {
                 }
                 .animation(.easeOut(duration: 0.18), value: configuration.isOn)
         }
+        // The whole row is the switch, never shorter than 44 pt.
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
         .onTapGesture { configuration.isOn.toggle() }
         .sensoryFeedback(.selection, trigger: configuration.isOn)

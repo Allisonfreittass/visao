@@ -32,6 +32,12 @@ struct PanelsSection: View {
                         .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
                 }
                 if panels?.isEmpty == true && nothingPending && projectId == nil {
+                    if !suggested.isEmpty {
+                        Text("Sugestões: tocar escreve o pedido na conversa, e nada roda antes de você mandar.")
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.tintaSuave)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     ForEach(suggested, id: \.text) { suggestion in
                         PillButton(title: suggestion.text) { onDraft(suggestion.draft) }
                     }

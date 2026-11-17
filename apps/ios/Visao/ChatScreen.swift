@@ -97,6 +97,8 @@ struct ChatScreen: View {
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 34)
                                 .glass(palette, cornerRadius: 999, strong: false, shadow: false)
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
@@ -193,6 +195,8 @@ struct ChatScreen: View {
                     placeholder: "Enviar mensagem para \(session.agentName ?? "o Visão")",
                     onPick: { picker = $0 },
                     onCall: { startCall() },
+                    live: call != nil,
+                    offline: session.listError != nil,
                     onSend: send
                 )
                 // A box that grows (more lines, a quote, files) never covers the end.
@@ -214,7 +218,7 @@ struct ChatScreen: View {
                         Image(systemName: "chevron.down")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(palette.tinta)
-                            .glassCircle(palette, size: 40)
+                            .glassCircle(palette, size: 44)
                     }
                     .buttonStyle(.plain)
                     .padding(.trailing, 16)

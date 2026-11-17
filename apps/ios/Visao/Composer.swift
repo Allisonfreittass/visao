@@ -13,8 +13,11 @@ struct Composer: View {
     let speaker: String
     var placeholder = "Escreva ou cole código…"
     let onPick: (ChatScreen.Picker) -> Void
-    /// Tapping the orb calls him (as on the web).
+    /// Tapping the wave calls him (as on the web).
     var onCall: () -> Void = {}
+    /// Listening or speaking in a call, and whether there is a connection.
+    var live = false
+    var offline = false
     let onSend: () -> Void
     @Environment(\.palette) private var palette
 
@@ -28,7 +31,8 @@ struct Composer: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Button(action: onCall) {
-                Orb(thinking: thinking, size: 50)
+                VoiceWave(state: offline ? .offline : live ? .live : thinking ? .thinking : .idle)
+                    .glassCircle(palette, size: 50)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Ligar")
