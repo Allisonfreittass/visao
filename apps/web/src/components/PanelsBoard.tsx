@@ -126,15 +126,20 @@ interface PanelsBoardProps {
   nothingPending: boolean;
   /** Opens the chat with this text in the box. */
   onDraft: (text: string) => void;
+  /** Only this project's panels, without suggestions (inside a project). */
+  projectId?: string;
 }
 
 /** The live panels on Início: native cards the server keeps up to date (docs/PAINEIS.md). */
-export function PanelsBoard({ api, nothingPending, onDraft }: PanelsBoardProps) {
+export function PanelsBoard({ api, nothingPending, onDraft, projectId }: PanelsBoardProps) {
   const [panels, setPanels] = useState<Panel[] | null>(null);
   const [suggested, setSuggested] = useState<PanelSuggestion[]>([]);
   const load = useCallback(() => {
-    api.panels().then(setPanels, () => setPanels([]));
-  }, [api]);
+    api.panels().then(
+      (all) => setPanels(projectId ? all.filter((p) => p.project_id === projectId) : all),
+      () => setPanels([]),
+    );
+  }, [api, projectId]);
 
   useEffect(() => {
     load();
@@ -143,10 +148,10 @@ export function PanelsBoard({ api, nothingPending, onDraft }: PanelsBoardProps) 
   }, [load]);
 
   useEffect(() => {
-    if (panels && panels.length === 0 && nothingPending) api.panelSuggestions().then(setSuggested, () => setSuggested([]));
+    if (panels && panels.length === 0 && nothingPending && !projectId) api.panelSuggestions().then(setSuggested, () => setSuggested([]));
   }, [api, panels, nothingPending]);
 
-  if (panels === null) return null;
+  if (panels === null || (projectId && panels.length === 0)) return null;
   return (
     <section className="list-group panels-board" aria-label="Painéis">
       <h2 className="rotulo">Painéis</h2>

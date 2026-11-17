@@ -467,6 +467,27 @@ def list_conversations(db: DbSession, user: CurrentUser) -> list[ConversationOut
     return [_conversation_out(c) for c in conversations]
 
 
+@router.get("/project/{project_id}")
+def project_chat(project_id: uuid.UUID, db: DbSession, user: CurrentUser) -> ConversationOut:
+    """The project's own chat: its latest conversation, made the first time (docs/ACOES.md).
+    The project page opens this instead of a new conversation each time."""
+    own_project(db, user.id, project_id)
+    found = db.scalar(
+        select(Conversation)
+        .where(Conversation.user_id == user.id, Conversation.project_id == project_id)
+        .order_by(Conversation.created_at.desc())
+        .limit(1)
+    )
+    if found is None:
+        identity = get_identity(db)
+        if identity is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Genesis ainda não foi executado")
+        found = Conversation(user_id=user.id, identity_id=identity.id, project_id=project_id)
+        db.add(found)
+        db.commit()
+    return _conversation_out(found)
+
+
 @router.get("/continuous")
 def continuous_conversation(db: DbSession, user: CurrentUser) -> ConversationOut:
     """The owner's continuous conversation, made the first time (docs/decisions/0014)."""

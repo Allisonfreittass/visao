@@ -296,6 +296,8 @@ export interface Panel {
   watch_every_hours?: number | null;
   note: string;
   conversation_id: string | null;
+  /** The project it belongs to (ADR-0021); shown inside that project too. */
+  project_id?: string | null;
   created_at: string;
   history?: Array<{ total: string | null; checked_at: string }>;
 }
@@ -468,6 +470,11 @@ export class Api {
       body: JSON.stringify({ name }),
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  /** The project's own chat: its latest conversation, made the first time. */
+  projectChat(projectId: string): Promise<Conversation> {
+    return this.request(`/conversations/project/${encodeURIComponent(projectId)}`);
   }
 
   setProjectNotes(id: string, notes: string): Promise<Project> {

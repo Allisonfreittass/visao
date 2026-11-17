@@ -175,6 +175,8 @@ export function App() {
   sendingRef.current = sending;
   messagesRef.current = messages;
   const conversationsRef = useRef<Conversation[]>([]);
+  // Project names for the bar on top of a project's chat.
+  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
   conversationsRef.current = conversations;
 
   // The continuous conversation loads only its last page (and as many as are already shown);
@@ -492,21 +494,6 @@ export function App() {
     return conversation.id;
   }
 
-  async function newConversation(projectId?: string) {
-    if (preparing || sending) return;
-    setError(null);
-    setPreparing(true);
-    setView("conversation");
-    try {
-      await openConversation(projectId);
-      setMenuOpen(false);
-    } catch (e) {
-      handleError(e);
-    } finally {
-      setPreparing(false);
-    }
-  }
-
   async function askMac(command: { project: string; prompt: string }): Promise<void> {
     setSending(true);
     try {
@@ -766,6 +753,22 @@ export function App() {
     setMenuOpen(false);
   }
 
+  /** A project's own chat (made the first time), from the project page. */
+  async function openProjectChat(projectId: string) {
+    if (preparing) return;
+    setPreparing(true);
+    try {
+      const chat = await api.projectChat(projectId);
+      setConversations((list) => (list.some((c) => c.id === chat.id) ? list : [chat, ...list]));
+      setCurrent(chat.id);
+      showView("conversation");
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setPreparing(false);
+    }
+  }
+
   /** "Conversa" in the menu: the continuous conversation (a project's chats open from Projetos). */
   function openChat() {
     const continuous = conversationsRef.current.find((c) => c.continuous);
@@ -805,6 +808,23 @@ export function App() {
     onOpenSettings: () => showView("settings"),
   };
   const currentConversation = conversations.find((c) => c.id === current);
+  const currentProjectId = currentConversation?.project_id ?? null;
+  useEffect(() => {
+    if (!currentProjectId || projectNames[currentProjectId]) return;
+    api.projects().then(
+      (list) => setProjectNames(Object.fromEntries(list.map((p) => [p.id, p.name]))),
+      () => undefined,
+    );
+  }, [api, currentProjectId, projectNames]);
+  // In a project's chat: which project, and the way back to the main conversation.
+  const inProject = currentProjectId;
+  const projectBar = inProject ? (
+    <div className="project-chat-bar" role="navigation" aria-label="Chat do projeto">
+      <span>Chat do projeto{projectNames[inProject] ? <> <strong>{projectNames[inProject]}</strong></> : null}</span>
+      <button type="button" className="link-button" onClick={openChat}>← Conversa principal</button>
+    </div>
+  ) : null;
+
   const reload = () => { if (current) loadMessages(current).then(setMessages).catch(handleError); };
   reloadRef.current = reload;
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
@@ -820,7 +840,7 @@ export function App() {
           agentName={agentName}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
-          onView={showView}
+          onView={(next) => (next === "conversation" ? openChat() : showView(next))}
         />
       )}
       <header className={`topbar ${ready ? "topbar--app" : ""}`}>
@@ -905,7 +925,7 @@ export function App() {
                 current={current}
                 currentProjectId={currentConversation?.project_id ?? null}
                 onOpenConversation={(id) => { setCurrent(id); showView("conversation"); }}
-                onNewConversation={(projectId) => void newConversation(projectId)}
+                onNewConversation={(projectId) => void openProjectChat(projectId)}
                 onMoved={(id, projectId) => setConversations((list) => list.map((c) => (c.id === id ? { ...c, project_id: projectId } : c)))}
                 onError={handleError}
               />
@@ -958,7 +978,10 @@ export function App() {
               placeholder={sky ? `Enviar mensagem para ${agentName ?? "o Visão"}` : undefined}
               composerStart={sky ? <SkyOrbButton state={orbState} canCall={call.canCall} hint={call.hint} onCall={call.onCall} /> : undefined}
               header={sky ? (
-                memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined
+                <>
+                  {projectBar}
+                  {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
+                </>
               ) : (
                 <div className="chat-head">
                   <div className="chat-head-text">

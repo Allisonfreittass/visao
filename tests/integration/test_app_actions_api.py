@@ -248,3 +248,99 @@ def test_the_manifest_and_the_unrelated_messages():
     assert "projetos pela conversa" in said
     assert not actions.candidate("bom dia, tudo bem?")
     assert actions.candidate(ASKED)
+
+
+def test_a_yes_to_its_own_offer_does_it(client, db):
+    """17/11/2026: "Quer que eu acrescente essas informações agora?" / "Por favor" got "Não
+    consigo acrescentar isso agora"."""
+    llm = world(
+        client,
+        db,
+        actions_answer=[[{"do": "add_notes", "project": CHILE, "lines": ["Hotel em Providencia"]}]],
+        reply="Acrescentei o hotel nas anotações.",
+    )
+    headers = _login(client, db)
+    owner = db.query(User).one()
+    db.add(Project(owner_user_id=owner.id, name=CHILE))
+    db.commit()
+    conversation = _continuous(client, headers)
+    db.add(
+        Message(
+            conversation_id=uuid.UUID(conversation),
+            role="assistant",
+            content="Quer que eu acrescente essas informações agora?",
+        )
+    )
+    db.commit()
+
+    _send(client, headers, conversation, "Por favor")
+
+    assert db.query(Project).one().notes == "- Hotel em Providencia"
+    assert "anotei 1 linha(s)" in _chat_prompt(llm)[0].content
+
+
+def test_saying_it_cannot_add_when_it_can_loses_that_sentence(client, db):
+    world(client, db, reply="Não consigo acrescentar isso agora. Me passa o texto que eu ajeito.")
+    headers = _login(client, db)
+    conversation = _continuous(client, headers)
+    turn = _send(client, headers, conversation, "o que falta decidir da viagem?")
+    assert turn["assistant_message"]["content"] == "Me passa o texto que eu ajeito."
+
+
+def test_a_project_has_its_own_chat_and_its_own_panels(client, db):
+    world(client, db)
+    headers = _login(client, db)
+    owner = db.query(User).one()
+    project = Project(owner_user_id=owner.id, name=CHILE)
+    db.add(project)
+    db.flush()
+    db.add(
+        Panel(
+            owner_user_id=owner.id,
+            project_id=project.id,
+            title="Santiago",
+            spec={"destination": "Santiago"},
+            status="active",
+        )
+    )
+    db.commit()
+
+    first = client.get(f"/conversations/project/{project.id}", headers=headers).json()
+    again = client.get(f"/conversations/project/{project.id}", headers=headers).json()
+
+    assert first["id"] == again["id"] and first["project_id"] == str(project.id)
+    assert first["continuous"] is False
+    listed = client.get("/panels", headers=headers).json()
+    assert listed[0]["project_id"] == str(project.id)
+
+
+def test_send_it_to_the_project_does_it_instead_of_handing_it_over(client, db):
+    """17/11/2026: "Envie o preço do voo pro projeto" got "Você pode colar este texto na tela do
+    projeto"."""
+    llm = world(
+        client,
+        db,
+        actions_answer=[
+            [{"do": "add_notes", "project": CHILE, "lines": ["R$ 2.047 para 2 pessoas"]}]
+        ],
+        reply='Você pode colar este texto na tela do projeto "Viagem para o Chile":\n\nR$ 2.047',
+    )
+    headers = _login(client, db)
+    owner = db.query(User).one()
+    db.add(Project(owner_user_id=owner.id, name=CHILE))
+    db.commit()
+    conversation = _continuous(client, headers)
+    _said_before(db, conversation)
+
+    _send(client, headers, conversation, "Envie o preço do voo pro projeto")
+
+    assert db.query(Project).one().notes == "- R$ 2.047 para 2 pessoas"
+    assert "anotei 1 linha(s)" in _chat_prompt(llm)[0].content
+
+
+def test_handing_it_over_is_removed_when_nothing_was_done(client, db):
+    world(client, db, reply="Você pode colar este texto no projeto. Boa viagem para vocês!")
+    headers = _login(client, db)
+    conversation = _continuous(client, headers)
+    turn = _send(client, headers, conversation, "como está a viagem?")
+    assert turn["assistant_message"]["content"] == "Boa viagem para vocês!"

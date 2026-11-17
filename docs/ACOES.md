@@ -13,13 +13,26 @@ Peça na conversa, e ele faz antes de responder
 | "pausa o painel" / "retoma o painel" | pausa ou retoma a conferência |
 | "apaga o projeto do Chile" / "apaga o painel" | pergunta antes; só apaga com o seu "sim, apaga" |
 
+**Um "sim" para a oferta dele também vale.** Quando ele pergunta "quer que eu acrescente essas
+informações?", um "por favor" faz a ação.
+
+## Dentro do projeto
+
+- **Chat do projeto:** cada projeto tem o seu chat, aberto por "Abrir o chat do projeto". É
+  sempre o mesmo e nasce na primeira vez. Em cima dele, uma barra mostra o projeto e
+  "← Conversa principal". "Conversa", em qualquer menu, também volta para a conversa principal.
+- **Painéis do projeto:** os painéis postos no projeto aparecem nele como no Início, com preço,
+  meta, Pausar e Apagar.
+- **Anotações:** ficam no topo, com Editar.
+
 **Regras:**
 - **Anotações:** uma linha por fato, com os valores como apareceram na conversa. Um número que
   não apareceu não é anotado. Você edita as anotações na tela do projeto, em Editar.
 - **As anotações voltam:** na conversa contínua, quando o assunto bate ("e o voo da JetSMART?"),
   as anotações do projeto vão junto com a resposta.
 - **Ele só diz que fez o que fez.** Se a resposta disser "anotei" ou "criei" sem ter feito, a
-  frase é tirada antes de chegar a você.
+  frase é tirada antes de chegar a você. "Não consigo acrescentar" também sai, porque ele
+  consegue; "não consigo comprar" fica, porque é verdade.
 - **Fora daqui:** comprar, reservar e mandar mensagem.
 
 ## API (por acréscimo)
@@ -32,6 +45,9 @@ Peça na conversa, e ele faz antes de responder
   muda.
 - **Apagar:** `DELETE /projects/{id}` mantém as conversas, as páginas e os painéis, fora de
   projeto.
+- **Chat do projeto:** `GET /conversations/project/{project_id}` devolve o chat do projeto e o
+  cria na primeira vez.
+- **Painéis:** `GET /panels` traz `project_id` em cada painel.
 
 ## Peças
 

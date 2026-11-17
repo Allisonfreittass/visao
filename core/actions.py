@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from core import projects
 from core.memory.text import fold
 from core.panels import service as panels
+from core.panels.offers import affirmative
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import (
     Artifact,
@@ -47,7 +48,13 @@ CONFIRMING = {"delete_project", "delete_panel"}
 _THING = re.compile(r"\bprojeto|\bpainel|\bpaineis|\bpagina|\banot|\bnotas?\b")
 _VERB = re.compile(
     r"\banot|\bapag|\bexclu|\bdelet|\bremov|\brenome|\bpaus[ae]|\bretom|\bmov[ae]\b|"
-    r"\bcoloc|\bpo[eê]\b|\bpoe\b|\bjunt[ae]\b|\bcri[ae]\b|\bcriar\b|\bguard|\bsalv|\btir[ae]\b"
+    r"\bcoloc|\bpo[eê]\b|\bpoe\b|\bjunt[ae]\b|\bcri[ae]\b|\bcriar\b|\bguard|\bsalv|\btir[ae]\b|"
+    r"\bacrescent|\badicion|\binclu|\batualiz|\bcomplet|\benvi|\bmand[ae]\b|\bjog[ae]\b|"
+    r"\bleva\b|\bregistr|\bgrav"
+)
+# "envie o preço do voo pro projeto" (17/11/2026): naming where it goes is a request by itself.
+_INTO = re.compile(
+    r"\b(pro|pra|para o|para a|no|na|ao|dentro do) (projeto|painel|anotac\w*|notas)\b"
 )
 _YES = re.compile(
     r"^(sim|pode|confirmo|confirma|isso|ok|apaga|apague|exclui|exclua|remove|manda ver|"
@@ -85,9 +92,17 @@ class Deed:
     waiting: bool = False  # deleting, until the owner says yes
 
 
-def candidate(text: str) -> bool:
+def candidate(text: str, last_reply: str = "") -> bool:
+    """Worth reading for actions: the message names a thing in the app and a verb that changes
+    it, or it is a plain yes to the last reply offering to change something ("Quer que eu
+    acrescente essas informações?" / "por favor", 17/11/2026)."""
     folded = fold(text)
-    return len(text) <= 2000 and bool(_THING.search(folded)) and bool(_VERB.search(folded))
+    if len(text) > 2000:
+        return False
+    if (_THING.search(folded) and _VERB.search(folded)) or _INTO.search(folded):
+        return True
+    offered = fold(last_reply)
+    return affirmative(text) and "?" in last_reply and bool(_VERB.search(offered))
 
 
 # Finding things --------------------------------------------------------------------------------

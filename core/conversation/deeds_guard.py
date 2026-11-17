@@ -17,6 +17,17 @@ _CLAIM = re.compile(
     r"coloquei|pausei|retomei)\b"
 )
 _THING = re.compile(r"\b(projeto|projetos|anotac\w*|notas?|painel|paineis|pagina)\b")
+# "Não consigo acrescentar isso agora" right after offering to (17/11/2026): it can.
+_DENIES = re.compile(
+    r"\b(nao (consigo|posso|tenho como|da para|da pra)|sem como)\b.{0,40}"
+    r"\b(anotar|acrescentar|adicionar|incluir|criar|colocar|atualizar|apagar)\b"
+)
+# "Você pode colar este texto na tela do projeto" (17/11/2026): it does that itself.
+_HANDS_OVER = re.compile(
+    r"\b(voce|vc) (pode|precisa|tem que|deve)\b.{0,30}"
+    r"\b(colar|copiar|anotar|acrescentar|adicionar|criar|colocar)\b.{0,60}"
+    r"\b(projeto|anotac\w*|notas?|painel)\b"
+)
 FALLBACK = "Não fiz nada no app nesta resposta."
 MIN_KEPT_CHARS = 12
 
@@ -26,7 +37,8 @@ def violations(text: str) -> list[str]:
     found = []
     for sentence in _SENTENCE_BREAK.split(text):
         folded = fold(sentence)
-        if _CLAIM.search(folded) and _THING.search(folded):
+        claimed = _CLAIM.search(folded) and _THING.search(folded)
+        if claimed or _DENIES.search(folded) or _HANDS_OVER.search(folded):
             found.append(sentence)
     return found
 

@@ -470,6 +470,7 @@ def card(
         ),
         "note": panel.check_note,
         "conversation_id": panel.conversation_id,
+        "project_id": panel.project_id,
         "created_at": panel.created_at,
     }
 

@@ -3,6 +3,7 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { type Api, type Project, type ProjectDetail, utcDate } from "../api";
 import { attachmentUrl, formatSize } from "../attachments";
 import { useBackClose } from "../hooks/useBackClose";
+import { PanelsBoard } from "./PanelsBoard";
 import { dayLabel } from "../labels";
 
 interface ProjectsViewProps {
@@ -118,7 +119,7 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
           <button type="button" className="link-button projects-back" onClick={() => { setOpen(null); reload(); }}>← Projetos</button>
           <h1 id="project-title">{open.name}</h1>
           <div className="row">
-            <button type="button" className="projects-primary" onClick={() => onNewConversation(open.id)}>Nova conversa aqui</button>
+            <button type="button" className="projects-primary" onClick={() => onNewConversation(open.id)}>Abrir o chat do projeto</button>
             {current && currentProjectId !== open.id && (
               <button type="button" onClick={() => void bringCurrent()}>Trazer a conversa aberta</button>
             )}
@@ -152,20 +153,10 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
               </>
             )}
           </section>
-          {open.panel_list && open.panel_list.length > 0 && (
-            <section className="list-group">
-              <h2 className="rotulo">Painéis</h2>
-              {open.panel_list.map((p) => (
-                <div key={p.id} className="project-row">
-                  <strong>{p.title}</strong>
-                  <span>{p.status === "paused" ? "pausado" : "no Início"}</span>
-                </div>
-              ))}
-            </section>
-          )}
+          <PanelsBoard api={api} nothingPending={false} onDraft={() => undefined} projectId={open.id} />
           <section className="list-group">
-            <h2 className="rotulo">Conversas</h2>
-            {open.conversation_list.length === 0 && <p className="note">Nenhuma ainda. Comece uma aqui ou traga a que está aberta.</p>}
+            <h2 className="rotulo">Conversas do projeto</h2>
+            {open.conversation_list.length === 0 && <p className="note">Nenhuma ainda. Abra o chat do projeto para começar.</p>}
             {open.conversation_list.map((c) => (
               <button type="button" key={c.id} className="project-row" onClick={() => onOpenConversation(c.id)}>
                 <strong>{c.title}</strong>

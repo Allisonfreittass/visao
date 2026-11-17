@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 17/11/2026
 
+- **Projeto com chat e painéis próprios.**
+  - "Abrir o chat do projeto" abre sempre o mesmo chat.
+  - Os painéis do projeto aparecem nele.
+  - No chat do projeto, uma barra leva de volta à conversa principal, e "Conversa" em qualquer
+    menu também volta.
+  - Um "por favor" para a oferta dele ("quer que eu acrescente?") agora faz a ação.
+  - "Não consigo acrescentar" é tirado da resposta, porque ele consegue. [ACOES.md](ACOES.md).
 - **Ações no app pela conversa.**
   - Projetos: criar, renomear e apagar.
   - Anotar num projeto o que a conversa decidiu; uma linha com número que não apareceu na

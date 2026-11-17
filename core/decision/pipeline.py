@@ -250,12 +250,13 @@ def run_turn(
     confirmed = app_actions.answered(
         session, owner=owner, conversation=conversation, text=text, now=datetime.now(UTC)
     )
+    history = context_history(session, conversation)
+    last_reply = history[-1].content if history and history[-1].role == "assistant" else ""
+    offer_answered = panel_offers.answered_by(session, conversation.id, text)
     if confirmed is not None:
         deeds.append(confirmed)
-    elif app_actions.candidate(text):
-        said_before = "\n".join(
-            f"{m.role}: {m.content[:2000]}" for m in context_history(session, conversation)[-12:]
-        )
+    elif offer_answered is None and app_actions.candidate(text, last_reply):
+        said_before = "\n".join(f"{m.role}: {m.content[:2000]}" for m in history[-12:])
         progress.step("Organizando no app")
         asked = app_actions.plan(
             session,
@@ -285,9 +286,7 @@ def run_turn(
 
     # "pode", "por favor" right after it offered a panel: that answers the card, and the panel is
     # made now, before the reply, so "está no Início" is true when it is said.
-    accepted = (
-        None if confirmed is not None else panel_offers.answered_by(session, conversation.id, text)
-    )
+    accepted = None if confirmed is not None else offer_answered
     created = None
     if accepted is not None:
         progress.step("Montando seu painel")

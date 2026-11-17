@@ -71,6 +71,8 @@ class PanelOut(BaseModel):
     watch_every_hours: int | None = None
     note: str
     conversation_id: uuid.UUID | None
+    # The project it belongs to (shown inside that project too, ADR-0021); null: none.
+    project_id: uuid.UUID | None = None
     created_at: datetime
 
 
