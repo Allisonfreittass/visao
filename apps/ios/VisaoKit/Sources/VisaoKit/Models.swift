@@ -225,6 +225,17 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         try c.encodeIfPresent(parts, forKey: .parts)
     }
 
+    /// The tag next to the name, by where the message came from (as in ChatView.tsx).
+    public var originTag: String? {
+        switch origin {
+        case "initiative": "puxou conversa"
+        case "arm": "no Mac"
+        case "google": "no Google"
+        case "share": "compartilhado do iPhone"
+        default: nil
+        }
+    }
+
     /// How a reply quotes this message: one line, as the web does (160 characters).
     public var quoted: Quoted {
         Quoted(id: id, role: role, excerpt: Message.oneLine(content, limit: 160))

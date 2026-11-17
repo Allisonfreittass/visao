@@ -188,12 +188,7 @@ struct MessageRow: View, Equatable {
         case .queued: return ("na fila", false)
         default: break
         }
-        switch message.origin {
-        case "initiative": return ("puxou conversa", false)
-        case "arm": return ("no Mac", false)
-        case "google": return ("no Google", false)
-        default: return nil
-        }
+        return message.originTag.map { ($0, false) }
     }
 
     /// Only a clearly sideways drag to the right moves the bubble; vertical scrolling stays.
