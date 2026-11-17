@@ -3,7 +3,7 @@ import Foundation
 // The rest of the web's places: Projetos, Ajustes, the Mac, goals and notices
 // (apps/web/src/api.ts; routes in apps/api/routes).
 
-/// A subject with its conversations, pages and files (Projetos).
+/// A subject with its own chat, notes, panels, pages and files (Projetos, ADR-0021).
 public struct Project: Codable, Sendable, Identifiable, Hashable {
     public let id: String
     public let name: String
@@ -11,10 +11,16 @@ public struct Project: Codable, Sendable, Identifiable, Hashable {
     public let conversations: Int
     public let pages: Int
     public let files: Int
+    /// One fact per line, each starting with "- " (written by him, edited by you).
+    public let notes: String
+    public let notesUpdatedAt: Date?
+    /// How many panels are in it.
+    public let panels: Int
 
     enum CodingKeys: String, CodingKey {
-        case id, name, conversations, pages, files
+        case id, name, conversations, pages, files, notes, panels
         case createdAt = "created_at"
+        case notesUpdatedAt = "notes_updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -25,6 +31,14 @@ public struct Project: Codable, Sendable, Identifiable, Hashable {
         conversations = try c.decodeIfPresent(Int.self, forKey: .conversations) ?? 0
         pages = try c.decodeIfPresent(Int.self, forKey: .pages) ?? 0
         files = try c.decodeIfPresent(Int.self, forKey: .files) ?? 0
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        notesUpdatedAt = try c.decodeIfPresent(Date.self, forKey: .notesUpdatedAt)
+        panels = try c.decodeIfPresent(Int.self, forKey: .panels) ?? 0
+    }
+
+    /// "4 anotações · 1 painel · 2 páginas" (projectSummary in ProjectsView.tsx).
+    public var summary: String {
+        ProjectText.summary(notes: notes, panels: panels, pages: pages, files: files)
     }
 
     /// "3 conversas · 1 página", as the web's project card.
@@ -36,7 +50,58 @@ public struct Project: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// What the project card says, the same words as the web.
+public enum ProjectText {
+    public static func summary(notes: String, panels: Int, pages: Int, files: Int) -> String {
+        let count = noteLines(notes).count
+        let parts = [
+            count > 0 ? "\(count) \(count == 1 ? "anotação" : "anotações")" : nil,
+            panels > 0 ? "\(panels) \(panels == 1 ? "painel" : "painéis")" : nil,
+            pages > 0 ? "\(pages) \(pages == 1 ? "página" : "páginas")" : nil,
+            files > 0 ? "\(files) \(files == 1 ? "arquivo" : "arquivos")" : nil,
+        ].compactMap { $0 }
+        return parts.isEmpty ? "só o chat, por enquanto" : parts.joined(separator: " · ")
+    }
+
+    /// The notes as a list: one per non-empty line, without the leading "- ".
+    public static func noteLines(_ notes: String) -> [String] {
+        notes.split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { line in
+                guard line.hasPrefix("-") else { return line }
+                return line.dropFirst().trimmingCharacters(in: .whitespaces)
+            }
+    }
+}
+
+/// The body of PATCH /projects/{id}: only what changed goes.
+public struct ProjectChange: Encodable, Sendable, Equatable {
+    public var name: String?
+    public var notes: String?
+
+    public init(name: String? = nil, notes: String? = nil) {
+        self.name = name
+        self.notes = notes
+    }
+
+    enum CodingKeys: String, CodingKey { case name, notes }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encodeIfPresent(notes, forKey: .notes)
+    }
+}
+
 public struct ProjectDetail: Codable, Sendable, Identifiable {
+    /// A panel in the project: enough to know it is there.
+    public struct PanelRef: Codable, Sendable, Identifiable, Hashable {
+        public let id: String
+        public let title: String
+        public let status: String
+    }
+
     public struct ConversationRow: Codable, Sendable, Identifiable, Hashable {
         public let id: String
         public let createdAt: Date
@@ -53,9 +118,15 @@ public struct ProjectDetail: Codable, Sendable, Identifiable {
     public let conversationList: [ConversationRow]
     public let pageList: [Artifact]
     public let fileList: [Attachment]
+    public let notes: String
+    public let notesUpdatedAt: Date?
+    public let panels: Int
+    public let panelList: [PanelRef]
 
     enum CodingKeys: String, CodingKey {
-        case id, name
+        case id, name, notes, panels
+        case notesUpdatedAt = "notes_updated_at"
+        case panelList = "panel_list"
         case conversationList = "conversation_list"
         case pageList = "page_list"
         case fileList = "file_list"
@@ -68,7 +139,17 @@ public struct ProjectDetail: Codable, Sendable, Identifiable {
         conversationList = try c.decodeIfPresent([ConversationRow].self, forKey: .conversationList) ?? []
         pageList = try c.decodeIfPresent([Artifact].self, forKey: .pageList) ?? []
         fileList = try c.decodeIfPresent([Attachment].self, forKey: .fileList) ?? []
+        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
+        notesUpdatedAt = try c.decodeIfPresent(Date.self, forKey: .notesUpdatedAt)
+        panelList = try c.decodeIfPresent([PanelRef].self, forKey: .panelList) ?? []
+        panels = try c.decodeIfPresent(Int.self, forKey: .panels) ?? panelList.count
     }
+
+    public var summary: String {
+        ProjectText.summary(notes: notes, panels: panels, pages: pageList.count, files: fileList.count)
+    }
+
+    public var noteLines: [String] { ProjectText.noteLines(notes) }
 }
 
 /// A Mac paired to run work (docs/BRACO.md).
@@ -157,7 +238,17 @@ extension APIClient {
     }
 
     public func renameProject(id projectId: String, name: String) async throws -> Project {
-        try await json("/projects/\(id(projectId))", method: "PATCH", body: ["name": name])
+        try await updateProject(id: projectId, ProjectChange(name: name))
+    }
+
+    /// "Editar anotações" and Renomear: only the field that changed goes.
+    public func updateProject(id projectId: String, _ change: ProjectChange) async throws -> Project {
+        try await json("/projects/\(id(projectId))", method: "PATCH", body: change)
+    }
+
+    /// The project's own chat, created the first time with an opening message (origin "project").
+    public func projectConversation(projectId: String) async throws -> Conversation {
+        try await request("/conversations/project/\(id(projectId))")
     }
 
     /// Its conversations, pages and files stay; they only leave the project.

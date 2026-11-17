@@ -22,6 +22,8 @@ final class Session {
     /// The continuous conversation (docs/CONVERSA_CONTINUA.md): Chat always opens it. There is no
     /// list of conversations; separate ones only live inside a project.
     private(set) var continuousId: String?
+    /// Project id → name, for "Abrir o projeto «…» →" under a reply (GET /projects).
+    private(set) var projectNames: [String: String] = [:]
     private(set) var loadingList = false
     var listError: String?
 
@@ -86,6 +88,7 @@ final class Session {
             async let status = api.status()
             continuousId = try await continuous.id
             agentName = (try? await status)?.identity?.chosenName
+            await loadProjectNames()
             listError = nil
             pending.onError = { [weak self] in self?.handle($0) }
             await pending.refresh()
@@ -93,6 +96,15 @@ final class Session {
             listError = (error as? LocalizedError)?.errorDescription
             handle(error)
         }
+    }
+
+    func loadProjectNames() async {
+        guard let list = try? await api.projects() else { return }
+        projectNames = Dictionary(list.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func renamed(project id: String, to name: String) {
+        projectNames[id] = name
     }
 
     /// Text Início puts in the chat's message box (a suggestion, "Criar um novo painel").

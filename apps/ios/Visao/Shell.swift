@@ -46,6 +46,12 @@ struct Shell: View {
     @State private var target: ChatTarget?
     @State private var drawerOpen = false
     @State private var onboarding: OnboardingStatus?
+    /// A project's chat is in front, under the Projetos tab (ADR-0021).
+    @State private var projectChat = false
+    @State private var openingProject = false
+
+    /// The chat shows on Chat, and on Projetos while a project's chat is open.
+    private var chatInFront: Bool { place == .chat || (place == .projetos && projectChat) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,11 +61,11 @@ struct Shell: View {
             GeometryReader { proxy in
                 ZStack {
                     chat
-                        .offset(x: place == .chat ? 0 : (place.rawValue < Place.chat.rawValue ? proxy.size.width : -proxy.size.width))
-                        .opacity(place == .chat ? 1 : 0)
-                        .allowsHitTesting(place == .chat)
-                        .accessibilityHidden(place != .chat)
-                    if place != .chat {
+                        .offset(x: chatInFront ? 0 : (place.rawValue < Place.chat.rawValue ? proxy.size.width : -proxy.size.width))
+                        .opacity(chatInFront ? 1 : 0)
+                        .allowsHitTesting(chatInFront)
+                        .accessibilityHidden(!chatInFront)
+                    if !chatInFront {
                         other
                             .id(place)
                             .transition(slide)
@@ -108,8 +114,11 @@ struct Shell: View {
             ChatScreen(
                 api: session.api, conversationId: target.conversationId, projectId: target.projectId,
                 continuous: target.continuous,
-                isActive: place == .chat,
-                onCreated: { self.target?.conversationId = $0.id }
+                isActive: chatInFront,
+                onCreated: { self.target?.conversationId = $0.id },
+                onOpenProject: { openProject($0) },
+                onBackToProjects: { withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = false } },
+                onProjectDeleted: { openChat() }
             )
             .id(target.key)
         } else {
@@ -130,11 +139,10 @@ struct Shell: View {
                 }
             )
         case .projetos:
-            ProjectsView(
-                currentConversation: target?.conversationId,
-                onOpen: { open(conversation: $0) },
-                onNew: { newConversation(projectId: $0) }
-            )
+            ProjectsView(onOpenProject: { openProject($0) })
+                .overlay {
+                    if openingProject { ProgressView().controlSize(.large) }
+                }
         case .caderno:
             CadernoView()
         case .mac:
@@ -164,8 +172,13 @@ struct Shell: View {
     private func go(_ next: Place) {
         guard next != place else {
             withAnimation(.spring(duration: 0.35)) { drawerOpen = false }
+            // Projetos again, from a project's chat: back to the list.
+            if next == .projetos && projectChat {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = false }
+            }
             return
         }
+        projectChat = false
         forward = next.rawValue > place.rawValue
         withAnimation(.spring(duration: 0.35)) { drawerOpen = false }
         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { place = next }
@@ -188,9 +201,23 @@ struct Shell: View {
         go(.chat)
     }
 
-    private func newConversation(projectId: String?) {
-        target = ChatTarget(conversationId: nil, projectId: projectId)
-        go(.chat)
+    /// The project's own chat (GET /conversations/project/{id}), under the Projetos tab.
+    private func openProject(_ id: String) {
+        guard !openingProject else { return }
+        openingProject = true
+        Task {
+            defer { openingProject = false }
+            do {
+                let conversation = try await session.api.projectConversation(projectId: id)
+                if target?.conversationId != conversation.id {
+                    target = ChatTarget(conversationId: conversation.id, projectId: id)
+                }
+                if place != .projetos { go(.projetos) }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = true }
+            } catch {
+                session.handle(error)
+            }
+        }
     }
 }
 

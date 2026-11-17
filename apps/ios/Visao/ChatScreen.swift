@@ -35,6 +35,8 @@ struct ChatScreen: View {
     @State private var speaker = VoiceEngine()
     @State private var spokenIds: Set<String> = []
     @FocusState private var composerFocused: Bool
+    /// Bumped when a turn ends in a project's chat: its card loads the new notes.
+    @State private var cardRefresh = 0
 
     enum Picker: Identifiable {
         case photos, camera, files
@@ -50,8 +52,20 @@ struct ChatScreen: View {
     /// In front: the progress and the openings are only looked at while you see this chat.
     private let isActive: Bool
 
-    init(api: APIClient, conversationId: String?, projectId: String? = nil, continuous: Bool = false, isActive: Bool = true, onCreated: @escaping (Conversation) -> Void = { _ in }) {
+    /// "Abrir o projeto «…» →" under a reply, and the project card's way back.
+    private let onOpenProject: (String) -> Void
+    private let onBackToProjects: () -> Void
+    private let onProjectDeleted: () -> Void
+
+    init(
+        api: APIClient, conversationId: String?, projectId: String? = nil, continuous: Bool = false, isActive: Bool = true,
+        onCreated: @escaping (Conversation) -> Void = { _ in }, onOpenProject: @escaping (String) -> Void = { _ in },
+        onBackToProjects: @escaping () -> Void = {}, onProjectDeleted: @escaping () -> Void = {}
+    ) {
         self.isActive = isActive
+        self.onOpenProject = onOpenProject
+        self.onBackToProjects = onBackToProjects
+        self.onProjectDeleted = onProjectDeleted
         _store = State(initialValue: ChatStore(api: api, conversationId: conversationId, projectId: projectId, paged: continuous))
         self.onCreated = onCreated
         _draft = State(initialValue: AttachmentDraft(api: api))
@@ -94,6 +108,8 @@ struct ChatScreen: View {
                             onReply: { reply(to: message) },
                             onQuoteTap: { id in withAnimation { proxy.scrollTo(id, anchor: .center) } },
                             onOpenPage: { viewing = $0 },
+                            projectName: message.projectId.flatMap { session.projectNames[$0] },
+                            onOpenProject: message.projectId == nil || message.projectId == store.projectId ? nil : onOpenProject,
                             onFeedback: { positive, tags in
                                 do {
                                     let changed = try await session.api.feedback(messageId: message.id, positive: positive, tags: tags)
@@ -156,6 +172,15 @@ struct ChatScreen: View {
                 if new == .idle, old == .interacting || old == .decelerating { stick = atBottom }
             }
             .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .top, spacing: 6) {
+                if let projectId = store.projectId {
+                    ProjectCard(
+                        projectId: projectId, refreshKey: cardRefresh, onBack: onBackToProjects,
+                        onDeleted: onProjectDeleted, onOpenPage: { viewing = $0 },
+                        onBench: store.conversationId == nil ? nil : { benchOpen = true }
+                    )
+                }
+            }
             .animation(opened ? .spring(response: 0.35, dampingFraction: 0.9) : nil, value: store.messages.count)
             .overlay(alignment: .bottom) {
                 Composer(
@@ -218,6 +243,7 @@ struct ChatScreen: View {
                 followOnLockScreen(sending: sending)
                 // A turn can leave an email or Mac work waiting for a tap.
                 if !sending { Task { await session.pending.refresh() } }
+                if !sending { afterTurn() }
             }
             .onChange(of: session.pending.asks(in: store.conversationId).count) { scrollToBottom(proxy) }
             .onChange(of: store.liveStep) { scrollToBottom(proxy) }
@@ -228,7 +254,7 @@ struct ChatScreen: View {
         }
         .overlay(alignment: .topTrailing) {
             // The Bancada: what he really did here, the pages and the sites he read.
-            if store.conversationId != nil {
+            if store.conversationId != nil && store.projectId == nil {
                 Button { benchOpen = true } label: {
                     Image(systemName: "list.bullet.rectangle")
                         .font(.subheadline.weight(.medium))
@@ -394,6 +420,15 @@ struct ChatScreen: View {
             let ok = await session.pending.decide(ask, approve: approve)
             // What was sent or scheduled comes back as his message in this conversation.
             if ok && approve { await store.refresh() }
+        }
+    }
+
+    /// A turn ended: the project card reloads (new notes), and a project the reply names but the
+    /// app does not know yet gets its name.
+    private func afterTurn() {
+        if store.projectId != nil { cardRefresh += 1 }
+        if store.messages.contains(where: { $0.projectId.map { session.projectNames[$0] == nil } ?? false }) {
+            Task { await session.loadProjectNames() }
         }
     }
 

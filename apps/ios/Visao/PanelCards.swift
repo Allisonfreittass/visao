@@ -7,6 +7,9 @@ import VisaoKit
 struct PanelsSection: View {
     let nothingPending: Bool
     let onDraft: (String) -> Void
+    /// In a project's card: only its panels, without suggestions or "Criar", and nothing when
+    /// it has none.
+    var projectId: String? = nil
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -14,18 +17,28 @@ struct PanelsSection: View {
     @State private var suggested: [PanelSuggestion] = []
 
     var body: some View {
+        if projectId != nil && panels?.isEmpty != false {
+            Color.clear.frame(height: 0).task { await load() }
+        } else {
+            board
+        }
+    }
+
+    private var board: some View {
         PageGroup(label: "Painéis") {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(panels ?? []) { panel in
                     PanelCard(panel: panel) { await load() }
                         .transition(reduceMotion ? .opacity : .scale(scale: 0.96).combined(with: .opacity))
                 }
-                if panels?.isEmpty == true && nothingPending {
+                if panels?.isEmpty == true && nothingPending && projectId == nil {
                     ForEach(suggested, id: \.text) { suggestion in
                         PillButton(title: suggestion.text) { onDraft(suggestion.draft) }
                     }
                 }
-                PillButton(title: "+ Criar um novo painel") { onDraft("Quero acompanhar ") }
+                if projectId == nil {
+                    PillButton(title: "+ Criar um novo painel") { onDraft("Quero acompanhar ") }
+                }
             }
             .animation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.8), value: panels?.map(\.id))
         }
@@ -40,9 +53,10 @@ struct PanelsSection: View {
     }
 
     private func load() async {
-        guard let list = try? await session.api.panels() else { return }
+        guard let all = try? await session.api.panels() else { return }
+        let list = projectId.map { id in all.filter { $0.projectId == id } } ?? all
         panels = list
-        if list.isEmpty && nothingPending, let ideas = try? await session.api.panelSuggestions() {
+        if list.isEmpty && nothingPending && projectId == nil, let ideas = try? await session.api.panelSuggestions() {
             suggested = ideas
         }
     }

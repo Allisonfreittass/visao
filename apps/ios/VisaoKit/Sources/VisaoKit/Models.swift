@@ -166,6 +166,8 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
     public var local: LocalState?
     /// The same text as `content` in 2 or 3 bubbles (ADR-0010); nil is one bubble.
     public let parts: [String]?
+    /// The reply created or changed this project: "Abrir o projeto «…» →" (ADR-0021).
+    public let projectId: String?
 
     /// What goes on screen: one text per bubble.
     public var bubbles: [String] {
@@ -176,7 +178,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
     public init(
         id: String, role: Role, content: String, createdAt: Date, origin: String = "turn",
         attachments: [Attachment] = [], artifact: Artifact? = nil, replyTo: Quoted? = nil,
-        sources: [Source] = [], local: LocalState? = nil, parts: [String]? = nil
+        sources: [Source] = [], local: LocalState? = nil, parts: [String]? = nil, projectId: String? = nil
     ) {
         self.id = id
         self.role = role
@@ -189,10 +191,12 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         self.sources = sources
         self.local = local
         self.parts = parts
+        self.projectId = projectId
     }
 
     enum CodingKeys: String, CodingKey {
         case id, role, content, origin, attachments, artifact, parts
+        case projectId = "project_id"
         case createdAt = "created_at"
         case replyTo = "reply_to"
     }
@@ -208,6 +212,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         artifact = try c.decodeIfPresent(Artifact.self, forKey: .artifact)
         replyTo = try c.decodeIfPresent(Quoted.self, forKey: .replyTo)
         parts = try c.decodeIfPresent([String].self, forKey: .parts)
+        projectId = try c.decodeIfPresent(String.self, forKey: .projectId)
         sources = []
         local = nil
     }
@@ -223,6 +228,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         try c.encodeIfPresent(artifact, forKey: .artifact)
         try c.encodeIfPresent(replyTo, forKey: .replyTo)
         try c.encodeIfPresent(parts, forKey: .parts)
+        try c.encodeIfPresent(projectId, forKey: .projectId)
     }
 
     /// The tag next to the name, by where the message came from (as in ChatView.tsx).

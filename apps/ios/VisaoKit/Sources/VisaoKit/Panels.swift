@@ -55,10 +55,13 @@ public struct LivePanel: Codable, Sendable, Identifiable, Hashable {
     public let history: [PanelPoint]?
     /// Near the goal it checks every few hours (3); nil: once a day (ADR-0016).
     public let watchEveryHours: Int?
+    /// The project it was put in, if any.
+    public let projectId: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, status, spec, total, goal, change, items, note, history
         case watchEveryHours = "watch_every_hours"
+        case projectId = "project_id"
         case goalGap = "goal_gap"
         case goalWords = "goal_words"
         case checkedAt = "checked_at"
