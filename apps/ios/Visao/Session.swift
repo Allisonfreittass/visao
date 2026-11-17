@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import VisaoKit
 
-/// Who is logged in, against which server, and the conversation list.
+/// Who is logged in, against which server, and which conversation Chat opens.
 @MainActor
 @Observable
 final class Session {
@@ -19,7 +19,9 @@ final class Session {
     private(set) var loggedIn: Bool
     /// The name it chose, or nil while it has none: the app never calls it "VISÃO".
     private(set) var agentName: String?
-    private(set) var conversations: [Conversation] = []
+    /// The continuous conversation (docs/CONVERSA_CONTINUA.md): Chat always opens it. There is no
+    /// list of conversations; separate ones only live inside a project.
+    private(set) var continuousId: String?
     private(set) var loadingList = false
     var listError: String?
 
@@ -71,7 +73,7 @@ final class Session {
     func logout() {
         api.logout()
         loggedIn = false
-        conversations = []
+        continuousId = nil
         agentName = nil
     }
 
@@ -84,9 +86,9 @@ final class Session {
         loadingList = true
         defer { loadingList = false }
         do {
-            async let list = api.conversations()
+            async let continuous = api.continuousConversation()
             async let status = api.status()
-            conversations = try await list
+            continuousId = try await continuous.id
             agentName = (try? await status)?.identity?.chosenName
             listError = nil
             pending.onError = { [weak self] in self?.handle($0) }
@@ -97,17 +99,12 @@ final class Session {
         }
     }
 
-    /// Only the list (the title may have arrived); a failure keeps the one on screen.
-    func loadConversations() async {
-        if let list = try? await api.conversations() { conversations = list }
-    }
-
     /// Text Início puts in the chat's message box (a suggestion, "Criar um novo painel").
     var chatDraft: String?
 
+    /// The first message made the continuous conversation (it was not there yet).
     func added(_ conversation: Conversation) {
-        conversations.removeAll { $0.id == conversation.id }
-        conversations.insert(conversation, at: 0)
+        if conversation.continuous || conversation.projectId == nil { continuousId = conversation.id }
     }
 
     var speakerName: String { agentName ?? "Ele" }

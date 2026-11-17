@@ -1,8 +1,8 @@
 import SwiftUI
 import VisaoKit
 
-/// The places of the web (Rail.tsx / SkyNav.tsx): Chat is home, Início holds Pendências, the
-/// avatar opens Ajustes, the drawer has the rest and the conversations.
+/// The places of the web (Rail.tsx / SkyNav.tsx): Início, Chat and Projetos on top (Chat is the
+/// continuous conversation), the avatar opens Ajustes, the drawer has what is not on top.
 enum Place: Int, Hashable, CaseIterable {
     case inicio, chat, projetos, caderno, mac, ajustes
 
@@ -25,6 +25,12 @@ struct ChatTarget: Equatable {
     var key = UUID()
     var conversationId: String?
     var projectId: String?
+    /// The continuous conversation (docs/CONVERSA_CONTINUA.md), which the Chat tab always opens.
+    var continuous = false
+
+    static func continuous(_ id: String?) -> ChatTarget {
+        ChatTarget(conversationId: id, continuous: true)
+    }
 }
 
 /// Logged in: the top bar over the forest, the place under it, the drawer over everything.
@@ -45,7 +51,7 @@ struct Shell: View {
         VStack(spacing: 0) {
             SkyNav(place: place, pendingCount: session.pending.count, agentName: session.agentName) {
                 withAnimation(.spring(duration: 0.35)) { drawerOpen = true }
-            } onPlace: { go($0) }
+            } onPlace: { $0 == .chat ? openChat() : go($0) }
             GeometryReader { proxy in
                 ZStack {
                     chat
@@ -65,21 +71,14 @@ struct Shell: View {
             }
         }
         .overlay {
-            Drawer(
-                open: $drawerOpen,
-                place: place,
-                current: target?.conversationId,
-                onPlace: { go($0) },
-                onConversation: { open(conversation: $0) },
-                onNew: { newConversation(projectId: nil) }
-            )
+            Drawer(open: $drawerOpen, place: place, onPlace: { go($0) })
         }
         .visaoBackground()
         .task {
             await session.loadHome()
             if target == nil {
-                // As on the web: the most recent conversation, or a new one.
-                target = ChatTarget(conversationId: session.conversations.first?.id)
+                // The continuous conversation; if it did not load, sending creates it.
+                target = .continuous(session.continuousId)
             }
             // The first run asks a few questions, once, always skippable.
             if let status = try? await session.api.onboarding(), !status.completed { onboarding = status }
@@ -108,6 +107,7 @@ struct Shell: View {
         if let target {
             ChatScreen(
                 api: session.api, conversationId: target.conversationId, projectId: target.projectId,
+                continuous: target.continuous,
                 isActive: place == .chat,
                 onCreated: { self.target?.conversationId = $0.id }
             )
@@ -126,7 +126,7 @@ struct Shell: View {
                 onOpenConversation: { open(conversation: $0) },
                 onDraft: { text in
                     session.chatDraft = text
-                    go(.chat)
+                    openChat()
                 }
             )
         case .projetos:
@@ -155,7 +155,9 @@ struct Shell: View {
                 guard abs(dx) > 80, abs(dx) > abs(value.translation.height) * 2,
                       let index = Place.tabs.firstIndex(of: place) else { return }
                 let next = dx < 0 ? index + 1 : index - 1
-                if Place.tabs.indices.contains(next) { go(Place.tabs[next]) }
+                if Place.tabs.indices.contains(next) {
+                    Place.tabs[next] == .chat ? openChat() : go(Place.tabs[next])
+                }
             }
     }
 
@@ -169,7 +171,19 @@ struct Shell: View {
         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { place = next }
     }
 
+    /// Chat: always the continuous conversation, also from inside a project's chat.
+    private func openChat() {
+        if target?.continuous != true || target?.conversationId != session.continuousId && session.continuousId != nil {
+            target = .continuous(session.continuousId)
+        }
+        go(.chat)
+    }
+
     private func open(conversation id: String) {
+        if id == session.continuousId {
+            openChat()
+            return
+        }
         if target?.conversationId != id { target = ChatTarget(conversationId: id) }
         go(.chat)
     }
@@ -213,7 +227,7 @@ struct SkyNav: View {
                     .glassCircle(palette, size: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Conversas, Caderno, Mac e mais")
+            .accessibilityLabel("Caderno, Mac e Ajustes")
             Spacer(minLength: 0)
             pill
             Spacer(minLength: 0)
@@ -310,23 +324,18 @@ struct SkyNav: View {
     }
 }
 
-/// The drawer: the brand, the places, the conversations, and whether we are connected. Drag it
-/// to the left or tap outside to close.
+/// The drawer: the brand, what is not in the tabs on top (Caderno, Mac, Ajustes), and whether we
+/// are connected. There is no list of conversations (docs/CONVERSA_CONTINUA.md). Drag it to the
+/// left or tap outside to close.
 struct Drawer: View {
     @Binding var open: Bool
     let place: Place
-    let current: String?
     let onPlace: (Place) -> Void
-    let onConversation: (String) -> Void
-    let onNew: () -> Void
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @State private var drag: CGFloat = 0
 
     private let items: [(Place, String, String)] = [
-        (.chat, "Conversa", "bubble.left"),
-        (.inicio, "Pendências", "tray"),
-        (.projetos, "Projetos", "folder"),
         (.caderno, "Caderno", "book.closed"),
         (.mac, "Mac", "laptopcomputer"),
         (.ajustes, "Ajustes", "slider.horizontal.3"),
@@ -378,80 +387,18 @@ struct Drawer: View {
                                 .foregroundStyle(place == item ? palette.estanho : palette.tintaFraca)
                             Text(label)
                             Spacer()
-                            if item == .inicio && session.pending.count > 0 {
-                                Text("\(session.pending.count)")
-                                    .font(Typo.mono(.caption2))
-                                    .padding(.horizontal, 6)
-                                    .frame(minWidth: 20, minHeight: 20)
-                                    .overlay(Capsule().strokeBorder(palette.estanho.opacity(0.4)))
-                            }
                         }
                         .font(Typo.text(.subheadline, weight: .medium))
                         .foregroundStyle(place == item ? palette.tinta : palette.tintaSuave)
                         .padding(.horizontal, 10)
-                        .frame(minHeight: 40)
+                        .frame(minHeight: 44)
                         .background(place == item ? palette.fundoHover : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            Rectangle().fill(palette.linha).frame(height: 1)
-            HStack {
-                Rotulo("Conversas")
-                Spacer()
-                Button(action: onNew) {
-                    Image(systemName: "plus")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(palette.tintaSuave)
-                        .frame(width: 28, height: 28)
-                        .overlay(Circle().strokeBorder(palette.linhaForte))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Nova conversa")
-            }
-            .padding(.leading, 10)
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(session.conversations) { conversation in
-                        Button { onConversation(conversation.id) } label: {
-                            HStack {
-                                if let title = conversation.title {
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(title).lineLimit(1)
-                                        Text(DayLabel.text(for: conversation.createdAt))
-                                            .font(Typo.text(.caption2))
-                                            .foregroundStyle(palette.tintaFraca)
-                                    }
-                                } else {
-                                    Text(DayLabel.text(for: conversation.createdAt))
-                                }
-                                if conversation.projectId != nil {
-                                    Image(systemName: "folder").font(.caption).foregroundStyle(palette.tintaFraca)
-                                }
-                                Spacer()
-                            }
-                            .font(Typo.text(.subheadline))
-                            .foregroundStyle(conversation.id == current && place == .chat ? palette.tinta : palette.tintaSuave)
-                            .padding(.horizontal, 10)
-                            .frame(minHeight: 38)
-                            .background(conversation.id == current && place == .chat ? palette.fundoHover : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if session.conversations.isEmpty {
-                        Text("Nenhuma ainda.")
-                            .font(Typo.text(.footnote))
-                            .foregroundStyle(palette.tintaFraca)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 10)
-                    }
-                }
-            }
-            .scrollIndicators(.hidden)
+            Spacer(minLength: 0)
             Text(session.listError == nil ? "CONECTADO" : "SEM CONEXÃO")
                 .font(Typo.mono(.caption2))
                 .tracking(0.8)

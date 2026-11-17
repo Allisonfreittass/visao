@@ -52,13 +52,26 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     public let projectId: String?
     /// 3 to 6 words after the first exchange; nil: the menu shows the date.
     public let title: String?
+    /// The owner's one continuous conversation (docs/CONVERSA_CONTINUA.md): Chat opens it.
+    public let continuous: Bool
 
-    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil, title: String? = nil) {
+    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil, title: String? = nil, continuous: Bool = false) {
         self.id = id
         self.createdAt = createdAt
         self.memoryStatus = memoryStatus
         self.projectId = projectId
         self.title = title
+        self.continuous = continuous
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        memoryStatus = try c.decodeIfPresent(String.self, forKey: .memoryStatus)
+        projectId = try c.decodeIfPresent(String.self, forKey: .projectId)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        continuous = try c.decodeIfPresent(Bool.self, forKey: .continuous) ?? false
     }
 
     /// The server could not prepare memory for it: you can talk, it may forget details.
@@ -67,7 +80,7 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, title, continuous
         case createdAt = "created_at"
         case memoryStatus = "memory_status"
         case projectId = "project_id"

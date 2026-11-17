@@ -1,7 +1,7 @@
 import SwiftUI
 import VisaoKit
 
-/// Início: Pendências, everything that waits for a yes, a no or a read (InboxView.tsx).
+/// Início: everything that waits for a yes, a no or a read (InboxView.tsx).
 struct InicioView: View {
     let currentConversation: String?
     let onOpenConversation: (String) -> Void
@@ -14,7 +14,7 @@ struct InicioView: View {
 
     var body: some View {
         GlassPage(
-            label: "Pendências",
+            label: "Início",
             title: pending.count == 0 ? "Nada esperando " : "O que precisa ",
             italic: pending.count == 0 ? "por você." : "de você.",
             lede: "Eu só proponho. Nada roda sem o seu sim."

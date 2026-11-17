@@ -151,19 +151,22 @@ final class ChatStoreTests: XCTestCase {
         try await until { !store.sending }
     }
 
-    func testFirstMessageCreatesTheConversation() async throws {
+    func testWithNothingOpenSendingGoesToTheContinuousConversation() async throws {
         let transport = StubTransport()
-        transport.on("POST", "/api/conversations", json: #"{"id":"c1","created_at":"2026-11-13T10:00:00Z"}"#)
+        transport.on("GET", "/api/conversations/continuous", json: #"{"id":"c1","created_at":"2026-11-13T10:00:00Z","title":null,"project_id":null,"continuous":true}"#)
         transport.on("POST", path, json: Fixture.turn(user: "oi", reply: "olá"))
         let store = ChatStore(api: api(transport), conversationId: nil)
-        var created: [String] = []
-        store.onConversationCreated = { created.append($0.id) }
+        var created: [Conversation] = []
+        store.onConversationCreated = { created.append($0) }
 
         store.send("oi")
         try await until { store.messages.count == 2 }
 
         XCTAssertEqual(store.conversationId, "c1")
-        XCTAssertEqual(created, ["c1"])
+        XCTAssertEqual(created.map(\.id), ["c1"])
+        XCTAssertEqual(created.first?.continuous, true)
+        XCTAssertEqual(transport.count("POST", "/api/conversations"), 0, "there is no new conversation outside a project")
+        XCTAssertTrue(store.paged)
     }
 
     func testRefreshKeepsUnsentAndPicksUpInitiative() async throws {

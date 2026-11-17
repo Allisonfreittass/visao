@@ -86,8 +86,18 @@ public final class APIClient: Sendable {
         return try await request("/conversations", method: "POST", query: query)
     }
 
-    public func messages(conversationId: String) async throws -> [Message] {
-        try await request("/conversations/\(segment(conversationId))/messages")
+    /// The owner's continuous conversation, created the first time it is asked for.
+    public func continuousConversation() async throws -> Conversation {
+        try await request("/conversations/continuous")
+    }
+
+    /// Without `limit`, the whole conversation; with it, the last `limit` (before `before`, when
+    /// given), oldest first (docs/CONVERSA_CONTINUA.md).
+    public func messages(conversationId: String, limit: Int? = nil, before: String? = nil) async throws -> [Message] {
+        var query: [URLQueryItem] = []
+        if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let before { query.append(URLQueryItem(name: "before", value: before)) }
+        return try await request("/conversations/\(segment(conversationId))/messages", query: query)
     }
 
     public func send(

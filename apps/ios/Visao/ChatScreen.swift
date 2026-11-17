@@ -44,15 +44,15 @@ struct ChatScreen: View {
     /// It can speak first: what it said on its own shows up while you look (as on the web).
     private static let initiativePoll: Duration = .seconds(15)
 
-    /// Told when the first message creates the conversation, so the drawer marks it.
+    /// Told when the first message creates the conversation (the continuous one, the first time).
     private let onCreated: (Conversation) -> Void
 
     /// In front: the progress and the openings are only looked at while you see this chat.
     private let isActive: Bool
 
-    init(api: APIClient, conversationId: String?, projectId: String? = nil, isActive: Bool = true, onCreated: @escaping (Conversation) -> Void = { _ in }) {
+    init(api: APIClient, conversationId: String?, projectId: String? = nil, continuous: Bool = false, isActive: Bool = true, onCreated: @escaping (Conversation) -> Void = { _ in }) {
         self.isActive = isActive
-        _store = State(initialValue: ChatStore(api: api, conversationId: conversationId, projectId: projectId))
+        _store = State(initialValue: ChatStore(api: api, conversationId: conversationId, projectId: projectId, paged: continuous))
         self.onCreated = onCreated
         _draft = State(initialValue: AttachmentDraft(api: api))
     }
@@ -66,11 +66,19 @@ struct ChatScreen: View {
                     if store.messages.isEmpty && !store.sending && !store.loading {
                         EmptyConversation()
                     }
-                    if store.messages.count > shownCount {
+                    if store.messages.count > shownCount || store.olderLeft {
                         Button {
-                            shownCount += Self.page
+                            // What is already here first; then the page before it, from the server.
+                            if store.messages.count > shownCount {
+                                shownCount += Self.page
+                            } else {
+                                Task {
+                                    await store.loadOlder()
+                                    shownCount = store.messages.count
+                                }
+                            }
                         } label: {
-                            Text("Mostrar mensagens anteriores")
+                            Text(store.loadingOlder ? "Carregando…" : "Carregar mensagens anteriores")
                                 .font(Typo.text(.footnote, weight: .medium))
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 34)
@@ -210,7 +218,6 @@ struct ChatScreen: View {
                 followOnLockScreen(sending: sending)
                 // A turn can leave an email or Mac work waiting for a tap.
                 if !sending { Task { await session.pending.refresh() } }
-                if !sending { titleSoon() }
             }
             .onChange(of: session.pending.asks(in: store.conversationId).count) { scrollToBottom(proxy) }
             .onChange(of: store.liveStep) { scrollToBottom(proxy) }
@@ -382,17 +389,6 @@ struct ChatScreen: View {
             let ok = await session.pending.decide(ask, approve: approve)
             // What was sent or scheduled comes back as his message in this conversation.
             if ok && approve { await store.refresh() }
-        }
-    }
-
-    /// The worker writes the conversation's title a few seconds after the first reply
-    /// (core/conversation/title.py): ask for the list again once, then the menu has it.
-    private func titleSoon() {
-        guard let id = store.conversationId,
-              session.conversations.first(where: { $0.id == id })?.title == nil else { return }
-        Task {
-            try? await Task.sleep(for: .seconds(12))
-            await session.loadConversations()
         }
     }
 
