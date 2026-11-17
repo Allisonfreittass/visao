@@ -131,6 +131,8 @@ public struct ServerSettings: Equatable, Sendable {
     /// "Agir por conta própria" is the opposite of paused.
     public var paused: Bool
     public var autoResearch: Bool
+    /// The morning summary when the quiet hours end (docs/RESUMO_DA_MANHA.md); on by default.
+    public var morningBriefing: Bool = true
 }
 
 extension APIClient {
@@ -182,7 +184,10 @@ extension APIClient {
         async let autonomy: [String: Bool] = request("/system/autonomy")
         async let permissions: [String: Bool] = request("/autonomy/permissions")
         let (m, a, p) = try await (memory, autonomy, permissions)
-        return ServerSettings(memory: m["enabled"] ?? false, paused: a["paused"] ?? false, autoResearch: p["auto_research"] ?? false)
+        return ServerSettings(
+            memory: m["enabled"] ?? false, paused: a["paused"] ?? false, autoResearch: p["auto_research"] ?? false,
+            morningBriefing: p["morning_briefing"] ?? true
+        )
     }
 
     public func setMemory(enabled: Bool) async throws -> Bool {
@@ -199,6 +204,18 @@ extension APIClient {
     public func setAutoResearch(_ enabled: Bool) async throws -> Bool {
         let result: [String: Bool] = try await json("/autonomy/permissions", method: "PUT", body: ["auto_research": enabled])
         return result["auto_research"] ?? enabled
+    }
+
+    /// Only this field goes: the PUT changes only what comes, so auto_research stays as it is.
+    public func setMorningBriefing(_ enabled: Bool) async throws -> Bool {
+        let result: [String: Bool] = try await json("/autonomy/permissions", method: "PUT", body: ["morning_briefing": enabled])
+        return result["morning_briefing"] ?? enabled
+    }
+
+    /// "Mandar agora": a summary now, even with the daily one off. False: autonomy is paused.
+    public func briefingNow() async throws -> Bool {
+        let result: [String: Bool] = try await request("/autonomy/briefing", method: "POST")
+        return result["queued"] ?? false
     }
 
     // MARK: Mac, goals, notices
