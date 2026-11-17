@@ -273,9 +273,8 @@ def test_near_the_goal_it_checks_every_few_hours_outside_quiet_hours(client, db,
     recheck_now(db, llm, browser, now=evening)
     assert panel.next_check_at.replace(tzinfo=UTC) == datetime(2026, 11, 18, 11, 0, tzinfo=UTC)
     jobs = db.query(ScheduledJob).filter_by(kind=panels.JOB_KIND).all()
-    assert len(jobs) == 4  # one per check: the moved ones do nothing when they come
-    first = min(jobs, key=lambda j: j.created_at)
-    assert panels.stale(panel, first.payload["at"])
+    # Every job but the latest was moved since: those do nothing when they come.
+    assert len([j for j in jobs if panels.stale(panel, j.payload["at"])]) == len(jobs) - 1
 
 
 def test_an_urgent_notice_in_quiet_hours_waits_for_the_first_check_after(client, db, monkeypatch):

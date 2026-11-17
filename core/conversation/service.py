@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
-from core.conversation import attachments, browser_guard, progress
+from core.conversation import attachments, browser_guard, deeds_guard, progress
 from core.conversation import parts as bubbles
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
@@ -103,6 +103,8 @@ class TurnResult:
     # The reply denied the browser and was fixed (core/conversation/browser_guard.py): "rewritten"
     # by the check, "stripped" in code when the rewrite did not fix it; "" when it did not deny.
     browser_guard: str = ""
+    # The reply said it did something in the app that was not done; that sentence went (ADR-0021).
+    claimed_undone: bool = False
 
 
 def _spent(session: Session, *conditions: object) -> Decimal:
@@ -222,6 +224,7 @@ def reply(
     files: list[Attachment] | None = None,
     reply_to_id: uuid.UUID | None = None,
     browser_fallback: str = "",
+    did_in_app: bool | None = None,
     quote_table: dict | None = None,
 ) -> TurnResult:
     """`browser_fallback` is the sentence that closes a reply that denied the browser and could
@@ -374,6 +377,11 @@ def reply(
         # goes, and one true sentence takes its place. Removing adds no claim.
         content = browser_guard.strip(content, browser_fallback or browser_guard.FALLBACK)
         parts, guarded = None, "stripped"
+    claimed = False
+    if did_in_app is False and modality != "voice" and deeds_guard.violations(content):
+        # Nothing was done in the app this turn: a sentence saying it was goes (ADR-0021).
+        content, parts = deeds_guard.strip(content), None
+        claimed = True
     if truncated:
         content = content.rstrip() + f"\n\n{TRUNCATION_NOTICE}"
         if parts:
@@ -400,7 +408,15 @@ def reply(
     # Observable behavior, measured in code, tagged with the state version in force.
     behavior_state.observe(session, assistant_message, owner.id)
     session.commit()
-    return TurnResult(user_message, assistant_message, usage, recalled, page, browser_guard=guarded)
+    return TurnResult(
+        user_message,
+        assistant_message,
+        usage,
+        recalled,
+        page,
+        browser_guard=guarded,
+        claimed_undone=claimed,
+    )
 
 
 FIT_MARGIN_BYTES = 512

@@ -153,10 +153,15 @@ export interface Project {
   conversations: number;
   pages: number;
   files: number;
+  /** What it noted here from the conversation, a "- " line per fact (ADR-0021). */
+  notes?: string;
+  notes_updated_at?: string | null;
+  panels?: number;
 }
 
 export interface ProjectDetail extends Project {
   conversation_list: { id: string; created_at: string; title: string }[];
+  panel_list?: { id: string; title: string; status: string }[];
   page_list: ArtifactSummary[];
   file_list: Attachment[];
 }
@@ -461,6 +466,14 @@ export class Api {
     return this.request(`/projects/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify({ name }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  setProjectNotes(id: string, notes: string): Promise<Project> {
+    return this.request(`/projects/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ notes }),
       headers: { "Content-Type": "application/json" },
     });
   }

@@ -5,6 +5,20 @@ em você?" e "o que você consegue fazer agora?" com fatos. Cada item aponta par
 detalhes. O que está ligado **agora** vem do manifesto de capacidades
 (`core/identity/capabilities.py`), que entra em todo prompt; este arquivo conta a história.
 
+## 17/11/2026
+
+- **Ações no app pela conversa.**
+  - Projetos: criar, renomear e apagar.
+  - Anotar num projeto o que a conversa decidiu; uma linha com número que não apareceu na
+    conversa não é gravada.
+  - Pôr painel ou página num projeto; pausar, retomar e apagar painéis.
+  - Apagar só depois do "sim, apaga".
+  - As anotações voltam nas respostas quando o assunto volta.
+  - Uma resposta que diz "anotei" ou "criei" sem ter feito perde essa frase.
+
+  Veio do caso de 17/11, quando ele disse "Anotado" sem projeto nem anotação.
+  [ADR-0021](decisions/0021-acoes-no-app-pela-conversa.md), [ACOES.md](ACOES.md).
+
 ## 16/11/2026
 
 - **Localização para "perto de mim".** "Tem farmácia aberta aqui perto?":

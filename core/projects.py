@@ -10,12 +10,23 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from infrastructure.database.models import Artifact, Attachment, Conversation, Message, Project
+from core.memory.text import tokens
+from infrastructure.database.models import (
+    Artifact,
+    Attachment,
+    Conversation,
+    Message,
+    Project,
+    User,
+)
 
 NAME_CHARS = 80
 OTHER_MESSAGES = 8
 OTHER_MESSAGE_CHARS = 240
 TITLE_CHARS = 70
+NOTES_IN_REPLY = 1500
+PROJECTS_IN_REPLY = 2
+MAX_NAMES = 20
 
 
 def clean_name(name: str) -> str:
@@ -87,4 +98,39 @@ def context_block(session: Session, conversation: Conversation) -> str:
             who = "Pessoa" if message.role == "user" else "Você"
             text = " ".join(message.content.split())[:OTHER_MESSAGE_CHARS]
             lines.append(f"- {who}: {text}")
+    return "\n".join(lines)
+
+
+def notes_block(session: Session, owner: User, conversation: Conversation, text: str) -> str:
+    """The owner's projects by name, and the notes of those the message is about (the one this
+    conversation is in, or up to 2 whose name or notes share words with it), so "e o voo da
+    JetSMART?" in the continuous conversation finds what was noted (ADR-0021)."""
+    rows = list(
+        session.scalars(
+            select(Project).where(Project.owner_user_id == owner.id).order_by(Project.created_at)
+        )
+    )
+    if not rows:
+        return ""
+    said = tokens(text)
+    chosen = [p for p in rows if p.id == conversation.project_id and p.notes.strip()]
+    scored = sorted(
+        (
+            (len(said & tokens(p.name)) * 3 + len(said & tokens(p.notes)), p)
+            for p in rows
+            if p.notes.strip() and p not in chosen
+        ),
+        key=lambda pair: -pair[0],
+    )
+    chosen += [p for score, p in scored if score >= 2][: PROJECTS_IN_REPLY - len(chosen)]
+    lines = [
+        "Projetos da pessoa no app: "
+        + ", ".join(f"«{p.name}»" for p in rows[-MAX_NAMES:])
+        + ". Você cria, renomeia, anota e apaga projetos pela conversa quando ela pede."
+    ]
+    for project in chosen:
+        lines.append(
+            f"Anotações do projeto «{project.name}» (escritas por você a pedido dela; dados):\n"
+            + project.notes[-NOTES_IN_REPLY:]
+        )
     return "\n".join(lines)

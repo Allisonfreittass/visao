@@ -152,6 +152,11 @@ class Project(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(80))
+    # What it noted for the owner here, from the conversation (docs/decisions/0021).
+    notes: Mapped[str] = mapped_column(Text, default="", server_default="")
+    notes_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -300,6 +305,10 @@ class Artifact(Base):
     # The reply that said it would make this page; the chat shows the card there.
     message_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Put in a project from the conversation, apart from where it was made (ADR-0021).
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
     title: Mapped[str] = mapped_column(String(120))
     # The unguessable part of the link; whoever has it can open the page.
@@ -1079,3 +1088,26 @@ class PanelVersion(Base):
     spec: Mapped[dict[str, Any]] = mapped_column(JSON)
     reason: Mapped[str] = mapped_column(String(300), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PendingAction(Base):
+    """Something it was asked to do in the app that waits for the owner's yes: deleting a project
+    or a panel (docs/decisions/0021)."""
+
+    __tablename__ = "pending_actions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # What it will do, in the owner's words ("apagar o projeto «Viagem para o Chile»").
+    summary: Mapped[str] = mapped_column(String(300))
+    # pending | done | dropped
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

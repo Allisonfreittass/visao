@@ -21,6 +21,7 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
   const [list, setList] = useState<Project[] | null>(null);
   const [open, setOpen] = useState<ProjectDetail | null>(null);
   const [name, setName] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
   useBackClose(open !== null, () => setOpen(null));
 
   const reload = useCallback(() => {
@@ -99,6 +100,17 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
     }
   }
 
+  async function saveNotes() {
+    if (!open || editing === null) return;
+    try {
+      const saved = await api.setProjectNotes(open.id, editing);
+      setOpen({ ...open, notes: saved.notes, notes_updated_at: saved.notes_updated_at });
+      setEditing(null);
+    } catch (e) {
+      onError(e);
+    }
+  }
+
   if (open) {
     return (
       <section className="page projects" aria-labelledby="project-title">
@@ -115,6 +127,42 @@ export function ProjectsView({ api, current, currentProjectId, onOpenConversatio
           </div>
         </header>
         <div className="page-body">
+          <section className="list-group project-notes">
+            <h2 className="rotulo">Anotações</h2>
+            {editing === null ? (
+              <>
+                {open.notes?.trim() ? (
+                  <ul>
+                    {open.notes.split("\n").filter((l) => l.trim()).map((line, i) => (
+                      <li key={i}>{line.replace(/^-\s*/, "")}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="note">Nada anotado ainda. Na conversa, peça: “anota isso no projeto {open.name}”.</p>
+                )}
+                <button type="button" className="link-button" onClick={() => setEditing(open.notes ?? "")}>Editar</button>
+              </>
+            ) : (
+              <>
+                <textarea value={editing} rows={8} onChange={(e) => setEditing(e.target.value)} aria-label="Anotações do projeto" />
+                <div className="row">
+                  <button type="button" className="projects-primary" onClick={() => void saveNotes()}>Salvar</button>
+                  <button type="button" className="ghost" onClick={() => setEditing(null)}>Cancelar</button>
+                </div>
+              </>
+            )}
+          </section>
+          {open.panel_list && open.panel_list.length > 0 && (
+            <section className="list-group">
+              <h2 className="rotulo">Painéis</h2>
+              {open.panel_list.map((p) => (
+                <div key={p.id} className="project-row">
+                  <strong>{p.title}</strong>
+                  <span>{p.status === "paused" ? "pausado" : "no Início"}</span>
+                </div>
+              ))}
+            </section>
+          )}
           <section className="list-group">
             <h2 className="rotulo">Conversas</h2>
             {open.conversation_list.length === 0 && <p className="note">Nenhuma ainda. Comece uma aqui ou traga a que está aberta.</p>}

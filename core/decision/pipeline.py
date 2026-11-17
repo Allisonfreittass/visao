@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
+from core import actions as app_actions
 from core import browse, location, projects
 from core.arm import intent as mac_intent
 from core.autonomy import continuity
@@ -242,9 +243,51 @@ def run_turn(
                     action_ids=[str(a.id) for a in helped.proposed],
                 )
 
+    # Projects, notes and panels changed from the conversation, before the reply, so "anotei" is
+    # true when it is said (core/actions.py, ADR-0021). A "sim, apaga" answers the deletion the
+    # last reply asked about.
+    deeds: list[app_actions.Deed] = []
+    confirmed = app_actions.answered(
+        session, owner=owner, conversation=conversation, text=text, now=datetime.now(UTC)
+    )
+    if confirmed is not None:
+        deeds.append(confirmed)
+    elif app_actions.candidate(text):
+        said_before = "\n".join(
+            f"{m.role}: {m.content[:2000]}" for m in context_history(session, conversation)[-12:]
+        )
+        progress.step("Organizando no app")
+        asked = app_actions.plan(
+            session,
+            provider,
+            owner=owner,
+            conversation=conversation,
+            text=text,
+            recent=said_before[-8000:],
+        )
+        if asked:
+            deeds = app_actions.execute(
+                session,
+                owner=owner,
+                conversation=conversation,
+                asked=asked,
+                source=f"{said_before}\n{text}",
+                limits=config.panel_limits,
+            )
+    if deeds:
+        blocks.append(app_actions.block(deeds))
+        plan.add(
+            "app_actions",
+            executed=any(d.done for d in deeds),
+            reason="owner_asked",
+            deeds=[d.said for d in deeds],
+        )
+
     # "pode", "por favor" right after it offered a panel: that answers the card, and the panel is
     # made now, before the reply, so "está no Início" is true when it is said.
-    accepted = panel_offers.answered_by(session, conversation.id, text)
+    accepted = (
+        None if confirmed is not None else panel_offers.answered_by(session, conversation.id, text)
+    )
     created = None
     if accepted is not None:
         progress.step("Montando seu painel")
@@ -554,6 +597,9 @@ def run_turn(
     in_project = projects.context_block(session, conversation)
     if in_project:
         blocks.append(in_project)
+    noted = projects.notes_block(session, owner, conversation, text)
+    if noted:
+        blocks.append(noted)
     # Earlier turns' real actions: without them it once denied a Gmail read it had done.
     earlier = deed_record.conversation_block(session, conversation, owner)
     if earlier:
@@ -606,7 +652,13 @@ def run_turn(
         reply_to_id=reply_to_id,
         browser_fallback=browser_fallback,
         quote_table=quote_table,
+        did_in_app=any(d.done and not d.waiting for d in deeds)
+        or accepted is not None
+        or edited is not None,
     )
+    if result.claimed_undone:
+        # It said it did something in the app that was not done; the sentence went (ADR-0021).
+        plan.add("claim_removed", executed=True, reason="said_done_in_app_without_doing")
     if result.browser_guard:
         # It denied the browser and was fixed before anyone read it (docs/decisions/0013).
         plan.add("browser_denial_fixed", executed=True, reason=result.browser_guard)

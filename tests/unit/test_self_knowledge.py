@@ -64,4 +64,4 @@ def test_the_manifest_tells_it_what_it_can_do_now():
     assert "me avisa se ficar abaixo de R$ X" in said
     assert "conversa contínua" in said and "sem pedir aprovação" in said
     plain = "; ".join(Capabilities().actions())
-    assert "painel" not in plain and "conversa contínua" not in plain
+    assert "num painel vivo" not in plain and "conversa contínua" not in plain

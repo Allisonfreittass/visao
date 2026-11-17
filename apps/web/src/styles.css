@@ -652,3 +652,6 @@ button.projects-primary { background: var(--tinta); color: var(--sobre-tinta); b
 .chat-divider span { max-width: 70%; text-align: center; overflow-wrap: anywhere; }
 .load-older { align-self: center; margin: 4px auto 10px; display: block; background: none; border: 1px solid var(--linha); border-radius: var(--raio-pilula); padding: 6px 14px; font: 400 12.5px/1.2 var(--font-sans); color: var(--tinta-suave); cursor: pointer; }
 .load-older:hover { background: var(--fundo-hover); }
+
+.project-notes ul { margin: 0 0 8px; padding-left: 1.1em; display: grid; gap: 4px; }
+.project-notes textarea { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--linha, rgba(0,0,0,.15)); background: transparent; color: inherit; margin-bottom: 8px; }

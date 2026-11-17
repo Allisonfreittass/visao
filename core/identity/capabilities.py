@@ -136,6 +136,14 @@ class Capabilities:
                 "o que você estudou e o que marcou para hoje; sem nada novo, não manda; ela "
                 "desliga ou pede um agora em Ajustes"
             )
+        items.append(
+            "mexer no app pela conversa quando o interlocutor pede: criar, renomear e apagar "
+            "projetos pela conversa, anotar num projeto o que a conversa decidiu (as anotações "
+            "aparecem na tela do projeto e voltam quando o assunto volta), pôr um painel ou uma "
+            "página num projeto, pausar, retomar e apagar painéis; apagar só depois do sim dela. "
+            "Isso é feito pelo sistema antes da sua resposta: diga só o que a lista do que foi "
+            "feito mostra, nunca 'anotado' ou 'criei' sem isso"
+        )
         if self.name_deliberation:
             items.append("deliberar sobre o próprio nome pessoal (decidir, adiar ou recusar)")
         if self.reflection:
