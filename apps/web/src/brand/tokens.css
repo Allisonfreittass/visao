@@ -1,21 +1,22 @@
-/* V.I.S.A.O.: tokens da marca (Ciclope). Fonte única de cor, tipo, forma e movimento.
-   Claro é o padrão; o escuro vem de Ajustes ou do sistema (src/brand/theme.ts põe data-theme no
-   <html>). O laranja (--accent) é para FORMAS: o Ciclope, botões preenchidos e o anel de foco.
-   Texto pequeno em laranja usa --accent-text; texto sobre laranja usa --on-accent, nunca branco.
-   Espelhado em apps/ios/Visao/Theme.swift. */
+/* V.I.S.A.O.: tokens da marca "Ciclope Sentinela". Metal grafite, um sensor vermelho aceso,
+   texto de sistema. Escuro é o único tema exposto (brand/theme.ts força data-theme="dark").
+   Regra do vermelho: só no olho do mascote, no botão principal, no foco, no indicador de aba,
+   em UMA palavra de destaque por tela e em erros. Atenção é âmbar, sucesso é verde, o resto é
+   grafite. Texto sobre vermelho usa --on-red, nunca branco. Espelhado em
+   apps/ios/Visao/Theme.swift. */
 :root {
   /* Tipografia */
-  --font-display: "Bricolage Grotesque", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --tracking-display: -0.02em;
+  --tracking-display: -0.01em;
   --text-12: 12px;
-  --text-14: 14px;
+  --text-13: 13px;
+  --text-15: 15px;
   --text-16: 16px;
   --text-20: 20px;
-  --text-28: 28px;
-  --text-40: 40px;
-  --text-56: 56px;
+  --text-30: 30px;
+  --text-44: 44px;
 
   /* Espaço (base 4) */
   --space-1: 4px;
@@ -28,30 +29,75 @@
 
   /* Forma */
   --radius-chip: 10px;
+  --radius-input: 12px;
   --radius-card: 16px;
   --radius-panel: 24px;
   --radius-pill: 999px;
 
   /* Movimento */
   --ease: cubic-bezier(.2, .8, .2, 1);
+  /* Pálpebra e piscada: sensação mecânica. */
+  --ease-mech: cubic-bezier(.6, 0, .2, 1);
   --ease-spring: cubic-bezier(.2, 1.3, .4, 1);
-  --duration-state: 240ms;
+  --duration-state: 220ms;
 
   /* Camadas */
   --layer-content: 1;
   --layer-overlay: 60;
 
-  /* Cores fixas nos dois temas */
-  --accent: #FF6A1A;
-  --on-accent: #16161A;
-  --iris: #1B1E3A;
-  --family-mac: #3B6BFF;
-  --family-whatsapp: #18C27A;
-  --family-email: #FFC83D;
-  --family-caderno: #9B87FF;
+  /* Cores fixas */
+  --red: #FF3B30;
+  --red-text: #FF5A4E;
+  --on-red: #0B0B0D;
+  --amber: #F5B544;
+  --amber-bg: #2A2212;
+  --green: #4ADE80;
+  --green-dot: #16A34A;
+  --graphite: #2B2E34;
+  --graphite-edge: #454952;
+  --graphite-line: #5A5F69;
+  --socket: #050506;
+  --sensor-mac: #3B6BFF;
+  --sensor-whatsapp: #18C27A;
+  --sensor-email: #E0A800;
+  --sensor-caderno: #9B87FF;
 }
 
-:root, [data-theme="light"] {
+/* Escuro: o tema da marca. Sem sombras: a separação vem da borda de 1px. */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #09090B;
+  --surface: #141518;
+  --surface-2: #1D1F24;
+  --surface-sidebar: rgb(14 15 18 / .85);
+  --bubble-user: #1F2126;
+  --bubble-user-border: #2C2E34;
+  --border: #24262B;
+  --border-strong: #34363C;
+  --text: #EDEDEF;
+  --text-2: #C2C3C8;
+  --text-muted: #9A9BA2;
+  --success: var(--green);
+  --danger: #FF3B30;
+  --warning: var(--amber);
+  --shadow-card: none;
+  --shadow-float: none;
+  --scrim: rgb(0 0 0 / .6);
+  --card-ink: #141518;
+  --card-ink-2: #1D1F24;
+  --card-ink-text: #EDEDEF;
+  --card-ink-muted: #9A9BA2;
+  /* Nomes da marca anterior, agora neutros ou vermelhos conforme a regra. */
+  --accent: var(--red);
+  --on-accent: var(--on-red);
+  --accent-text: var(--text-2);
+  --accent-strong: var(--red-text);
+  --accent-soft: rgb(255 59 48 / .22);
+  --iris: var(--surface-2);
+}
+
+/* Tema claro: guardado, não exposto (o app força o escuro em brand/theme.ts). */
+[data-theme="light"] {
   color-scheme: light;
   --bg: #F6F4F1;
   --surface: #FFFFFF;
@@ -79,37 +125,9 @@
   --card-ink-muted: #A1A1AA;
 }
 
-[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0E0F13;
-  --surface: #17181D;
-  --surface-2: #1E2026;
-  --border: #2A2C33;
-  --border-strong: #3A3D45;
-  --text: #F2F2F3;
-  --text-muted: #A1A1AA;
-  --accent-text: #FF8A4C;
-  --accent-strong: #FF8A4C;
-  --accent-soft: rgb(255 106 26 / .16);
-  --blob-1: rgb(255 138 107 / .18);
-  --blob-2: rgb(185 166 255 / .20);
-  --blob-3: rgb(255 201 168 / .14);
-  --success: #4ADE80;
-  --danger: #F87171;
-  --warning: #FBBF24;
-  /* No escuro, só a borda: sem sombra. */
-  --shadow-card: none;
-  --shadow-float: 0 0 0 1px var(--border);
-  --scrim: rgb(0 0 0 / .5);
-  --card-ink: #1E2026;
-  --card-ink-2: #2A2C33;
-  --card-ink-text: #F2F2F3;
-  --card-ink-muted: #A1A1AA;
-}
-
-/* Foco: anel laranja de 2px, com uma folga da cor da superfície. */
+/* Foco: anel vermelho de 2px, com uma folga da cor do fundo. */
 :root {
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red);
 }
 
 /* ---------------------------------------------------------------------------------------------

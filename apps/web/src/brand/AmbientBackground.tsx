@@ -1,11 +1,12 @@
-/** The floor of every screen: --bg and three big soft blobs in the corners (coral, lavender,
- * peach) that drift slowly; still with reduced motion. The only gradient in the app. */
-export function AmbientBackground() {
+import type { CiclopeState } from "../ciclope/state";
+
+/** The floor of every screen: --bg, a HUD grid of faint dots, and the sensor's red glow behind
+ * the mascot of Início, which breathes with its state (still with reduced motion). */
+export function AmbientBackground({ state = "idle" }: { state?: CiclopeState }) {
   return (
-    <div className="ambient" aria-hidden="true">
-      <span className="ambient-blob ambient-blob--1" />
-      <span className="ambient-blob ambient-blob--2" />
-      <span className="ambient-blob ambient-blob--3" />
+    <div className="ambient" data-state={state} aria-hidden="true">
+      <span className="ambient-grid" />
+      <span className="ambient-glow" />
     </div>
   );
 }

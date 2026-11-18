@@ -12,7 +12,7 @@
 	<string>$(VISAO_BUNDLE_ID).auth</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>BricolageGrotesque.ttf</string>
+		<string>SpaceGrotesk.ttf</string>
 		<string>InterTight-Regular.ttf</string>
 		<string>InterTight-Medium.ttf</string>
 		<string>JetBrainsMono-Regular.ttf</string>

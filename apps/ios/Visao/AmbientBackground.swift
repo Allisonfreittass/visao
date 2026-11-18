@@ -1,46 +1,45 @@
 import SwiftUI
 
-/// The floor of every screen (apps/web/src/brand/AmbientBackground.tsx): the brand's warm `bg`
-/// and three big soft blobs in the corners (coral, lavender, peach) drifting slowly. Still with
-/// Reduce Motion. The only gradient in the app.
+/// The floor of every screen (apps/web/src/brand/AmbientBackground.tsx): the brand's `bg`, a HUD
+/// grid of faint dots every 24 pt, and the sensor's red glow near the top (10% down), behind the
+/// mascot of Início. The glow breathes (opacity .10 → .16); still with Reduce Motion.
 struct AmbientBackground: View {
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var drift = false
+    @State private var breathe = false
 
     var body: some View {
         GeometryReader { proxy in
-            let side = max(proxy.size.width, proxy.size.height) * 0.45
-            let dx = proxy.size.width * 0.03, dy = proxy.size.height * 0.03
             ZStack {
                 palette.bg
-                blob(palette.blob1, side: side)
-                    .position(x: proxy.size.width * 0.05, y: proxy.size.height * 0.04)
-                    .offset(x: drift ? dx : -dx, y: drift ? dy : -dy)
-                blob(palette.blob2, side: side)
-                    .position(x: proxy.size.width * 1.02, y: proxy.size.height * 0.42)
-                    .offset(x: drift ? -dx : dx, y: drift ? dy : -dy)
-                blob(palette.blob3, side: side)
-                    .position(x: proxy.size.width * 0.45, y: proxy.size.height * 1.02)
-                    .offset(x: drift ? dx : -dx, y: drift ? -dy : dy)
+                Canvas { context, size in
+                    let dot = Path(ellipseIn: CGRect(x: -0.5, y: -0.5, width: 1, height: 1))
+                    var y: CGFloat = 12
+                    while y < size.height {
+                        var x: CGFloat = 12
+                        while x < size.width {
+                            context.fill(dot.offsetBy(dx: x, dy: y), with: .color(.white.opacity(0.045)))
+                            x += 24
+                        }
+                        y += 24
+                    }
+                }
+                RadialGradient(
+                    colors: [Palette.red.opacity(0.16), .clear],
+                    center: UnitPoint(x: 0.5, y: 0.1), startRadius: 0,
+                    endRadius: max(proxy.size.width, proxy.size.height) * 0.42
+                )
+                .opacity(breathe ? 1 : 0.625)
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .clipped()
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)
         .allowsHitTesting(false)
         .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 24).repeatForever(autoreverses: true)) { drift = true }
+            guard !reduceMotion else { breathe = false; return }
+            withAnimation(.easeInOut(duration: 4.8).repeatForever(autoreverses: true)) { breathe = true }
         }
-    }
-
-    private func blob(_ color: Color, side: CGFloat) -> some View {
-        Circle()
-            .fill(color)
-            .frame(width: side, height: side)
-            .blur(radius: 60)
     }
 }
 
@@ -60,7 +59,7 @@ private struct VisaoBackground: ViewModifier {
             .background { AmbientBackground().environment(\.palette, palette) }
             .environment(\.palette, palette)
             .foregroundStyle(palette.text)
-            .tint(palette.accentText)
+            .tint(palette.text2)
     }
 
     private var palette: Palette {

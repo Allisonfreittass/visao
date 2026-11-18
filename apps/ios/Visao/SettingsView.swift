@@ -39,6 +39,7 @@ struct SettingsView: View {
                 }
                 SystemVoiceRow()
             }
+            if Appearance.forced == nil {
             PageGroup(label: "Aparência") {
                 PageRow {
                     VStack(alignment: .leading, spacing: 10) {
@@ -54,6 +55,7 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                     }
                 }
+            }
             }
             PageGroup(label: "Voz e avisos") {
                 SettingRow(

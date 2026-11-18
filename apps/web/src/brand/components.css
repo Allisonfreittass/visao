@@ -2,7 +2,7 @@
    status e mensagem. Dependem de tokens.css. */
 .rs-pilha { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 
-/* Botão: pílula; o principal é laranja preenchido com texto escuro (--on-accent). Sem gradiente. */
+/* Botão: pílula; o principal é vermelho com texto quase preto (--on-red), nunca branco. Sem gradiente. */
 .rs-botao { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 44px; padding: 0 20px; border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: 600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer;
   transition: border-color .2s var(--ease), background-color .2s var(--ease), transform .2s var(--ease); }
@@ -10,7 +10,7 @@
 .rs-botao:active { transform: scale(.98); }
 .rs-botao:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .rs-botao--principal { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.rs-botao--principal:hover { background: #FF7A33; border-color: #FF7A33; }
+.rs-botao--principal:hover { background: #FF5146; border-color: #FF5146; }
 .rs-botao--compacto { min-height: 36px; padding: 0 14px; font: 500 13px/1 var(--font-sans); color: var(--text-muted); }
 .rs-botao[aria-pressed="true"] { color: var(--text); border-color: var(--text); }
 .rs-botao:disabled { opacity: .45; cursor: not-allowed; transform: none; }
@@ -27,16 +27,17 @@
 .rs-mensagem--sucesso b, .rs-mensagem--sucesso i { color: var(--success); }
 .rs-mensagem--aviso b, .rs-mensagem--aviso i { color: var(--warning); }
 .rs-mensagem--erro b, .rs-mensagem--erro i { color: var(--danger); }
-.rs-mensagem--info b, .rs-mensagem--info i { color: var(--accent-text); }
+.rs-mensagem--info b, .rs-mensagem--info i { color: var(--text-2); }
 
 /* Campo */
 .rs-campo { display: grid; gap: 6px; }
 .rs-campo label { font: 500 14px/1.4 var(--font-sans); color: var(--text); }
-.rs-campo input, .rs-campo textarea { min-height: 48px; padding: 0 var(--space-4); border: 1px solid var(--border-strong); border-radius: var(--radius-chip); background: var(--surface);
+.rs-campo input, .rs-campo textarea { min-height: 48px; padding: 0 var(--space-4); border: 1px solid var(--border-strong); border-radius: var(--radius-input); background: var(--bg);
   color: var(--text); font: 400 16px/1.4 var(--font-sans); transition: border-color .2s var(--ease), box-shadow .2s var(--ease); }
 .rs-campo textarea { min-height: 96px; padding: 12px var(--space-4); resize: vertical; }
 .rs-campo input::placeholder, .rs-campo textarea::placeholder { color: var(--text-muted); }
-.rs-campo input:focus-visible, .rs-campo textarea:focus-visible { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+/* Foco do campo: borda de 2px vermelha e halo. */
+.rs-campo input:focus-visible, .rs-campo textarea:focus-visible { outline: none; border-color: var(--red); background: var(--surface); box-shadow: 0 0 0 1px var(--red), 0 0 0 5px rgb(255 59 48 / .22); }
 .rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .rs-campo[data-estado="erro"] input { border-color: var(--danger); }
 .rs-campo[data-estado="erro"] small { color: var(--danger); }

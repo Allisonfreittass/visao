@@ -3,8 +3,9 @@ import SwiftUI
 import UIKit
 import VisaoKit
 
-/// The look (apps/web/src/brand/theme.ts): light by default, dark as the alternative in Ajustes,
-/// or the iPhone's own choice ("Sistema", the first-run default).
+/// The look (apps/web/src/brand/theme.ts). The brand ("Ciclope Sentinela") shows only the dark
+/// theme: `forced` wins over the saved choice, and Ajustes hides the picker. The light theme and
+/// the choice stay in the code in case they come back.
 @MainActor
 @Observable
 final class Appearance {
@@ -30,11 +31,17 @@ final class Appearance {
         mode = Mode(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .sistema
     }
 
-    var isDark: Bool { mode == .escuro || (mode == .sistema && systemDark) }
+    /// The theme the brand shows, whatever is saved. nil would bring the choice back.
+    static let forced: Mode? = .escuro
+
+    var isDark: Bool {
+        let shown = Appearance.forced ?? mode
+        return shown == .escuro || (shown == .sistema && systemDark)
+    }
 
     /// nil lets the system decide (and lets `systemDark` follow it).
     var preferredScheme: ColorScheme? {
-        switch mode {
+        switch Appearance.forced ?? mode {
         case .claro: .light
         case .escuro: .dark
         case .sistema: nil
@@ -44,9 +51,10 @@ final class Appearance {
     var palette: Palette { isDark ? .escuro : .claro }
 }
 
-/// The brand's color tokens (apps/web/src/brand/tokens.css). The orange (`accent`) is for SHAPES:
-/// the Ciclope, filled buttons, the focus ring. Small orange text uses `accentText`; text on
-/// orange uses `onAccent`, never white. The older names (tinta, fundo...) point to the new ones.
+/// The brand's color tokens (apps/web/src/brand/tokens.css). Red is rare: only the mascot's eye,
+/// the primary button, focus, the active tab mark, one highlighted word and real errors. Amber
+/// is attention, green is success, the rest is graphite. Text on red uses `onRed`, never white.
+/// The older names (tinta, fundo...) point to the new ones.
 struct Palette: Equatable {
     var bg: Color
     var surface: Color
@@ -68,10 +76,27 @@ struct Palette: Equatable {
     var cardInk2: Color
     var isDark: Bool
 
-    var accent: Color { Palette.accentColor }
-    var onAccent: Color { Color(rgb: 0x16161a) }
-    var iris: Color { Color(rgb: 0x1b1e3a) }
-    static let accentColor = Color(rgb: 0xff6a1a)
+    var accent: Color { Palette.red }
+    var onAccent: Color { Palette.onRed }
+    var iris: Color { surface2 }
+    var red: Color { Palette.red }
+    var redText: Color { Color(rgb: 0xff5a4e) }
+    var onRed: Color { Palette.onRed }
+    var amber: Color { Color(rgb: 0xf5b544) }
+    var amberBg: Color { Color(rgb: 0x2a2212) }
+    var green: Color { Color(rgb: 0x4ade80) }
+    var greenDot: Color { Color(rgb: 0x16a34a) }
+    var text2: Color { Color(rgb: 0xc2c3c8) }
+    var bubbleUser: Color { Color(rgb: 0x1f2126) }
+    var bubbleUserBorder: Color { Color(rgb: 0x2c2e34) }
+    static let red = Color(rgb: 0xff3b30)
+    static let onRed = Color(rgb: 0x0b0b0d)
+    static let graphite = Color(rgb: 0x2b2e34)
+    static let graphiteEdge = Color(rgb: 0x454952)
+    static let graphiteLine = Color(rgb: 0x5a5f69)
+    static let socket = Color(rgb: 0x050506)
+    /// Kept for older call sites: the mascot's red.
+    static let accentColor = red
 
     // Older names, kept so the screens keep compiling; new code uses the names above.
     var tinta: Color { text }
@@ -122,14 +147,14 @@ struct Palette: Equatable {
     )
 
     static let escuro = Palette(
-        bg: Color(rgb: 0x0e0f13), surface: Color(rgb: 0x17181d), surface2: Color(rgb: 0x1e2026),
-        border: Color(rgb: 0x2a2c33), borderStrong: Color(rgb: 0x3a3d45),
-        text: Color(rgb: 0xf2f2f3), textMuted: Color(rgb: 0xa1a1aa),
-        accentText: Color(rgb: 0xff8a4c), accentStrong: Color(rgb: 0xff8a4c),
-        blob1: Color(rgb: 0xff8a6b, opacity: 0.18), blob2: Color(rgb: 0xb9a6ff, opacity: 0.20), blob3: Color(rgb: 0xffc9a8, opacity: 0.14),
-        success: Color(rgb: 0x4ade80), danger: Color(rgb: 0xf87171),
+        bg: Color(rgb: 0x09090b), surface: Color(rgb: 0x141518), surface2: Color(rgb: 0x1d1f24),
+        border: Color(rgb: 0x24262b), borderStrong: Color(rgb: 0x34363c),
+        text: Color(rgb: 0xededef), textMuted: Color(rgb: 0x9a9ba2),
+        accentText: Color(rgb: 0xc2c3c8), accentStrong: Color(rgb: 0xff5a4e),
+        blob1: .clear, blob2: .clear, blob3: .clear,
+        success: Color(rgb: 0x4ade80), danger: Color(rgb: 0xff3b30),
         shadow: .clear,
-        cardInk: Color(rgb: 0x1e2026), cardInk2: Color(rgb: 0x2a2c33),
+        cardInk: Color(rgb: 0x141518), cardInk2: Color(rgb: 0x1d1f24),
         isDark: true
     )
 }
@@ -163,19 +188,25 @@ extension Color {
     }
 }
 
-/// The brand's three faces: Bricolage Grotesque (heavy) for titles, the greeting and the name;
-/// Inter Tight for text; JetBrains Mono only for small metadata (times, "conferido hoje"). The
-/// files ship with the app; without them, SF in the same weights. Every size follows Dynamic Type.
+/// The brand's three faces: Space Grotesk (600/700) for titles, the greeting and the name; Inter
+/// Tight for text; JetBrains Mono only for small metadata ("conferido hoje, 09:00"). The files ship
+/// with the app; without them, SF in the same weights. Every size follows Dynamic Type.
 enum Typo {
-    static let displayFace = "BricolageGrotesque-96ptExtraBold"
+    static let displayFace = "SpaceGrotesk-Light"
 
-    /// `italic` is kept for older call sites and ignored: the highlighted word is colored
-    /// (`accentStrong`), not slanted.
-    static func display(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle, italic: Bool = false, weight: Font.Weight = .heavy) -> Font {
-        if UIFont(name: displayFace, size: size) != nil {
-            return .custom(displayFace, size: size, relativeTo: style).weight(weight)
+    /// `italic` is kept for older call sites and ignored: the highlighted word is colored, not
+    /// slanted. Space Grotesk is a variable font: the weight is set on its axis.
+    static func display(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle, italic: Bool = false, weight: Font.Weight = .bold) -> Font {
+        let scaled = UIFontMetrics(forTextStyle: style.uiStyle).scaledValue(for: size)
+        if let base = UIFont(name: displayFace, size: scaled) {
+            let wght: CGFloat = weight == .semibold ? 600 : 700
+            let axis = 0x7767_6874 // 'wght'
+            let descriptor = base.fontDescriptor.addingAttributes([
+                UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): [axis: wght],
+            ])
+            return Font(UIFont(descriptor: descriptor, size: scaled))
         }
-        return .system(style, design: .default).weight(weight)
+        return .system(size: scaled, weight: weight)
     }
 
     static func text(_ style: Font.TextStyle = .body, weight: Font.Weight = .regular) -> Font {

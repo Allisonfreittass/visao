@@ -6,7 +6,7 @@ import { AccountPanel } from "./AccountPanel";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
-import { loadThemePreference, saveThemePreference, type ThemePreference } from "../brand/theme";
+import { FORCED_THEME, loadThemePreference, saveThemePreference, type ThemePreference } from "../brand/theme";
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "light", label: "Claro" },
@@ -108,10 +108,11 @@ export function SettingsView(props: SettingsViewProps) {
   return (
     <section className="page" aria-labelledby="settings-title">
       <header className="page-head">
-        <span className="rotulo">Ajustes</span>
-        <h1 id="settings-title">Do seu <em>jeito.</em></h1>
+        <h1 id="settings-title">Ajustes</h1>
+        <p className="lede">Voz, avisos, permissões e conta.</p>
       </header>
       <div className="page-body settings">
+        {!FORCED_THEME && (
         <section className="settings-group" aria-labelledby="g-aparencia">
           <h2 id="g-aparencia" className="rotulo">Aparência</h2>
           <div className="setting">
@@ -134,6 +135,7 @@ export function SettingsView(props: SettingsViewProps) {
             </div>
           </div>
         </section>
+        )}
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>
           <Setting

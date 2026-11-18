@@ -11,7 +11,8 @@
 .intro-critter .critter { display: block; }
 .intro-confetti { position: absolute; left: 50%; top: 50%; border-radius: 50%; opacity: 0; z-index: 1; will-change: transform; }
 .intro-confetti:nth-child(3n) { border-radius: 3px; }
-.intro-word { font: 800 56px/1 var(--font-display); letter-spacing: var(--tracking-display); color: var(--text); white-space: nowrap; opacity: 0; }
-.intro-word b { color: var(--accent); font-weight: 800; }
+.intro-word { font: 700 56px/1 var(--font-display); letter-spacing: var(--tracking-display); color: var(--text); white-space: nowrap; opacity: 0; }
+.intro-word b { color: var(--text-muted); font-weight: 700; }
+.intro-word b:last-child { color: var(--red); }
 @media (max-width: 560px) { .intro-word { font-size: 40px; } }
 @media (prefers-reduced-motion: reduce) { .intro { display: none; } }

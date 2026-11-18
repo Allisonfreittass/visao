@@ -857,7 +857,7 @@ export function App() {
 
   return (
     <div className={`app${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
-      <AmbientBackground />
+      <AmbientBackground state={ciclope} />
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {ready && !firstRun && (
         <MobileBar
