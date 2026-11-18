@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 
-import { Orb } from "../orb/Orb";
+import { Ciclope } from "../ciclope/Ciclope";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end (the CSS timeline in styles.css adds up to this). */
@@ -83,7 +83,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
           ))}
           <span className="intro-ring" />
           <div className="intro-core">
-            <Orb state="IDLE" size={132} />
+            <Ciclope state="idle" size={132} decorative />
           </div>
         </div>
         <div className="intro-words">

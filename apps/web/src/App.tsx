@@ -41,8 +41,8 @@ import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { dayLabel } from "./labels";
-import { Orb, STATE_LABELS } from "./orb/Orb";
-import type { OrbState } from "./orb/orbModel";
+import { Ciclope } from "./ciclope/Ciclope";
+import { type AssistantState, type CiclopeState, CICLOPE_LABELS, ciclopeState } from "./ciclope/state";
 import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
@@ -67,7 +67,7 @@ const PUSH_SYNC_MS = 60 * 60 * 1000;
 const INITIATIVE_POLL_MS = 15_000;
 const PROGRESS_POLL_MS = 900;
 const ARTIFACT_POLL_MS = 3000;
-const DEMO_STATES: OrbState[] = ["IDLE", "LISTENING", "THINKING", "SPEAKING", "INTERRUPTED", "DISCONNECTED"];
+const DEMO_STATES: CiclopeState[] = ["idle", "listening", "thinking", "speaking", "working", "error", "offline", "interrupted"];
 
 function useHealth(api: Api): boolean {
   const [online, setOnline] = useState(true);
@@ -147,8 +147,8 @@ export function App() {
   const sky = true;
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
   const [latency, setLatency] = useState<TurnLatency | null>(null);
-  const [demoState, setDemoState] = useState<OrbState>("IDLE");
-  const demoLevel = useDemoLevel(demo && (demoState === "LISTENING" || demoState === "SPEAKING"));
+  const [demoState, setDemoState] = useState<CiclopeState>("idle");
+  const demoLevel = useDemoLevel(demo && (demoState === "listening" || demoState === "speaking"));
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
   // What the turn in flight is doing now, shown in place of "Pensando".
@@ -772,8 +772,8 @@ export function App() {
     showView("conversation");
   }
 
-  const orbState: OrbState = demo
-    ? demoState
+  const orbState: AssistantState = demo
+    ? "IDLE"
     : !online
       ? "DISCONNECTED"
       : sending || voice.transcribing
@@ -785,6 +785,10 @@ export function App() {
             : voice.inCall
               ? "LISTENING"
               : "IDLE";
+  // What the Ciclope shows: the state above, plus a task running on the Mac or an error on screen.
+  const ciclope: CiclopeState = demo
+    ? demoState
+    : ciclopeState({ state: orbState, macWorking: pending.tasks.some((t) => t.status === "running"), error: error !== null });
   const agentName = status?.identity?.chosen_name ?? null;
   const callHint = voice.listenerKind
     ? null
@@ -794,6 +798,7 @@ export function App() {
 
   const call: CallControls = {
     state: orbState,
+    ciclope,
     level: voice.level,
     levelActive: voice.speaking || voice.inCall,
     canCall: voice.listenerKind !== null && online,
@@ -1070,10 +1075,10 @@ export function App() {
             <div className="entrance">
               <div className="presence">
                 <div className="orb-wrap">
-                  <Orb state={orbState} size={240} level={demoLevel} getLevel={voice.speaking || voice.inCall ? voice.level : undefined} />
+                  <Ciclope state={ciclope} size={160} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" decorative />
                 </div>
                 <div className="presence-copy">
-                  <p className="rotulo state-label">{STATE_LABELS[orbState]}</p>
+                  <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>
                   {!demo && (
                     <p className="lede entrance-words">
                       Eu nasci sem nome e venho <em>decidindo quem sou.</em> <span>Entre para conversar.</span>
@@ -1086,7 +1091,7 @@ export function App() {
               <div className="demo">
                 {DEMO_STATES.map((s) => (
                   <button key={s} type="button" className="rs-botao rs-botao--compacto" aria-pressed={s === demoState} onClick={() => setDemoState(s)}>
-                    {STATE_LABELS[s]}
+                    {CICLOPE_LABELS[s]}
                   </button>
                 ))}
               </div>

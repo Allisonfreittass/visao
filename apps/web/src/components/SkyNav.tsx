@@ -1,5 +1,4 @@
-import type { OrbState } from "../orb/orbModel";
-import { STATE_LABELS } from "../orb/Orb";
+import { type AssistantState, STATE_LABELS } from "../ciclope/state";
 import { Icon } from "./Icon";
 import type { WorkspaceView } from "./Rail";
 
@@ -56,7 +55,7 @@ export function SkyNav({ wide, view, pendingCount, agentName, menuOpen, onMenu, 
 }
 
 /** The round button left of the message box: a voice wave, and a tap calls it. */
-export function SkyOrbButton({ state, canCall, hint, onCall }: { state: OrbState; canCall: boolean; hint: string | null; onCall: () => void }) {
+export function SkyOrbButton({ state, canCall, hint, onCall }: { state: AssistantState; canCall: boolean; hint: string | null; onCall: () => void }) {
   return (
     <button
       type="button"

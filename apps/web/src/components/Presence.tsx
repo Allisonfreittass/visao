@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { type Api, utcDate } from "../api";
 import type { Pending } from "../hooks/usePending";
 import { dayLabel } from "../labels";
-import { Orb, STATE_LABELS } from "../orb/Orb";
-import type { OrbState } from "../orb/orbModel";
+import { Ciclope } from "../ciclope/Ciclope";
+import { type AssistantState, type CiclopeState, CICLOPE_LABELS } from "../ciclope/state";
 import { Icon } from "./Icon";
 
 export interface CallControls {
-  state: OrbState;
+  state: AssistantState;
+  /** What the Ciclope shows (the state above, plus Mac at work and errors). */
+  ciclope: CiclopeState;
   level: () => number;
   levelActive: boolean;
   canCall: boolean;
@@ -24,14 +26,13 @@ export interface CallControls {
 export function Presence({ call, size = 72, compact }: { call: CallControls; size?: number; compact?: boolean }) {
   return (
     <div className={`presence ${compact ? "presence--compacta" : ""}`}>
-      {/* The orb's particles are drawn for a big canvas; small, it reads as a blob. */}
       {!compact && (
         <div className="orb-wrap" style={{ width: size, height: size }}>
-          <Orb state={call.state} size={size} getLevel={call.levelActive ? call.level : undefined} />
+          <Ciclope state={call.ciclope} size={size} level={call.levelActive ? call.level : undefined} lookAt="pointer" decorative />
         </div>
       )}
       <div className="presence-copy">
-        <p className="rotulo state-label">{STATE_LABELS[call.state]}</p>
+        <p className="rotulo state-label">{CICLOPE_LABELS[call.ciclope]}</p>
         <div className="call-start">
           <button type="button" className="rs-botao rs-botao--principal call-button" onClick={call.onCall} disabled={!call.canCall}>
             <Icon name="phone" size={16} /> Ligar

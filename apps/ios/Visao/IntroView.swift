@@ -104,7 +104,7 @@ struct IntroView: View {
 
     private func orb(t: Double) -> some View {
         let p = Self.ease(t, from: 1.05, to: 1.75, curve: .out)
-        return Orb(size: Self.orbSize, control: false)
+        return CiclopeView(state: .idle, size: Self.orbSize, animated: false)
             .scaleEffect(0.6 + 0.4 * p)
             .opacity(p)
     }
