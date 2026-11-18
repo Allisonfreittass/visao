@@ -1,18 +1,21 @@
-/* A abertura (components/Intro.tsx): ~2,6 s, uma vez por dia e após o login, pulada por clique
-   ou tecla, desligada com movimento reduzido. Só transform e opacity animam (Web Animations). */
-.intro { position: fixed; inset: 0; z-index: calc(var(--layer-overlay) + 20); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: #0E0F13; }
-.intro-light { position: absolute; inset: 0; background: var(--bg); opacity: 0; }
+/* A abertura (components/Intro.tsx): sequência de boot de ~2,4 s, uma vez por dia e após o
+   login, pulada por clique ou tecla, desligada com movimento reduzido. Só transform e opacity. */
+.intro { position: fixed; inset: 0; z-index: calc(var(--layer-overlay) + 20); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: #09090B; }
+.intro-grid { position: absolute; inset: 0; background-image: radial-gradient(rgb(255 255 255 / .045) 1px, transparent 1px); background-size: 24px 24px; }
+.intro-glow { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgb(255 59 48 / .16), transparent 42%); opacity: 0; }
 .intro-stage { position: relative; display: grid; place-items: center; }
 .intro-lockup { display: flex; align-items: center; gap: 20px; will-change: transform; }
 .intro-hero { position: relative; display: grid; place-items: center; width: 112px; height: 112px; will-change: transform; }
 .intro-hero > .ciclope { position: relative; z-index: 2; }
+/* The LED in the mascot's corner (83,17 of its -8…108 box), blinking before it wakes. */
+.intro-led { position: absolute; z-index: 3; left: calc(112px * 91 / 116 - 3px); top: calc(112px * 25 / 116 - 3px); width: 6px; height: 6px; border-radius: 50%; background: #FF3B30; box-shadow: 0 0 6px #FF3B30; opacity: 0; }
 .intro-ring { position: absolute; left: 50%; top: 50%; margin: -84px 0 0 -84px; opacity: 0; overflow: visible; z-index: 1; }
-.intro-critter { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; opacity: 0; z-index: 3; will-change: transform; }
-.intro-critter .critter { display: block; }
-.intro-confetti { position: absolute; left: 50%; top: 50%; border-radius: 50%; opacity: 0; z-index: 1; will-change: transform; }
-.intro-confetti:nth-child(3n) { border-radius: 3px; }
-.intro-word { font: 700 56px/1 var(--font-display); letter-spacing: var(--tracking-display); color: var(--text); white-space: nowrap; opacity: 0; }
+.intro-sensor { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; opacity: 0; z-index: 3; will-change: transform; }
+.intro-sensor .critter { display: block; }
+.intro-sensor-on { position: absolute; inset: 0; opacity: 0; }
+.intro-word { font: 700 44px/1 var(--font-display); letter-spacing: .04em; color: var(--text); white-space: nowrap; }
+.intro-word > span { opacity: 0; }
 .intro-word b { color: var(--text-muted); font-weight: 700; }
-.intro-word b:last-child { color: var(--red); }
-@media (max-width: 560px) { .intro-word { font-size: 40px; } }
+.intro-word > span:last-child b { color: var(--red); }
+@media (max-width: 560px) { .intro-word { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { .intro { display: none; } }

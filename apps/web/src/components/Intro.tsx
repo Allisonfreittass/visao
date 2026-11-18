@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Ciclope } from "../ciclope/Ciclope";
-import { Critter, type CritterKind, FAMILY_COLORS } from "../ciclope/Family";
+import { Critter, type CritterKind } from "../ciclope/Family";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end. */
-export const INTRO_MS = 2600;
+export const INTRO_MS = 2400;
 const DAY_KEY = "intro-day";
 const SESSION_KEY = "visao.intro-ran";
 const EASE = "cubic-bezier(.2, .8, .2, 1)";
-const SPRING = "cubic-bezier(.3, 1.45, .5, 1)";
 
 /** "Bom dia" / "Boa tarde" / "Boa noite", by the hour on this device. */
 export function greeting(hour: number): string {
@@ -50,31 +49,18 @@ export function introAfterLogin(): boolean {
   return !reducedMotion() && !ranThisSession();
 }
 
-const FAMILY: CritterKind[] = ["mac", "whatsapp", "email", "caderno"];
-// Where each one comes from (vw/vh from the center) and where it lands around the Ciclope (px).
-const ENTRIES = [
-  { from: [-60, -40], land: [-92, -58] },
-  { from: [62, -36], land: [92, -58] },
-  { from: [-58, 44], land: [-92, 58] },
-  { from: [60, 42], land: [92, 58] },
-];
-const CONFETTI = [...Object.values(FAMILY_COLORS), "#FF6A1A"];
+const SENSORS: CritterKind[] = ["mac", "email", "caderno", "whatsapp"];
+const ORBIT = 96; // px from the mascot's center
+const WORD = "V.I.S.A.O.";
 
-/** The opening (≈2.6 s): the Ciclope wakes up on a dark floor that turns light, its family
- * bounces in from the edges and joins it, a ring draws around it and pops confetti, the name
- * slides in beside it, and the lockup flies to its place on the side bar as Início fades in.
- * A click or a key skips it. */
+/** The opening, a boot sequence (≈2.4 s): the dark grid with the mascot off and shut; its LED
+ * blinks twice; the lid opens mechanically and the eye lights up with the room's red glow; the
+ * sensors come online in orbit, one by one, as a thin red ring sweeps once; they fold into the
+ * mascot, it slides left and the name is typed beside it, the last dot lit red; then the lockup
+ * flies to the side bar's logo as Início fades in. A click or a key skips it. */
 export function Intro({ onDone }: { onDone: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [awake, setAwake] = useState(false);
-  const confetti = useMemo(
-    () => Array.from({ length: 16 }, (_, i) => {
-      const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
-      const reach = 110 + Math.random() * 70;
-      return { x: Math.cos(angle) * reach, y: Math.sin(angle) * reach, color: CONFETTI[i % CONFETTI.length], size: 6 + Math.random() * 5 };
-    }),
-    [],
-  );
 
   useEffect(() => {
     savePreference(DAY_KEY, localDay(new Date()));
@@ -93,65 +79,58 @@ export function Intro({ onDone }: { onDone: () => void }) {
       anims.push(node.animate(frames, { fill: "both", ...options }));
     };
 
-    // 1–2. Dark floor, the light one fades in; the Ciclope grows a little and opens its eye.
-    run(q(".intro-light"), [{ opacity: 0 }, { opacity: 1 }], { delay: 300, duration: 400, easing: "ease-in-out" });
-    run(q(".intro-hero"), [{ transform: "scale(.55)" }, { transform: "scale(1)" }], { delay: 300, duration: 450, easing: SPRING });
-    const wake = window.setTimeout(() => setAwake(true), 320);
+    // 2. The LED blinks twice.
+    run(q(".intro-led"), [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0, offset: 0.45 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { delay: 250, duration: 300, easing: "steps(1, end)" });
+    // 3. The lid opens (the mascot leaves "offline") and the eye lights up with the glow.
+    const wake = window.setTimeout(() => setAwake(true), 550);
+    run(q(".intro-glow"), [{ opacity: 0 }, { opacity: 1.0, offset: 0.7 }, { opacity: 0.8 }], { delay: 550, duration: 350, easing: EASE });
+    run(q(".intro-hero"), [{ transform: "scale(1)" }, { transform: "scale(1.04)", offset: 0.6 }, { transform: "scale(1)" }], { delay: 600, duration: 300, easing: EASE });
 
-    // 3. The family comes in from the edges in arcs and bounces into place.
-    all<HTMLElement>(".intro-critter").forEach((node, i) => {
-      const { from, land } = ENTRIES[i];
-      const fx = `${from[0]}vw`, fy = `${from[1]}vh`;
+    // 4. The sensors come online in orbit, one every 120 ms; a red ring sweeps once.
+    all<HTMLElement>(".intro-sensor").forEach((node, i) => {
+      const angle = -Math.PI / 2 + (i / SENSORS.length) * Math.PI * 2;
+      const x = Math.cos(angle) * ORBIT;
+      const y = Math.sin(angle) * ORBIT;
       run(node, [
-        { transform: `translate(${fx}, ${fy}) scale(.6) rotate(${from[0] > 0 ? 40 : -40}deg)`, opacity: 0 },
-        { transform: `translate(calc(${fx} * .45), calc(${fy} * .9)) scale(.9) rotate(0deg)`, opacity: 1, offset: 0.45 },
-        { transform: `translate(${land[0]}px, ${land[1]}px) scale(1)`, opacity: 1 },
-      ], { delay: 700 + i * 50, duration: 600 - i * 50, easing: SPRING });
-      // 4. …and join the Ciclope.
+        { transform: `translate(${x}px, ${y}px) scale(.3)`, opacity: 0 },
+        { transform: `translate(${x}px, ${y}px) scale(1.08)`, opacity: 1, offset: 0.7 },
+        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
+      ], { delay: 900 + i * 120, duration: 240, easing: EASE });
+      run(node.querySelector(".intro-sensor-on"), [{ opacity: 0 }, { opacity: 1 }], { delay: 1000 + i * 120, duration: 120, easing: "linear" });
+      // 5. …and fold into the mascot.
       run(node, [
-        { transform: `translate(${land[0]}px, ${land[1]}px) scale(1)`, opacity: 1 },
+        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
         { transform: "translate(0, 0) scale(.2)", opacity: 0 },
-      ], { delay: 1300, duration: 260, easing: "cubic-bezier(.5, 0, .9, .4)", fill: "forwards" });
+      ], { delay: 1500, duration: 220, easing: "cubic-bezier(.6, 0, .2, 1)", fill: "forwards" });
     });
-    // 4. A thin orange ring draws itself around it, then confetti.
     const ring = q<SVGCircleElement>(".intro-ring circle");
     if (ring) {
       const length = 2 * Math.PI * 76;
-      ring.style.strokeDasharray = `${length}`;
-      run(ring, [{ strokeDashoffset: length }, { strokeDashoffset: 0 }], { delay: 1400, duration: 300, easing: EASE });
-      run(q(".intro-ring"), [{ opacity: 1 }, { opacity: 1, offset: 0.6 }, { opacity: 0, transform: "scale(1.15)" }], { delay: 1400, duration: 600, easing: "ease-out" });
+      ring.style.strokeDasharray = `${length * 0.18} ${length}`;
+      run(q(".intro-ring"), [{ transform: "rotate(0deg)", opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 }, { transform: "rotate(360deg)", opacity: 0 }], { delay: 950, duration: 550, easing: "cubic-bezier(.4, 0, .2, 1)" });
     }
-    run(q(".intro-hero"), [{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }], { delay: 1560, duration: 260, easing: EASE, fill: "forwards" });
-    all<HTMLElement>(".intro-confetti").forEach((node, i) => {
-      const c = confetti[i];
-      run(node, [
-        { transform: "translate(0, 0) scale(.4)", opacity: 0 },
-        { transform: `translate(${c.x * 0.7}px, ${c.y * 0.7}px) scale(1)`, opacity: 1, offset: 0.35 },
-        { transform: `translate(${c.x}px, ${c.y + 30}px) scale(.8)`, opacity: 0 },
-      ], { delay: 1560 + (i % 4) * 20, duration: 640, easing: "cubic-bezier(.1, .7, .3, 1)" });
-    });
 
-    // 5. The Ciclope slides left and the name comes in beside it.
+    // 5. The mascot slides left and the name is typed, 40 ms a letter; the last dot lights red.
     const lockup = q<HTMLElement>(".intro-lockup");
     const word = q<HTMLElement>(".intro-word");
     const shift = word ? (word.offsetWidth + 20) / 2 : 0;
     if (lockup) lockup.style.transform = `translateX(${shift}px)`;
-    run(lockup, [{ transform: `translateX(${shift}px)` }, { transform: "translateX(0)" }], { delay: 1700, duration: 500, easing: EASE });
-    run(word, [{ opacity: 0, transform: "translateX(-16px)" }, { opacity: 1, transform: "translateX(0)" }], { delay: 1780, duration: 420, easing: EASE });
+    run(lockup, [{ transform: `translateX(${shift}px)` }, { transform: "translateX(0)" }], { delay: 1500, duration: 400, easing: EASE });
+    all<HTMLElement>(".intro-word > span").forEach((letter, i) => {
+      run(letter, [{ opacity: 0 }, { opacity: 1 }], { delay: 1520 + i * 40, duration: 1, easing: "linear" });
+    });
 
-    // 6. The lockup shrinks and flies to the side bar's logo; the app shows through.
+    // 6. The lockup flies to the side bar's logo; the app shows through.
     const fly = window.setTimeout(() => {
       if (!lockup) return;
       const from = lockup.getBoundingClientRect();
       const target = Array.from(document.querySelectorAll<HTMLElement>("[data-lockup]")).find((n) => n.offsetParent !== null);
       const to = target?.getBoundingClientRect() ?? new DOMRect(24, 20, 140, 28);
       const scale = to.height / from.height;
-      const dx = to.left - from.left;
-      const dy = to.top - from.top;
       lockup.style.transformOrigin = "0 0";
-      run(lockup, [{ transform: "translate(0, 0) scale(1)" }, { transform: `translate(${dx}px, ${dy}px) scale(${scale})` }], { duration: 400, easing: EASE, fill: "forwards" });
-    }, 2200);
-    run(el, [{ opacity: 1 }, { opacity: 0 }], { delay: 2280, duration: 320, easing: "ease-in", fill: "forwards" });
+      run(lockup, [{ transform: "translate(0, 0) scale(1)" }, { transform: `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${scale})` }], { duration: 420, easing: EASE, fill: "forwards" });
+    }, 1920);
+    run(el, [{ opacity: 1 }, { opacity: 0 }], { delay: 2020, duration: 380, easing: "ease-in", fill: "forwards" });
     const done = window.setTimeout(onDone, INTRO_MS);
 
     const skip = () => onDone();
@@ -163,31 +142,31 @@ export function Intro({ onDone }: { onDone: () => void }) {
       window.removeEventListener("keydown", skip);
       anims.forEach((a) => a.cancel());
     };
-  }, [onDone, confetti]);
+  }, [onDone]);
 
   // On <body>, so no app layout rule can pull it out of full screen.
   return createPortal(
     <div className="intro" ref={root} onClick={onDone} aria-hidden="true">
-      <div className="intro-light">
-        <span className="ambient-blob ambient-blob--1" />
-        <span className="ambient-blob ambient-blob--2" />
-        <span className="ambient-blob ambient-blob--3" />
-      </div>
+      <span className="intro-grid" />
+      <span className="intro-glow" />
       <div className="intro-stage">
         <div className="intro-lockup">
           <div className="intro-hero">
             <svg className="intro-ring" viewBox="-80 -80 160 160" width="168" height="168">
-              <circle r="76" fill="none" stroke="#FF6A1A" strokeWidth="2.5" strokeLinecap="round" transform="rotate(-90)" />
+              <circle r="76" fill="none" stroke="#FF3B30" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90)" />
             </svg>
-            {FAMILY.map((kind) => (
-              <span className="intro-critter" key={kind}><Critter kind={kind} size={44} /></span>
+            {SENSORS.map((kind) => (
+              <span className="intro-sensor" key={kind}>
+                <Critter kind={kind} size={36} asleep />
+                <span className="intro-sensor-on"><Critter kind={kind} size={36} /></span>
+              </span>
             ))}
-            {confetti.map((c, i) => (
-              <span className="intro-confetti" key={i} style={{ background: c.color, width: c.size, height: c.size }} />
-            ))}
-            <Ciclope state="idle" size={112} eyesClosed={!awake} decorative />
+            <Ciclope state={awake ? "idle" : "offline"} size={112} decorative />
+            <span className="intro-led" />
           </div>
-          <span className="intro-word">V<b>.</b>I<b>.</b>S<b>.</b>A<b>.</b>O<b>.</b></span>
+          <span className="intro-word">
+            {WORD.split("").map((c, i) => (c === "." ? <span key={i}><b>.</b></span> : <span key={i}>{c}</span>))}
+          </span>
         </div>
       </div>
     </div>,

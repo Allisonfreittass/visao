@@ -1,10 +1,10 @@
 import Foundation
 
-/// The opening (Intro.tsx on the web, shortened to 1.8 s on the iPhone): once a day on this
+/// The opening (Intro.tsx on the web, a 1.6 s boot sequence on the iPhone): once a day on this
 /// device, never with Reduce Motion, and only when the app is ready to use (not on the login or
 /// the first-run questions).
 public enum Opening {
-    public static let duration: Double = 1.8
+    public static let duration: Double = 1.6
     static let dayKey = "openingDay"
 
     /// "Bom dia" from 5 h to 12 h, "Boa tarde" to 18 h, "Boa noite" the rest.
