@@ -40,17 +40,19 @@ struct SettingsView: View {
                 SystemVoiceRow()
             }
             PageGroup(label: "Aparência") {
-                SettingRow(
-                    title: "Floresta com neblina ao fundo",
-                    description: "Pinheiros com neblina que se mexe, nas cores da hora do dia, com vidro de névoa por cima. Desligado, volta o tema escuro.",
-                    isOn: Binding(get: { appearance.mode == .neblina }, set: { appearance.mode = $0 ? .neblina : .noite })
-                )
-                if appearance.mode == .neblina {
-                    SettingRow(
-                        title: "Neblina em movimento",
-                        description: "Desligado, a floresta fica parada e só acompanha a hora, gastando menos bateria. Para sozinha no Modo de Pouca Energia.",
-                        isOn: $appearance.moving
-                    )
+                PageRow {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Tema").font(Typo.text(.subheadline, weight: .medium))
+                        Text("Claro é o padrão. “Sistema” segue o claro ou escuro do iPhone.")
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.textMuted)
+                        Picker("Tema", selection: $appearance.mode) {
+                            ForEach(Appearance.Mode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
             }
             PageGroup(label: "Voz e avisos") {

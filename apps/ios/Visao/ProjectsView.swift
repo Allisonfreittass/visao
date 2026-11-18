@@ -30,7 +30,6 @@ struct ProjectsView: View {
             (Text("projetos").font(Typo.display(34, relativeTo: .largeTitle, italic: true))
                 + Text(" são o lugar de cada assunto: um chat só dele, com o que eu anotei, os painéis, as páginas e os arquivos em cima. dê um nome, ou me peça na conversa: “cria o projeto…”.")
                 .font(Typo.display(34, relativeTo: .largeTitle)))
-                .shadow(color: palette.usesGlass && palette == .neblinaDia ? .white.opacity(0.45) : .clear, radius: 9)
             createRow
             if let error { errorLine(error) }
             Spacer(minLength: 0)

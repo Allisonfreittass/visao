@@ -46,7 +46,7 @@ import type { OrbState } from "./orb/orbModel";
 import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
-import { Sky } from "./sky/SkyCanvas";
+import { AmbientBackground } from "./brand/AmbientBackground";
 import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, spokenPanelOffer, VOICE_ANSWER_MS } from "./voice/approval";
 import { followTurn } from "./stream";
 import { MAX_FILES } from "./attachments";
@@ -143,15 +143,8 @@ export function App() {
   );
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
-  // "Céu" (a live sky, light glass) unless the owner went back to the night theme.
-  const [sky, setSky] = useState(() => loadPreference("appearance") !== "noite");
-  const [skyNight, setSkyNight] = useState(false);
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = sky ? "ceu" : "noite";
-    if (sky && skyNight) root.dataset.ceu = "noite";
-    else delete root.dataset.ceu;
-  }, [sky, skyNight]);
+  // The layout of the "Céu" look is the only one now (marca Ciclope); the theme lives in brand/theme.ts.
+  const sky = true;
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
   const [latency, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<OrbState>("IDLE");
@@ -740,12 +733,6 @@ export function App() {
     savePreference("device-listening", next ? "1" : "0");
   }
 
-  function toggleSky() {
-    const next = !sky;
-    setSky(next);
-    savePreference("appearance", next ? "ceu" : "noite");
-  }
-
   function logout() {
     voice.endCall();
     voice.stopSpeaking();
@@ -863,7 +850,7 @@ export function App() {
 
   return (
     <div className={`app${sky ? " app--ceu" : ""}${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
-      {sky && <Sky onNight={setSkyNight} />}
+      <AmbientBackground />
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {sky && ready && !firstRun && (
         <SkyNav
@@ -989,8 +976,6 @@ export function App() {
                 }}
                 onLogout={logout}
                 onError={handleError}
-                sky={sky}
-                onToggleSky={toggleSky}
                 voiceApproval={voiceApproval}
                 onToggleVoiceApproval={() => {
                   const next = !voiceApproval;

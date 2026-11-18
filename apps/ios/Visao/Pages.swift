@@ -17,7 +17,7 @@ struct GlassPage<Body: View>: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Rotulo(label)
                     (Text(title).font(Typo.display(40, relativeTo: .largeTitle))
-                        + Text(italic).font(Typo.display(40, relativeTo: .largeTitle, italic: true)).foregroundColor(palette.tintaSuave))
+                        + Text(italic).font(Typo.display(40, relativeTo: .largeTitle)).foregroundColor(palette.accentStrong))
                         .accessibilityAddTraits(.isHeader)
                     if let lede {
                         Text(lede)

@@ -6,6 +6,13 @@ import { AccountPanel } from "./AccountPanel";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
+import { loadThemePreference, saveThemePreference, type ThemePreference } from "../brand/theme";
+
+const THEMES: { value: ThemePreference; label: string }[] = [
+  { value: "light", label: "Claro" },
+  { value: "dark", label: "Escuro" },
+  { value: "system", label: "Sistema" },
+];
 
 interface SettingsViewProps {
   api: Api;
@@ -22,8 +29,6 @@ interface SettingsViewProps {
   onRestartOnboarding: () => void;
   onLogout: () => void;
   onError: (e: unknown) => void;
-  sky: boolean;
-  onToggleSky: () => void;
   voiceApproval: boolean;
   onToggleVoiceApproval: () => void;
 }
@@ -37,6 +42,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [morningNote, setMorningNote] = useState("");
   const [here, setHere] = useState(locationOn());
   const [hereNote, setHereNote] = useState("");
+  const [theme, setTheme] = useState<ThemePreference>(loadThemePreference);
 
   useEffect(() => {
     Promise.all([api.autonomy(), api.permissions()])
@@ -108,12 +114,25 @@ export function SettingsView(props: SettingsViewProps) {
       <div className="page-body settings">
         <section className="settings-group" aria-labelledby="g-aparencia">
           <h2 id="g-aparencia" className="rotulo">Aparência</h2>
-          <Setting
-            title="Floresta com neblina ao fundo"
-            description="Pinheiros com neblina que se mexe, nas cores da hora do dia, com vidro de névoa por cima. Desligado, volta o tema escuro."
-            checked={props.sky}
-            onChange={props.onToggleSky}
-          />
+          <div className="setting">
+            <div className="setting-text">
+              <span id="theme-title" className="setting-title">Tema</span>
+              <p className="note">Claro é o padrão. “Sistema” segue o claro ou escuro do aparelho.</p>
+            </div>
+            <div className="segmented" role="radiogroup" aria-labelledby="theme-title">
+              {THEMES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === t.value}
+                  onClick={() => { setTheme(t.value); saveThemePreference(t.value); }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>

@@ -39,7 +39,7 @@ struct IntroView: View {
         .accessibilityHint("Toque para pular")
     }
 
-    private var night: Bool { appearance.look.isNight }
+    private var night: Bool { appearance.isDark }
     private var tin: Color { night ? Color(rgb: 0xa9bcbd) : Color(rgb: 0x4f6366) }
     private var ink: Color { night ? Color(rgb: 0xf5f5f7) : Color(rgb: 0x17222a) }
     private var soft: Color { night ? Color(rgb: 0xc7cbd8) : Color(rgb: 0x36454e) }

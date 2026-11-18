@@ -1,0 +1,12 @@
+/* <AmbientBackground>: fixo atrás de tudo. Só transform anima (deriva de ±3% em 20–30 s). */
+.ambient { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg); }
+.ambient-blob { position: absolute; width: 45vmax; height: 45vmax; border-radius: 50%; filter: blur(80px); will-change: transform;
+  animation: ambient-drift 24s var(--ease) infinite alternate; }
+.ambient-blob--1 { top: -14vmax; left: -12vmax; background: var(--blob-1); }
+.ambient-blob--2 { top: 18vh; right: -18vmax; background: var(--blob-2); animation-duration: 30s; animation-delay: -8s; }
+.ambient-blob--3 { bottom: -22vmax; left: 22vw; background: var(--blob-3); animation-duration: 20s; animation-delay: -4s; }
+@keyframes ambient-drift {
+  from { transform: translate3d(-3%, -2%, 0); }
+  to { transform: translate3d(3%, 3%, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .ambient-blob { animation: none; } }

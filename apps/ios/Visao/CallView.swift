@@ -441,10 +441,7 @@ struct CallView: View {
         .padding(.vertical, 16)
         .foregroundStyle(palette.tinta)
         .background {
-            ZStack {
-                SkyBackground()
-                Rectangle().fill(.ultraThinMaterial).opacity(0.55).ignoresSafeArea()
-            }
+            AmbientBackground()
         }
         .overlay(alignment: .topTrailing) {
             if let camera = controller.camera {

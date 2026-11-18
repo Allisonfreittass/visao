@@ -1,0 +1,154 @@
+/* V.I.S.A.O.: tokens da marca (Ciclope). Fonte única de cor, tipo, forma e movimento.
+   Claro é o padrão; o escuro vem de Ajustes ou do sistema (src/brand/theme.ts põe data-theme no
+   <html>). O laranja (--accent) é para FORMAS: o Ciclope, botões preenchidos e o anel de foco.
+   Texto pequeno em laranja usa --accent-text; texto sobre laranja usa --on-accent, nunca branco.
+   Espelhado em apps/ios/Visao/Theme.swift. */
+:root {
+  /* Tipografia */
+  --font-display: "Bricolage Grotesque", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tracking-display: -0.02em;
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-28: 28px;
+  --text-40: 40px;
+  --text-56: 56px;
+
+  /* Espaço (base 4) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Forma */
+  --radius-chip: 10px;
+  --radius-card: 16px;
+  --radius-panel: 24px;
+  --radius-pill: 999px;
+
+  /* Movimento */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.2, 1.3, .4, 1);
+  --duration-state: 240ms;
+
+  /* Camadas */
+  --layer-content: 1;
+  --layer-overlay: 60;
+
+  /* Cores fixas nos dois temas */
+  --accent: #FF6A1A;
+  --on-accent: #16161A;
+  --iris: #1B1E3A;
+  --family-mac: #3B6BFF;
+  --family-whatsapp: #18C27A;
+  --family-email: #FFC83D;
+  --family-caderno: #9B87FF;
+}
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --bg: #F6F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #EFECE7;
+  --border: #E6E1DA;
+  --border-strong: #D3CCC2;
+  --text: #16161A;
+  --text-muted: #6B6A70;
+  --accent-text: #C2410C;
+  --accent-strong: #D9480F;
+  --accent-soft: rgb(255 106 26 / .12);
+  --blob-1: rgb(255 138 107 / .35);
+  --blob-2: rgb(185 166 255 / .40);
+  --blob-3: rgb(255 201 168 / .30);
+  --success: #15803D;
+  --danger: #B91C1C;
+  --warning: #92400E;
+  --shadow-card: 0 1px 2px rgb(22 22 26 / .04), 0 8px 24px rgb(22 22 26 / .06);
+  --shadow-float: 0 2px 6px rgb(22 22 26 / .06), 0 16px 40px rgb(22 22 26 / .10);
+  --scrim: rgb(22 22 26 / .32);
+  /* O cartão escuro (páginas, pedidos de sim/não) fica escuro nos dois temas, como uma tela. */
+  --card-ink: #17181D;
+  --card-ink-2: #23252C;
+  --card-ink-text: #F2F2F3;
+  --card-ink-muted: #A1A1AA;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E0F13;
+  --surface: #17181D;
+  --surface-2: #1E2026;
+  --border: #2A2C33;
+  --border-strong: #3A3D45;
+  --text: #F2F2F3;
+  --text-muted: #A1A1AA;
+  --accent-text: #FF8A4C;
+  --accent-strong: #FF8A4C;
+  --accent-soft: rgb(255 106 26 / .16);
+  --blob-1: rgb(255 138 107 / .18);
+  --blob-2: rgb(185 166 255 / .20);
+  --blob-3: rgb(255 201 168 / .14);
+  --success: #4ADE80;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  /* No escuro, só a borda: sem sombra. */
+  --shadow-card: none;
+  --shadow-float: 0 0 0 1px var(--border);
+  --scrim: rgb(0 0 0 / .5);
+  --card-ink: #1E2026;
+  --card-ink-2: #2A2C33;
+  --card-ink-text: #F2F2F3;
+  --card-ink-muted: #A1A1AA;
+}
+
+/* Foco: anel laranja de 2px, com uma folga da cor da superfície. */
+:root {
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Nomes antigos (marca Rastros), apontando para os novos. Os estilos das telas ainda usam estes
+   nomes; não crie regras novas com eles.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --espaco-1: var(--space-1);
+  --espaco-2: var(--space-2);
+  --espaco-3: var(--space-3);
+  --espaco-4: var(--space-4);
+  --espaco-5: var(--space-5);
+  --espaco-6: var(--space-6);
+  --espaco-7: var(--space-7);
+  --espaco-8: 64px;
+  --raio-1: var(--radius-chip);
+  --raio-2: var(--radius-card);
+  --raio-3: var(--radius-panel);
+  --raio-pilula: var(--radius-pill);
+  --camada-conteudo: var(--layer-content);
+  --camada-sobreposicao: var(--layer-overlay);
+  --fundo: var(--bg);
+  --fundo-elevado: var(--surface);
+  --fundo-hover: var(--surface-2);
+  --tinta: var(--text);
+  --tinta-suave: var(--text-muted);
+  --tinta-fraca: var(--text-muted);
+  --linha: var(--border);
+  --linha-forte: var(--border-strong);
+  --borda: var(--border-strong);
+  --estanho: var(--accent-text);
+  --estanho-linha: color-mix(in srgb, var(--accent) 40%, transparent);
+  --lanterna: var(--accent);
+  --lanterna-luz: var(--accent-soft);
+  --sobre-lanterna: var(--on-accent);
+  --sobre-tinta: var(--bg);
+  --sucesso: var(--success);
+  --aviso: var(--warning);
+  --erro: var(--danger);
+  --anel-foco: var(--focus-ring);
+  --elevacao: var(--shadow-float);
+}
