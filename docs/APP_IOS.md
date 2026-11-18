@@ -6,8 +6,9 @@ do Caddy, em `/api`); nada no servidor muda por causa dele.
 | Pasta | O que tem |
 |---|---|
 | `apps/ios/VisaoKit/` | Pacote Swift com o que dá para testar sem tela: cliente da API, tipos, Keychain, a fila de envio do chat e o Markdown. Testes em XCTest. |
-| `apps/ios/Visao/` | As telas em SwiftUI (login, conversas, chat). A pasta é sincronizada com o projeto: arquivo novo aqui entra no app sozinho. |
-| `apps/ios/Config/` | `Visao.xcconfig` (no git), `Local.xcconfig` (seu, fora do git) e o `Info.plist`. |
+| `apps/ios/Visao/` | As telas em SwiftUI (login, chat, projetos, ajustes). A pasta é sincronizada com o projeto: arquivo novo aqui entra no app sozinho. |
+| `apps/ios/VisaoShare/` | A extensão de compartilhar "Visão" (desde 17/11/2026), também sincronizada. |
+| `apps/ios/Config/` | `Visao.xcconfig` (no git), `Local.xcconfig` (seu, fora do git), os `Info.plist` do app e da extensão e os dois `.entitlements` (App Group e grupo do Keychain). |
 | `apps/ios/Visao.xcodeproj` | O projeto do Xcode. |
 
 O app se chama **V.I.S.A.O.** na tela inicial, com o bundle id `io.github.allisonfreittass.visao`
@@ -68,9 +69,32 @@ iOS 18 ou mais novo, Swift 6, Observation, async/await e URLSession. Uma depend�
 4. Na primeira instalação o iOS bloqueia o app de um desenvolvedor desconhecido: Ajustes → Geral →
    VPN e Gerenciamento de Dispositivo → seu Apple ID → Confiar.
 
-**A cada 7 dias o app para de abrir**: o perfil do Apple ID grátis vence. Ligue o cabo e rode de
-novo pelo Xcode (⌘R); os dados e o login continuam. Outros limites do Apple ID grátis: até 3 apps
-seus instalados por vez e 10 ids de app novos por semana.
+**A cada 7 dias o app para de abrir**: o perfil do Apple ID grátis vence. Rode de novo pelo Xcode
+(⌘R), pelo cabo ou pelo Wi-Fi (abaixo); os dados e o login continuam. Outros limites do Apple ID
+grátis: até 3 apps seus instalados por vez e 10 ids de app novos por semana. O app e a extensão de
+compartilhar contam como um app só.
+
+### Sem cabo, pelo Wi-Fi
+
+O cabo só é obrigatório na **primeira vez** (para o iPhone confiar no Mac e ligar o Modo de
+Desenvolvedor). Depois:
+
+1. Com o cabo ligado, no Xcode: **Window → Devices and Simulators**, escolha o iPhone e marque
+   **Connect via network** (no Xcode novo, o iPhone já pareado aparece sozinho pela rede).
+2. Tire o cabo. Com o iPhone e o Mac **no mesmo Wi-Fi** e o iPhone desbloqueado, ele continua na
+   lista de destinos do Xcode com um ícone de rede. ⌘R instala por ali.
+
+É mais lento que o cabo na primeira instalação de cada build (o app tem uns 30 MB). Se o iPhone
+sumir da lista, desbloqueie, confira o Wi-Fi ou ligue o cabo uma vez.
+
+### App Group no Apple ID grátis
+
+O app e a extensão dividem o token (grupo do Keychain) e o endereço do servidor (App Group). Não
+ficou confirmado se o perfil grátis aceita App Group no iPhone. Se o Xcode recusar a assinatura por
+causa dele, tire a chave `com.apple.security.application-groups` dos dois arquivos em
+`Config/*.entitlements`: o código continua funcionando, e a extensão passa a usar o endereço do
+`Local.xcconfig` em vez de um digitado no login. O grupo do Keychain fica, e o Apple ID grátis
+aceita.
 
 ### Testes
 
@@ -93,6 +117,13 @@ só trabalho proposto do Mac vira cartão, o corpo do email aparece, `via=toque`
 decisão recusada pelo servidor não some nem é dada como feita. Da etapa 5: os vereditos de voz
 com os mesmos casos do `approval.test.ts`, o texto falado do `speakable.test.ts`, cada pedido lido
 uma vez, resposta só dentro de 3 minutos e só para o pedido ainda esperando, e `modality=voice`.
+Da Fase 4: a conversa contínua (rota, páginas de 100 e "anteriores" com `before`), "perto da meta"
+no painel, o Resumo da manhã (o PUT só com o campo dele), a etiqueta "compartilhado do iPhone", o
+`/share` (só os campos presentes, arquivos antes, 202, 401 e 422, sem subir de novo ao tentar de
+novo), o token lido pelo grupo e a migração do item antigo, a regra de "perto de mim" com os casos
+do `location.test.ts` (a posição nunca é pedida com a chave desligada e vai só com aquela
+mensagem), o projeto (tipos novos com e sem os campos, resumo, anotações sem hífen, PATCH só com
+o que mudou) e a abertura (cumprimento pela hora, uma vez por dia, nunca com Reduzir Movimento).
 
 ## O que o app tem
 
@@ -178,15 +209,16 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
   visita as outras telas: uma resposta a caminho continua e você volta onde estava.
 - **Liquid Glass** (iOS 26 em diante) nos controles que flutuam: os botões da barra, a pílula, o
   campo de mensagem, a orbe e a gaveta. Antes do iOS 26, o vidro fosco do web.
-- **Gaveta** de vidro pela esquerda: a marca, Conversa, Pendências, Projetos, Caderno, Mac e Ajustes, as
-  conversas com + e "Conectado" embaixo. Arrastar para a esquerda ou tocar fora fecha.
-- **Chat** é a tela de entrada, como no web.
-- **Início → Pendências**: "Nada esperando por você." ou o que precisa de você, em grupos: No Mac,
+- **Gaveta** de vidro pela esquerda, só com o que não está nas abas de cima: a marca, Caderno, Mac e
+  Ajustes, e "Conectado" embaixo. Não há lista de conversas nem "Nova conversa" (desde 16/11/2026).
+  Arrastar para a esquerda ou tocar fora fecha.
+- **Chat** é a tela de entrada e abre sempre a **conversa contínua**
+  ([CONVERSA_CONTINUA.md](CONVERSA_CONTINUA.md)), também quando você está no chat de um projeto.
+- **Início**: "Nada esperando por você." ou o que precisa de você, em grupos: No Mac,
   Email e agenda, Metas que eu quero seguir e Avisos (Responder abre a conversa, Dispensar marca
   como lido). As aberturas dele não contam: já estão no chat e são marcadas como lidas ao abrir.
-- **Projetos**: sem nenhum, a frase grande em serifa sobre a floresta com o campo para criar; com
-  projetos, os cartões; dentro de um, nova conversa aqui, trazer a conversa aberta, renomear,
-  apagar e as conversas, páginas e arquivos dele.
+- **Projetos**: a lista, com "Nome do novo projeto" e Criar; cada item com o resumo ("4 anotações ·
+  1 painel"). Tocar abre o **chat do projeto** (ver Fase 4).
 - **Caderno** ("O que eu fiz enquanto você não estava."): o que ele sabe de você e o que aprendeu
   com as suas correções (desfazer e apagar), temperamento, o que quer te perguntar, como se
   descreve (desfazer), interesses, pensamentos e o caderno de estudo com achados e fontes, e a
@@ -199,7 +231,7 @@ O app segue as telas do web (`SkyNav.tsx`, `Rail.tsx`, `InboxView.tsx`, `Project
 - **Boas-vindas**: na primeira vez, os três passos do web (como funciona, perguntas, permissões),
   sempre dá para pular; refazer em Ajustes → Memória.
 - **Ajustes** ("Do seu jeito."): Aparência (floresta e movimento), Autonomia (agir por conta
-  própria, pesquisar sozinho), Google (estado, olhar sozinho, desconectar; conectar continua pelo
+  própria, pesquisar sozinho, Resumo da manhã com Mandar agora), Localização, Google (estado, olhar sozinho, desconectar; conectar continua pelo
   computador), Memória (lembrar, refazer as perguntas iniciais) e Conta (trocar senha e email,
   sair). Os de voz entram com a ligação (etapa 5); avisos com o app fechado dependem da conta paga
   (APNs).
@@ -396,6 +428,48 @@ frase, como uma foto mandada no chat. Se o envio da foto falhar, a frase vai sem
   (`Session.chatDraft`).
 
 O modelo está em `VisaoKit/Panels.swift`. Ver [PAINEIS.md](PAINEIS.md).
+
+### Fase 4: o que o servidor ganhou em 16 e 17/11/2026
+
+Tudo por acréscimo na API; um app antigo continua funcionando.
+
+- **Conversa contínua** (`GET /conversations/continuous`): o Chat abre sempre ela. Sem conversa
+  aberta, enviar vai para ela. Carrega as últimas 100 mensagens e "Carregar mensagens anteriores"
+  busca a página de antes (`limit`, `before`). Ainda faltam as divisões por dia e por trecho que o
+  web mostra.
+- **Painel perto da meta** ([ADR-0016](decisions/0016-painel-de-olho-perto-da-meta.md)): com
+  `watch_every_hours`, o card diz "perto da meta: confiro a cada 3 h" (nada com o painel pausado).
+- **Resumo da manhã** ([RESUMO_DA_MANHA.md](RESUMO_DA_MANHA.md)): a chave em Ajustes > Autonomia e
+  **Mandar agora**. O PUT manda só `morning_briefing`. O resumo chega como mensagem comum da contínua.
+- **Compartilhar do iPhone** ([COMPARTILHAR.md](COMPARTILHAR.md)): a extensão **Visão** na folha
+  de compartilhar aceita um link, um texto selecionado ou até 4 fotos, prints e PDFs. Mostra uma
+  prévia, um campo "Comentário" e Enviar; as fotos são reduzidas antes de subir, os arquivos vão por
+  `POST /attachments` e depois `POST /share`. Com 202 diz "Enviado. A resposta chega como aviso." e
+  fecha; sem login ou com 401, "Abra o Visão e entre de novo". A resposta chega por aviso e na
+  contínua, com a etiqueta "compartilhado do iPhone".
+  - O token mudou para o grupo do Keychain comum ao app e à extensão; na primeira abertura depois
+    da atualização o item antigo é movido, sem pedir login de novo.
+  - Se "Visão" não aparecer na folha, role a fila de apps até o fim, toque em **Mais** e ligue.
+- **Localização para "perto de mim"** ([LOCALIZACAO.md](LOCALIZACAO.md)): Ajustes > Localização >
+  **Usar minha localização**, desligada por padrão e só neste aparelho. Ligar pede "Durante o uso";
+  negado, volta a desligar e explica onde liberar. A posição (precisão de ~100 m, até 4 s) vai só
+  com uma mensagem parecida com "perto de mim" (a regex do web) e nunca fica guardada. Vale no chat
+  e no compartilhar.
+- **O projeto é o chat dele** ([ACOES.md](ACOES.md)): tocar num projeto abre o chat dele, e a aba
+  marcada fica em Projetos. No topo, um cartão com voltar, o nome inteiro e o resumo, que abre as
+  anotações (com Editar), os painéis do projeto, as páginas, os arquivos, Renomear e Apagar. O
+  cartão recarrega ao fim de cada resposta. Na contínua, uma resposta que mexeu num projeto traz
+  "Abrir o projeto «…» →".
+- **Acabamento**: alvos de toque com pelo menos 44 pt; o botão de ligar virou uma onda de três
+  barrinhas (vermelha ao ouvir e falar, mais lenta ao pensar, apagada sem conexão); sugestões do
+  Início com a linha que explica que nada roda antes de mandar.
+- **Abertura**: 4 s na primeira abertura do dia (pontos que viram o orbe, o anel, "V.I.S.A.O." e
+  "Bom dia/Boa tarde/Boa noite"). Um toque pula; nunca toca com Reduzir Movimento, no login ou nas
+  perguntas iniciais.
+
+Testado no simulador: build do app e da extensão, a extensão registrada e a abertura. Precisa do
+aparelho: o login com o token migrado, a folha de compartilhar de outros apps, push e localização
+real.
 
 ### Pendências da voz (para retomar)
 
