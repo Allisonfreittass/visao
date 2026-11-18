@@ -1,28 +1,30 @@
 import SwiftUI
 import VisaoKit
 
-/// The opening (Intro.tsx and "The opening" in styles.css on the web): ~44 points drift in from
-/// beyond the edges and become the orb, a ring pulses out, "V.I.S.A.O." is written with the
-/// greeting, and the app shows through. 4 s; a tap skips it. Only the orb and the name: no mascot,
-/// no logo, nobody else's mark.
+/// The opening (apps/web/src/components/Intro.tsx, shortened to 1.8 s): the Ciclope wakes up on a
+/// dark floor that turns light, its family bounces in from the edges and joins it, a thin orange
+/// ring draws around it and pops confetti, the name slides in beside it, and the lockup shrinks
+/// toward the tab bar as the app shows through. A tap skips it; never with Reduce Motion.
 struct IntroView: View {
     let onDone: () -> Void
-    @Environment(Appearance.self) private var appearance
-    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.palette) private var palette
     @State private var start = Date()
-    @State private var dots = IntroView.scatter(44)
     private let hello = Opening.greeting()
 
-    private static let red = Color(rgb: 0xe0483f)
-    private static let orbSize: CGFloat = 132
+    private static let family: [CritterView.Kind] = [.mac, .whatsapp, .email, .caderno]
+    /// Where each one comes from (a fraction of the screen from the center) and lands (points).
+    private static let entries: [(from: CGPoint, land: CGPoint)] = [
+        (CGPoint(x: -0.7, y: -0.45), CGPoint(x: -78, y: -50)),
+        (CGPoint(x: 0.7, y: -0.4), CGPoint(x: 78, y: -50)),
+        (CGPoint(x: -0.65, y: 0.5), CGPoint(x: -78, y: 50)),
+        (CGPoint(x: 0.7, y: 0.45), CGPoint(x: 78, y: 50)),
+    ]
+    private static let confettiColors: [Color] = [0x3b6bff, 0x18c27a, 0xffc83d, 0x9b87ff, 0xff6a1a].map { Color(rgb: $0) }
 
     var body: some View {
         GeometryReader { proxy in
-            let wide = sizeClass == .regular || proxy.size.width > 700
             TimelineView(.animation) { context in
-                let t = context.date.timeIntervalSince(start)
-                stage(t: t, size: proxy.size, wide: wide)
-                    .opacity(1 - Self.ease(t, from: 3.4, to: 4.0))
+                stage(t: context.date.timeIntervalSince(start), size: proxy.size)
             }
         }
         .ignoresSafeArea()
@@ -34,135 +36,101 @@ struct IntroView: View {
             onDone()
         }
         .accessibilityElement()
-        .accessibilityLabel("\(hello). O que a gente resolve hoje?")
+        .accessibilityLabel("V.I.S.A.O. \(hello).")
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Toque para pular")
     }
 
-    private var night: Bool { appearance.isDark }
-    private var tin: Color { night ? Color(rgb: 0xa9bcbd) : Color(rgb: 0x4f6366) }
-    private var ink: Color { night ? Color(rgb: 0xf5f5f7) : Color(rgb: 0x17222a) }
-    private var soft: Color { night ? Color(rgb: 0xc7cbd8) : Color(rgb: 0x36454e) }
+    private func stage(t: Double, size: CGSize) -> some View {
+        let light = Self.ease(t, 0.2, 0.48)
+        let grow = Self.back(Self.clamp((t - 0.2) / 0.32))
+        let merge = Self.ease(t, 0.9, 1.08)
+        let ringDraw = Self.ease(t, 0.97, 1.18)
+        let ringFade = Self.ease(t, 1.18, 1.4)
+        let pop = Self.clamp((t - 1.08) / 0.44)
+        let slide = Self.ease(t, 1.18, 1.5)
+        let word = Self.ease(t, 1.24, 1.52)
+        let fly = Self.ease(t, 1.5, 1.8)
+        let wordWidth: CGFloat = 190
+        let shift = (wordWidth + 16) / 2 * (1 - slide)
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        // The end: toward the Início tab, where the Ciclope lives in the tab bar.
+        let tab = CGPoint(x: size.width / 6, y: size.height - 48)
 
-    private func stage(t: Double, size: CGSize, wide: Bool) -> some View {
-        let words = Self.ease(t, from: 1.8, to: 2.7)
-        let greet = Self.ease(t, from: 2.4, to: 3.0)
-        // Wide: the orb moves left as the name slides in beside it.
-        let shift: CGFloat = wide ? -150 * words : 0
-        let center = CGPoint(x: size.width / 2 + shift, y: size.height / 2 - (wide ? 0 : 50))
         return ZStack {
-            background(size: size)
-            ForEach(dots.indices, id: \.self) { index in
-                dot(dots[index], t: t, size: size, center: center)
+            Color(rgb: 0x0e0f13)
+            AmbientBackground().opacity(light)
+
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .trim(from: 0, to: ringDraw)
+                        .stroke(Palette.accentColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .frame(width: 128, height: 128)
+                        .scaleEffect(1 + 0.15 * ringFade)
+                        .opacity(1 - ringFade)
+                    ForEach(0..<14, id: \.self) { i in
+                        confetti(i, pop: pop)
+                    }
+                    CiclopeView(state: .idle, size: 88, eyesClosed: t < 0.22)
+                        .scaleEffect((0.55 + 0.45 * grow) * (1 + 0.08 * sin(Self.clamp((t - 1.1) / 0.18) * .pi)))
+                    ForEach(Self.family.indices, id: \.self) { i in
+                        critter(i, t: t, merge: merge, size: size)
+                    }
+                }
+                .frame(width: 88, height: 88)
+                Text("V.I.S.A.O.")
+                    .font(Typo.display(34, relativeTo: .largeTitle))
+                    .foregroundStyle(palette.text)
+                    .fixedSize()
+                    .frame(width: wordWidth, alignment: .leading)
+                    .opacity(word)
+                    .offset(x: -14 * (1 - word))
             }
-            ring(t: t).position(center)
-            orb(t: t).position(center)
-            wordsView(words: words, greet: greet, wide: wide)
-                .position(
-                    wide
-                        ? CGPoint(x: center.x + Self.orbSize / 2 + 24 + 170 + (1 - words) * 40, y: center.y)
-                        : CGPoint(x: size.width / 2, y: center.y + Self.orbSize / 2 + 70 + (1 - words) * 14)
-                )
+            .offset(x: shift)
+            .scaleEffect(1 - 0.7 * fly)
+            .position(x: center.x + (tab.x - center.x) * fly, y: center.y + (tab.y - center.y) * fly)
         }
-        .frame(width: size.width, height: size.height)
+        .opacity(1 - Self.ease(t, 1.56, 1.8))
     }
 
-    /// Solid, with three soft spots: a faint red-pink top left, tin on the right, a fainter red below.
-    private func background(size: CGSize) -> some View {
-        let big = max(size.width, size.height)
-        return ZStack {
-            (night ? Color(rgb: 0x141828) : Color(rgb: 0xeef2f3))
-            RadialGradient(colors: [Self.red.opacity(night ? 0.14 : 0.12), .clear], center: UnitPoint(x: 0.08, y: 0.12), startRadius: 0, endRadius: big * 0.42)
-            RadialGradient(colors: [tin.opacity(0.22), .clear], center: UnitPoint(x: 0.96, y: 0.6), startRadius: 0, endRadius: big * 0.48)
-            RadialGradient(colors: [Self.red.opacity(0.07), .clear], center: UnitPoint(x: 0.4, y: 1.04), startRadius: 0, endRadius: big * 0.3)
-        }
+    private func critter(_ i: Int, t: Double, merge: Double, size: CGSize) -> some View {
+        let entry = Self.entries[i]
+        let p = Self.clamp((t - 0.48 - Double(i) * 0.03) / (0.42 - Double(i) * 0.03))
+        let k = Self.back(p)
+        let from = CGPoint(x: entry.from.x * size.width, y: entry.from.y * size.height)
+        let x = from.x + (entry.land.x - from.x) * k
+        let y = from.y + (entry.land.y - from.y) * k
+        return CritterView(kind: Self.family[i], size: 36)
+            .rotationEffect(.degrees((entry.from.x > 0 ? 40 : -40) * (1 - p)))
+            .scaleEffect((0.6 + 0.4 * p) * (1 - 0.8 * merge))
+            .offset(x: x * (1 - merge), y: y * (1 - merge))
+            .opacity(p <= 0 ? 0 : 1 - merge)
     }
 
-    private func dot(_ dot: Dot, t: Double, size: CGSize, center: CGPoint) -> some View {
-        let far = max(size.width, size.height) * dot.far
-        let travel = Self.ease(t, from: dot.delay, to: dot.delay + 1.1, curve: .out)
-        let x = cos(dot.angle) * far * (1 - travel) + cos(dot.turn) * dot.near * travel
-        let y = sin(dot.angle) * far * (1 - travel) + sin(dot.turn) * dot.near * travel
-        // From ~1.1 s they shrink and go into the orb.
-        let gone = Self.ease(t, from: max(1.1, dot.delay + 0.75), to: 1.5)
+    private func confetti(_ i: Int, pop: Double) -> some View {
+        let angle = Double(i) / 14 * 2 * .pi + 0.2
+        let reach = 96 + Double(i % 3) * 22
+        let e = 1 - pow(1 - pop, 3)
         return Circle()
-            .fill(dot.warm ? Self.red : tin)
-            .frame(width: dot.size, height: dot.size)
-            .scaleEffect(1 - gone)
-            .opacity(1 - gone)
-            .position(x: center.x + x, y: center.y + y)
+            .fill(Self.confettiColors[i % Self.confettiColors.count])
+            .frame(width: 7, height: 7)
+            .offset(x: cos(angle) * reach * e, y: sin(angle) * reach * e + 24 * pop * pop)
+            .opacity(pop <= 0 || pop >= 1 ? 0 : (pop < 0.35 ? pop / 0.35 : 1 - (pop - 0.35) / 0.65))
     }
 
-    private func ring(t: Double) -> some View {
-        let p = Self.ease(t, from: 1.05, to: 2.15, curve: .out)
-        return Circle()
-            .strokeBorder(tin.opacity(0.7), lineWidth: 1.5)
-            .frame(width: Self.orbSize, height: Self.orbSize)
-            .scaleEffect(0.5 + 1.2 * p)
-            .opacity(t < 1.05 ? 0 : 1 - p)
+    private static func clamp(_ x: Double) -> Double { min(1, max(0, x)) }
+
+    /// cubic-bezier(.2,.8,.2,1)-like ease between two times.
+    private static func ease(_ t: Double, _ from: Double, _ to: Double) -> Double {
+        let x = clamp((t - from) / (to - from))
+        return 1 - pow(1 - x, 3)
     }
 
-    private func orb(t: Double) -> some View {
-        let p = Self.ease(t, from: 1.05, to: 1.75, curve: .out)
-        return CiclopeView(state: .idle, size: Self.orbSize, animated: false)
-            .scaleEffect(0.6 + 0.4 * p)
-            .opacity(p)
-    }
-
-    private func wordsView(words: Double, greet: Double, wide: Bool) -> some View {
-        VStack(alignment: wide ? .leading : .center, spacing: 10) {
-            Text("V.I.S.A.O.")
-                .font(Typo.display(38, relativeTo: .largeTitle))
-                .foregroundStyle(ink)
-                .opacity(words)
-            (Text("\(hello). ") + Text("O que a gente resolve hoje?").italic())
-                .font(Typo.display(20, relativeTo: .title3))
-                .foregroundStyle(soft)
-                .multilineTextAlignment(wide ? .leading : .center)
-                .opacity(greet)
-                .offset(y: (1 - greet) * 8)
-        }
-        .frame(width: 340, alignment: wide ? .leading : .center)
-    }
-
-    // MARK: Timing
-
-    enum Curve { case inOut, out }
-
-    /// 0 before `from`, 1 after `to`, eased in between.
-    static func ease(_ t: Double, from: Double, to: Double, curve: Curve = .inOut) -> Double {
-        guard to > from else { return t >= to ? 1 : 0 }
-        let x = min(max((t - from) / (to - from), 0), 1)
-        switch curve {
-        case .out: return 1 - pow(1 - x, 3)
-        case .inOut: return x < 0.5 ? 4 * x * x * x : 1 - pow(-2 * x + 2, 3) / 2
-        }
-    }
-
-    struct Dot {
-        let angle: Double
-        let turn: Double
-        /// From beyond the edges, as a share of the screen's long side.
-        let far: Double
-        /// Where it lands on the orb, in points from its center (inside a 46 pt disc).
-        let near: Double
-        let size: CGFloat
-        let delay: Double
-        let warm: Bool
-    }
-
-    static func scatter(_ count: Int) -> [Dot] {
-        (0..<count).map { i in
-            let angle = Double.random(in: 0..<(2 * .pi))
-            return Dot(
-                angle: angle,
-                turn: angle + Double.random(in: -0.6...0.6),
-                far: 0.75 + Double.random(in: 0...0.3),
-                near: sqrt(Double.random(in: 0...1)) * 46,
-                size: CGFloat.random(in: 3...7),
-                delay: Double.random(in: 0...0.35),
-                warm: i % 8 == 0
-            )
-        }
+    /// An ease with a little overshoot, for the bounce.
+    private static func back(_ x: Double) -> Double {
+        let c1 = 1.70158, c3 = c1 + 1
+        return 1 + c3 * pow(x - 1, 3) + c1 * pow(x - 1, 2)
     }
 }

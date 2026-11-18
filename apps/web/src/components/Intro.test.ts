@@ -21,4 +21,7 @@ describe("shouldPlayIntro", () => {
   it("never plays for someone who asked for less motion", () => {
     expect(shouldPlayIntro(now, null, true)).toBe(false);
   });
+  it("plays once per tab session", () => {
+    expect(shouldPlayIntro(now, null, false, true)).toBe(false);
+  });
 });

@@ -1,0 +1,17 @@
+/* A abertura (components/Intro.tsx): ~2,6 s, uma vez por dia e após o login, pulada por clique
+   ou tecla, desligada com movimento reduzido. Só transform e opacity animam (Web Animations). */
+.intro { position: fixed; inset: 0; z-index: calc(var(--layer-overlay) + 20); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: #0E0F13; }
+.intro-light { position: absolute; inset: 0; background: var(--bg); opacity: 0; }
+.intro-stage { position: relative; display: grid; place-items: center; }
+.intro-lockup { display: flex; align-items: center; gap: 20px; will-change: transform; }
+.intro-hero { position: relative; display: grid; place-items: center; width: 112px; height: 112px; will-change: transform; }
+.intro-hero > .ciclope { position: relative; z-index: 2; }
+.intro-ring { position: absolute; left: 50%; top: 50%; margin: -84px 0 0 -84px; opacity: 0; overflow: visible; z-index: 1; }
+.intro-critter { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; opacity: 0; z-index: 3; will-change: transform; }
+.intro-critter .critter { display: block; }
+.intro-confetti { position: absolute; left: 50%; top: 50%; border-radius: 50%; opacity: 0; z-index: 1; will-change: transform; }
+.intro-confetti:nth-child(3n) { border-radius: 3px; }
+.intro-word { font: 800 56px/1 var(--font-display); letter-spacing: var(--tracking-display); color: var(--text); white-space: nowrap; opacity: 0; }
+.intro-word b { color: var(--accent); font-weight: 800; }
+@media (max-width: 560px) { .intro-word { font-size: 40px; } }
+@media (prefers-reduced-motion: reduce) { .intro { display: none; } }

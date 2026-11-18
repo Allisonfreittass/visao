@@ -19,7 +19,7 @@ import {
 import { useCallCamera } from "./call/camera";
 import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
-import { Intro, introDue } from "./components/Intro";
+import { Intro, introAfterLogin, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
 import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
@@ -135,7 +135,8 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   // The opening animation, once a day (components/Intro.tsx).
-  const [intro, setIntro] = useState(() => introDue());
+  // `?intro` in the address plays it again on demand (to see it).
+  const [intro, setIntro] = useState(() => introDue() || new URLSearchParams(window.location.search).has("intro"));
   const endIntro = useCallback(() => setIntro(false), []);
   // A notification about Mac work opens the list of what waits for a yes (`/?mac=1`).
   const [view, setView] = useState<WorkspaceView>(() =>
@@ -1101,6 +1102,7 @@ export function App() {
                 onLoggedIn={(token, remember) => {
                   saveToken(token, remember);
                   setLoggedIn(true);
+                  if (introAfterLogin()) setIntro(true);
                 }}
               />
             ) : status && !status.genesis_completed ? (
