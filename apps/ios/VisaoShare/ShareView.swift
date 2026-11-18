@@ -2,21 +2,21 @@ import SwiftUI
 import VisaoKit
 
 /// The sheet: what goes (link, picture, the start of the text), a comment, Enviar. The app's
-/// colors (Theme.swift, "Neblina" by day and by night), on a plain card.
+/// colors (Theme.swift), on a plain card.
 struct ShareView: View {
     @Bindable var model: ShareModel
     @Environment(\.colorScheme) private var scheme
     @FocusState private var noteFocused: Bool
 
-    private var ink: Color { scheme == .dark ? Color(rgb: 0xf5f5f7) : Color(rgb: 0x17222a) }
-    private var soft: Color { scheme == .dark ? Color(rgb: 0xc7cbd8) : Color(rgb: 0x36454e) }
-    private var faint: Color { scheme == .dark ? Color(rgb: 0x9aa0b4) : Color(rgb: 0x56656e) }
-    private var tin: Color { scheme == .dark ? Color(rgb: 0xa9bcbd) : Color(rgb: 0x4f6366) }
-    private var card: Color { scheme == .dark ? Color(rgb: 0x1c2034) : Color(rgb: 0xf4f7f8) }
-    private var well: Color { scheme == .dark ? Color(rgb: 0xf5f5f7, opacity: 0.08) : Color(rgb: 0x17222a, opacity: 0.05) }
-    private var errorColor: Color { scheme == .dark ? Color(rgb: 0xff7a6e) : Color(rgb: 0xb3342b) }
-    private var primary: Color { scheme == .dark ? Color(rgb: 0xf5f5f7) : Color(rgb: 0x2e3d45) }
-    private var primaryInk: Color { scheme == .dark ? Color(rgb: 0x1d1d1f) : Color(rgb: 0xeef2f3) }
+    private var ink: Color { Color(rgb: 0xededef) }
+    private var soft: Color { Color(rgb: 0xc2c3c8) }
+    private var faint: Color { Color(rgb: 0x9a9ba2) }
+    private var tin: Color { Color(rgb: 0xc2c3c8) }
+    private var card: Color { Color(rgb: 0x141518) }
+    private var well: Color { Color(rgb: 0x1d1f24) }
+    private var errorColor: Color { Color(rgb: 0xff3b30) }
+    private var primary: Color { Color(rgb: 0xff3b30) }
+    private var primaryInk: Color { Color(rgb: 0x0b0b0d) }
 
     var body: some View {
         VStack(spacing: 0) {

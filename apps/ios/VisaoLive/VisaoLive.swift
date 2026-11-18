@@ -15,7 +15,7 @@ struct TurnLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: VisaoTurnAttributes.self) { context in
             LockScreenCard(attributes: context.attributes, state: context.state)
-                .activityBackgroundTint(Color(red: 0x1b / 255, green: 0x26 / 255, blue: 0x2d / 255).opacity(0.92))
+                .activityBackgroundTint(Color(red: 0x14 / 255, green: 0x15 / 255, blue: 0x18 / 255).opacity(0.94))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -58,7 +58,7 @@ struct TurnLiveActivity: Widget {
             } minimal: {
                 Lantern(state: context.state)
             }
-            .keylineTint(Color(red: 0xe0 / 255, green: 0x48 / 255, blue: 0x3f / 255))
+            .keylineTint(Color(red: 0xff / 255, green: 0x3b / 255, blue: 0x30 / 255))
         }
     }
 }
@@ -132,9 +132,9 @@ private struct Lantern: View {
                     .foregroundStyle(.white)
             } else {
                 Circle()
-                    .fill(Color(red: 0xe0 / 255, green: 0x48 / 255, blue: 0x3f / 255))
+                    .fill(Color(red: 0xff / 255, green: 0x3b / 255, blue: 0x30 / 255))
                     .frame(width: 10, height: 10)
-                    .shadow(color: Color(red: 0xe0 / 255, green: 0x48 / 255, blue: 0x3f / 255).opacity(0.7), radius: 4)
+                    .shadow(color: Color(red: 0xff / 255, green: 0x3b / 255, blue: 0x30 / 255).opacity(0.7), radius: 4)
             }
         }
         .accessibilityLabel(state.done ? "Respondeu" : "Trabalhando")

@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import VisaoKit
 
-/// One message, as in the "Neblina" look of the web: what he says in a solid bubble on the left,
+/// One message, as on the web: what he says in a solid bubble on the left,
 /// what you say in glass on the right. Names and times stay out of the way; only "puxou
 /// conversa", "no Mac", "não foi enviada" and the like are shown.
 struct MessageRow: View, Equatable {

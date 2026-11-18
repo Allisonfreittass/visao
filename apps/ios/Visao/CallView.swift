@@ -382,7 +382,7 @@ struct CallView: View {
             Spacer(minLength: 0)
             CallOrb(state: controller.state, level: controller.level)
             VStack(spacing: 6) {
-                Text(agentName ?? "Sem nome ainda")
+                Text(agentName ?? "V.I.S.A.O.")
                     .font(Typo.display(34, relativeTo: .largeTitle, italic: agentName == nil))
                 Text(stateLabel)
                     .font(Typo.mono(.caption))

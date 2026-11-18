@@ -993,7 +993,7 @@ export function App() {
               segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
               olderLeft={olderLeft}
               onLoadOlder={() => void loadOlder()}
-              placeholder={`Mensagem para ${agentName ?? "o V.I.S.A.O."}`}
+              placeholder="Dê uma ordem ao Visão"
               composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
               ciclope={ciclope}
               voiceLevel={voice.level}

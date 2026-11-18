@@ -1,7 +1,7 @@
-/* V.I.S.A.O.: marca Ciclope. Tokens em ./brand/tokens.css (claro por padrão, escuro em Ajustes).
-   Regras: fundo claro e quente com manchas desfocadas, cartões brancos com sombra suave (só borda
-   no escuro), títulos em Bricolage Grotesque pesada, laranja só em formas (texto pequeno usa
-   --accent-text), foco com anel laranja de 2px, nada de caixa-alta espaçada. */
+/* V.I.S.A.O.: marca Ciclope Sentinela. Tokens em ./brand/tokens.css (só o escuro é exposto).
+   Regras: grafite com a grade de pontos e o brilho vermelho do sensor, cartões com borda de 1px e
+   sem sombra, títulos em Space Grotesk, vermelho só no olho, no botão principal, no foco e em uma
+   palavra de destaque; âmbar para atenção; nada de caixa-alta espaçada. Layout em ./layout.css. */
 @import "./brand/tokens.css";
 @import "./brand/components.css";
 @import "./brand/ambient.css";
@@ -25,7 +25,7 @@ button, summary, a, input { -webkit-tap-highlight-color: transparent; }
 h1, h2, h3 { text-wrap: balance; font-weight: 700; }
 h1, .display { font-family: var(--font-display); letter-spacing: var(--tracking-display); }
 em { font-style: italic; }
-/* A palavra em destaque de um título: laranja forte, sem itálico (a Bricolage não tem itálico). */
+/* A palavra em destaque de um título: vermelho de texto, sem itálico. */
 h1 em, h2 em, .display em, .page-head h1 em, .empty-conversation h2 em, .onboarding h1 em, .projects-vazio h1 em { font-style: normal; color: var(--accent-strong) !important; }
 a { color: var(--tinta); text-decoration-color: var(--linha-forte); text-underline-offset: 3px; }
 a:hover { text-decoration-color: var(--tinta); }
