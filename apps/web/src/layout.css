@@ -353,3 +353,17 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .home-greeting { font-size: 32px; }
   .step-cards, .bubble.assistant .message-content, .bubble.assistant .bubble-part, .bubble.assistant > .message-attachments { margin-left: 0; }
 }
+
+/* Celular: a caixa de mensagem encosta na barrinha do iPhone, como nos apps nativos (a área
+   segura de baixo é de 34 pt; deixar ela inteira mais as margens deixava a caixa flutuando). */
+@media (max-width: 899px) {
+  .app { padding-bottom: max(6px, calc(env(safe-area-inset-bottom) - 18px)); }
+  .main { padding-bottom: 0; }
+  .home-dock { padding-bottom: 4px; }
+  .composer-dock { padding-bottom: 4px; }
+  /* As sugestões numa linha só, rolando para o lado. */
+  .suggestion-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px; scrollbar-width: none; overscroll-behavior-x: contain; }
+  .suggestion-chips::-webkit-scrollbar { display: none; }
+  .suggestion-chips li { flex: none; }
+}
+[data-teclado] .app { padding-bottom: 6px; }
