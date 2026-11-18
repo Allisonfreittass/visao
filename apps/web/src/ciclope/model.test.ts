@@ -2,16 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   BLINK_MS,
+  LID_HIDDEN,
+  LID_SHUT,
   LOOK_MAX,
   POSES,
-  RESTING,
+  SLIT,
   approach,
   blinkAmount,
-  breathe,
+  errorFlicker,
   hash01,
+  ledOpacity,
   lookOffset,
+  mech,
   nextBlinkDelay,
   shake,
+  shutBy,
   springStep,
   withLevel,
 } from "./model";
@@ -36,69 +41,100 @@ describe("ciclopeState", () => {
 });
 
 describe("poses", () => {
-  it("closes the eye when offline and looks up when thinking", () => {
-    expect(POSES.offline.lid).toBe(1);
-    expect(POSES.offline.gray).toBeCloseTo(0.6);
-    expect(POSES.thinking.irisY).toBeLessThan(0);
-    expect(POSES.working.ring).toBe(1);
-    expect(POSES.listening.sclera).toBeCloseTo(1.06);
+  it("has a flat lid at rest, a V at work and a deeper V failing", () => {
+    expect(POSES.idle.lidSide).toBe(POSES.idle.lidMid);
+    expect(POSES.working.lidMid).toBeGreaterThan(POSES.working.lidSide);
+    expect(POSES.error.lidMid).toBeGreaterThan(POSES.working.lidMid);
+    expect(POSES.listening.lidSide).toBeLessThan(POSES.idle.lidSide);
   });
 
-  it("settles in about 240 ms", () => {
-    let pose = RESTING;
-    for (let t = 0; t < 0.24; t += 1 / 60) pose = approach(pose, POSES.offline, 1 / 60);
-    expect(pose.lid).toBeGreaterThan(0.95);
+  it("shuts and dims when offline", () => {
+    expect(POSES.offline.lidMid).toBe(LID_SHUT);
+    expect(POSES.offline.lowerLid).toBe(LID_SHUT);
+    expect(POSES.offline.iris).toBeCloseTo(0.15);
+    expect(POSES.offline.body).toBeCloseTo(0.7);
+    expect(POSES.idle.lowerLid).toBe(LID_HIDDEN);
+  });
+
+  it("leaves a 6-unit slit for the password", () => {
+    expect(SLIT.lowerLid - SLIT.lidMid).toBe(6);
+  });
+
+  it("settles in about 220 ms", () => {
+    let pose = POSES.idle;
+    for (let t = 0; t < 0.22; t += 1 / 60) pose = approach(pose, POSES.offline, 1 / 60);
+    expect(LID_SHUT - pose.lidMid).toBeLessThan(1.2);
   });
 });
 
 describe("blink", () => {
-  it("closes in 120 ms and opens in 160 ms", () => {
-    expect(blinkAmount(0)).toBe(0);
-    expect(blinkAmount(120)).toBeCloseTo(1);
-    expect(blinkAmount(200)).toBeCloseTo(0.5);
+  it("shuts in 90 ms, holds 60 ms and opens in 140 ms", () => {
+    expect(blinkAmount(0)).toBeCloseTo(0);
+    expect(blinkAmount(90)).toBeCloseTo(1);
+    expect(blinkAmount(120)).toBe(1);
     expect(blinkAmount(BLINK_MS)).toBe(0);
+    expect(BLINK_MS).toBe(290);
   });
 
-  it("comes every 3 to 6 seconds", () => {
-    expect(nextBlinkDelay(0)).toBe(3000);
-    expect(nextBlinkDelay(1)).toBe(6000);
+  it("comes every 6 to 10 seconds", () => {
+    expect(nextBlinkDelay(0)).toBe(6000);
+    expect(nextBlinkDelay(1)).toBe(10000);
+  });
+
+  it("closes both lids", () => {
+    const shut = shutBy(POSES.idle, 1);
+    expect(shut.lidMid).toBe(LID_SHUT);
+    expect(shut.lowerLid).toBe(LID_SHUT);
+    expect(shutBy(POSES.idle, 0)).toEqual(POSES.idle);
+  });
+
+  it("eases mechanically", () => {
+    expect(mech(0)).toBeCloseTo(0);
+    expect(mech(1)).toBeCloseTo(1);
+    expect(mech(0.25)).toBeLessThan(0.25);
   });
 });
 
 describe("motion", () => {
-  it("springs to the target without blowing up", () => {
+  it("springs dry to the target", () => {
     let s = { x: 0, v: 0 };
-    for (let i = 0; i < 120; i++) s = springStep(s, 5, 1 / 60);
-    expect(s.x).toBeCloseTo(5, 1);
-    s = springStep({ x: 0, v: 0 }, 5, 0.5);
-    expect(Number.isFinite(s.x)).toBe(true);
+    for (let i = 0; i < 120; i++) s = springStep(s, 4, 1 / 60);
+    expect(s.x).toBeCloseTo(4, 1);
+    expect(Number.isFinite(springStep({ x: 0, v: 0 }, 4, 0.5).x)).toBe(true);
   });
 
-  it("never looks further than 5", () => {
-    const far = lookOffset(1000, 0, 96);
-    expect(far.x).toBeCloseTo(LOOK_MAX);
-    expect(Math.hypot(lookOffset(300, -400, 96).x, lookOffset(300, -400, 96).y)).toBeLessThanOrEqual(LOOK_MAX + 1e-9);
+  it("never looks further than 4", () => {
+    expect(lookOffset(1000, 0, 96).x).toBeCloseTo(LOOK_MAX);
+    const o = lookOffset(300, -400, 96);
+    expect(Math.hypot(o.x, o.y)).toBeLessThanOrEqual(LOOK_MAX + 1e-9);
     expect(lookOffset(0, 0, 96)).toEqual({ x: 0, y: 0 });
   });
 
-  it("shakes once and breathes up to 3%", () => {
-    expect(shake(400)).toBe(0);
-    expect(Math.abs(shake(30))).toBeLessThanOrEqual(2);
-    expect(breathe(0)).toBe(1);
-    expect(breathe(0.6)).toBeCloseTo(1.03);
+  it("trembles and flickers once when failing", () => {
+    expect(shake(300)).toBe(0);
+    expect(Math.abs(shake(25))).toBeLessThanOrEqual(1.5);
+    expect(errorFlicker(0)).toBeLessThan(1);
+    expect(errorFlicker(400)).toBe(1);
   });
 
-  it("lets the voice grow the iris when speaking", () => {
-    expect(withLevel(POSES.speaking, "speaking", 0).pose.iris).toBeCloseTo(10.5 / 11.5);
-    expect(withLevel(POSES.speaking, "speaking", 1).pose.iris).toBeCloseTo(12.5 / 11.5);
-    expect(withLevel(POSES.speaking, "speaking", 1).mouth).toBe(1);
-    expect(withLevel(POSES.listening, "listening", 1).pose.pupil).toBeGreaterThan(POSES.listening.pupil);
+  it("keeps the LED off offline and pulsing at rest", () => {
+    expect(ledOpacity("offline", 1, false)).toBe(0);
+    expect(ledOpacity("idle", 0, false)).toBeCloseTo(1);
+    expect(ledOpacity("idle", 1.2, false)).toBeCloseTo(0.35);
+    expect(ledOpacity("idle", 1.2, true)).toBe(1);
+  });
+
+  it("lets the voice move the eye and the grille", () => {
+    expect(withLevel(POSES.speaking, "speaking", 1).pose.ring).toBeCloseTo(12 / 10.5);
+    expect(withLevel(POSES.speaking, "speaking", 0.5).grille).toBe(0.5);
+    expect(withLevel(POSES.listening, "listening", 1).pose.core).toBeCloseTo(6.5 / 4.5);
+    expect(withLevel(POSES.listening, "listening", 1).pose.glow).toBeCloseTo(1);
     expect(withLevel(POSES.idle, "idle", 1).pose).toEqual(POSES.idle);
   });
 
   it("gives each name a stable color slot", () => {
-    expect(hash01("Viagem")).toBe(hash01("Viagem"));
-    expect(hash01("Viagem")).toBeGreaterThanOrEqual(0);
-    expect(hash01("Viagem")).toBeLessThan(1);
+    expect(hash01("Chile")).toBe(hash01("Chile"));
+    expect(hash01("Chile")).toBeGreaterThanOrEqual(0);
+    expect(hash01("Chile")).toBeLessThan(1);
   });
 });
