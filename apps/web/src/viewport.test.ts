@@ -11,17 +11,17 @@ function fakeWindow(innerHeight: number, vvHeight: number, offsetTop = 0) {
   const style: Record<string, string> = {};
   const root = {
     clientHeight: innerHeight,
-    style: { setProperty: (k: string, v: string) => (style[k] = v) },
+    style: { setProperty: (k: string, v: string) => (style[k] = v), removeProperty: (k: string) => delete style[k] },
     toggleAttribute: (k: string, on: boolean) => (on ? attrs.add(k) : attrs.delete(k)),
   } as unknown as HTMLElement;
   return { vv, listeners, scrollTo, attrs, style, root };
 }
 
 describe("the app follows the visible height (the iPhone keyboard)", () => {
-  it("takes the whole screen with the keyboard closed", () => {
+  it("leaves the height to the CSS (the whole screen) with the keyboard closed", () => {
     const w = fakeWindow(844, 844);
     trackVisibleViewport(w.root);
-    expect(w.style["--app-height"]).toBe("844px");
+    expect(w.style["--app-height"]).toBeUndefined();
     expect(w.attrs.has("data-teclado")).toBe(false);
   });
 
@@ -50,6 +50,7 @@ describe("the app follows the visible height (the iPhone keyboard)", () => {
     w.vv.height = 844;
     w.listeners.resize();
     expect(w.attrs.has("data-teclado")).toBe(false);
+    expect(w.style["--app-height"]).toBeUndefined();
     vi.unstubAllGlobals();
   });
 });

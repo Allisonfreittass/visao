@@ -22,8 +22,13 @@ export function trackVisibleViewport(root: HTMLElement = document.documentElemen
       tallest = vv.height;
     }
     tallest = Math.max(tallest, vv.height, root.clientHeight || 0);
-    root.style.setProperty("--app-height", `${Math.round(vv.height)}px`);
-    root.toggleAttribute("data-teclado", tallest - vv.height > KEYBOARD_MIN);
+    const keyboard = tallest - vv.height > KEYBOARD_MIN;
+    // Keyboard open: exactly the visible height, so the box sits on it. Closed: the CSS height
+    // (100dvh). In the app installed on the iPhone the visible height already leaves out the
+    // home-bar area, which the page pads for again, and the box floated that much too high.
+    if (keyboard) root.style.setProperty("--app-height", `${Math.round(vv.height)}px`);
+    else root.style.removeProperty("--app-height");
+    root.toggleAttribute("data-teclado", keyboard);
     if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0);
   };
   vv.addEventListener("resize", apply);
