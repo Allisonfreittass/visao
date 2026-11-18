@@ -49,6 +49,8 @@ struct Shell: View {
     /// A project's chat is in front, under the Projetos tab (ADR-0021).
     @State private var projectChat = false
     @State private var openingProject = false
+    /// The 4-second opening, once a day, when the app is ready (not on the first-run questions).
+    @State private var intro = false
 
     /// The chat shows on Chat, and on Projetos while a project's chat is open.
     private var chatInFront: Bool { place == .chat || (place == .projetos && projectChat) }
@@ -80,17 +82,34 @@ struct Shell: View {
             Drawer(open: $drawerOpen, place: place, onPlace: { go($0) })
         }
         .visaoBackground()
+        .overlay {
+            if intro {
+                IntroView { withAnimation(.easeOut(duration: 0.25)) { intro = false } }
+                    .transition(.opacity)
+            }
+        }
         .task {
-            await session.loadHome()
+            async let home: Void = session.loadHome()
+            // The first run asks a few questions, once, always skippable; the opening waits for it.
+            let status = try? await session.api.onboarding()
+            if let status, !status.completed {
+                onboarding = status
+            } else if Opening.takeTurn(reduceMotion: UIAccessibility.isReduceMotionEnabled) {
+                intro = true
+            }
+            await home
             if target == nil {
                 // The continuous conversation; if it did not load, sending creates it.
                 target = .continuous(session.continuousId)
             }
-            // The first run asks a few questions, once, always skippable.
-            if let status = try? await session.api.onboarding(), !status.completed { onboarding = status }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await session.loadHome() } }
+            guard phase == .active else { return }
+            Task { await session.loadHome() }
+            // Back the next day without having closed the app: the opening plays once.
+            if onboarding == nil, target != nil, Opening.takeTurn(reduceMotion: UIAccessibility.isReduceMotionEnabled) {
+                intro = true
+            }
         }
         .fullScreenCover(item: Binding(get: { onboarding.map(OnboardingBox.init) }, set: { onboarding = $0?.status })) { box in
             OnboardingView(status: box.status) { onboarding = nil }
