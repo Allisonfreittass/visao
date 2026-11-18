@@ -23,7 +23,7 @@ export function Login({ api, onLoggedIn, onPasswordFocus }: LoginProps) {
     try {
       onLoggedIn(await api.login(email.trim(), password), remember);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Não consegui falar com o servidor.");
+      setError(e instanceof ApiError ? e.message : "Sem conexão com o servidor. Tente de novo.");
     } finally {
       setBusy(false);
     }
@@ -32,7 +32,7 @@ export function Login({ api, onLoggedIn, onPasswordFocus }: LoginProps) {
   return (
     <form className="login" onSubmit={submit}>
       <div className="rs-campo">
-        <label htmlFor="login-email">Email</label>
+        <label htmlFor="login-email">E-mail</label>
         <input id="login-email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <div className="rs-campo" data-estado={error ? "erro" : undefined}>
@@ -52,10 +52,10 @@ export function Login({ api, onLoggedIn, onPasswordFocus }: LoginProps) {
       </div>
       <label className="memory-toggle">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        Manter conectado
+        Manter conectado neste aparelho
       </label>
       <button type="submit" className="rs-botao rs-botao--principal" disabled={busy}>
-        {busy ? "Entrando…" : "Entrar"}
+        {busy ? "Verificando…" : "Acessar"}
       </button>
     </form>
   );

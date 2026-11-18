@@ -1,7 +1,7 @@
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { type Api, type Panel, utcDate } from "../api";
-import { HOME_SUGGESTIONS, homeGreeting } from "../brand/copy";
+import { homeGreeting } from "../brand/copy";
 import { Ciclope } from "../ciclope/Ciclope";
 import type { AssistantState, CiclopeState } from "../ciclope/state";
 import type { Pending } from "../hooks/usePending";
@@ -26,16 +26,53 @@ export interface CallControls {
   onOpenSettings: () => void;
 }
 
-/** The line under the greeting, from what is really there: what waits and the panels. */
-export function homeSummary(pendingCount: number, panels: Pick<Panel, "total">[] | null): string {
-  const parts: string[] = [];
-  if (pendingCount > 0) parts.push(pendingCount === 1 ? "1 coisa esperando você" : `${pendingCount} coisas esperando você`);
-  if (panels && panels.length > 0) {
-    const open = panels.filter((p) => p.total === null).length;
-    if (open > 0) parts.push(open === 1 ? "1 painel com preço a confirmar" : `${open} painéis com preço a confirmar`);
-    else parts.push(panels.length === 1 ? "1 painel em dia" : `${panels.length} painéis em dia`);
-  }
-  return parts.length ? `${parts.join(" · ")}.` : "Nada esperando por você agora.";
+/** "2 painéis" (a non-breaking space between the number and the word). */
+export function watchCount(panels: Pick<Panel, "status">[] | null): string | null {
+  const watched = (panels ?? []).filter((p) => p.status !== "paused").length;
+  if (watched === 0) return null;
+  return `${watched}\u00a0${watched === 1 ? "painel" : "painéis"}`;
+}
+
+interface StatusSignals {
+  online: boolean;
+  /** null: no Mac paired. */
+  macOnline: boolean | null;
+  pendingCount: number;
+  panels: Pick<Panel, "items">[] | null;
+}
+
+/** The status line under the greeting, from real data: "Sistemas prontos · Mac conectado ·
+ * 1 voo aguardando preço". */
+export function statusLine({ online, macOnline, pendingCount, panels }: StatusSignals): string {
+  if (!online) return "Sem conexão com o servidor.";
+  const parts = ["Sistemas prontos"];
+  if (macOnline === true) parts.push("Mac conectado");
+  if (macOnline === false) parts.push("Sem conexão com o Mac");
+  const items = (panels ?? []).flatMap((p) => p.items).filter((i) => i.cost === null);
+  const flights = items.filter((i) => i.kind === "flight").length;
+  const hotels = items.length - flights;
+  if (flights) parts.push(`${flights} ${flights === 1 ? "voo aguardando" : "voos aguardando"} preço`);
+  if (hotels) parts.push(`${hotels} ${hotels === 1 ? "hospedagem aguardando" : "hospedagens aguardando"} preço`);
+  if (pendingCount) parts.push(`${pendingCount} ${pendingCount === 1 ? "pedido esperando" : "pedidos esperando"} você`);
+  return parts.join(" · ");
+}
+
+interface Suggestion {
+  label: string;
+  draft?: string;
+  open?: () => void;
+}
+
+/** The chips over the message box, from what is there: always the day's report; watching the
+ * flights when a panel has one; opening the first project. */
+export function homeSuggestions(panels: Pick<Panel, "title" | "items">[] | null, project: { id: string; name: string } | null, openProject: (id: string) => void): Suggestion[] {
+  const list: Suggestion[] = [{ label: "Relatório do dia", draft: "Me dá o relatório do dia" }];
+  const flight = (panels ?? []).find((p) => p.items.some((i) => i.kind === "flight"));
+  if (flight) list.push({ label: "Vigiar preço dos voos", draft: `Vigie o preço dos voos de «${flight.title}» e me avise se cair` });
+  else list.push({ label: "Vigiar um preço", draft: "Quero acompanhar " });
+  if (project) list.push({ label: `Abrir projeto ${project.name}`, open: () => openProject(project.id) });
+  else list.push({ label: "Pedir ao Mac", draft: "/mac " });
+  return list;
 }
 
 const THOUGHT_POLL_MS = 30_000;
@@ -66,11 +103,17 @@ interface InboxViewProps {
   pending: Pending;
   current: string | null;
   onReplied: (conversationId: string) => void;
+  online: boolean;
+  /** null: no Mac paired. */
+  macOnline: boolean | null;
+  /** A project to offer in the chips (the first one), if any. */
+  project: { id: string; name: string } | null;
+  onOpenProject: (id: string) => void;
 }
 
 /** Início: the Ciclope and the greeting, a line about the day, the live panels, everything that
  * waits for a yes, a no or a read, and the message box at the bottom. */
-export function InboxView({ api, call, onDraft, onSend, pending, current, onReplied }: InboxViewProps) {
+export function InboxView({ api, call, onDraft, onSend, pending, current, onReplied, online, macOnline, project, onOpenProject }: InboxViewProps) {
   const empty = pending.count === 0;
   const [panels, setPanels] = useState<Panel[] | null>(null);
   const [hello, setHello] = useState(() => homeGreeting());
@@ -88,9 +131,9 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
         <header className="home-hero">
           <Ciclope state={call.ciclope} size={96} level={call.levelActive ? call.level : undefined} lookAt="pointer" />
           <h1 id="home-title" className="home-greeting">
-            <span>{hello}</span> O que a gente <em>resolve</em> hoje?
+            <span>{hello}</span> {watchCount(panels) ? <>Estou de olho em <em>{watchCount(panels)}</em>.</> : "Nada sob vigilância ainda."}
           </h1>
-          <p className="home-summary">{homeSummary(pending.count, panels)}</p>
+          <p className="home-summary">{statusLine({ online, macOnline, pendingCount: pending.count, panels })}</p>
           {call.speaking && (
             <button type="button" className="rs-botao rs-botao--compacto" onClick={call.onStopSpeaking}>Parar de falar</button>
           )}
@@ -98,7 +141,7 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
 
         {thought && (
           <section className="home-card home-thought" aria-labelledby="home-thought">
-            <h2 id="home-thought" className="rotulo">Pensando agora</h2>
+            <h2 id="home-thought" className="rotulo">Em análise</h2>
             <p>{thought.content}</p>
             <time>{dayLabel(utcDate(thought.created_at))}</time>
           </section>
@@ -203,16 +246,16 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
             ))}
           </section>
         )}
-        {empty && <p className="note page-empty">Eu só proponho: quando eu quiser fazer algo por conta própria, aparece aqui primeiro.</p>}
+        {empty && <p className="note page-empty">Nada esperando você. O que eu quiser fazer por conta própria aparece aqui antes.</p>}
       </div>
 
-      <HomeComposer call={call} onSend={onSend} />
+      <HomeComposer call={call} onSend={onSend} suggestions={homeSuggestions(panels, project, onOpenProject)} />
     </section>
   );
 }
 
 /** Início's message box: suggestions above, the microphone on the left, send on the right. */
-function HomeComposer({ call, onSend }: { call: CallControls; onSend: (text: string) => void }) {
+function HomeComposer({ call, onSend, suggestions }: { call: CallControls; onSend: (text: string) => void; suggestions: Suggestion[] }) {
   const [draft, setDraft] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -234,13 +277,14 @@ function HomeComposer({ call, onSend }: { call: CallControls; onSend: (text: str
   return (
     <div className="home-dock">
       <ul className="suggestion-chips" aria-label="Sugestões">
-        {HOME_SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <li key={s.label}>
             <button
               type="button"
               className="chip-button"
               onClick={() => {
-                setDraft(s.draft);
+                if (s.open) return s.open();
+                setDraft(s.draft ?? "");
                 box.current?.focus();
               }}
             >
@@ -257,7 +301,7 @@ function HomeComposer({ call, onSend }: { call: CallControls; onSend: (text: str
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Escreva ou toque no microfone…"
+            placeholder="Dê uma ordem ao Visão"
             rows={1}
             maxLength={8000}
             aria-label="Mensagem"

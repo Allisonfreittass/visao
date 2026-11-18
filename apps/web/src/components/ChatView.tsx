@@ -75,6 +75,42 @@ interface ChatViewProps {
   ciclope?: CiclopeState;
   /** Voice level 0..1 while it speaks. */
   voiceLevel?: () => number;
+  /** The turn in flight, step by step (shown as step cards before the reply's text). */
+  steps?: ProgressStep[];
+}
+
+/** Which sensor goes on a step card, from what the step says. */
+export function stepSensor(label: string): CritterKind {
+  if (/\bmac\b|finder|safari|claude code|terminal/i.test(label)) return "mac";
+  if (/gmail|e-?mail/i.test(label)) return "email";
+  if (/agenda|caderno|anota/i.test(label)) return "caderno";
+  return "projeto";
+}
+
+function StepCards({ steps }: { steps: ProgressStep[] }) {
+  if (steps.length === 0) return null;
+  return (
+    <ol className="step-cards" aria-label="Passos">
+      {steps.map((step, i) => {
+        const now = i === steps.length - 1;
+        const kind = stepSensor(step.label);
+        return (
+          <li key={`${i}-${step.label}`} className="step-card">
+            <Critter kind={kind} size={28} color={kind === "projeto" ? "#8E9AAF" : undefined} />
+            <span className="step-card-text">
+              {step.label}
+              {step.detail && <small>{step.detail}</small>}
+            </span>
+            {now ? (
+              <span className="step-card-status step-card-status--now"><span className="step-spinner" aria-hidden="true" />agora</span>
+            ) : (
+              <span className="step-card-status">✓ feito</span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 /** Which of the Ciclope's family goes on a card that waits for a yes. */
@@ -131,7 +167,7 @@ function useReveal(target: string) {
 /** The assistant's bubble while it works: it breathes with the current step, then the text comes
  * in where the dots were, and when the reply has arrived and finished showing it hands over to
  * the message itself (the same bubble, no jump). */
-function LiveBubble({ text, status, onStop, settling, onSettled, ciclope = "thinking" }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void; ciclope?: CiclopeState }) {
+function LiveBubble({ text, status, onStop, settling, onSettled, ciclope = "thinking", steps = [] }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void; ciclope?: CiclopeState; steps?: ProgressStep[] }) {
   const reveal = useReveal(text);
   useEffect(() => {
     if (settling && reveal.done) onSettled?.();
@@ -140,21 +176,22 @@ function LiveBubble({ text, status, onStop, settling, onSettled, ciclope = "thin
     return (
       <div className="live-status" role="status" aria-live="polite">
         <div className="bubble assistant pending">
-          <Ciclope state={ciclope} size={24} decorative className="message-avatar" />
-          <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Pensando"}</span>
+          <Ciclope state={ciclope} size={36} decorative className="message-avatar" />
+          <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Processando"}</span>
           {onStop && (
             <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
               <span aria-hidden="true">×</span>
             </button>
           )}
         </div>
-        {status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
+        {steps.length > 1 ? <StepCards steps={steps} /> : status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
       </div>
     );
   }
   return (
     <div className="bubble assistant bubble--live" aria-live="off">
-      <div className="message-meta message-meta--live"><Ciclope state={ciclope} size={24} decorative className="message-avatar" /><span>V.I.S.A.O.</span></div>
+      <div className="message-meta message-meta--live"><Ciclope state={ciclope} size={36} decorative className="message-avatar" /><span className="message-label">Visão · {settling ? "concluído" : "respondendo"}</span></div>
+      {!settling && <StepCards steps={steps} />}
       {!settling && status && <span key={status.label} className="live-status-label live-status-label--inline">{status.label}</span>}
       <MessageContent text={reveal.text} chunks={reveal.chunks} />
       {!settling && onStop && (
@@ -166,7 +203,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled, ciclope = "thin
   );
 }
 
-export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage, ciclope = "idle", voiceLevel }: ChatViewProps) {
+export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage, ciclope = "idle", voiceLevel, steps = [] }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   // In the continuous conversation: a divider at each new day and at each stretch's start.
   const divided = useMemo(() => (segments ? dividers(messages, segments, utcDate) : new Map<string, string>()), [messages, segments]);
@@ -302,9 +339,8 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
       >
         {messages.length === 0 && !sending && (
           <div className="empty-conversation">
-            <span className="rotulo">Conversa nova</span>
-            <h2>Por onde a gente <em>começa?</em></h2>
-            <p>Um bug, uma ideia pela metade, um plano. Pode escrever, colar código, mandar uma foto ou um arquivo, ou me ligar.</p>
+            <h2>Pronto para a <em>ordem.</em></h2>
+            <p>Escreva, cole código, mande uma foto ou um arquivo, ou fale pelo microfone.</p>
           </div>
         )}
         {olderLeft && onLoadOlder && (
@@ -354,9 +390,13 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             )}
             <div className="message-meta">{m.role === "assistant" && (
               i === shown.length - 1 && !sending
-                ? <Ciclope state={ciclope} size={24} level={ciclope === "speaking" ? voiceLevel : undefined} decorative className="message-avatar" />
-                : <Ciclope state="idle" size={24} animated={false} decorative className="message-avatar" />
-            )}<span>{m.role === "user" ? "Você" : agentName ?? "V.I.S.A.O."}</span>{m.origin === "arm" && <Critter kind="mac" size={18} />}{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
+                ? <Ciclope state={ciclope} size={36} level={ciclope === "speaking" ? voiceLevel : undefined} decorative className="message-avatar" />
+                : <Ciclope state="idle" size={36} animated={false} decorative className="message-avatar" />
+            )}{m.role === "assistant" ? (
+              i === shown.length - 1 && !sending && ciclope === "working"
+                ? <span className="message-label message-label--working">Visão · executando no Mac</span>
+                : <span className="message-label">Visão · concluído</span>
+            ) : <span>Você</span>}{m.origin === "arm" && <Critter kind="mac" size={18} />}{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.parts && m.parts.length > 1
               ? m.parts.map((part, n) => (
@@ -400,7 +440,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           </Fragment>
         ))}
         {(sending || settlingId) && (
-          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} ciclope={sending ? "thinking" : ciclope} />
+          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} ciclope={sending ? "thinking" : ciclope} steps={steps} />
         )}
         {asks.map((ask) => (
           <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>

@@ -898,6 +898,8 @@ export function App() {
       {!firstRun && ready && (
         <div className="layout">
           <Rail
+            api={api}
+            ciclope={ciclope}
             open={menuOpen}
             view={inProject ? "projects" : view}
             preparing={preparing}
@@ -929,6 +931,10 @@ export function App() {
                   setView("conversation");
                   void send(text);
                 }}
+                online={online}
+                macOnline={macOnline}
+                project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
+                onOpenProject={(id) => void openProjectChat(id)}
                 pending={pending}
                 current={current}
                 onReplied={(conversationId) => {
@@ -991,6 +997,7 @@ export function App() {
               composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
               ciclope={ciclope}
               voiceLevel={voice.level}
+              steps={liveSteps}
               header={
                 <>
                   {projectBar}
@@ -1046,13 +1053,16 @@ export function App() {
         <div className="layout">
           <main className="main auth-main">
             <div className="entrance">
-              <Ciclope state={ciclope} size={160} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" eyesClosed={notLooking} />
+              <div className="entrance-mascot">
+                <Ciclope state={ciclope} size={124} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" eyesClosed={notLooking} />
+                {notLooking && <span className="entrance-bubble" role="status">Não estou olhando.</span>}
+              </div>
               {demo ? (
                 <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>
               ) : (
                 <div className="entrance-words">
-                  <h1>Oi. Pronto pra começar?</h1>
-                  <p className="lede">Entre para falar com o V.I.S.A.O.</p>
+                  <h1>Identifique-se.</h1>
+                  <p className="lede">Acesso restrito. Só você entra aqui.</p>
                 </div>
               )}
             </div>

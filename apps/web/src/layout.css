@@ -53,13 +53,19 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .rail-dot.on { background: var(--success); }
 .rail-preparing { padding: 0 12px; font-size: 13px; }
 .rail-bottom { margin-top: auto; display: grid; gap: var(--space-3); padding: 0; }
-.rail-status { justify-self: start; display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--surface-2);
-  color: var(--text); font: 500 13px/1 var(--font-sans); }
-.rail-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
-.rail-status--off { color: var(--text-muted); }
+.rail-offline { margin: 0; padding: 0 12px; font: 500 13px/1.4 var(--font-sans); color: var(--amber); }
+.rail-section { display: grid; gap: 4px; }
+.rail-heading { margin: 0; padding: 0 12px 4px; font: 600 12px/1.4 var(--font-sans); color: var(--text-muted); }
+.rail-integrations { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.rail-integrations button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 4px 12px; border: 0; border-radius: var(--radius-chip);
+  background: transparent; color: var(--text); text-align: left; }
+.rail-integrations button:hover, .rail-integrations button[aria-current] { background: var(--surface-2); }
+.rail-integration-text { display: grid; gap: 2px; min-width: 0; font: 500 14px/1.2 var(--font-sans); }
+.rail-integration-text small { font: 500 12px/1.2 var(--font-sans); color: var(--text-muted); }
+.rail-integration-text small.on { color: var(--green); }
 .rail-me { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0 8px; border-top: 1px solid var(--border); }
 .rail-avatar, .mobile-bar-avatar { width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
-  background: var(--iris); color: #fff; font: 700 15px/1 var(--font-sans); }
+  background: var(--text); color: var(--bg); font: 700 15px/1 var(--font-sans); }
 .rail-name { flex: 1; min-width: 0; font: 600 14px/1.2 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-settings { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: var(--radius-chip); background: transparent; color: var(--text-muted); }
 .rail-settings:hover, .rail-settings[aria-current] { background: var(--surface-2); color: var(--text); }
@@ -278,10 +284,15 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .auth-main > * { max-width: 400px; }
 .entrance { display: grid; justify-items: center; gap: var(--space-4); text-align: center; }
 .entrance-words { display: grid; gap: var(--space-2); }
+.entrance-mascot { position: relative; }
+.entrance-bubble { position: absolute; left: calc(100% - 6px); top: -14px; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: 12px 12px 12px 4px;
+  background: var(--surface); color: var(--text-2); font: 500 13px/1.3 var(--font-sans); white-space: nowrap; animation: bubble-in .2s var(--ease) both; }
+@keyframes bubble-in { from { opacity: 0; transform: translateX(-4px); } }
+@media (max-width: 420px) { .entrance-bubble { font-size: 12px; padding: 6px 10px; } }
 .entrance-words h1 { margin: 0; font: 700 44px/1.08 var(--font-display); letter-spacing: var(--tracking-display); }
 .entrance-words .lede { margin: 0 auto; color: var(--text-muted); }
 .auth-main .login { display: grid; gap: 14px; margin-top: var(--space-5); padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float); text-align: left; }
-.login .memory-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 400 15px/1.3 var(--font-sans); color: var(--text); }
+.login .memory-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font: 400 15px/1.3 var(--font-sans); color: var(--text); }
 .login .memory-toggle input { width: 20px; height: 20px; margin: 0; accent-color: var(--text-2); }
 .login .rs-botao--principal { width: 100%; min-height: 52px; font-size: 16px; }
 .demo { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: var(--space-5); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
@@ -314,3 +325,31 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .list-group, .settings-group { padding: var(--space-3) var(--space-4) var(--space-1); }
 }
 [data-teclado] .app { padding-bottom: 6px; }
+
+/* ---------- Sentinela: etiquetas, cards de painel, rótulos do chat, cartões de passo ---------- */
+.tag { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-muted); font: 600 12px/1 var(--font-sans); white-space: nowrap; }
+.tag--amber { background: var(--amber-bg); color: var(--amber); }
+.tag--green { color: var(--green); }
+.live-panel-top { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.live-panel-icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-chip); background: var(--surface-2); color: var(--text-2); }
+.live-panel-top h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-panel-head { gap: 10px; }
+.live-panel-missing { display: grid; gap: 8px; justify-items: start; padding-top: 4px; }
+.live-panel-missing button { min-height: 40px; }
+.home-greeting { font: 700 44px/1.1 var(--font-display); letter-spacing: var(--tracking-display); }
+.home-greeting em { white-space: nowrap; }
+.home-summary { font: 500 15px/1.45 var(--font-sans); }
+.message-label { font: 500 13px/1.3 var(--font-sans); color: var(--text-muted); }
+.message-label--working { color: var(--amber); }
+.step-cards { display: grid; gap: 8px; margin: 2px 0 10px 46px; padding: 0; list-style: none; }
+.step-card { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--surface); }
+.step-card-text { min-width: 0; display: grid; gap: 2px; font: 500 14px/1.3 var(--font-sans); color: var(--text); }
+.step-card-text small { font: 400 12px/1.3 var(--font-sans); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-card-status { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--font-sans); color: var(--green); white-space: nowrap; }
+.step-card-status--now { color: var(--text-muted); }
+.step-spinner { width: 12px; height: 12px; border: 2px solid var(--border-strong); border-top-color: var(--red); border-radius: 50%; animation: anexo-gira .8s linear infinite; }
+.bubble.assistant .message-content, .bubble.assistant .bubble-part, .bubble.assistant > .message-attachments { margin-left: 46px; }
+@media (max-width: 560px) {
+  .home-greeting { font-size: 32px; }
+  .step-cards, .bubble.assistant .message-content, .bubble.assistant .bubble-part, .bubble.assistant > .message-attachments { margin-left: 0; }
+}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { type Api, type Panel, type PanelItem, type PanelSuggestion, utcDate } from "../api";
 import { assumedLine } from "./QuoteTable";
+import { Icon } from "./Icon";
 
 const REFRESH_MS = 60_000;
 
@@ -28,6 +29,20 @@ export function checkedLabel(panel: Pick<Panel, "checked_at" | "checked_today">)
   return `conferido em ${at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}, ${time} · não conferido hoje`;
 }
 
+/** What is already known about a panel: the total, or the sum of the prices it has with what is
+ * still missing ("R$ 164 + voo"); the amber tag for what is pending; whether data is missing. */
+export function panelKnown(panel: Pick<Panel, "total" | "items">): { amount: string; tag: string | null; missingData: boolean } {
+  if (panel.items.length === 0) return { amount: "—", tag: "Faltam dados", missingData: true };
+  const total = brl(panel.total);
+  const open = panel.items.filter((i) => i.cost === null);
+  const known = panel.items.reduce((sum, i) => (i.cost === null ? sum : sum + Number(i.cost)), 0);
+  const missing = [...new Set(open.map((i) => (i.kind === "flight" ? "voo" : "hospedagem")))];
+  if (total && open.length === 0) return { amount: total, tag: null, missingData: false };
+  const tag = missing.length === 1 ? `${missing[0] === "voo" ? "Voo" : "Hospedagem"} a confirmar` : "Preços a confirmar";
+  const amount = known > 0 ? `${brl(String(known))} + ${missing.join(" + ")}` : "a confirmar";
+  return { amount, tag, missingData: false };
+}
+
 function monogram(provider: string): string {
   return provider.trim().charAt(0).toUpperCase() || "?";
 }
@@ -48,10 +63,12 @@ function ItemRow({ item }: { item: PanelItem }) {
   );
 }
 
-function PanelCard({ api, panel, onChanged }: { api: Api; panel: Panel; onChanged: () => void }) {
+function PanelCard({ api, panel, onChanged, onDraft }: { api: Api; panel: Panel; onChanged: () => void; onDraft: (text: string) => void }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<Panel | null>(null);
-  const total = brl(panel.total);
+  const known = panelKnown(panel);
+  const flight = panel.items.some((i) => i.kind === "flight") || /voo|passagem/i.test(panel.title);
+  const hotel = !flight && panel.items.some((i) => i.kind === "hotel");
   const below = panel.goal_gap !== null && Number(panel.goal_gap) < 0;
   const change = panel.change !== null ? Number(panel.change) : 0;
 
@@ -62,9 +79,12 @@ function PanelCard({ api, panel, onChanged }: { api: Api; panel: Panel; onChange
   return (
     <article className={`live-panel${panel.status === "paused" ? " live-panel--paused" : ""}`}>
       <button type="button" className="live-panel-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="rotulo">{panel.status === "paused" ? "Pausado" : "Painel"}</span>
-        <h3>{panel.title}</h3>
-        <span className="live-panel-total" key={panel.total ?? "x"}>{total ?? "a confirmar"}</span>
+        <span className="live-panel-top">
+          <span className="live-panel-icon" aria-hidden="true"><Icon name={flight ? "plane" : hotel ? "bed" : "coin"} size={18} /></span>
+          <h3>{panel.title}</h3>
+          {panel.status === "paused" ? <span className="tag">Pausado</span> : known.tag && <span className="tag tag--amber">{known.tag}</span>}
+        </span>
+        <span className="live-panel-total" key={panel.total ?? "x"}>{known.amount}</span>
         {panel.spec.travelers && panel.spec.travelers > 1 && <span className="live-panel-sub">total para {panel.spec.travelers}</span>}
         {assumedLine(panel.spec.assumed) && <span className="live-panel-sub">{assumedLine(panel.spec.assumed)}</span>}
         {panel.goal_words && <span className={`live-panel-goal${below ? " live-panel-goal--below" : ""}`}>{panel.goal_words}</span>}
@@ -76,8 +96,13 @@ function PanelCard({ api, panel, onChanged }: { api: Api; panel: Panel; onChange
       </button>
       <ul className="panel-items">
         {panel.items.map((item, i) => <ItemRow key={`${item.kind}-${i}`} item={item} />)}
-        {panel.items.length === 0 && <li className="note">Os preços ainda estão a confirmar.</li>}
       </ul>
+      {known.missingData && (
+        <div className="live-panel-missing">
+          <p className="note">Faltam as datas para eu procurar os preços.</p>
+          <button type="button" onClick={() => onDraft(`As datas para «${panel.title}»: `)}>Informar datas</button>
+        </div>
+      )}
       <p className="live-panel-when">
         {checkedLabel(panel)}
         {watchLabel(panel) && <span className="live-panel-watch"> · {watchLabel(panel)}</span>}
@@ -161,7 +186,7 @@ export function PanelsBoard({ api, nothingPending, onDraft, projectId, onPanels 
   return (
     <section className="list-group panels-board" aria-label="Painéis">
       <h2 className="rotulo">Painéis</h2>
-      {panels.map((panel) => <PanelCard key={panel.id} api={api} panel={panel} onChanged={load} />)}
+      {panels.map((panel) => <PanelCard key={panel.id} api={api} panel={panel} onChanged={load} onDraft={onDraft} />)}
       {panels.length === 0 && nothingPending && suggested.length > 0 && (
         <>
         <p className="note panel-suggestions-hint">Sugestões: tocar escreve o pedido na conversa, e nada roda antes de você mandar.</p>
