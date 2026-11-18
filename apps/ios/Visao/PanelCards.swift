@@ -10,6 +10,8 @@ struct PanelsSection: View {
     /// In a project's card: only its panels, without suggestions or "Criar", and nothing when
     /// it has none.
     var projectId: String? = nil
+    /// Hears about the panels each time they load (Início's greeting and status line).
+    var onPanels: (([LivePanel]) -> Void)? = nil
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -62,6 +64,7 @@ struct PanelsSection: View {
         guard let all = try? await session.api.panels() else { return }
         let list = projectId.map { id in all.filter { $0.projectId == id } } ?? all
         panels = list
+        onPanels?(list)
         if list.isEmpty && nothingPending && projectId == nil, let ideas = try? await session.api.panelSuggestions() {
             suggested = ideas
         }

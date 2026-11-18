@@ -10,16 +10,59 @@ struct InicioView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
+    @State private var panels: [LivePanel]?
+    @State private var macOnline: Bool?
+
     private var pending: PendingStore { session.pending }
+    private var online: Bool { session.listError == nil }
 
     var body: some View {
-        GlassPage(
-            label: "Início",
-            title: pending.count == 0 ? "Nada esperando " : "O que precisa ",
-            italic: pending.count == 0 ? "por você." : "de você.",
-            lede: "Eu só proponho. Nada roda sem o seu sim."
-        ) {
-            PanelsSection(nothingPending: pending.count == 0, onDraft: onDraft)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                hero
+                content
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .safeAreaInset(edge: .bottom) { HomeBox(onDraft: onDraft) }
+        .refreshable { await pending.refresh() }
+        .task {
+            await pending.refresh()
+            macOnline = (try? await session.api.armDevices()).flatMap { list in list.isEmpty ? nil : list.contains { $0.online } }
+        }
+    }
+
+    /// The mascot, "Boa noite, Allison." / "Estou de olho em 2 painéis." (the number in red),
+    /// and the status line, all from real data.
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SentinelaView(state: online ? .idle : .offline, size: 64)
+            Group {
+                if let count = HomeLines.watchCount(panels) {
+                    Text("\(Opening.greeting()), \(OwnerName.value).\n") + Text("Estou de olho em ") + Text(count).foregroundColor(palette.redText) + Text(".")
+                } else {
+                    Text("\(Opening.greeting()), \(OwnerName.value).\nNada sob vigilância ainda.")
+                }
+            }
+            .font(Typo.display(32, relativeTo: .largeTitle))
+            .foregroundStyle(palette.text)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityAddTraits(.isHeader)
+            Text(HomeLines.status(online: online, macOnline: macOnline, pendingCount: pending.count, panels: panels))
+                .font(Typo.text(.subheadline, weight: .medium))
+                .foregroundStyle(palette.textMuted)
+        }
+        .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+            PanelsSection(nothingPending: pending.count == 0, onDraft: onDraft, onPanels: { panels = $0 })
             let mac = pending.asks.filter { if case .arm = $0.source { true } else { false } }
             let google = pending.asks.filter { if case .google = $0.source { true } else { false } }
             let panels = pending.asks.filter { if case .panel = $0.source { true } else { false } }
@@ -97,13 +140,10 @@ struct InicioView: View {
                 }
             }
             if pending.count == 0 {
-                Text("Quando eu quiser fazer algo por conta própria, aparece aqui primeiro.")
+                Text("Nada esperando você. O que eu quiser fazer por conta própria aparece aqui antes.")
                     .font(Typo.text(.footnote))
-                    .foregroundStyle(palette.tintaSuave)
+                    .foregroundStyle(palette.textMuted)
             }
-        }
-        .refreshable { await pending.refresh() }
-        .task { await pending.refresh() }
     }
 
     private func item(id: String, title: String, lines: [String], date: Date?, decide: @escaping (Bool) -> Void) -> some View {
@@ -136,5 +176,52 @@ struct InicioView: View {
                     .foregroundStyle(palette.tintaFraca)
             }
         }
+    }
+}
+
+/// Início's message box, above the tab bar: what you write goes to the chat's box, ready to send.
+private struct HomeBox: View {
+    let onDraft: (String) -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        HStack(spacing: 6) {
+            TextField("Dê uma ordem ao Visão", text: $text, axis: .vertical)
+                .font(Typo.text(.body))
+                .lineLimit(1...4)
+                .focused($focused)
+                .padding(.leading, 14)
+                .padding(.vertical, 12)
+                .submitLabel(.send)
+                .onSubmit(send)
+                .accessibilityLabel("Mensagem")
+            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button(action: send) {
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(palette.onRed)
+                        .frame(width: 40, height: 40)
+                        .background(palette.red, in: Circle())
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Enviar para o chat")
+            }
+        }
+        .padding(2)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(palette.border))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func send() {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        text = ""
+        focused = false
+        onDraft(value)
     }
 }

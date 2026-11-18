@@ -192,7 +192,7 @@ struct ChatScreen: View {
                     draft: draft,
                     thinking: store.sending,
                     speaker: session.speakerName,
-                    placeholder: "Enviar mensagem para \(session.agentName ?? "o Visão")",
+                    placeholder: "Dê uma ordem ao Visão",
                     onPick: { picker = $0 },
                     onCall: { startCall() },
                     live: call != nil,
@@ -477,18 +477,17 @@ private struct EmptyConversation: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Rotulo("Conversa nova")
-            (Text("Por onde a gente ").font(Typo.display(30, relativeTo: .title))
-                + Text("começa?").font(Typo.display(30, relativeTo: .title, italic: true)))
+            SentinelaView(state: .idle, size: 64)
+            (Text("Pronto para a ").font(Typo.display(30, relativeTo: .title))
+                + Text("ordem.").font(Typo.display(30, relativeTo: .title)).foregroundColor(palette.redText))
                 .multilineTextAlignment(.center)
-            Text("Um bug, uma ideia pela metade, um plano. Pode escrever, colar código, mandar uma foto ou um arquivo.")
+            Text("Escreva, cole código, mande uma foto ou um arquivo, ou fale pelo microfone.")
                 .font(Typo.text(.callout))
-                .foregroundStyle(palette.tintaSuave)
+                .foregroundStyle(palette.textMuted)
                 .multilineTextAlignment(.center)
         }
-        .padding(28)
+        .padding(24)
         .frame(maxWidth: .infinity)
-        .glass(palette, cornerRadius: 32)
         .padding(.top, 60)
         .accessibilityElement(children: .combine)
     }
