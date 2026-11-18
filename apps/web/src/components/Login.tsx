@@ -5,9 +5,11 @@ import { type Api, ApiError } from "../api";
 interface LoginProps {
   api: Api;
   onLoggedIn: (token: string, remember: boolean) => void;
+  /** The password field got or lost the focus (the Ciclope closes its eye: "not looking"). */
+  onPasswordFocus?: (focused: boolean) => void;
 }
 
-export function Login({ api, onLoggedIn }: LoginProps) {
+export function Login({ api, onLoggedIn, onPasswordFocus }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
@@ -41,6 +43,8 @@ export function Login({ api, onLoggedIn }: LoginProps) {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onFocus={() => onPasswordFocus?.(true)}
+          onBlur={() => onPasswordFocus?.(false)}
           required
           aria-describedby={error ? "login-error" : undefined}
         />
@@ -48,7 +52,7 @@ export function Login({ api, onLoggedIn }: LoginProps) {
       </div>
       <label className="memory-toggle">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        Manter conectado neste aparelho
+        Manter conectado
       </label>
       <button type="submit" className="rs-botao rs-botao--principal" disabled={busy}>
         {busy ? "Entrando…" : "Entrar"}

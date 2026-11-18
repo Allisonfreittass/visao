@@ -13,6 +13,9 @@ export interface Ask {
   onApprove: () => void;
   onReject: () => void;
 }
+import { Ciclope } from "../ciclope/Ciclope";
+import { Critter, type CritterKind } from "../ciclope/Family";
+import type { CiclopeState } from "../ciclope/state";
 import { ArtifactCard, ArtifactViewer } from "./ArtifactCard";
 import { Icon } from "./Icon";
 import { SwipeReply } from "./SwipeReply";
@@ -68,6 +71,18 @@ interface ChatViewProps {
   onDeleteArtifact: (artifact: ArtifactSummary) => void;
   /** On a computer, pages open beside the chat (the app shows them); otherwise over it, here. */
   onOpenPage?: (artifact: ArtifactSummary) => void;
+  /** The assistant's live state, for the Ciclope beside its newest reply. */
+  ciclope?: CiclopeState;
+  /** Voice level 0..1 while it speaks. */
+  voiceLevel?: () => number;
+}
+
+/** Which of the Ciclope's family goes on a card that waits for a yes. */
+function askCritter(label: string): CritterKind {
+  if (/^mac/i.test(label)) return "mac";
+  if (/email|e-mail/i.test(label)) return "email";
+  if (/agenda|evento/i.test(label)) return "caderno";
+  return "projeto";
 }
 
 function uploadError(e: unknown): string {
@@ -116,7 +131,7 @@ function useReveal(target: string) {
 /** The assistant's bubble while it works: it breathes with the current step, then the text comes
  * in where the dots were, and when the reply has arrived and finished showing it hands over to
  * the message itself (the same bubble, no jump). */
-function LiveBubble({ text, status, onStop, settling, onSettled }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void }) {
+function LiveBubble({ text, status, onStop, settling, onSettled, ciclope = "thinking" }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void; ciclope?: CiclopeState }) {
   const reveal = useReveal(text);
   useEffect(() => {
     if (settling && reveal.done) onSettled?.();
@@ -125,7 +140,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
     return (
       <div className="live-status" role="status" aria-live="polite">
         <div className="bubble assistant pending">
-          <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
+          <Ciclope state={ciclope} size={24} decorative className="message-avatar" />
           <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Pensando"}</span>
           {onStop && (
             <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
@@ -139,6 +154,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
   }
   return (
     <div className="bubble assistant bubble--live" aria-live="off">
+      <div className="message-meta message-meta--live"><Ciclope state={ciclope} size={24} decorative className="message-avatar" /><span>V.I.S.A.O.</span></div>
       {!settling && status && <span key={status.label} className="live-status-label live-status-label--inline">{status.label}</span>}
       <MessageContent text={reveal.text} chunks={reveal.chunks} />
       {!settling && onStop && (
@@ -150,7 +166,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled }: { text: strin
   );
 }
 
-export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage }: ChatViewProps) {
+export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage, ciclope = "idle", voiceLevel }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   // In the continuous conversation: a divider at each new day and at each stretch's start.
   const divided = useMemo(() => (segments ? dividers(messages, segments, utcDate) : new Map<string, string>()), [messages, segments]);
@@ -336,7 +352,11 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
                 <span className="bubble-quote-text">{m.reply_to.excerpt}</span>
               </button>
             )}
-            <div className="message-meta"><span>{m.role === "user" ? "Você" : agentName ?? "Ele"}</span>{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
+            <div className="message-meta">{m.role === "assistant" && (
+              i === shown.length - 1 && !sending
+                ? <Ciclope state={ciclope} size={24} level={ciclope === "speaking" ? voiceLevel : undefined} decorative className="message-avatar" />
+                : <Ciclope state="idle" size={24} animated={false} decorative className="message-avatar" />
+            )}<span>{m.role === "user" ? "Você" : agentName ?? "V.I.S.A.O."}</span>{m.origin === "arm" && <Critter kind="mac" size={18} />}{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.parts && m.parts.length > 1
               ? m.parts.map((part, n) => (
@@ -380,11 +400,11 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           </Fragment>
         ))}
         {(sending || settlingId) && (
-          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} />
+          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} ciclope={sending ? "thinking" : ciclope} />
         )}
         {asks.map((ask) => (
           <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
-            <span className="action-card-label">{ask.label}</span>
+            <span className="action-card-label"><Critter kind={askCritter(ask.label)} size={22} />{ask.label}</span>
             <p className="action-card-text">{ask.text}</p>
             {ask.detail && <p className="action-card-detail pre">{ask.detail}</p>}
             <div className="action-card-buttons">
@@ -447,7 +467,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             aria-label="Mensagem"
           />
           <button type="submit" className="composer-send" aria-label="Enviar mensagem" disabled={!canSend}>
-            <span aria-hidden="true">→</span>
+            <Icon name="send" size={20} />
           </button>
         </div>
       </form>

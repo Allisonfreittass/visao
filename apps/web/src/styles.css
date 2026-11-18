@@ -369,21 +369,10 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--linha-forte); border-radius: 6px; }
 
-@media (min-width: 1000px) {
-  .rail { display: flex; }
-  .topbar--app { display: none; }
-}
-@media (min-width: 1240px) {
-  .presence-panel { display: flex; }
-  .chat-head .presence--compacta { display: none; }
-}
 @media (max-width: 999px) {
   .topbar { padding: 0 var(--espaco-4); gap: var(--espaco-3); min-height: 60px; }
   .topbar--app .brand { margin-right: auto; }
   .brand { font-size: 26px; }
-  .rail.open { display: flex; position: fixed; z-index: var(--camada-sobreposicao); inset: calc(60px + env(safe-area-inset-top)) auto 0 0; width: min(300px, 86vw); background: var(--fundo-elevado); box-shadow: var(--elevacao); border-right: 1px solid var(--linha-forte); }
-  .rail.open .rail-brand { display: none; }
-  .scrim { display: block; position: fixed; inset: calc(60px + env(safe-area-inset-top)) 0 0 0; z-index: calc(var(--camada-sobreposicao) - 1); background: rgb(0 0 0 / .5); }
   .main { padding: var(--espaco-4) var(--espaco-4) var(--espaco-2); }
   .page-head h1, .empty-conversation h2, .onboarding h1 { font-size: 34px; }
 }

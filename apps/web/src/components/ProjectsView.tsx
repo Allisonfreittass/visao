@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import type { Api, Project } from "../api";
+import { Critter, projectColor } from "../ciclope/Family";
 
 interface ProjectsViewProps {
   api: Api;
@@ -53,10 +54,12 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
   if (list?.length === 0) {
     return (
       <section className="projects-vazio" aria-labelledby="projects-title">
-        <h1 id="projects-title">
-          <em>projetos</em> são o lugar de cada assunto: um chat só dele, com o que eu anotei, os painéis, as
-          páginas e os arquivos em cima. dê um nome, ou me peça na conversa: “cria o projeto…”.
-        </h1>
+        <Critter kind="projeto" size={72} color={projectColor("novo")} />
+        <h1 id="projects-title">Cada assunto, <em>um projeto.</em></h1>
+        <p className="lede">
+          Um chat só dele, com o que eu anotei, os painéis, as páginas e os arquivos em cima. Dê um nome, ou me
+          peça na conversa: “cria o projeto…”.
+        </p>
         {form}
       </section>
     );
@@ -65,8 +68,7 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
   return (
     <section className="page projects" aria-labelledby="projects-title">
       <header className="page-head">
-        <span className="rotulo">Projetos</span>
-        <h1 id="projects-title">Cada assunto <em>no seu chat.</em></h1>
+        <h1 id="projects-title">Projetos</h1>
         <p className="lede">Tocar abre o chat do projeto, com as anotações, os painéis e os arquivos em cima.</p>
       </header>
       <div className="page-body">
@@ -75,6 +77,7 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
         <div className="project-cards">
           {list?.map((p) => (
             <button type="button" key={p.id} className="project-card" onClick={() => onOpenProject(p.id)}>
+              <Critter kind="projeto" size={40} color={projectColor(p.name)} />
               <strong>{p.name}</strong>
               <span>{projectSummary(p)}</span>
             </button>

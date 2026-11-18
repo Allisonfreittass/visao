@@ -128,10 +128,12 @@ interface PanelsBoardProps {
   onDraft: (text: string) => void;
   /** Only this project's panels, without suggestions (inside a project). */
   projectId?: string;
+  /** Hears about the panels each time they load (Início's one-line summary). */
+  onPanels?: (panels: Panel[]) => void;
 }
 
 /** The live panels on Início: native cards the server keeps up to date (docs/PAINEIS.md). */
-export function PanelsBoard({ api, nothingPending, onDraft, projectId }: PanelsBoardProps) {
+export function PanelsBoard({ api, nothingPending, onDraft, projectId, onPanels }: PanelsBoardProps) {
   const [panels, setPanels] = useState<Panel[] | null>(null);
   const [suggested, setSuggested] = useState<PanelSuggestion[]>([]);
   const load = useCallback(() => {
@@ -140,6 +142,10 @@ export function PanelsBoard({ api, nothingPending, onDraft, projectId }: PanelsB
       () => setPanels([]),
     );
   }, [api, projectId]);
+
+  useEffect(() => {
+    if (panels) onPanels?.(panels);
+  }, [panels, onPanels]);
 
   useEffect(() => {
     load();
@@ -166,7 +172,7 @@ export function PanelsBoard({ api, nothingPending, onDraft, projectId }: PanelsB
         </ul>
         </>
       )}
-      <button type="button" className="panel-new ghost" onClick={() => onDraft("Quero acompanhar ")}>+ Criar um novo painel</button>
+      <button type="button" className="panel-new" onClick={() => onDraft("Quero acompanhar ")}>+ Criar um novo painel</button>
     </section>
   );
 }

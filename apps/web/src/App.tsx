@@ -27,20 +27,19 @@ import { MacView } from "./components/MacView";
 import { ProjectsView } from "./components/ProjectsView";
 import { ArtifactViewer } from "./components/ArtifactCard";
 import { Bench } from "./components/Bench";
-import { HomeColumn } from "./components/HomeColumn";
 import { ProjectColumn } from "./components/ProjectColumn";
 import { ProjectHeader } from "./components/ProjectHeader";
 import { useWide } from "./hooks/useWide";
 import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
-import { type CallControls, Presence, PresencePanel } from "./components/Presence";
+import { type CallControls } from "./components/InboxView";
+import { Lockup } from "./brand/Lockup";
 import { Rail, type WorkspaceView } from "./components/Rail";
 import { SettingsView } from "./components/SettingsView";
-import { SkyNav, SkyOrbButton } from "./components/SkyNav";
+import { MicButton, MobileBar } from "./components/SkyNav";
 import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
-import { dayLabel } from "./labels";
 import { Ciclope } from "./ciclope/Ciclope";
 import { type AssistantState, type CiclopeState, CICLOPE_LABELS, ciclopeState } from "./ciclope/state";
 import { parseMacCommand } from "./arm";
@@ -144,11 +143,12 @@ export function App() {
   );
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
-  // The layout of the "Céu" look is the only one now (marca Ciclope); the theme lives in brand/theme.ts.
-  const sky = true;
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
-  const [latency, setLatency] = useState<TurnLatency | null>(null);
+  // Measured each turn; shown in no screen of this brand (kept for whoever reads it later).
+  const [, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<CiclopeState>("idle");
+  // The password field has the focus: the Ciclope on the entrance closes its eye.
+  const [notLooking, setNotLooking] = useState(false);
   const demoLevel = useDemoLevel(demo && (demoState === "listening" || demoState === "speaking"));
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
@@ -166,7 +166,7 @@ export function App() {
   };
   const [liveSteps, setLiveSteps] = useState<ProgressStep[]>([]);
   // On a computer: three columns, and pages open beside the chat instead of over it.
-  const wide = useWide();
+  const wide = useWide(1280);
   useBackClose(menuOpen, () => setMenuOpen(false));
   const [bench, setBench] = useState<BenchData | null>(null);
   const [sidePage, setSidePage] = useState<ArtifactSummary | null>(null);
@@ -429,7 +429,7 @@ export function App() {
   }, [api, pendingPages]);
 
   // The Bancada follows the open conversation: after each turn and when a page gets ready.
-  const desk = sky && wide;
+  const desk = wide;
   const pageStates = messages.map((m) => m.artifact?.status ?? "").join(",");
   useEffect(() => {
     if (!desk || !current || sending) return;
@@ -804,6 +804,7 @@ export function App() {
     levelActive: voice.speaking || voice.inCall,
     canCall: voice.listenerKind !== null && online,
     speaking: voice.speaking,
+    inCall: voice.inCall,
     hint: callHint,
     onCall: () => { setError(null); void voice.startCall(); },
     onStopSpeaking: voice.stopSpeaking,
@@ -855,34 +856,27 @@ export function App() {
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
 
   return (
-    <div className={`app${sky ? " app--ceu" : ""}${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
+    <div className={`app${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
       <AmbientBackground />
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
-      {sky && ready && !firstRun && (
-        <SkyNav
-          wide={wide}
+      {ready && !firstRun && (
+        <MobileBar
           pendingCount={pending.count}
-          agentName={agentName}
+          ciclope={ciclope}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
           view={inProject ? "projects" : view}
           onView={go}
         />
       )}
-      <header className={`topbar ${ready ? "topbar--app" : ""}`}>
-        {ready && (
-          <button type="button" className="rs-botao rs-botao--compacto menu-button" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
-            Menu{pending.count > 0 && <span className="rail-badge" aria-label={`${pending.count} esperando você`}>{pending.count}</span>}
-          </button>
-        )}
-        <a className="brand" href="/" aria-label="V.I.S.A.O., início">V.I.S.A.O.</a>
-        <span className="identity" title={status?.identity?.internal_id}>
-          {agentName ?? <em>sem nome ainda</em>}
-        </span>
-        {loggedIn && !demo && !ready && (
-          <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
-        )}
-      </header>
+      {(firstRun || (loggedIn && !demo && !ready)) && (
+        <header className="topbar">
+          <Lockup />
+          {loggedIn && !demo && !ready && (
+            <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
+          )}
+        </header>
+      )}
 
       {firstRun && (
         <main className="main onboarding-main">
@@ -903,18 +897,6 @@ export function App() {
 
       {!firstRun && ready && (
         <div className="layout">
-          {desk && inProject && (
-            <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
-          )}
-          {desk && !inProject && (
-            <HomeColumn
-              api={api}
-              call={call}
-              pending={pending}
-              onOpen={showView}
-              onDraft={draftInChat}
-            />
-          )}
           <Rail
             open={menuOpen}
             view={inProject ? "projects" : view}
@@ -922,11 +904,13 @@ export function App() {
             online={online}
             pendingCount={pending.count}
             macOnline={macOnline}
-            inPill={sky ? (wide ? ["conversation", "projects"] : ["inbox", "conversation", "projects"]) : undefined}
             onView={go}
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+          {desk && inProject && (
+            <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
+          )}
 
           <main className="main">
             {notice && (
@@ -938,7 +922,13 @@ export function App() {
             {view === "inbox" && (
               <InboxView
                 api={api}
+                call={call}
                 onDraft={draftInChat}
+                onSend={(text) => {
+                  // To the conversation in front (as the suggestions do), shown at once.
+                  setView("conversation");
+                  void send(text);
+                }}
                 pending={pending}
                 current={current}
                 onReplied={(conversationId) => {
@@ -997,32 +987,16 @@ export function App() {
               segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
               olderLeft={olderLeft}
               onLoadOlder={() => void loadOlder()}
-              placeholder={sky ? `Enviar mensagem para ${agentName ?? "o Visão"}` : undefined}
-              composerStart={sky ? <SkyOrbButton state={orbState} canCall={call.canCall} hint={call.hint} onCall={call.onCall} /> : undefined}
-              header={sky ? (
+              placeholder={`Mensagem para ${agentName ?? "o V.I.S.A.O."}`}
+              composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
+              ciclope={ciclope}
+              voiceLevel={voice.level}
+              header={
                 <>
                   {projectBar}
                   {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
                 </>
-              ) : (
-                <>
-                {projectBar}
-                <div className="chat-head">
-                  <div className="chat-head-text">
-                    <span className="rotulo">{currentConversation ? dayLabel(utcDate(currentConversation.created_at)) : "Conversa nova"}</span>
-                    {memoryWarning && <p className="note" role="status">{memoryWarning}</p>}
-                    {latency && (
-                      <p className="latency">
-                        Último turno: transcrição {Math.round(latency.sttMs)} ms · resposta {Math.round(latency.llmMs)} ms
-                        {latency.ttsFirstAudioMs !== null && ` · 1º áudio ${Math.round(latency.ttsFirstAudioMs)} ms`}
-                        {latency.totalMs !== null && ` · fim da fala → voz ${Math.round(latency.totalMs)} ms`}
-                      </p>
-                    )}
-                  </div>
-                  <Presence call={call} compact />
-                </div>
-                </>
-              )}
+              }
               focusRequest={composerFocus}
               agentName={agentName}
               messages={messages}
@@ -1064,29 +1038,23 @@ export function App() {
             ) : (
               <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
             )
-          ) : (
-            <PresencePanel api={api} call={call} pending={pending} onOpen={showView} />
-          )}
+          ) : null}
         </div>
       )}
 
       {!firstRun && !ready && (
         <div className="layout">
-          <main className="main auth-main rs-luz-indireta">
+          <main className="main auth-main">
             <div className="entrance">
-              <div className="presence">
-                <div className="orb-wrap">
-                  <Ciclope state={ciclope} size={160} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" decorative />
+              <Ciclope state={ciclope} size={160} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" eyesClosed={notLooking} />
+              {demo ? (
+                <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>
+              ) : (
+                <div className="entrance-words">
+                  <h1>Oi. Pronto pra começar?</h1>
+                  <p className="lede">Entre para falar com o V.I.S.A.O.</p>
                 </div>
-                <div className="presence-copy">
-                  <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>
-                  {!demo && (
-                    <p className="lede entrance-words">
-                      Eu nasci sem nome e venho <em>decidindo quem sou.</em> <span>Entre para conversar.</span>
-                    </p>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
             {demo ? (
               <div className="demo">
@@ -1099,6 +1067,7 @@ export function App() {
             ) : !loggedIn ? (
               <Login
                 api={api}
+                onPasswordFocus={setNotLooking}
                 onLoggedIn={(token, remember) => {
                   saveToken(token, remember);
                   setLoggedIn(true);
