@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { trackVisibleViewport } from "./viewport";
+import { healShrunkViewport, trackVisibleViewport } from "./viewport";
 
 function fakeWindow(innerHeight: number, vvHeight: number, offsetTop = 0) {
   const listeners: Record<string, () => void> = {};
@@ -51,6 +51,25 @@ describe("the app follows the visible height (the iPhone keyboard)", () => {
     w.listeners.resize();
     expect(w.attrs.has("data-teclado")).toBe(false);
     expect(w.style["--app-height"]).toBeUndefined();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("the iPhone app gets its full height back after the keyboard", () => {
+  it("hides and shows the app once when the page stayed shorter, keeping the scroll", () => {
+    vi.stubGlobal("window", { innerHeight: 785 });
+    const list = { scrollTop: 320 };
+    const el = { style: { display: "" }, offsetHeight: 0, querySelectorAll: () => [list] } as unknown as HTMLElement;
+    expect(healShrunkViewport(844, el)).toBe(true);
+    expect(el.style.display).toBe("");
+    expect(list.scrollTop).toBe(320);
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves the app alone when the page has its full height", () => {
+    vi.stubGlobal("window", { innerHeight: 844 });
+    const el = { style: { display: "" }, querySelectorAll: vi.fn() } as unknown as HTMLElement;
+    expect(healShrunkViewport(844, el)).toBe(false);
     vi.unstubAllGlobals();
   });
 });
