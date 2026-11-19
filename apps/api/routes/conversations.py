@@ -3,7 +3,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -33,7 +33,8 @@ from apps.api.routes.projects import own_project
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
-from core import location, projects
+from core import brain, location, projects
+from core.arm import local_llm
 from core.conversation import artifacts, attachments, progress, segments, title
 from core.conversation.links import LinkReader
 from core.conversation.service import (
@@ -60,6 +61,7 @@ from infrastructure.database.models import (
     Conversation,
     ConversationSegment,
     Message,
+    ModelUsage,
     User,
 )
 from integrations.browser.base import Browser
@@ -140,6 +142,8 @@ class MessageOut(BaseModel):
     quote_table: dict[str, Any] | None = None
     # The reply did something in this project: the app shows "abrir o projeto" (ADR-0021).
     project_id: uuid.UUID | None = None
+    # Written by the local model on the owner's Mac (docs/MODELO_LOCAL.md): "Visão · local".
+    local_model: bool = False
 
 
 class LocationIn(BaseModel):
@@ -222,7 +226,11 @@ def _quoted(message: Message | None) -> QuotedOut | None:
 
 
 def _message_out(
-    message: Message, files: list | None = None, page=None, quoted: Message | None = None
+    message: Message,
+    files: list | None = None,
+    page=None,
+    quoted: Message | None = None,
+    local: bool = False,
 ) -> MessageOut:
     return MessageOut(
         id=message.id,
@@ -236,7 +244,23 @@ def _message_out(
         parts=message.parts,
         quote_table=message.quote_table,
         project_id=message.project_id,
+        local_model=local,
     )
+
+
+def _local_replies(db: DbSession, history: list[Message]) -> set[uuid.UUID]:
+    """The replies of this page written by the local model on the Mac."""
+    usage_ids = {m.model_usage_id for m in history if m.model_usage_id}
+    if not usage_ids:
+        return set()
+    local_usage = set(
+        db.scalars(
+            select(ModelUsage.id).where(
+                ModelUsage.id.in_(usage_ids), ModelUsage.provider == local_llm.PROVIDER_NAME
+            )
+        )
+    )
+    return {m.id for m in history if m.model_usage_id in local_usage}
 
 
 def _own_conversation(db: DbSession, user: CurrentUser, conversation_id: uuid.UUID) -> Conversation:
@@ -710,8 +734,10 @@ def list_messages(
     missing = {m.reply_to_id for m in history if m.reply_to_id and m.reply_to_id not in by_id}
     if missing:
         by_id.update({m.id: m for m in db.scalars(select(Message).where(Message.id.in_(missing)))})
+    local = _local_replies(db, history)
     return [
-        _message_out(m, files.get(m.id), pages.get(m.id), by_id.get(m.reply_to_id)) for m in history
+        _message_out(m, files.get(m.id), pages.get(m.id), by_id.get(m.reply_to_id), m.id in local)
+        for m in history
     ]
 
 
@@ -730,6 +756,9 @@ def send_message(
     browser: Annotated[Browser | None, Depends(get_browser)],
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
+    command = None if body.attachment_ids else brain.parse_command(body.content)
+    if command is not None:
+        return _switch_brain(db, user, conversation, body.content, command)
     if provider is None:
         missing = ", ".join(missing_llm_settings(settings))
         raise HTTPException(
@@ -858,7 +887,9 @@ def send_message(
             if v.ok
         ],
         user_message=_message_out(result.user_message, files, quoted=quoted),
-        assistant_message=_message_out(result.assistant_message, page=page),
+        assistant_message=_message_out(
+            result.assistant_message, page=page, local=usage.provider == local_llm.PROVIDER_NAME
+        ),
         usage=UsageOut(
             provider=usage.provider,
             model=usage.model,
@@ -875,6 +906,42 @@ def send_message(
         )
     if set(turn.plan.executed()) & WAITING_FOR_A_TAP:
         progress.publish(conversation.id, "action", {})
+    progress.publish(conversation.id, "done", out.model_dump(mode="json"))
+    return out
+
+
+def _switch_brain(
+    db: DbSession, user: User, conversation: Conversation, text: str, command: brain.Command
+) -> TurnOut:
+    """ "usa o modelo local", "volta pro Claude": recognized in code, so it works even with the
+    cloud quota gone. The order and the answer stay in the conversation like any turn."""
+    before = brain.get_mode(db)
+    if command.mode is not None and command.mode != before:
+        brain.set_mode(db, command.mode, actor_user_id=user.id, via="chat")
+    device = local_llm.available(db, user.id)
+    answer = brain.reply(command, before, device.local_model if device is not None else None)
+    now = datetime.now(UTC)
+    asked = Message(conversation_id=conversation.id, role="user", content=text, created_at=now)
+    said = Message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content=answer,
+        created_at=now + timedelta(milliseconds=1),
+    )
+    db.add_all([asked, said])
+    db.commit()
+    out = TurnOut(
+        user_message=_message_out(asked),
+        assistant_message=_message_out(said),
+        usage=UsageOut(
+            provider="visao",
+            model="",
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=Decimal(0),
+            latency_ms=0,
+        ),
+    )
     progress.publish(conversation.id, "done", out.model_dump(mode="json"))
     return out
 

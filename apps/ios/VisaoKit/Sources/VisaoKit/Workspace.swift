@@ -370,3 +370,64 @@ extension APIClient {
         try await json("/google/background", method: "PUT", body: ["enabled": enabled])
     }
 }
+
+/// Which model the Visão thinks with (docs/MODELO_LOCAL.md): the cloud, the local model on the
+/// Mac first, or the cloud with the Mac as a reserve.
+public enum BrainMode: String, Codable, Sendable, CaseIterable, Identifiable {
+    case nuvem, local, auto
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .nuvem: "Nuvem"
+        case .local: "Local"
+        case .auto: "Automático"
+        }
+    }
+}
+
+public struct BrainState: Codable, Sendable, Equatable {
+    public let mode: BrainMode
+    /// The model a Mac offers right now ("qwen3:4b"); nil: none online.
+    public let localModel: String?
+    public let macOnline: Bool
+
+    public init(mode: BrainMode, localModel: String?, macOnline: Bool) {
+        self.mode = mode
+        self.localModel = localModel
+        self.macOnline = macOnline
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case mode
+        case localModel = "local_model"
+        case macOnline = "mac_online"
+    }
+
+    /// One sentence on what the mode does with the Mac as it is now (BrainSettings.tsx).
+    public var note: String {
+        let mac: String
+        if let localModel {
+            mac = "O Mac oferece o \(localModel)."
+        } else if macOnline {
+            mac = "O Mac está ligado, mas sem modelo local configurado."
+        } else {
+            mac = "O Mac não está oferecendo modelo local agora."
+        }
+        switch mode {
+        case .local:
+            return "\(mac) Responde com o modelo do Mac e volta para a nuvem se ele dormir. O trabalho de fundo fica pausado."
+        case .auto:
+            return "\(mac) Usa a nuvem e passa para o modelo do Mac se ela falhar."
+        case .nuvem:
+            return "\(mac) Usa só a nuvem. Você também pode pedir no chat: “usa o modelo local”."
+        }
+    }
+}
+
+extension APIClient {
+    public func brain() async throws -> BrainState { try await request("/arm/brain") }
+
+    public func setBrain(_ mode: BrainMode) async throws -> BrainState {
+        try await json("/arm/brain", method: "PUT", body: ["mode": mode.rawValue])
+    }
+}

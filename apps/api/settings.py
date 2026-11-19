@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     llm_budget_input_tokens_per_call: int = Field(default=80_000, ge=1)
     llm_budget_output_tokens_per_call: int = Field(default=4096, ge=1)
     llm_budget_concurrency: int = Field(default=1, ge=1)
+    # The local model on the owner's Mac, through the arm (docs/MODELO_LOCAL.md). Used only when
+    # the owner switches to it and a Mac offers one. A small model reads little at once.
+    local_llm_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
+    local_llm_context_chars: int = Field(default=40_000, ge=4000)
 
     # Optional fallback provider, tried when the primary is out of quota, rate-limited or down.
     llm_fallback_provider_name: str | None = None

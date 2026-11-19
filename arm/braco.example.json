@@ -8,5 +8,10 @@
   "max_turns": 30,
   "max_budget_usd": 2.0,
   "timeout_minutes": 30,
-  "use_api_key": false
+  "use_api_key": false,
+  "modelo_local": {
+    "modelo": "qwen3:4b",
+    "endereco": "http://127.0.0.1:11434",
+    "contexto": 16384
+  }
 }

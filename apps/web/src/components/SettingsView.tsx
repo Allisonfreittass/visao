@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import type { Api } from "../api";
 import { AccountPanel } from "./AccountPanel";
+import { BrainSettings } from "./BrainSettings";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
@@ -109,7 +110,7 @@ export function SettingsView(props: SettingsViewProps) {
     <section className="page" aria-labelledby="settings-title">
       <header className="page-head">
         <h1 id="settings-title">Ajustes</h1>
-        <p className="lede">Voz, avisos, permissões e conta.</p>
+        <p className="lede">Modelo, voz, avisos, permissões e conta.</p>
       </header>
       <div className="page-body settings">
         {!FORCED_THEME && (
@@ -136,6 +137,10 @@ export function SettingsView(props: SettingsViewProps) {
           </div>
         </section>
         )}
+        <section className="settings-group" aria-labelledby="g-modelo">
+          <h2 id="g-modelo" className="rotulo">Modelo</h2>
+          <BrainSettings api={api} onError={onError} />
+        </section>
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>
           <Setting

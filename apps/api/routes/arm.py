@@ -13,7 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
-from core.arm import service
+from core import brain
+from core.arm import local_llm, service
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Message
 
@@ -82,6 +83,32 @@ class ResultIn(BaseModel):
     error: str = Field(default="", max_length=5000)
     cost_usd: Decimal | None = Field(default=None, ge=0)
     session_id: str | None = Field(default=None, max_length=128)
+
+
+class LlmNextOut(BaseModel):
+    id: uuid.UUID
+    model: str
+    messages: list[dict[str, str]]
+    max_output_tokens: int
+
+
+class LlmResultIn(BaseModel):
+    ok: bool
+    text: str = Field(default="", max_length=local_llm.MAX_RESULT)
+    error: str = Field(default="", max_length=5000)
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
+
+
+class BrainOut(BaseModel):
+    mode: brain.Mode
+    # The Mac offering a local model right now (None: none online).
+    local_model: str | None
+    mac_online: bool
+
+
+class BrainIn(BaseModel):
+    mode: brain.Mode
 
 
 def _device_out(device: ArmDevice) -> dict:
@@ -220,6 +247,25 @@ def reject(
     return _decide(service.reject, task_id, user, db, "reject", via)
 
 
+@router.get("/brain", response_model=BrainOut)
+def brain_status(user: CurrentUser, db: DbSession) -> BrainOut:
+    """Which model the Visão thinks with, and whether the Mac offers a local one now."""
+    device = local_llm.available(db, user.id)
+    macs = db.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == user.id)).all()
+    return BrainOut(
+        mode=brain.get_mode(db),
+        local_model=device.local_model if device is not None else None,
+        mac_online=any(service.online(d) for d in macs),
+    )
+
+
+@router.put("/brain", response_model=BrainOut)
+def brain_switch(body: BrainIn, user: CurrentUser, db: DbSession) -> BrainOut:
+    brain.set_mode(db, body.mode, actor_user_id=user.id, via="ajustes")
+    db.commit()
+    return brain_status(user, db)
+
+
 # --- machine side -------------------------------------------------------------------------
 
 
@@ -278,4 +324,51 @@ def device_result(task_id: uuid.UUID, body: ResultIn, device: Device, db: DbSess
         )
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarefa não está com este aparelho") from exc
+    db.commit()
+
+
+@router.get("/device/llm/next", response_model=LlmNextOut | None)
+def device_llm_next(
+    device: Device,
+    db: DbSession,
+    wait: Annotated[int, Query(ge=0, le=LONG_POLL_MAX)] = 0,
+    model: Annotated[str | None, Query(max_length=64)] = None,
+) -> LlmNextOut | None:
+    """Long poll for the local model (docs/MODELO_LOCAL.md): `model` is what this Mac offers;
+    answers with a question as soon as one waits, or null after `wait` seconds."""
+    deadline = time.monotonic() + wait
+    while True:
+        local_llm.seen(db, device, model)
+        call = local_llm.claim(db, device) if device.local_model else None
+        db.commit()
+        if call is not None:
+            payload = call.payload or {}
+            return LlmNextOut(
+                id=call.id,
+                model=device.local_model or "",
+                messages=list(payload.get("messages") or []),
+                max_output_tokens=int(payload.get("max_output_tokens") or 1024),
+            )
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.3)
+
+
+@router.post("/device/llm/{call_id}/result", status_code=status.HTTP_204_NO_CONTENT)
+def device_llm_result(call_id: uuid.UUID, body: LlmResultIn, device: Device, db: DbSession) -> None:
+    try:
+        local_llm.finish(
+            db,
+            device,
+            call_id,
+            ok=body.ok,
+            text=body.text,
+            error=body.error,
+            input_tokens=body.input_tokens,
+            output_tokens=body.output_tokens,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Pergunta não está com este aparelho"
+        ) from exc
     db.commit()

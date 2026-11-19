@@ -395,7 +395,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             )}{m.role === "assistant" ? (
               i === shown.length - 1 && !sending && ciclope === "working"
                 ? <span className="message-label message-label--working">Visão · executando no Mac</span>
-                : <span className="message-label">Visão · concluído</span>
+                : <span className="message-label">{m.local_model ? "Visão · local" : "Visão · concluído"}</span>
             ) : <span>Você</span>}{m.origin === "arm" && <Critter kind="mac" size={18} />}{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.parts && m.parts.length > 1

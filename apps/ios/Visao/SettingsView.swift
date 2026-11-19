@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.palette) private var palette
     @State private var server: ServerSettings?
     @State private var google: GoogleState?
+    @State private var brain: BrainState?
     @State private var email: String?
     @State private var error: String?
     @State private var confirmLogout = false
@@ -31,6 +32,27 @@ struct SettingsView: View {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(Typo.text(.footnote))
                     .foregroundStyle(palette.erro)
+            }
+            // Which model answers (docs/MODELO_LOCAL.md): the cloud or the local model on the Mac.
+            PageGroup(label: "Modelo") {
+                PageRow {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Quem responde").font(Typo.text(.subheadline, weight: .medium))
+                        Text(brain?.note ?? "Carregando…")
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.textMuted)
+                        Picker("Quem responde", selection: Binding(
+                            get: { brain?.mode ?? .nuvem },
+                            set: { mode in Task { await choose(mode) } }
+                        )) {
+                            ForEach(BrainMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(brain == nil)
+                    }
+                }
             }
             // First on the page: the voice decides whether the call sounds like a robot.
             PageGroup(label: "Voz no iPhone") {
@@ -307,10 +329,24 @@ struct SettingsView: View {
     private func load() async {
         async let s = try? session.api.serverSettings()
         async let g = try? session.api.google()
+        async let b = try? session.api.brain()
         async let me = try? session.api.me()
         server = await s ?? server
         google = await g ?? google
+        brain = await b ?? brain
         email = await me?.email ?? email
+    }
+
+    private func choose(_ mode: BrainMode) async {
+        guard let before = brain, mode != before.mode else { return }
+        brain = BrainState(mode: mode, localModel: before.localModel, macOnline: before.macOnline)
+        do {
+            brain = try await session.api.setBrain(mode)
+            error = nil
+        } catch {
+            brain = before
+            self.error = "Não consegui trocar o modelo agora."
+        }
     }
 }
 

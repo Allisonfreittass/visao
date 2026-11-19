@@ -5,6 +5,8 @@ from functools import lru_cache
 from pydantic import SecretStr
 
 from apps.api.settings import Settings, get_settings
+from core.arm.local_llm import LocalModelProvider
+from core.brain import BrainProvider
 from integrations.llm.anthropic_provider import AnthropicProvider
 from integrations.llm.base import LLMProvider, Pricing
 from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
@@ -52,7 +54,31 @@ def missing_fallback_settings(settings: Settings, slot: str = "fallback") -> lis
 @lru_cache
 def get_llm_provider() -> LLMProvider | None:
     # Conversation favours speed; background thinking keeps the model's full reasoning.
-    return build_llm_provider(get_settings(), fast=True)
+    settings = get_settings()
+    return with_brain(settings, build_llm_provider(settings, fast=True))
+
+
+def with_brain(
+    settings: Settings,
+    cloud: LLMProvider | None,
+    *,
+    background: bool = False,
+    session_factory=None,
+) -> LLMProvider | None:
+    """The cloud chain behind the owner's choice of model (core/brain.py): cloud, the local
+    model on the Mac first, or the cloud with it as a reserve."""
+    if cloud is None:
+        return None
+    if session_factory is None:
+        from infrastructure.database.session import get_sessionmaker
+
+        session_factory = get_sessionmaker()
+    local = LocalModelProvider(
+        session_factory,
+        timeout_seconds=settings.local_llm_timeout_seconds,
+        context_chars=settings.local_llm_context_chars,
+    )
+    return BrainProvider(cloud, local, session_factory, background=background)
 
 
 def is_anthropic(name: str | None, base_url: str | None) -> bool:

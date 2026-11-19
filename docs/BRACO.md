@@ -75,6 +75,8 @@ termos se um dia isso for oferecido a outras pessoas.
   verbo de ação); só então uma chamada curta extrai o projeto e o pedido. Como foi ele que
   interpretou, a tarefa nasce `proposed` e nada roda antes do seu sim.
 
+- Modelo local (2026-11-18): o braço também leva perguntas para um modelo rodando no Mac
+  (Ollama), numa segunda linha separada das tarefas. Veja [MODELO_LOCAL.md](MODELO_LOCAL.md).
 - Ele sabe o que o braço fez (2026-11-13): toda resposta leva o registro do braço tirado do banco
   (`work_record` em `core/arm/service.py`: os Macs, se estão ligados, e as últimas tarefas com
   pedido, situação e resultado) e a regra de que o que consta ali rodou de verdade. Antes disso
