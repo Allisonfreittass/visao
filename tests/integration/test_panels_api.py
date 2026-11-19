@@ -3,9 +3,10 @@ from the offer, edited from the conversation, checked daily by the worker within
 the budget, notices only when something relevant changes, expired after the trip."""
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -186,6 +187,26 @@ def test_a_yes_makes_a_live_panel_with_the_total_and_the_goal(client, db):
     assert job.run_after.replace(tzinfo=UTC) > datetime.now(UTC)
 
 
+@pytest.fixture
+def daytime(monkeypatch):
+    """These checks alert, and an alert waits out the owner's quiet hours (22:00 to 08:00 in São
+    Paulo): they run at a daytime hour whatever the real clock says (they failed between 21:00
+    and midnight there, when CI happened to run)."""
+    real = datetime.now(UTC)
+    local = real.astimezone(ZoneInfo("America/Sao_Paulo"))
+    if not 9 <= local.hour < 21:
+        day = local.date() + timedelta(days=1 if local.hour >= 21 else 0)
+        real = datetime.combine(day, time(12), tzinfo=local.tzinfo).astimezone(UTC)
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real.astimezone(tz) if tz else real.replace(tzinfo=None)
+
+    monkeypatch.setattr(panels, "datetime", Clock)
+    return real
+
+
 def recheck_now(db, llm, browser, **overrides):
     panel = db.query(Panel).one()
     owner = db.get(User, panel.owner_user_id)
@@ -201,7 +222,7 @@ def recheck_now(db, llm, browser, **overrides):
     )
 
 
-def test_the_daily_check_reads_both_pages_and_computes_the_goal(client, db):
+def test_the_daily_check_reads_both_pages_and_computes_the_goal(client, db, daytime):
     llm, _, browser = world(client, db)
     headers = _login(client, db)
     make_panel(client, db, headers)
@@ -221,7 +242,9 @@ def test_the_daily_check_reads_both_pages_and_computes_the_goal(client, db):
 BELOW = "Abaixo da sua meta de R$ 6.000: R$ 5.945 agora. Preço de site muda rápido."
 
 
-def test_below_the_goal_is_urgent_once_each_time_and_drops_once_a_day(client, db, monkeypatch):
+def test_below_the_goal_is_urgent_once_each_time_and_drops_once_a_day(
+    client, db, monkeypatch, daytime
+):
     llm, prices, browser = world(client, db)
     sent = []
     monkeypatch.setattr(panels.push, "send_to_owner", lambda *a, **k: sent.append(k["body"]) or 1)
@@ -411,7 +434,7 @@ def test_no_more_than_the_limit_of_active_panels(client, db, monkeypatch):
     assert db.query(Panel).count() == 0
 
 
-def test_the_worker_job_runs_the_check(client, db, monkeypatch):
+def test_the_worker_job_runs_the_check(client, db, monkeypatch, daytime):
     llm, _, browser = world(client, db)
     headers = _login(client, db)
     make_panel(client, db, headers)
