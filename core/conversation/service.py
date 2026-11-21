@@ -42,7 +42,14 @@ from infrastructure.database.models import (
     ModelUsage,
     User,
 )
-from integrations.llm.base import ChatMessage, LLMError, LLMProvider, LLMResponse, drafting
+from integrations.llm.base import (
+    ChatMessage,
+    LLMError,
+    LLMProvider,
+    LLMResponse,
+    compacting,
+    drafting,
+)
 
 if TYPE_CHECKING:
     from core.conversation.artifacts import Request as PageRequest
@@ -226,6 +233,7 @@ def reply(
     browser_fallback: str = "",
     did_in_app: bool | None = None,
     quote_table: dict | None = None,
+    extra_optional: str = "",
 ) -> TurnResult:
     """`browser_fallback` is the sentence that closes a reply that denied the browser and could
     not be rewritten (browser_guard.FALLBACK when empty)."""
@@ -246,58 +254,78 @@ def reply(
         )
     session.commit()
 
-    system_prompt = build_system_prompt(
-        identity,
-        memory_enabled=owner.memory_consent,
-        memories=[item.record for item in recalled],
-        capabilities=capabilities,
-        name_history_summary=name_history_summary,
-        modality=modality,
-        self_text=self_text,
-        owner_profile=owner_profile,
-        owner_rules=owner_rules,
-        arm_record=work_record(session, owner.id, owner.timezone or "UTC"),
-    )
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)
-    if adjustments:
-        system_prompt += (
-            f"\n\nAjustes de comunicação aprendidos com o retorno deste interlocutor "
-            f"(versão {version}, revertíveis):\n" + "\n".join(f"- {a}" for a in adjustments)
-        )
-    if extra_system:
-        # Per-turn context from the curiosity pipeline (a question to ask, or sources).
-        system_prompt += f"\n\nContexto desta resposta:\n{extra_system}"
-    if owner_rules:
-        system_prompt += "\n\n" + learned_rules_block(owner_rules)
-    prompt = [ChatMessage(role="system", content=system_prompt)]
+    arm_record = work_record(session, owner.id, owner.timezone or "UTC")
     from core.decision import record as deed_record
 
     history = context_history(session, conversation)
+    earlier = ""
     if conversation.continuous:
         from core.conversation import segments
 
         earlier = segments.block(segments.chosen(session, conversation, user_text, history), owner)
-        if earlier:
-            prompt[0] = replace(prompt[0], content=f"{prompt[0].content}\n\n{earlier}")
-    prompt += build_context(
-        history,
-        context_char_budget,
-        attachments.for_messages(
-            session, [m.id for m in history[-attachments.RECENT_MESSAGES * 4 :]]
-        ),
-        deed_record.false_denials(session, conversation, owner),
+    recent_files = attachments.for_messages(
+        session, [m.id for m in history[-attachments.RECENT_MESSAGES * 4 :]]
     )
-    if attachment and prompt[-1].role == "user":
-        # What came with this message (a page it opened) goes with the message itself, the last
-        # thing read: in the system prompt it lost to earlier replies saying the opposite.
-        prompt[-1] = replace(prompt[-1], content=f"{prompt[-1].content}\n\n{attachment}")
-    if budgets.call_input_bytes:
-        prompt = fit(prompt, budgets.call_input_bytes, attachment)
+    denials = deed_record.false_denials(session, conversation, owner)
+
+    def build(level: int) -> list[ChatMessage]:
+        """The prompt at one level of compaction (docs/MODO_COMPACTO.md). 0 is everything; each
+        level drops the next least important context. Never dropped: who it is, the truth rules,
+        the person's rules, what was done this turn and the person's own message."""
+        lean = level >= COMPACT_CORE
+        system_prompt = build_system_prompt(
+            identity,
+            memory_enabled=owner.memory_consent,
+            memories=[] if lean else [item.record for item in recalled],
+            capabilities=replace(capabilities, self_knowledge=False)
+            if lean and capabilities is not None
+            else capabilities,
+            name_history_summary=None if lean else name_history_summary,
+            modality=modality,
+            self_text=_clip(self_text, COMPACT_NOTE_CHARS) if lean else self_text,
+            owner_profile=_clip(owner_profile, COMPACT_NOTE_CHARS) if lean else owner_profile,
+            owner_rules=owner_rules,
+            arm_record="" if lean else arm_record,
+        )
+        if adjustments and not lean:
+            system_prompt += (
+                f"\n\nAjustes de comunicação aprendidos com o retorno deste interlocutor "
+                f"(versão {version}, revertíveis):\n" + "\n".join(f"- {a}" for a in adjustments)
+            )
+        context = [extra_system or ""]
+        if extra_optional and level < COMPACT_OPTIONAL:
+            context.append(extra_optional)
+        context_text = "\n\n".join(c for c in context if c)
+        if context_text:
+            # Per-turn context from the curiosity pipeline (a question to ask, or sources).
+            system_prompt += f"\n\nContexto desta resposta:\n{context_text}"
+        if owner_rules:
+            system_prompt += "\n\n" + learned_rules_block(owner_rules)
+        summary = earlier if not lean else ""
+        if summary and level >= COMPACT_OPTIONAL:
+            summary = _clip(summary, COMPACT_SUMMARY_CHARS)
+        if summary:
+            system_prompt += f"\n\n{summary}"
+        budget = COMPACT_HISTORY_CHARS.get(level, context_char_budget)
+        built = [ChatMessage(role="system", content=system_prompt)]
+        built += build_context(history, min(context_char_budget, budget), recent_files, denials)
+        if attachment and built[-1].role == "user":
+            # What came with this message (a page it opened) goes with the message itself, the
+            # last thing read: in the system prompt it lost to earlier replies saying otherwise.
+            page = attachment if level < COMPACT_FLOOR else _clip(attachment, COMPACT_PAGE_CHARS)
+            built[-1] = replace(built[-1], content=f"{built[-1].content}\n\n{page}")
+        if budgets.call_input_bytes:
+            built = fit(built, budgets.call_input_bytes, attachment)
+        return built
+
+    levels = [build(level) for level in range(COMPACT_FLOOR + 1)]
+    prompt = levels[0]
 
     progress.step("Escrevendo a resposta")
     try:
-        response = _write(provider, prompt, max_output_tokens, modality)
+        response = _write(provider, prompt, max_output_tokens, modality, levels)
     except LLMError as exc:
         _record_failure(session, conversation, provider, exc.kind)
         if exc.kind == "cancelled":
@@ -308,8 +336,10 @@ def reply(
         # The model in use does not take pictures: answer without them, and say so, instead of
         # failing every message that has a photo.
         prompt = without_images(prompt)
+        levels = [without_images(level) for level in levels]
+        levels[0] = prompt
         try:
-            response = _write(provider, prompt, max_output_tokens, modality)
+            response = _write(provider, prompt, max_output_tokens, modality, levels)
         except LLMError as again:
             _record_failure(session, conversation, provider, again.kind)
             raise
@@ -419,6 +449,24 @@ def reply(
     )
 
 
+# Compact mode (docs/MODO_COMPACTO.md): from level 1 history shrinks, from COMPACT_OPTIONAL the
+# helpful-but-optional context goes, from COMPACT_CORE memories and long notes go, and at the floor
+# only the essentials and the last messages remain.
+COMPACT_OPTIONAL = 2
+COMPACT_CORE = 3
+COMPACT_FLOOR = 4
+COMPACT_HISTORY_CHARS = {1: 6000, 2: 4000, 3: 2000, 4: 0}
+COMPACT_NOTE_CHARS = 500
+COMPACT_SUMMARY_CHARS = 1500
+COMPACT_PAGE_CHARS = 2000
+
+
+def _clip(text: str | None, limit: int) -> str | None:
+    if not text or len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
 FIT_MARGIN_BYTES = 512
 CUT_NOTE = "\n[… o resto das páginas lidas foi cortado para caber]"
 
@@ -459,12 +507,16 @@ def fit(prompt: list[ChatMessage], limit: int, attachment: str = "") -> list[Cha
 
 
 def _write(
-    provider: LLMProvider, prompt: list[ChatMessage], max_output_tokens: int, modality: str
+    provider: LLMProvider,
+    prompt: list[ChatMessage],
+    max_output_tokens: int,
+    modality: str,
+    levels: list[list[ChatMessage]] | None = None,
 ) -> LLMResponse:
     """The reply, streamed into the turn's progress: the chat shows it as it is written
     (docs/decisions/0011) and a voice call speaks the first sentence while the rest is written. A
     provider that cannot stream answers whole, as before. Parar stops the stream."""
-    with drafting(progress.draft, stop=progress.cancelled):
+    with drafting(progress.draft, stop=progress.cancelled), compacting(levels or [prompt]):
         return provider.complete(prompt, max_output_tokens=max_output_tokens)
 
 

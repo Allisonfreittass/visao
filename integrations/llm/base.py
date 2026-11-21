@@ -122,3 +122,29 @@ def tell_draft(text: str) -> None:
 
 def wants_draft() -> bool:
     return _draft_sink.get() is not None
+
+
+# The same prompt from complete to compact (docs/MODO_COMPACTO.md). Set by whoever built it, read
+# by integrations.llm.fitting, which sends each model the first version that fits its limit.
+_levels: ContextVar[tuple[list[ChatMessage], ...] | None] = ContextVar(
+    "llm_prompt_levels", default=None
+)
+
+
+@contextmanager
+def compacting(levels: list[list[ChatMessage]]) -> Iterator[None]:
+    """Offers smaller versions of a prompt to models with a small limit. levels[0] is the prompt
+    actually passed to complete(); the rest drop context in order of importance."""
+    token = _levels.set(tuple(levels))
+    try:
+        yield
+    finally:
+        _levels.reset(token)
+
+
+def prompt_levels(messages: list[ChatMessage]) -> tuple[list[ChatMessage], ...]:
+    """The versions offered for these messages, or just them when nobody offered any."""
+    levels = _levels.get()
+    if levels and levels[0] == messages:
+        return levels
+    return (messages,)

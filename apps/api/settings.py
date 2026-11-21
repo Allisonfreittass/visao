@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     llm_fallback2_price_input_per_mtok: Decimal | None = Field(default=None, ge=0)
     llm_fallback2_price_output_per_mtok: Decimal | None = Field(default=None, ge=0)
     # Room for a complete code answer; brevity comes from the prompt, not from cutting replies.
+    # Most a model takes in one request, prompt and answer together (docs/MODO_COMPACTO.md), e.g.
+    # 8000 on Groq's free tier. Optional: a 413 teaches it too. Above it, a compact prompt goes.
+    llm_max_request_tokens: int | None = Field(default=None, ge=1000)
+    llm_fallback_max_request_tokens: int | None = Field(default=None, ge=1000)
+    llm_fallback2_max_request_tokens: int | None = Field(default=None, ge=1000)
     llm_max_output_tokens: int = Field(default=2048, ge=1)
     # Curation asks for structured JSON; reasoning models think longer before answering it.
     llm_curation_max_output_tokens: int = Field(default=4096, ge=1)
@@ -180,6 +185,9 @@ class Settings(BaseSettings):
         "webpush_subject",
         "github_token",
         "tavily_api_key",
+        "llm_max_request_tokens",
+        "llm_fallback_max_request_tokens",
+        "llm_fallback2_max_request_tokens",
         mode="before",
     )
     @classmethod
