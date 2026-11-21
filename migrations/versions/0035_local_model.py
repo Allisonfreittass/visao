@@ -14,6 +14,14 @@ branch_labels = None
 depends_on = None
 
 
+def _private_postgres() -> bool:
+    connection = op.get_bind()
+    return (
+        connection.dialect.name == "postgresql"
+        and connection.exec_driver_sql("SELECT current_schema()").scalar_one() == "visao"
+    )
+
+
 def upgrade() -> None:
     with op.batch_alter_table("arm_devices") as batch:
         batch.add_column(sa.Column("local_model", sa.String(64), nullable=True))
@@ -45,6 +53,14 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_arm_llm_calls_owner_status", "arm_llm_calls", ["owner_user_id", "status"])
+    if _private_postgres():
+        # Like every private table (test_private_schema_rls): only the backend's role reads it.
+        op.execute("ALTER TABLE visao.arm_llm_calls ENABLE ROW LEVEL SECURITY")
+        op.execute(
+            "DO $$ BEGIN EXECUTE format("
+            "'CREATE POLICY backend_only ON visao.arm_llm_calls TO %I "
+            "USING (true) WITH CHECK (true)', current_user); END $$;"
+        )
 
 
 def downgrade() -> None:
