@@ -266,3 +266,19 @@ def test_short_rate_limit_is_still_retried(monkeypatch: pytest.MonkeyPatch) -> N
         [ChatMessage("user", "oi")], max_output_tokens=5
     )
     assert result.text == "olá"
+
+
+def test_a_request_too_big_for_the_host_is_its_own_kind():
+    """Real case (2026-11-21): Groq's free tier answered 413 to a whole chat turn."""
+    body = '{"error":{"message":"Request too large for model `openai/gpt-oss-120b` on tokens per minute (TPM): Limit 8000, Requested 14210"}}'  # noqa: E501
+    llm = OpenAICompatibleProvider(
+        name="groq",
+        base_url="https://api.groq.com/openai/v1",
+        api_key="k",
+        model="openai/gpt-oss-120b",
+        pricing=Pricing(Decimal(0), Decimal(0)),
+        transport=httpx.MockTransport(lambda request: httpx.Response(413, text=body)),
+    )
+    with pytest.raises(LLMError) as caught:
+        llm.complete([ChatMessage("user", "oi")], max_output_tokens=10)
+    assert caught.value.kind == "too_large" and "Limit 8000" in str(caught.value)

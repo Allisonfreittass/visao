@@ -58,6 +58,21 @@ def to_messages_api(messages: list[ChatMessage]) -> tuple[str, list[dict[str, An
     return system, turns
 
 
+# Real case (2026-11-18): every call came back 400 for days and the log only said "provider error
+# 400". Anthropic answers an account without credit with a 400 whose message says so.
+_NO_CREDIT = ("credit balance", "billing", "purchase credits", "spend limit")
+
+
+def status_error(exc: anthropic.APIStatusError) -> LLMError:
+    """The shared error kind, carrying the API's own explanation."""
+    message = str(getattr(exc, "message", "") or exc)[:300]
+    if exc.status_code == 413:
+        return LLMError("too_large", f"request too large for this provider: {message}")
+    if exc.status_code in (400, 402, 403) and any(w in message.lower() for w in _NO_CREDIT):
+        return LLMError("quota_exhausted", f"provider account has no credit: {message}")
+    return LLMError(f"http_{exc.status_code}", f"provider error {exc.status_code}: {message}")
+
+
 class AnthropicProvider:
     def __init__(
         self,
@@ -104,7 +119,7 @@ class AnthropicProvider:
         except anthropic.RateLimitError as exc:
             raise LLMError("http_429", "rate limited") from exc
         except anthropic.APIStatusError as exc:
-            raise LLMError(f"http_{exc.status_code}", f"provider error {exc.status_code}") from exc
+            raise status_error(exc) from exc
         except anthropic.APIError as exc:
             # An error event in the middle of a stream (e.g. overloaded) has no status code.
             raise LLMError("network", f"provider error: {type(exc).__name__}") from exc

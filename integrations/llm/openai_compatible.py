@@ -113,6 +113,13 @@ class OpenAICompatibleProvider:
                         "quota_exhausted",
                         f"provider quota exhausted; retrying won't help: {response.text[:300]}",
                     )
+                if response.status_code == 413:
+                    # Real case (2026-11-21): Groq's free tier caps a request at 8 000 tokens per
+                    # minute, below one chat turn. Another host in the chain may take it.
+                    raise LLMError(
+                        "too_large",
+                        f"request too large for this provider: {response.text[:300]}",
+                    )
                 if response.status_code not in _RETRYABLE_STATUS or last_attempt:
                     raise LLMError(
                         f"http_{response.status_code}",

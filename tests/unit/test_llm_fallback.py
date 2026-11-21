@@ -39,7 +39,8 @@ def test_uses_primary_when_it_works() -> None:
 
 
 @pytest.mark.parametrize(
-    "kind", ["quota_exhausted", "http_429", "http_503", "timeout", "network", "bad_response"]
+    "kind",
+    ["quota_exhausted", "http_429", "http_503", "timeout", "network", "bad_response", "too_large"],
 )
 def test_falls_back_on_transient_or_quota_errors(kind: str) -> None:
     provider = FallbackLLMProvider([_primary(fail_with=kind), _backup()])

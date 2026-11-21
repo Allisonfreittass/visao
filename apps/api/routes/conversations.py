@@ -71,6 +71,27 @@ from integrations.search.base import SearchProvider
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 logger = logging.getLogger(__name__)
 
+# What the owner reads when no model answered. "http_413" told them nothing.
+_PROVIDER_TROUBLE = {
+    "too_large": (
+        "A conversa ficou grande demais para o modelo que respondeu (o plano grátis do Groq "
+        "aceita no máximo 8 mil tokens por minuto) e nenhum outro da lista conseguiu"
+    ),
+    "quota_exhausted": "Acabou o crédito ou a cota dos modelos configurados",
+    "budget_denied": "O limite de gasto com modelos foi atingido",
+    "http_429": "Os modelos estão limitando pedidos agora; tente de novo em um minuto",
+    "timeout": "O modelo demorou demais para responder",
+    "network": "Não consegui falar com o modelo (rede)",
+}
+
+
+def provider_trouble(exc: LLMError) -> str:
+    # The provider's own words go to the log, where they explain a failure like a 400 for days.
+    logger.warning(f"llm failed ({exc.kind}): {exc}", extra={"event": "llm_failed"})
+    reason = _PROVIDER_TROUBLE.get(exc.kind)
+    return f"{reason} ({exc.kind})" if reason else f"Falha no provedor de LLM ({exc.kind})"
+
+
 OptionalProvider = Annotated[LLMProvider | None, Depends(get_llm_provider)]
 
 MAX_MESSAGE_CHARS = 8000
@@ -467,9 +488,7 @@ def curate(
     except BudgetExceededError as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Orçamento de LLM esgotado") from exc
     except LLMError as exc:
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY, f"Falha no provedor de LLM ({exc.kind})"
-        ) from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, provider_trouble(exc)) from exc
     except CurationOutputError as exc:
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
@@ -810,7 +829,7 @@ def send_message(
         raise _stream_error(
             conversation.id,
             status.HTTP_502_BAD_GATEWAY,
-            f"Falha no provedor de LLM ({exc.kind}); sem resposta",
+            f"{provider_trouble(exc)}; sem resposta",
         ) from exc
     except EmptyReplyError as exc:
         raise _stream_error(
