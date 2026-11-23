@@ -1,0 +1,91 @@
+/* <Anel>: the ring of traces and its states (DESIGN.md §6). Only opacity, stroke and transform
+   move; every loop stops with reduced motion or data-animado="nao". */
+.anel {
+  --apagada: .38;
+  --nivel: 0;
+  flex: none;
+  overflow: visible;
+  color: var(--papel);
+}
+.anel-marca { stroke: var(--cinza); stroke-width: 1.5; stroke-linecap: round; opacity: var(--apagada); }
+.anel-marca--hora { stroke: var(--papel); stroke-width: 2; opacity: 1; }
+.anel--mini .anel-marca:not(.anel-marca--hora) { opacity: 0; }
+.anel-contorno { fill: none; stroke: var(--cinza); stroke-width: 1.5; stroke-linecap: round; opacity: .55; }
+.anel-falha { fill: none; stroke: var(--ambar); stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.anel-ponto {
+  transform: translate(var(--ponto-x), var(--ponto-y));
+  transition: transform .6s var(--ease-out);
+}
+.anel-ponto-forma {
+  fill: var(--ambar);
+  stroke: var(--ambar);
+  stroke-width: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 + var(--nivel) * .7));
+  transition: fill .3s var(--ease-out), stroke .3s var(--ease-out);
+}
+.anel-muninn { opacity: 1; transition: opacity .3s var(--ease-out); }
+/* With Muninn the amber eye is the dot at rest; the dot itself only shows when it rises. */
+.anel-olho { fill: var(--ambar); stroke: var(--ambar); stroke-width: 0; transition: fill .3s var(--ease-out); }
+.anel--muninn .anel-ponto { opacity: 0; transition: transform .6s var(--ease-out), opacity .3s var(--ease-out); }
+.anel--muninn[data-estado="fala"] .anel-ponto { opacity: 1; }
+
+/* Ouvindo: the marks rise and fall in a wave round the ring; a voice makes it deeper. */
+.anel[data-estado="ouvindo"] .anel-marca {
+  animation: anel-onda 1.2s ease-in-out infinite alternate;
+  animation-delay: calc(var(--h) * -.1s);
+}
+@keyframes anel-onda {
+  from { opacity: var(--apagada); }
+  to { opacity: calc(.7 + var(--nivel) * .3); stroke: var(--papel); }
+}
+
+/* Pensando: one trace runs round in 1.6 s, an amber head with a tail fading papel → cinza (§2). */
+.anel[data-estado="pensando"] .anel-marca {
+  animation: anel-rastro 1.6s linear infinite;
+  animation-delay: calc((var(--h) / 24 - 1) * 1.6s);
+}
+@keyframes anel-rastro {
+  0% { stroke: var(--ambar); opacity: 1; }
+  4% { stroke: var(--papel); opacity: .95; }
+  21% { stroke: var(--cinza); opacity: var(--apagada); }
+  100% { stroke: var(--cinza); opacity: var(--apagada); }
+}
+.anel--mini[data-estado="pensando"] .anel-marca { animation-name: anel-rastro-mini; }
+@keyframes anel-rastro-mini {
+  0% { stroke: var(--ambar); opacity: 1; }
+  4% { stroke: var(--papel); opacity: .9; }
+  21%, 100% { opacity: 0; }
+}
+
+/* Fala primeiro: the dot rises to the gap, the name's place, and stays there while he speaks. */
+.anel[data-estado="fala"] .anel-ponto { transform: translate(0, var(--falha-y)); }
+
+/* Pede aprovação: the gap lights amber and breathes until the yes or the no. */
+.anel[data-estado="aprovacao"] .anel-falha { opacity: 1; animation: anel-respira 2.4s ease-in-out infinite alternate; }
+@keyframes anel-respira { from { opacity: .55; } to { opacity: 1; } }
+
+/* Pausado: the dot goes hollow; he does nothing on his own. */
+.anel[data-estado="pausado"] :is(.anel-ponto-forma, .anel-olho) { fill: transparent; stroke-width: 1.5; }
+
+/* Silêncio: everything dark, the hour too. */
+.anel[data-estado="silencio"] .anel-marca { stroke: var(--linha); opacity: 1; }
+.anel[data-estado="silencio"] .anel-contorno { stroke: var(--linha); opacity: 1; }
+.anel[data-estado="silencio"] :is(.anel-ponto-forma, .anel-olho) { fill: var(--linha); stroke: var(--linha); }
+.anel[data-estado="silencio"] .anel-muninn { opacity: .35; }
+
+/* Still poses: history avatars, and anyone who asked for less motion. Thinking keeps its head on
+   the current hour so the state still reads. */
+.anel[data-animado="nao"] *, .anel[data-animado="nao"] { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .anel *, .anel { animation: none !important; transition: none !important; }
+  .anel[data-estado="pensando"] .anel-marca--hora { stroke: var(--ambar); }
+  .anel[data-estado="ouvindo"] .anel-marca { opacity: .7; }
+  .anel[data-estado="aprovacao"] .anel-falha { opacity: 1; }
+}
+.anel[data-animado="nao"][data-estado="pensando"] .anel-marca--hora { stroke: var(--ambar); }
+
+/* <Sensor>: a line icon in the surrounding text color; cinza when disconnected. */
+.sensor { display: inline-flex; flex: none; color: inherit; line-height: 0; }
+.sensor--off { color: var(--cinza); }

@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import type { Message } from "../api";
 import { type CallCamera, cameraSupported } from "../call/camera";
 import { Icon } from "./Icon";
-import { Ciclope } from "../ciclope/Ciclope";
-import { type AssistantState, STATE_LABELS, ciclopeState } from "../ciclope/state";
+import { Anel } from "../anel/Anel";
+import { type AssistantState, STATE_LABELS, anelEstado } from "../anel/state";
 import { speakableText } from "../speech/speakable";
 
 interface CallViewProps {
@@ -72,7 +72,7 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         <span className="call-engine">{engine === "device" ? "Voz do aparelho" : "Voz própria"}</span>
       </header>
       <div className="call-center">
-        <Ciclope state={ciclopeState({ state })} size={size} level={level} lookAt="pointer" decorative />
+        <Anel estado={anelEstado({ state })} size={size} level={level} decorative />
         <h1 className="call-name">{agentName ?? "V.I.S.A.O."}</h1>
         <p className="call-state" aria-live="polite">{STATE_LABELS[state]}</p>
         <p className="call-hint">{HINTS[state] ?? "Estou aqui."}</p>

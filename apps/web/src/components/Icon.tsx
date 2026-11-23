@@ -21,14 +21,17 @@ const PATHS = {
   plane: "M10.5 13.5L3 11l1.5-1.5 8 1 4-4.5a2 2 0 0 1 3 3l-4.5 4 1 8L14.5 22 12 14.5l-3.5 3.5V20l-1.5 1-1-3-3-1 1-1.5h2z",
   coin: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM14.5 9.5c-.5-1-1.4-1.5-2.5-1.5-1.4 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2c-1.1 0-2-.5-2.5-1.5M12 6.5V8M12 16v1.5",
   bed: "M3 18V7M3 13h18v5M21 13a3 3 0 0 0-3-3h-7v3M7 11.5a1.5 1.5 0 1 0 0-.01",
+  mail: "M3 6h18v12H3zM3 7l9 6.5L21 7",
+  message: "M12 4a8 8 0 0 0-6.9 12L4 20l4.1-1.1A8 8 0 1 0 12 4z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+/** `exact`: the stroke stays 1.5 px whatever the size (the sensors, DESIGN.md §4). */
+export function Icon({ name, size = 18, exact = false, className }: { name: IconName; size?: number; exact?: boolean; className?: string }) {
   return (
-    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
-      <path d={PATHS[name]} />
+    <svg className={`icon${className ? ` ${className}` : ""}`} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" aria-hidden="true">
+      <path d={PATHS[name]} vectorEffect={exact ? "non-scaling-stroke" : undefined} />
     </svg>
   );
 }

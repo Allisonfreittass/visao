@@ -4,11 +4,11 @@ Fonte única do visual do Visão. Todo agente (Claude Code, Codex, Cursor) e tod
 em interface lê este arquivo antes. Se uma tela nova não couber nestas regras, a regra muda aqui
 primeiro, depois o código.
 
-> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1, 2 e 4 da
-> [Migração](#migração) estão feitos: tokens e fontes do Muninn em todo o app
-> (`apps/web/src/brand/tokens.css`, `fonts.css`) e o login no Muninn. Ainda da marca anterior: o
-> mascote Ciclope (com o olho já em âmbar), as cores dos sensores, os ícones e o iPhone
-> (`Theme.swift`). Telas novas já seguem este arquivo.
+> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 4 da
+> [Migração](#migração) estão feitos: tokens e fontes em todo o app, o `<Anel>` no lugar do
+> Ciclope, os sensores como ícones de traço e o login no Muninn. Faltam os textos (passo 5), os
+> ícones do app (passo 6) e o iPhone inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem
+> este arquivo.
 
 ## 1. Ideia
 
@@ -102,6 +102,16 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
   rastro percorre o anel em 1,6 s por volta: a marca da frente em âmbar, a cauda apagando em
   papel → cinza), fala primeiro (ponto sobe à falha), pede aprovação (falha acesa), pausado
   (ponto vazado), silêncio (tudo apagado).
+- No app web os estados moram em `<Anel estado=…>` (`apps/web/src/anel/`), em SVG com CSS (uma
+  linha de avatares não roda script; só a voz usa um `requestAnimationFrame`). O que liga cada um:
+  - silêncio: sem conexão com o servidor;
+  - ouvindo: em ligação, ou logo depois de ser interrompido;
+  - pensando: escrevendo a resposta, ou uma tarefa rodando no Mac;
+  - fala primeiro: falando em voz, ou com uma conversa que ele abriu ainda não lida;
+  - pede aprovação: algo preparado esperando sim (Mac, e-mail, agenda, painel);
+  - pausado: autonomia pausada em Ajustes.
+  O que acontece agora vence o que espera; parado, a ordem é Mac, aprovação, pausa, abertura.
+  Em volta do Muninn o olho fica no lugar e um segundo ponto sobe à falha.
 - `prefers-reduced-motion`: mostrar o quadro final, sem movimento.
 - Canvas 2D, `devicePixelRatio` até 2, um `requestAnimationFrame`, cancelado ao desmontar.
 
@@ -126,6 +136,9 @@ Sem exclamação, sem emoji.
 2. Fontes: Newsreader, Geist e Geist Mono no lugar de Space Grotesk, Inter Tight e JetBrains Mono.
    **Feito** no web, servidas pelo app (`public/fonts/`), sem Google Fonts.
 3. Mascote: `<Ciclope>` vira `<Anel estado=…>` (estados da seção 6) e `<Muninn>` (gênese).
+   **Feito** no web: os sensores viraram ícones de traço 1,5 px na cor do texto (`<Sensor>`), os
+   nomes antigos de cor saíram de `tokens.css` e a abertura de 2,4 s fecha o anel em vez de acordar
+   o Ciclope.
 4. Login: Muninn grande + "Bem-vindo de volta." no lugar de "Identifique-se.". **Feito** no app
    web (`apps/web/src/muninn/`). O iPhone (`LoginView`) ainda não mudou.
 5. Textos: seção 7.

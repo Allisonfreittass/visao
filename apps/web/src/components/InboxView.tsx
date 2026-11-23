@@ -2,8 +2,8 @@ import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, use
 
 import { type Api, type Panel, utcDate } from "../api";
 import { homeGreeting } from "../brand/copy";
-import { Ciclope } from "../ciclope/Ciclope";
-import type { AssistantState, CiclopeState } from "../ciclope/state";
+import { Anel } from "../anel/Anel";
+import type { AnelEstado, AssistantState } from "../anel/state";
 import type { Pending } from "../hooks/usePending";
 import { dayLabel } from "../labels";
 import { Icon } from "./Icon";
@@ -12,8 +12,8 @@ import { MicButton } from "./SkyNav";
 
 export interface CallControls {
   state: AssistantState;
-  /** What the Ciclope shows (the state above, plus Mac at work and errors). */
-  ciclope: CiclopeState;
+  /** What the ring shows (the state above, plus Mac work, a yes waiting, the pause). */
+  anel: AnelEstado;
   level: () => number;
   levelActive: boolean;
   canCall: boolean;
@@ -111,7 +111,7 @@ interface InboxViewProps {
   onOpenProject: (id: string) => void;
 }
 
-/** Início: the Ciclope and the greeting, a line about the day, the live panels, everything that
+/** Início: the ring and the greeting, a line about the day, the live panels, everything that
  * waits for a yes, a no or a read, and the message box at the bottom. */
 export function InboxView({ api, call, onDraft, onSend, pending, current, onReplied, online, macOnline, project, onOpenProject }: InboxViewProps) {
   const empty = pending.count === 0;
@@ -129,7 +129,7 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
     <section className="home" aria-labelledby="home-title">
       <div className="home-scroll">
         <header className="home-hero">
-          <Ciclope state={call.ciclope} size={96} level={call.levelActive ? call.level : undefined} lookAt="pointer" />
+          <Anel estado={call.anel} size={96} level={call.levelActive ? call.level : undefined} />
           <h1 id="home-title" className="home-greeting">
             <span>{hello}</span> {watchCount(panels) ? <>Estou de olho em <em>{watchCount(panels)}</em>.</> : "Nada sob vigilância ainda."}
           </h1>

@@ -17,6 +17,8 @@ const THEMES: { value: ThemePreference; label: string }[] = [
 
 interface SettingsViewProps {
   api: Api;
+  /** The pause changed here: the ring shows it at once (DESIGN.md §6, "pausado"). */
+  onPausedChange?: (paused: boolean) => void;
   memoryEnabled: boolean;
   onToggleMemory: () => void;
   speakReplies: boolean;
@@ -55,10 +57,20 @@ export function SettingsView(props: SettingsViewProps) {
       .catch(onError);
   }, [api, onError]);
 
+  // The switch and the ring move on the tap; the server's answer settles both, and a failure
+  // puts them back.
   async function togglePause() {
+    if (paused === null) return;
+    const before = paused;
+    setPaused(!before);
+    props.onPausedChange?.(!before);
     try {
-      setPaused((await api.setAutonomyPaused(!paused)).paused);
+      const { paused: now } = await api.setAutonomyPaused(!before);
+      setPaused(now);
+      props.onPausedChange?.(now);
     } catch (e) {
+      setPaused(before);
+      props.onPausedChange?.(before);
       onError(e);
     }
   }

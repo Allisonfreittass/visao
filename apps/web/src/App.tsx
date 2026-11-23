@@ -41,8 +41,8 @@ import { MicButton, MobileBar } from "./components/SkyNav";
 import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
-import { Ciclope } from "./ciclope/Ciclope";
-import { type AssistantState, type CiclopeState, CICLOPE_LABELS, ciclopeState } from "./ciclope/state";
+import { Anel } from "./anel/Anel";
+import { ANEL_ESTADOS, ANEL_LABELS, type AnelEstado, type AssistantState, anelEstado } from "./anel/state";
 import { parseMacCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
@@ -67,7 +67,6 @@ const PUSH_SYNC_MS = 60 * 60 * 1000;
 const INITIATIVE_POLL_MS = 15_000;
 const PROGRESS_POLL_MS = 900;
 const ARTIFACT_POLL_MS = 3000;
-const DEMO_STATES: CiclopeState[] = ["idle", "listening", "thinking", "speaking", "working", "error", "offline", "interrupted"];
 
 function useHealth(api: Api): boolean {
   const [online, setOnline] = useState(true);
@@ -152,10 +151,10 @@ export function App() {
   const [deviceListening, setDeviceListening] = useState(() => loadPreference("device-listening") === "1");
   // Measured each turn; shown in no screen of this brand (kept for whoever reads it later).
   const [, setLatency] = useState<TurnLatency | null>(null);
-  const [demoState, setDemoState] = useState<CiclopeState>("idle");
+  const [demoState, setDemoState] = useState<AnelEstado>("ocioso");
   // The login is checking the credentials: the ring on the entrance shows "pensando".
   const [loginBusy, setLoginBusy] = useState(false);
-  const demoLevel = useDemoLevel(demo && (demoState === "listening" || demoState === "speaking"));
+  const demoLevel = useDemoLevel(demo && demoState === "ouvindo");
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
   // What the turn in flight is doing now, shown in place of "Pensando".
@@ -792,10 +791,12 @@ export function App() {
             : voice.inCall
               ? "LISTENING"
               : "IDLE";
-  // What the Ciclope shows: the state above, plus a task running on the Mac or an error on screen.
-  const ciclope: CiclopeState = demo
+  // What the ring shows (DESIGN.md §6): the state above, plus Mac work, a yes waiting, the pause
+  // and an unread opening.
+  const macWorking = pending.tasks.some((t) => t.status === "running");
+  const anel: AnelEstado = demo
     ? demoState
-    : ciclopeState({ state: orbState, macWorking: pending.tasks.some((t) => t.status === "running"), error: error !== null });
+    : anelEstado({ state: orbState, macWorking, approvals: pending.approvals, opening: pending.opening, paused: pending.paused });
   const agentName = status?.identity?.chosen_name ?? null;
   const callHint = voice.listenerKind
     ? null
@@ -805,7 +806,7 @@ export function App() {
 
   const call: CallControls = {
     state: orbState,
-    ciclope,
+    anel,
     level: voice.level,
     levelActive: voice.speaking || voice.inCall,
     canCall: voice.listenerKind !== null && online,
@@ -863,12 +864,12 @@ export function App() {
 
   return (
     <div className={`app${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
-      {(loggedIn || demo) && <AmbientBackground state={ciclope} />}
+      {(loggedIn || demo) && <AmbientBackground />}
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {ready && !firstRun && (
         <MobileBar
           pendingCount={pending.count}
-          ciclope={ciclope}
+          anel={anel}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
           view={inProject ? "projects" : view}
@@ -905,7 +906,7 @@ export function App() {
         <div className="layout">
           <Rail
             api={api}
-            ciclope={ciclope}
+            anel={anel}
             open={menuOpen}
             view={inProject ? "projects" : view}
             preparing={preparing}
@@ -969,6 +970,7 @@ export function App() {
             {view === "settings" && (
               <SettingsView
                 api={api}
+                onPausedChange={pending.setPaused}
                 memoryEnabled={memoryEnabled}
                 onToggleMemory={() => void toggleMemory()}
                 speakReplies={speakReplies}
@@ -1001,7 +1003,8 @@ export function App() {
               onLoadOlder={() => void loadOlder()}
               placeholder="Dê uma ordem ao Visão"
               composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
-              ciclope={ciclope}
+              anel={anel}
+              macWorking={macWorking}
               voiceLevel={voice.level}
               steps={liveSteps}
               header={
@@ -1074,15 +1077,15 @@ export function App() {
           <main className="main auth-main">
             <div className="entrance">
               <div className="entrance-mascot">
-                <Ciclope state={ciclope} size={124} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" />
+                <Anel estado={anel} size={200} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} />
               </div>
-              {demo && <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>}
+              {demo && <p className="rotulo state-label">{ANEL_LABELS[anel]}</p>}
             </div>
             {demo ? (
               <div className="demo">
-                {DEMO_STATES.map((s) => (
+                {ANEL_ESTADOS.map((s) => (
                   <button key={s} type="button" className="rs-botao rs-botao--compacto" aria-pressed={s === demoState} onClick={() => setDemoState(s)}>
-                    {CICLOPE_LABELS[s]}
+                    {ANEL_LABELS[s]}
                   </button>
                 ))}
               </div>

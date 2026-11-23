@@ -50,32 +50,16 @@
   --ease: cubic-bezier(.2, .8, .2, 1);
   /* Pálpebra e piscada: sensação mecânica. */
   --ease-mech: cubic-bezier(.6, 0, .2, 1);
-  --ease-spring: cubic-bezier(.2, 1.3, .4, 1);
+  /* Entradas: ease-out sem quique (DESIGN.md §6). */
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
   --duration-state: 220ms;
 
   /* Camadas */
   --layer-content: 1;
   --layer-overlay: 60;
 
-  /* Cores fixas. Os nomes da marca anterior ficam apontando para a paleta nova; o vermelho não
-     existe mais fora do erro. */
-  --red: var(--vermelho-erro);
-  --red-text: var(--vermelho-erro);
-  --on-red: var(--tinta);
-  --amber: var(--ambar);
-  --amber-bg: color-mix(in srgb, var(--ambar) 14%, var(--tinta));
-  /* Verde só no ponto de 6 px de "conectado". */
-  --green: #4ADE80;
-  --green-dot: #16A34A;
-  --graphite: var(--grafite);
-  --graphite-edge: var(--linha);
-  --graphite-line: color-mix(in srgb, var(--linha), var(--cinza) 25%);
-  --socket: #0A0B0C;
-  /* Cores dos sensores do mascote: saem no passo 3 da migração (DESIGN.md §8). */
-  --sensor-mac: #3B6BFF;
-  --sensor-whatsapp: #18C27A;
-  --sensor-email: #E0A800;
-  --sensor-caderno: #9B87FF;
+  /* Verde só no ponto de 6 px de "conectado" (DESIGN.md §2). */
+  --conectado: #4ADE80;
 }
 
 /* Escuro: o tema da marca. Sem sombras: a separação vem da borda de 1px. */
@@ -95,6 +79,7 @@
   --success: var(--text-2);
   --danger: var(--vermelho-erro);
   --warning: var(--ambar);
+  --warning-bg: color-mix(in srgb, var(--ambar) 14%, var(--tinta));
   --shadow-card: none;
   --shadow-float: none;
   --scrim: rgb(0 0 0 / .6);
@@ -109,7 +94,6 @@
   --accent-text: var(--text-2);
   --accent-strong: var(--text);
   --accent-soft: color-mix(in srgb, var(--papel) 12%, transparent);
-  --iris: var(--surface-2);
 }
 
 /* Tema claro (o "dia": papel com texto tinta). Guardado, não exposto. */
@@ -132,6 +116,7 @@
   --success: var(--text-2);
   --danger: #B3261E;
   --warning: var(--ambar-fundo);
+  --warning-bg: color-mix(in srgb, var(--ambar) 18%, var(--papel));
   --shadow-card: none;
   --shadow-float: none;
   --scrim: rgb(16 18 20 / .32);
@@ -148,8 +133,8 @@
 }
 
 /* ---------------------------------------------------------------------------------------------
-   Nomes antigos (marca Rastros), apontando para os novos. Os estilos das telas ainda usam estes
-   nomes; não crie regras novas com eles.
+   Nomes antigos de espaço, raio e camada (marca Rastros), apontando para os novos. Os estilos das
+   telas ainda usam estes; não crie regras novas com eles. Os de cor saíram no passo 3.
    --------------------------------------------------------------------------------------------- */
 :root {
   --espaco-1: var(--space-1);
@@ -166,22 +151,4 @@
   --raio-pilula: var(--radius-pill);
   --camada-conteudo: var(--layer-content);
   --camada-sobreposicao: var(--layer-overlay);
-  --fundo: var(--bg);
-  --fundo-elevado: var(--surface);
-  --fundo-hover: var(--surface-2);
-  --tinta-suave: var(--text-muted);
-  --tinta-fraca: var(--text-muted);
-  --linha-forte: var(--border-strong);
-  --borda: var(--border-strong);
-  --estanho: var(--accent-text);
-  --estanho-linha: color-mix(in srgb, var(--accent) 40%, transparent);
-  --lanterna: var(--accent);
-  --lanterna-luz: var(--accent-soft);
-  --sobre-lanterna: var(--on-accent);
-  --sobre-tinta: var(--bg);
-  --sucesso: var(--success);
-  --aviso: var(--warning);
-  --erro: var(--danger);
-  --anel-foco: var(--focus-ring);
-  --elevacao: var(--shadow-float);
 }

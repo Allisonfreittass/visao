@@ -1,20 +1,20 @@
 import { Lockup } from "../brand/Lockup";
 import { OWNER_NAME } from "../brand/copy";
-import type { CiclopeState } from "../ciclope/state";
+import type { AnelEstado } from "../anel/state";
 import { Icon } from "./Icon";
 import type { WorkspaceView } from "./Rail";
 
 interface MobileBarProps {
   view: WorkspaceView;
   pendingCount: number;
-  ciclope: CiclopeState;
+  anel: AnelEstado;
   menuOpen: boolean;
   onMenu: () => void;
   onView: (view: WorkspaceView) => void;
 }
 
 /** Below 900 px: the drawer button, the logo, and the avatar that opens Ajustes. */
-export function MobileBar({ view, pendingCount, ciclope, menuOpen, onMenu, onView }: MobileBarProps) {
+export function MobileBar({ view, pendingCount, anel, menuOpen, onMenu, onView }: MobileBarProps) {
   return (
     <header className="mobile-bar">
       <button type="button" className="mobile-bar-button" onClick={onMenu} aria-expanded={menuOpen} aria-label="Abrir o menu">
@@ -22,7 +22,7 @@ export function MobileBar({ view, pendingCount, ciclope, menuOpen, onMenu, onVie
         {pendingCount > 0 && <span className="mobile-bar-badge" aria-label={`${pendingCount} esperando você`}>{pendingCount}</span>}
       </button>
       <button type="button" className="mobile-bar-brand" onClick={() => onView("inbox")} aria-label="V.I.S.A.O., Início">
-        <Lockup state={ciclope} size={26} animated />
+        <Lockup estado={anel} size={26} animated />
       </button>
       <button
         type="button"
@@ -38,7 +38,7 @@ export function MobileBar({ view, pendingCount, ciclope, menuOpen, onMenu, onVie
   );
 }
 
-/** The microphone left of the message box: a tap starts a voice call (the Ciclope listens). */
+/** The microphone left of the message box: a tap starts a voice call (the ring listens). */
 export function MicButton({ canCall, hint, onCall, live }: { canCall: boolean; hint: string | null; onCall: () => void; live?: boolean }) {
   return (
     <button

@@ -18,6 +18,14 @@ export interface Pending {
   tasks: ArmTask[];
   /** How many things wait for the owner right now. */
   count: number;
+  /** How many of them are a yes or no to give (the ring lights its gap, DESIGN.md §6). */
+  approvals: number;
+  /** He opened a conversation that was not read yet (the ring's dot rises to the gap). */
+  opening: boolean;
+  /** His autonomy is paused in Ajustes (the ring's dot goes hollow). */
+  paused: boolean;
+  /** Ajustes changed the pause: the ring follows at once, the next poll only confirms. */
+  setPaused: (paused: boolean) => void;
   refresh: () => void;
   decideArm: (task: ArmTask, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<boolean>;
@@ -39,6 +47,13 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   const [tasks, setTasks] = useState<ArmTask[]>([]);
   const [google, setGoogle] = useState<GoogleAction[]>([]);
   const [offers, setOffers] = useState<PanelOffer[]>([]);
+  const [paused, setPausedState] = useState(false);
+  // Bumped by every local change, so a poll that left before it cannot flip the ring back.
+  const pauseVersion = useRef(0);
+  const setPaused = useCallback((next: boolean) => {
+    pauseVersion.current += 1;
+    setPausedState(next);
+  }, []);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
@@ -46,6 +61,9 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     if (!enabled) return;
     // An older server without panel offers answers 404: that is just none.
     const panelOffers = api.panelOffers().catch(() => [] as PanelOffer[]);
+    // Only the ring reads the pause; an error here must not hide what waits.
+    const asked = pauseVersion.current;
+    api.autonomy().then((a) => { if (pauseVersion.current === asked) setPausedState(a.paused); }, () => undefined);
     Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions(), panelOffers])
       .then(([g, n, d, t, o, p]) => {
         setOffers(p);
@@ -96,6 +114,10 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     devices,
     tasks,
     count: armProposals.length + google.length + offers.length + goals.length + notices.length,
+    approvals: armProposals.length + google.length + offers.length + goals.length,
+    opening: openings.length > 0,
+    paused,
+    setPaused,
     refresh,
     decideArm: (task, decision, via) => act(() => api.decideArm(task.id, decision, via)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),

@@ -1,7 +1,6 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import type { Api, Project } from "../api";
-import { Critter, projectColor } from "../ciclope/Family";
 
 interface ProjectsViewProps {
   api: Api;
@@ -54,7 +53,6 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
   if (list?.length === 0) {
     return (
       <section className="projects-vazio" aria-labelledby="projects-title">
-        <Critter kind="projeto" size={72} color={projectColor("novo")} />
         <h1 id="projects-title">Cada assunto, <em>um projeto.</em></h1>
         <p className="lede">
           Um chat só dele, com o que eu anotei, os painéis, as páginas e os arquivos em cima. Dê um nome, ou me
@@ -77,7 +75,6 @@ export function ProjectsView({ api, onOpenProject, onError }: ProjectsViewProps)
         <div className="project-cards">
           {list?.map((p) => (
             <button type="button" key={p.id} className="project-card" onClick={() => onOpenProject(p.id)}>
-              <Critter kind="projeto" size={40} color={projectColor(p.name)} />
               <strong>{p.name}</strong>
               <span>{projectSummary(p)}</span>
             </button>

@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import type { Api } from "../api";
 import { Lockup } from "../brand/Lockup";
 import { OWNER_NAME } from "../brand/copy";
-import type { CiclopeState } from "../ciclope/state";
-import { Critter, type CritterKind } from "../ciclope/Family";
+import type { AnelEstado } from "../anel/state";
+import { Sensor, type SensorKind } from "../anel/Sensor";
 import { useDragToClose } from "../hooks/useDragToClose";
 import { Icon, type IconName } from "./Icon";
 
@@ -28,7 +28,7 @@ interface RailProps {
   /** null: no Mac paired yet. */
   macOnline: boolean | null;
   /** The mascot's live state, for the logo. */
-  ciclope?: CiclopeState;
+  anel?: AnelEstado;
   onView: (view: WorkspaceView) => void;
   /** Closes the drawer (dragging it left, on a phone). */
   onClose?: () => void;
@@ -51,7 +51,7 @@ export function Rail(props: RailProps) {
   const { view, onView } = props;
   const drag = useDragToClose("left", () => props.onClose?.(), 70);
   const google = useGoogleConnected(props.api);
-  const integrations: { kind: CritterKind; label: string; on: boolean | null; open: WorkspaceView; idle: string }[] = [
+  const integrations: { kind: SensorKind; label: string; on: boolean | null; open: WorkspaceView; idle: string }[] = [
     { kind: "mac", label: "Mac", on: props.online ? props.macOnline : false, open: "mac", idle: "Não pareado" },
     { kind: "email", label: "E-mail", on: props.online ? google : false, open: "settings", idle: "Não conectado" },
   ];
@@ -63,7 +63,7 @@ export function Rail(props: RailProps) {
       {...(props.open ? drag.handlers : {})}
     >
       <a className="rail-brand" href="/" aria-label="V.I.S.A.O., início">
-        <Lockup state={props.ciclope} />
+        <Lockup estado={props.anel} />
       </a>
       <nav className="rail-nav" aria-label="Seções">
         {NAV.map((item) => (
@@ -82,11 +82,11 @@ export function Rail(props: RailProps) {
           {integrations.map((i) => (
             <li key={i.kind}>
               <button type="button" aria-current={view === i.open && i.kind === "mac" ? "page" : undefined} onClick={() => onView(i.open)}>
-                <Critter kind={i.kind} size={28} asleep={i.on !== true} />
+                <Sensor kind={i.kind} size={22} asleep={i.on !== true} />
                 <span className="rail-integration-text">
                   <span>{i.label}</span>
                   <small className={i.on ? "on" : ""}>
-                    {i.on ? "● Conectado" : !props.online ? "Sem conexão" : i.on === false ? "Desconectado" : i.idle}
+                    {i.on ? <><span className="ponto-conectado" aria-hidden="true" />Conectado</> : !props.online ? "Sem conexão" : i.on === false ? "Desconectado" : i.idle}
                   </small>
                 </span>
               </button>

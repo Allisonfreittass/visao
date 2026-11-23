@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-import { Ciclope } from "../ciclope/Ciclope";
-import { Critter, type CritterKind } from "../ciclope/Family";
+import { Anel } from "../anel/Anel";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end. */
@@ -49,18 +48,14 @@ export function introAfterLogin(): boolean {
   return !reducedMotion() && !ranThisSession();
 }
 
-const SENSORS: CritterKind[] = ["mac", "email", "caderno", "whatsapp"];
-const ORBIT = 96; // px from the mascot's center
 const WORD = "V.I.S.A.O.";
 
-/** The opening, a boot sequence (≈2.4 s): the dark grid with the mascot off and shut; its LED
- * blinks twice; the lid opens mechanically and the eye lights up with the room's red glow; the
- * sensors come online in orbit, one by one, as a thin red ring sweeps once; they fold into the
- * mascot, it slides left and the name is typed beside it, the last dot lit red; then the lockup
- * flies to the side bar's logo as Início fades in. A click or a key skips it. */
+/** The opening (≈2.4 s), a short genesis of the ring (DESIGN.md §6): the amber dot lights; the
+ * ring closes from the gap, mark by mark; the empty gap flashes amber twice; the ring slides left
+ * and the name is typed beside it, the last dot amber; then the lockup flies to the side bar's
+ * logo as the app shows through. A click or a key skips it. */
 export function Intro({ onDone }: { onDone: () => void }) {
   const root = useRef<HTMLDivElement>(null);
-  const [awake, setAwake] = useState(false);
 
   useEffect(() => {
     savePreference(DAY_KEY, localDay(new Date()));
@@ -79,38 +74,16 @@ export function Intro({ onDone }: { onDone: () => void }) {
       anims.push(node.animate(frames, { fill: "both", ...options }));
     };
 
-    // 2. The LED blinks twice.
-    run(q(".intro-led"), [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 0, offset: 0.45 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { delay: 250, duration: 300, easing: "steps(1, end)" });
-    // 3. The lid opens (the mascot leaves "offline") and the eye lights up with the glow.
-    const wake = window.setTimeout(() => setAwake(true), 550);
-    run(q(".intro-glow"), [{ opacity: 0 }, { opacity: 1.0, offset: 0.7 }, { opacity: 0.8 }], { delay: 550, duration: 350, easing: EASE });
-    run(q(".intro-hero"), [{ transform: "scale(1)" }, { transform: "scale(1.04)", offset: 0.6 }, { transform: "scale(1)" }], { delay: 600, duration: 300, easing: EASE });
-
-    // 4. The sensors come online in orbit, one every 120 ms; a red ring sweeps once.
-    all<HTMLElement>(".intro-sensor").forEach((node, i) => {
-      const angle = -Math.PI / 2 + (i / SENSORS.length) * Math.PI * 2;
-      const x = Math.cos(angle) * ORBIT;
-      const y = Math.sin(angle) * ORBIT;
-      run(node, [
-        { transform: `translate(${x}px, ${y}px) scale(.3)`, opacity: 0 },
-        { transform: `translate(${x}px, ${y}px) scale(1.08)`, opacity: 1, offset: 0.7 },
-        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
-      ], { delay: 900 + i * 120, duration: 240, easing: EASE });
-      run(node.querySelector(".intro-sensor-on"), [{ opacity: 0 }, { opacity: 1 }], { delay: 1000 + i * 120, duration: 120, easing: "linear" });
-      // 5. …and fold into the mascot.
-      run(node, [
-        { transform: `translate(${x}px, ${y}px) scale(1)`, opacity: 1 },
-        { transform: "translate(0, 0) scale(.2)", opacity: 0 },
-      ], { delay: 1500, duration: 220, easing: "cubic-bezier(.6, 0, .2, 1)", fill: "forwards" });
+    // 1. The amber dot lights at the centre.
+    run(q(".anel-ponto-forma"), [{ opacity: 0, transform: "scale(.2)" }, { opacity: 1, transform: "scale(1)" }], { delay: 150, duration: 260, easing: EASE });
+    // 2. The ring closes clockwise from the gap, one mark every 45 ms, each to its own resting look.
+    all<SVGLineElement>(".anel-marca").forEach((mark, i) => {
+      run(mark, [{ opacity: 0 }], { delay: 300 + i * 45, duration: 160, easing: EASE, fill: "backwards" });
     });
-    const ring = q<SVGCircleElement>(".intro-ring circle");
-    if (ring) {
-      const length = 2 * Math.PI * 76;
-      ring.style.strokeDasharray = `${length * 0.18} ${length}`;
-      run(q(".intro-ring"), [{ transform: "rotate(0deg)", opacity: 0 }, { opacity: 1, offset: 0.1 }, { opacity: 1, offset: 0.85 }, { transform: "rotate(360deg)", opacity: 0 }], { delay: 950, duration: 550, easing: "cubic-bezier(.4, 0, .2, 1)" });
-    }
+    // 3. The empty gap flashes amber twice: the name is not chosen yet.
+    run(q(".anel-falha"), [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }], { delay: 1320, duration: 420, easing: "ease-in-out", fill: "none" });
 
-    // 5. The mascot slides left and the name is typed, 40 ms a letter; the last dot lights red.
+    // 4. The ring slides left and the name is typed, 40 ms a letter; the last dot is amber.
     const lockup = q<HTMLElement>(".intro-lockup");
     const word = q<HTMLElement>(".intro-word");
     const shift = word ? (word.offsetWidth + 20) / 2 : 0;
@@ -120,7 +93,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       run(letter, [{ opacity: 0 }, { opacity: 1 }], { delay: 1520 + i * 40, duration: 1, easing: "linear" });
     });
 
-    // 6. The lockup flies to the side bar's logo; the app shows through.
+    // 5. The lockup flies to the side bar's logo; the app shows through.
     const fly = window.setTimeout(() => {
       if (!lockup) return;
       const from = lockup.getBoundingClientRect();
@@ -136,7 +109,6 @@ export function Intro({ onDone }: { onDone: () => void }) {
     const skip = () => onDone();
     window.addEventListener("keydown", skip);
     return () => {
-      window.clearTimeout(wake);
       window.clearTimeout(fly);
       window.clearTimeout(done);
       window.removeEventListener("keydown", skip);
@@ -147,22 +119,10 @@ export function Intro({ onDone }: { onDone: () => void }) {
   // On <body>, so no app layout rule can pull it out of full screen.
   return createPortal(
     <div className="intro" ref={root} onClick={onDone} aria-hidden="true">
-      <span className="intro-grid" />
-      <span className="intro-glow" />
       <div className="intro-stage">
         <div className="intro-lockup">
           <div className="intro-hero">
-            <svg className="intro-ring" viewBox="-80 -80 160 160" width="168" height="168">
-              <circle r="76" fill="none" stroke="#F0A23B" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90)" />
-            </svg>
-            {SENSORS.map((kind) => (
-              <span className="intro-sensor" key={kind}>
-                <Critter kind={kind} size={36} asleep />
-                <span className="intro-sensor-on"><Critter kind={kind} size={36} /></span>
-              </span>
-            ))}
-            <Ciclope state={awake ? "idle" : "offline"} size={112} decorative />
-            <span className="intro-led" />
+            <Anel estado="ocioso" size={112} decorative />
           </div>
           <span className="intro-word">
             {WORD.split("").map((c, i) => (c === "." ? <span key={i}><b>.</b></span> : <span key={i}>{c}</span>))}
