@@ -2,9 +2,13 @@
 OpenRouter, DeepInfra, vLLM...). Choosing a host is configuration, not code."""
 
 import base64
+import json
 import logging
+import re
 import time
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -108,10 +112,12 @@ class OpenAICompatibleProvider:
             else:
                 if response.status_code < 400:
                     return response
-                if response.status_code == 429 and _quota_exhausted(response):
+                exhausted, retry_at = _quota(response)
+                if exhausted:
                     raise LLMError(
                         "quota_exhausted",
                         f"provider quota exhausted; retrying won't help: {response.text[:300]}",
+                        retry_at=retry_at,
                     )
                 if response.status_code == 413:
                     # Real case (2026-11-21): Groq's free tier caps a request at 8 000 tokens per
@@ -169,19 +175,69 @@ def _rate_limit_headers(response: httpx.Response) -> dict[str, str]:
     }
 
 
-def _quota_exhausted(response: httpx.Response) -> bool:
-    """True when the provider says no requests remain until a reset further away than we would
-    ever wait (e.g. a daily free-tier cap). Short per-minute limits still get retried."""
+def _error_body(response: httpx.Response) -> dict:
+    """The error object, as OpenAI ({"error": ...}) or Gemini ([{"error": ...}]) sends it."""
+    try:
+        body = response.json()
+    except ValueError:
+        return {}
+    if isinstance(body, list) and body:
+        body = body[0]
+    error = body.get("error") if isinstance(body, dict) else None
+    return error if isinstance(error, dict) else {}
+
+
+def _next_pacific_midnight(now: float) -> float | None:
+    """Gemini's daily free quota comes back at midnight, Pacific time."""
+    try:
+        zone = ZoneInfo("America/Los_Angeles")
+    except ZoneInfoNotFoundError:
+        return None
+    here = datetime.fromtimestamp(now, zone)
+    return (here.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).timestamp()
+
+
+def _seconds(text: object) -> float | None:
+    """ "43s" or "1.5s" (Google's RetryInfo.retryDelay) -> 43.0."""
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)s", str(text).strip())
+    return float(match.group(1)) if match else None
+
+
+def _quota(response: httpx.Response) -> tuple[bool, float | None]:
+    """(exhausted, when it comes back in seconds since the epoch, if the provider said).
+
+    Exhausted means retrying soon won't help: no requests left until a reset further away than we
+    would ever wait (e.g. a daily free-tier cap), or an account without credit. Short
+    per-minute limits stay a plain 429 and still get retried."""
+    now = time.time()
+    if response.status_code != 429:
+        return False, None
+    error = _error_body(response)
+    # OpenAI: the account ran out of credit.
+    if error.get("code") == "insufficient_quota" or error.get("type") == "insufficient_quota":
+        return True, None
+    # Gemini: RESOURCE_EXHAUSTED, a per-day quota or a long RetryInfo delay.
+    if error.get("status") == "RESOURCE_EXHAUSTED":
+        details = [d for d in error.get("details") or [] if isinstance(d, dict)]
+        if "PerDay" in json.dumps(details):
+            return True, _next_pacific_midnight(now)
+        for detail in details:
+            delay = _seconds(detail.get("retryDelay", ""))
+            if delay is not None and delay > _MAX_RETRY_DELAY_SECONDS:
+                return True, now + delay
+        return False, None
     headers = _rate_limit_headers(response)
     if headers.get("x-ratelimit-remaining") != "0":
-        return False
+        return False, None
     reset = headers.get("x-ratelimit-reset")
     if reset is None:
-        return True
+        return True, None
     try:
         reset_at = float(reset)
     except ValueError:
-        return True
+        return True, None
     if reset_at > 1e12:  # milliseconds since epoch
         reset_at /= 1000
-    return reset_at - time.time() > _MAX_RETRY_DELAY_SECONDS
+    if reset_at - now > _MAX_RETRY_DELAY_SECONDS:
+        return True, reset_at
+    return False, None

@@ -1,18 +1,21 @@
 import logging
+from collections.abc import Callable
 from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import SecretStr
 
 from apps.api.settings import Settings, get_settings
+from core import llm_routing
 from core.arm.local_llm import LocalModelProvider
 from core.brain import BrainProvider
 from integrations.llm.anthropic_provider import AnthropicProvider
-from integrations.llm.base import LLMProvider, Pricing
+from integrations.llm.base import LLMProvider, Pricing, current_purpose
 from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
 from integrations.llm.fallback import FallbackLLMProvider
 from integrations.llm.fitting import FittingProvider
 from integrations.llm.openai_compatible import OpenAICompatibleProvider
+from integrations.llm.pause import PauseBoard
 
 logger = logging.getLogger(__name__)
 
@@ -128,18 +131,67 @@ def _openai_compatible(
     )
 
 
+def chained_slots(settings: Settings, *, warn: bool = False) -> list[str]:
+    """Setting prefixes of the providers in the chain, in configured order: the primary, the
+    fallback when complete, and the second fallback when complete too (a second one without a
+    first is not chained). A partial one is ignored, with a warning."""
+    if missing_llm_settings(settings):
+        return []
+    slots = ["llm_"]
+    for slot in ("fallback", "fallback2"):
+        missing = missing_fallback_settings(settings, slot)
+        if missing and len(missing) < 6 and warn:
+            logger.warning(
+                f"LLM {slot} ignored, missing: " + ", ".join(missing),
+                extra={"event": "llm_fallback_incomplete"},
+            )
+        if missing:
+            break
+        slots.append(f"llm_{slot}_")
+    return slots
+
+
+def configured_kinds(settings: Settings) -> list[llm_routing.Kind]:
+    """Claude, OpenAI, Gemini or another, for each provider in the chain (Ajustes shows them)."""
+    return [
+        llm_routing.provider_kind(
+            getattr(settings, f"{prefix}provider_name"), getattr(settings, f"{prefix}base_url")
+        )
+        for prefix in chained_slots(settings)
+    ]
+
+
+def _session_factory():
+    from infrastructure.database.session import get_sessionmaker
+
+    return get_sessionmaker()()
+
+
+def _routed_order(kinds: list[llm_routing.Kind], factory) -> Callable[[], list[int]]:
+    """The order per task (core/llm_routing.py), read at each call from the owner's switch."""
+
+    def order() -> list[int]:
+        return llm_routing.order(kinds, current_purpose(), llm_routing.cached_mode(factory))
+
+    return order
+
+
 def build_llm_provider(
-    settings: Settings, *, budget_guard: BudgetGuard | None = None, fast: bool = False
+    settings: Settings,
+    *,
+    budget_guard: BudgetGuard | None = None,
+    fast: bool = False,
+    session_factory=None,
 ) -> LLMProvider | None:
     """Returns None unless every primary setting, prices included, is present. A fully
-    configured fallback is chained after the primary; a partial one is ignored with a warning."""
+    configured fallback is chained after the primary; a partial one is ignored with a warning.
+    With more than one provider, the owner's switch may reorder them per task (ADR-0022)."""
     if missing_llm_settings(settings):
         return None
+    factory = session_factory or _session_factory
     if budget_guard is None:
-        from infrastructure.database.session import get_sessionmaker
-
         budget_guard = BudgetGuard(
-            lambda: get_sessionmaker()(),
+            factory,
             settings.llm_free_grants,
             BudgetLimits(
                 calls_per_day=settings.llm_budget_calls_per_day,
@@ -154,67 +206,30 @@ def build_llm_provider(
             paid_daily_usd=settings.llm_paid_daily_usd,
             paid_monthly_usd=settings.llm_paid_monthly_usd,
         )
-    primary_raw = _openai_compatible(
-        settings,
-        settings.llm_provider_name,
-        settings.llm_base_url,
-        settings.llm_api_key,
-        settings.llm_model,
-        settings.llm_price_input_per_mtok,
-        settings.llm_price_output_per_mtok,
-        settings.llm_fast_extra_body if fast else None,
-    )
-    primary = FittingProvider(
-        GuardedLLMProvider(primary_raw, settings.llm_base_url, budget_guard),
-        settings.llm_max_request_tokens,
-    )
-    missing = missing_fallback_settings(settings)
-    if len(missing) == 6:
-        return primary
-    if missing:
-        logger.warning(
-            "LLM fallback ignored, missing: " + ", ".join(missing),
-            extra={"event": "llm_fallback_incomplete"},
-        )
-        return primary
-    fallback_raw = _openai_compatible(
-        settings,
-        settings.llm_fallback_provider_name,
-        settings.llm_fallback_base_url,
-        settings.llm_fallback_api_key,
-        settings.llm_fallback_model,
-        settings.llm_fallback_price_input_per_mtok,
-        settings.llm_fallback_price_output_per_mtok,
-        settings.llm_fallback_fast_extra_body if fast else None,
-    )
-    chain = [
-        primary,
-        FittingProvider(
-            GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard),
-            settings.llm_fallback_max_request_tokens,
-        ),
-    ]
-    missing = missing_fallback_settings(settings, "fallback2")
-    if missing and len(missing) < 6:
-        logger.warning(
-            "second LLM fallback ignored, missing: " + ", ".join(missing),
-            extra={"event": "llm_fallback_incomplete"},
-        )
-    elif not missing:
-        second = _openai_compatible(
+    chain: list[LLMProvider] = []
+    kinds: list[llm_routing.Kind] = []
+    for prefix in chained_slots(settings, warn=True):
+        name = getattr(settings, f"{prefix}provider_name")
+        base_url = getattr(settings, f"{prefix}base_url")
+        raw = _openai_compatible(
             settings,
-            settings.llm_fallback2_provider_name,
-            settings.llm_fallback2_base_url,
-            settings.llm_fallback2_api_key,
-            settings.llm_fallback2_model,
-            settings.llm_fallback2_price_input_per_mtok,
-            settings.llm_fallback2_price_output_per_mtok,
-            settings.llm_fallback2_fast_extra_body if fast else None,
+            name,
+            base_url,
+            getattr(settings, f"{prefix}api_key"),
+            getattr(settings, f"{prefix}model"),
+            getattr(settings, f"{prefix}price_input_per_mtok"),
+            getattr(settings, f"{prefix}price_output_per_mtok"),
+            getattr(settings, f"{prefix}fast_extra_body") if fast else None,
         )
         chain.append(
             FittingProvider(
-                GuardedLLMProvider(second, settings.llm_fallback2_base_url, budget_guard),
-                settings.llm_fallback2_max_request_tokens,
+                GuardedLLMProvider(raw, base_url, budget_guard),
+                getattr(settings, f"{prefix}max_request_tokens"),
             )
         )
-    return FallbackLLMProvider(chain)
+        kinds.append(llm_routing.provider_kind(name, base_url))
+    if len(chain) == 1:
+        return chain[0]
+    return FallbackLLMProvider(
+        chain, order=_routed_order(kinds, factory), pauses=PauseBoard(factory)
+    )

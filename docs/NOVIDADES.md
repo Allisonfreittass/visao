@@ -7,6 +7,20 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 23/11/2026
 
+- **Provedor por tarefa, escolhido por regra no código**
+  ([ADR-0022](decisions/0022-provedor-por-tarefa.md)).
+  - Em Ajustes > Modelo, "Escolha do provedor" tem duas opções. **Ordem fixa** é a de antes:
+    principal, reserva, segunda reserva. **Por tarefa** reordena os mesmos provedores pelo
+    propósito da chamada.
+  - A conversa e tudo que leva algo do dono vão primeiro no Claude, depois OpenAI e Gemini. Só a
+    revisão do estudo, que leva apenas texto público, vai primeiro no Gemini grátis, porque o
+    nível grátis dele pode usar o que recebe para melhorar os produtos do Google.
+  - Nenhum modelo escolhe outro. O fallback em falha, os tetos pagos e o encaixe do prompt
+    continuam iguais.
+  - Um provedor sem cota fica pausado no banco, para a API e o worker juntos, até o reset que
+    ele mesmo informou (meia-noite do Pacífico para a cota diária do Gemini). Antes eram 15
+    minutos, e cada processo descobria por si.
+
 - **Braço versão 3: desfazer, até os testes passarem, e todo comando no sandbox**
   ([BRACO.md](BRACO.md), itens 4, 8, 9 e 10).
   - Todo comando que uma tarefa roda no Mac fica no sandbox do Claude Code: grava só no projeto,

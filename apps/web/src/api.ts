@@ -74,6 +74,19 @@ export interface QuoteTable {
 /** "nuvem": the cloud; "local": the model on the Mac first; "auto": the cloud, the Mac as reserve. */
 export type BrainMode = "nuvem" | "local" | "auto";
 
+/** Which cloud provider goes first for each task (docs/decisions/0022). */
+export type RoutingMode = "fixa" | "por_tarefa";
+
+export interface RoutingState {
+  mode: RoutingMode;
+  /** The configured providers, in the order of the server's settings. */
+  configured: string[];
+  /** The order right now for what carries something of the owner (almost everything). */
+  personal: string[];
+  /** The order right now for what carries only public text (the study review). */
+  public: string[];
+}
+
 export interface BrainState {
   mode: BrainMode;
   /** The model a Mac offers right now ("qwen3:4b"); null: none online. */
@@ -809,6 +822,18 @@ export class Api {
 
   setBrain(mode: BrainMode): Promise<BrainState> {
     return this.request("/arm/brain", {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  routing(): Promise<RoutingState> {
+    return this.request("/system/llm-routing");
+  }
+
+  setRouting(mode: RoutingMode): Promise<RoutingState> {
+    return this.request("/system/llm-routing", {
       method: "PUT",
       body: JSON.stringify({ mode }),
       headers: { "Content-Type": "application/json" },

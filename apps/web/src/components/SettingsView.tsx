@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { Api } from "../api";
 import { AccountPanel } from "./AccountPanel";
 import { BrainSettings } from "./BrainSettings";
+import { RoutingSettings } from "./RoutingSettings";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
@@ -152,6 +153,7 @@ export function SettingsView(props: SettingsViewProps) {
         <section className="settings-group" aria-labelledby="g-modelo">
           <h2 id="g-modelo" className="rotulo">Modelo</h2>
           <BrainSettings api={api} onError={onError} />
+          <RoutingSettings api={api} onError={onError} />
         </section>
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>

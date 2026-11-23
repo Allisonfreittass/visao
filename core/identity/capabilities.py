@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core import llm_routing
 from core.initiatives import push
 from core.policies.autonomy import is_paused
 from infrastructure.database.models import ArmDevice, GoogleAccount, PushSubscription, User
@@ -47,6 +48,8 @@ class Capabilities:
     push_devices: int | None = None
     push_configured: bool = True
     self_knowledge: bool = False
+    # Ajustes > Escolha do provedor on "Por tarefa" (core/llm_routing.py, ADR-0022).
+    provider_by_task: bool = False
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -184,6 +187,14 @@ class Capabilities:
                 "ler o próprio código-fonte e a própria documentação (só leitura) para "
                 "explicar como funciona"
             )
+        if self.provider_by_task:
+            items.append(
+                "responder pelo provedor que uma regra no código escolhe para cada tarefa (não é "
+                "você nem outro modelo que escolhe): a conversa e tudo que leva algo do "
+                "interlocutor vão primeiro no Claude, depois OpenAI e Gemini; só a revisão do "
+                "estudo, com texto público, vai primeiro no Gemini grátis; o dono liga e desliga "
+                "em Ajustes"
+            )
         if self.notifications:
             if not self.push_configured:
                 items.append(
@@ -279,6 +290,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         or 0,
         push_configured=push.configured(),
         self_knowledge=inputs.self_knowledge,
+        provider_by_task=llm_routing.get_mode(session) == "por_tarefa",
         google=session.scalar(
             select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
         )

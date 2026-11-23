@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from infrastructure.database.models import ModelUsage
-from integrations.llm.base import ChatMessage, LLMError, LLMProvider
+from integrations.llm.base import ChatMessage, LLMError, LLMProvider, for_purpose
 
 AUTONOMOUS_PURPOSES = (
     "code_proposal",
@@ -128,7 +128,9 @@ def complete_json(
     session.add(usage)
     session.commit()  # a crash/failed call still counts toward the call limit
     try:
-        response = provider.complete(prompt, max_output_tokens=budget.max_output_tokens)
+        # The purpose picks the order of providers when the owner turned it on (ADR-0022).
+        with for_purpose(purpose):
+            response = provider.complete(prompt, max_output_tokens=budget.max_output_tokens)
     except LLMError as exc:
         usage.outcome, usage.error_kind = "error", exc.kind[:50]
         session.commit()

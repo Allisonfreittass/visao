@@ -61,9 +61,11 @@ class Pricing:
 class LLMError(Exception):
     """The provider failed. `kind` is safe to log; the message may contain provider details."""
 
-    def __init__(self, kind: str, message: str) -> None:
+    def __init__(self, kind: str, message: str, *, retry_at: float | None = None) -> None:
         super().__init__(message)
         self.kind = kind
+        # When the provider said its quota comes back (seconds since the epoch), if it said so.
+        self.retry_at = retry_at
 
 
 class LLMProvider(Protocol):
@@ -148,3 +150,21 @@ def prompt_levels(messages: list[ChatMessage]) -> tuple[list[ChatMessage], ...]:
     if levels and levels[0] == messages:
         return levels
     return (messages,)
+
+
+# What the call is for (the `purpose` written to ModelUsage). Read by the order of providers per
+# task (core/llm_routing.py, ADR-0022); a call that does not say goes in the personal order.
+_purpose: ContextVar[str | None] = ContextVar("llm_purpose", default=None)
+
+
+@contextmanager
+def for_purpose(purpose: str) -> Iterator[None]:
+    token = _purpose.set(purpose)
+    try:
+        yield
+    finally:
+        _purpose.reset(token)
+
+
+def current_purpose() -> str | None:
+    return _purpose.get()
