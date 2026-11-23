@@ -8,8 +8,16 @@ import Observation
 @Observable
 public final class ChatStore {
     public private(set) var conversationId: String?
-    /// A new conversation started from a project is created inside it.
+    /// A new conversation started from a project is created inside it; without a project and
+    /// without a conversation, sending goes to the continuous one.
     public let projectId: String?
+    /// The continuous conversation grows without end: it loads its last page, and older ones on
+    /// request (docs/CONVERSA_CONTINUA.md).
+    public let paged: Bool
+    /// The last page came full: there may be older messages on the server.
+    public private(set) var olderLeft = false
+    public private(set) var loadingOlder = false
+    public static let pageSize = 100
     public private(set) var messages: [Message] = []
     public private(set) var sending = false
     /// What the turn in flight is doing now; nil reads "Pensando".
@@ -38,6 +46,9 @@ public final class ChatStore {
     public var followInBackground = false
     /// Called when a conversation is created by the first message (the list adds it).
     public var onConversationCreated: ((Conversation) -> Void)?
+    /// The phone's position for this message's text, or nil (docs/LOCALIZACAO.md). The screen sets
+    /// it; it decides by the switch and the text, and the position goes only with that message.
+    public var locate: ((String) async -> SentLocation?)?
     /// Called with every API error, so a 401 can send the app back to the login screen.
     public var onError: ((Error) -> Void)?
 
@@ -60,12 +71,14 @@ public final class ChatStore {
     private var artifactTask: Task<Void, Never>?
 
     public init(
-        api: APIClient, conversationId: String?, projectId: String? = nil, progressInterval: Duration = .milliseconds(900),
-        artifactInterval: Duration = .seconds(3)
+        api: APIClient, conversationId: String?, projectId: String? = nil, paged: Bool = false,
+        progressInterval: Duration = .milliseconds(900), artifactInterval: Duration = .seconds(3)
     ) {
         self.api = api
         self.conversationId = conversationId
         self.projectId = projectId
+        // A chat with nothing open is the continuous one.
+        self.paged = paged || (conversationId == nil && projectId == nil)
         self.progressInterval = progressInterval
         self.artifactInterval = artifactInterval
     }
@@ -75,8 +88,9 @@ public final class ChatStore {
         loading = true
         defer { loading = false }
         do {
-            let stored = try await api.messages(conversationId: conversationId)
+            let stored = try await fetch(conversationId)
             messages = merge(stored: stored)
+            olderLeft = paged && stored.count >= Self.pageSize
             watchPages()
         } catch {
             report(error)
@@ -86,11 +100,34 @@ public final class ChatStore {
     /// Picks up what it said on its own while you were away, keeping what was never sent.
     public func refresh() async {
         guard let conversationId, !sending else { return }
-        guard let stored = try? await api.messages(conversationId: conversationId), !sending else { return }
+        guard let stored = try? await fetch(conversationId), !sending else { return }
         let next = merge(stored: stored)
         if next.map(\.id) != messages.map(\.id) {
             messages = next
             watchPages()
+        }
+    }
+
+    /// The whole conversation, or, paged, the last page (and as many as are already shown).
+    private func fetch(_ id: String) async throws -> [Message] {
+        guard paged else { return try await api.messages(conversationId: id) }
+        let shown = messages.filter { $0.local == nil }.count
+        return try await api.messages(conversationId: id, limit: max(Self.pageSize, shown))
+    }
+
+    /// "Carregar mensagens anteriores": the page before the first one on screen.
+    public func loadOlder() async {
+        guard paged, olderLeft, !loadingOlder, let conversationId,
+              let first = messages.first(where: { $0.local == nil }) else { return }
+        loadingOlder = true
+        defer { loadingOlder = false }
+        do {
+            let page = try await api.messages(conversationId: conversationId, limit: Self.pageSize, before: first.id)
+            let known = Set(messages.map(\.id))
+            messages = page.filter { !known.contains($0.id) } + messages
+            olderLeft = page.count >= Self.pageSize
+        } catch {
+            report(error)
         }
     }
 
@@ -137,7 +174,7 @@ public final class ChatStore {
         do {
             let id = try await ensureConversation()
             _ = try await api.askArm(project: project, prompt: prompt, conversationId: id)
-            messages = merge(stored: try await api.messages(conversationId: id))
+            messages = merge(stored: try await fetch(id))
         } catch {
             report(error)
         }
@@ -226,7 +263,11 @@ public final class ChatStore {
         }
         let api = self.api
         let attachmentIds = attachments.map(\.id)
-        let task = Task { try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id) }
+        let locate = self.locate
+        let task = Task {
+            let location = await locate?(text)
+            return try await api.send(conversationId: id, content: text, modality: spoken ? "voice" : "text", attachmentIds: attachmentIds, replyToId: replyTo?.id, location: location)
+        }
         turnTask = task
         do {
             let turn = try await task.value
@@ -253,7 +294,7 @@ public final class ChatStore {
             mark(localId, state)
             // The message may have been stored even if the reply failed: reload, keeping the one
             // that never arrived visible so it is not silently lost.
-            if let stored = try? await api.messages(conversationId: id) {
+            if let stored = try? await fetch(id) {
                 let lastUser = stored.last(where: { $0.role == .user })
                 let arrived = lastUser.map { $0.content == text && $0.createdAt >= optimistic.createdAt.addingTimeInterval(-5) } ?? false
                 let waiting = messages.filter { $0.local == .queued }
@@ -279,7 +320,8 @@ public final class ChatStore {
 
     private func ensureConversation() async throws -> String {
         if let conversationId { return conversationId }
-        let created = try await api.createConversation(projectId: projectId)
+        // There is no list of conversations: without a project, it is the continuous one.
+        let created = projectId == nil ? try await api.continuousConversation() : try await api.createConversation(projectId: projectId)
         conversationId = created.id
         if created.memoryUnavailable {
             error = "Não consegui preparar a memória desta vez. Dá para conversar, mas posso esquecer detalhes."

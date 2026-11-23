@@ -1,0 +1,12 @@
+/* <AmbientBackground>: fixo atrás de tudo. A grade de pontos (HUD) e o brilho vermelho do sensor,
+   que pulsa de .10 a .16 com o estado do mascote. Só opacity anima. */
+.ambient { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg); }
+.ambient-grid { position: absolute; inset: 0; background-image: radial-gradient(rgb(255 255 255 / .045) 1px, transparent 1px); background-size: 24px 24px; }
+.ambient-glow { position: absolute; inset: 0; background: radial-gradient(circle at 50% 16%, rgb(255 59 48 / .16), transparent 42%); opacity: .8;
+  animation: ambient-breathe 4.8s var(--ease) infinite alternate; }
+.ambient[data-state="listening"] .ambient-glow, .ambient[data-state="speaking"] .ambient-glow { animation: none; opacity: 1; }
+.ambient[data-state="working"] .ambient-glow, .ambient[data-state="thinking"] .ambient-glow { animation-duration: 1.6s; }
+.ambient[data-state="offline"] .ambient-glow { animation: none; opacity: .15; }
+@keyframes ambient-breathe { from { opacity: .77; } to { opacity: 1; } }
+@media (min-width: 900px) { .ambient-glow { left: 248px; } }
+@media (prefers-reduced-motion: reduce) { .ambient-glow { animation: none !important; } }

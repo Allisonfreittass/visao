@@ -86,15 +86,25 @@ public final class APIClient: Sendable {
         return try await request("/conversations", method: "POST", query: query)
     }
 
-    public func messages(conversationId: String) async throws -> [Message] {
-        try await request("/conversations/\(segment(conversationId))/messages")
+    /// The owner's continuous conversation, created the first time it is asked for.
+    public func continuousConversation() async throws -> Conversation {
+        try await request("/conversations/continuous")
+    }
+
+    /// Without `limit`, the whole conversation; with it, the last `limit` (before `before`, when
+    /// given), oldest first (docs/CONVERSA_CONTINUA.md).
+    public func messages(conversationId: String, limit: Int? = nil, before: String? = nil) async throws -> [Message] {
+        var query: [URLQueryItem] = []
+        if let limit { query.append(URLQueryItem(name: "limit", value: String(limit))) }
+        if let before { query.append(URLQueryItem(name: "before", value: before)) }
+        return try await request("/conversations/\(segment(conversationId))/messages", query: query)
     }
 
     public func send(
         conversationId: String, content: String, modality: String = "text",
-        attachmentIds: [String] = [], replyToId: String? = nil
+        attachmentIds: [String] = [], replyToId: String? = nil, location: SentLocation? = nil
     ) async throws -> Turn {
-        let body = SendBody(content: content, modality: modality, attachmentIds: attachmentIds, replyToId: replyToId)
+        let body = SendBody(content: content, modality: modality, attachmentIds: attachmentIds, replyToId: replyToId, location: location)
         return try await request(
             "/conversations/\(segment(conversationId))/messages", method: "POST",
             body: try JSONEncoder().encode(body), contentType: "application/json"
@@ -163,9 +173,11 @@ public final class APIClient: Sendable {
         let modality: String
         let attachmentIds: [String]
         let replyToId: String?
+        /// Only with a "perto de mim" message and the switch on (docs/LOCALIZACAO.md).
+        var location: SentLocation? = nil
 
         enum CodingKeys: String, CodingKey {
-            case content, modality
+            case content, modality, location
             case attachmentIds = "attachment_ids"
             case replyToId = "reply_to_id"
         }
@@ -177,6 +189,7 @@ public final class APIClient: Sendable {
             try c.encode(attachmentIds, forKey: .attachmentIds)
             // null, not missing: the same body the web sends.
             try c.encode(replyToId, forKey: .replyToId)
+            try c.encodeIfPresent(location, forKey: .location)
         }
     }
 

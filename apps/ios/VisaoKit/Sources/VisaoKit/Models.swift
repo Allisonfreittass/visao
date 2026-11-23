@@ -52,13 +52,26 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     public let projectId: String?
     /// 3 to 6 words after the first exchange; nil: the menu shows the date.
     public let title: String?
+    /// The owner's one continuous conversation (docs/CONVERSA_CONTINUA.md): Chat opens it.
+    public let continuous: Bool
 
-    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil, title: String? = nil) {
+    public init(id: String, createdAt: Date, memoryStatus: String? = nil, projectId: String? = nil, title: String? = nil, continuous: Bool = false) {
         self.id = id
         self.createdAt = createdAt
         self.memoryStatus = memoryStatus
         self.projectId = projectId
         self.title = title
+        self.continuous = continuous
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        memoryStatus = try c.decodeIfPresent(String.self, forKey: .memoryStatus)
+        projectId = try c.decodeIfPresent(String.self, forKey: .projectId)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        continuous = try c.decodeIfPresent(Bool.self, forKey: .continuous) ?? false
     }
 
     /// The server could not prepare memory for it: you can talk, it may forget details.
@@ -67,7 +80,7 @@ public struct Conversation: Codable, Sendable, Identifiable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title
+        case id, title, continuous
         case createdAt = "created_at"
         case memoryStatus = "memory_status"
         case projectId = "project_id"
@@ -153,6 +166,8 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
     public var local: LocalState?
     /// The same text as `content` in 2 or 3 bubbles (ADR-0010); nil is one bubble.
     public let parts: [String]?
+    /// The reply created or changed this project: "Abrir o projeto «…» →" (ADR-0021).
+    public let projectId: String?
 
     /// What goes on screen: one text per bubble.
     public var bubbles: [String] {
@@ -163,7 +178,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
     public init(
         id: String, role: Role, content: String, createdAt: Date, origin: String = "turn",
         attachments: [Attachment] = [], artifact: Artifact? = nil, replyTo: Quoted? = nil,
-        sources: [Source] = [], local: LocalState? = nil, parts: [String]? = nil
+        sources: [Source] = [], local: LocalState? = nil, parts: [String]? = nil, projectId: String? = nil
     ) {
         self.id = id
         self.role = role
@@ -176,10 +191,12 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         self.sources = sources
         self.local = local
         self.parts = parts
+        self.projectId = projectId
     }
 
     enum CodingKeys: String, CodingKey {
         case id, role, content, origin, attachments, artifact, parts
+        case projectId = "project_id"
         case createdAt = "created_at"
         case replyTo = "reply_to"
     }
@@ -195,6 +212,7 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         artifact = try c.decodeIfPresent(Artifact.self, forKey: .artifact)
         replyTo = try c.decodeIfPresent(Quoted.self, forKey: .replyTo)
         parts = try c.decodeIfPresent([String].self, forKey: .parts)
+        projectId = try c.decodeIfPresent(String.self, forKey: .projectId)
         sources = []
         local = nil
     }
@@ -210,6 +228,18 @@ public struct Message: Codable, Sendable, Identifiable, Hashable {
         try c.encodeIfPresent(artifact, forKey: .artifact)
         try c.encodeIfPresent(replyTo, forKey: .replyTo)
         try c.encodeIfPresent(parts, forKey: .parts)
+        try c.encodeIfPresent(projectId, forKey: .projectId)
+    }
+
+    /// The tag next to the name, by where the message came from (as in ChatView.tsx).
+    public var originTag: String? {
+        switch origin {
+        case "initiative": "puxou conversa"
+        case "arm": "no Mac"
+        case "google": "no Google"
+        case "share": "compartilhado do iPhone"
+        default: nil
+        }
     }
 
     /// How a reply quotes this message: one line, as the web does (160 characters).

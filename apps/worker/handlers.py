@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from apps.api.browser import get_browser
 from apps.api.limits import panel_limits
-from apps.api.llm import build_llm_provider
+from apps.api.llm import build_llm_provider, with_brain
 from apps.api.settings import Settings
 from apps.worker.runner import Handler, HandlerResult
 from core.autonomy.budget import has_room
@@ -285,9 +285,10 @@ def briefing_handler(settings: Settings, provider: LLMProvider | None) -> Handle
 
 
 def build_handlers(settings: Settings) -> dict[str, Handler]:
-    provider = build_llm_provider(settings)
+    # Work done on its own: paused while the owner runs on the local model (core/brain.py).
+    provider = with_brain(settings, build_llm_provider(settings), background=True)
     # With reasoning on, a long conversation filled the output limit and the JSON came back cut.
-    fast = build_llm_provider(settings, fast=True)
+    fast = with_brain(settings, build_llm_provider(settings, fast=True), background=True)
     search = OpenWebSearch() if settings.mind_enabled else WikipediaSearch()
     return {
         "research_followup": research_followup_handler(settings, provider, search),

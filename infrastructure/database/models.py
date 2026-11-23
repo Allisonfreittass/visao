@@ -249,7 +249,7 @@ class Message(Base):
         Uuid, ForeignKey("conversations.id", ondelete="CASCADE")
     )
     # Made by the app once per message it sends: the same message sent again (a retry on a bad
-    # network) is answered with the turn already made, never run twice (migration 0035).
+    # network) is answered with the turn already made, never run twice (migration 0036).
     client_message_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
@@ -901,7 +901,39 @@ class ArmDevice(Base):
     projects: Mapped[list[Any]] = mapped_column(JSON, default=list)
     version: Mapped[str] = mapped_column(String(32), default="")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The local model the arm offers (docs/MODELO_LOCAL.md), e.g. "qwen3:4b", and when it last
+    # asked for a question to answer with it. Unset: this Mac offers no local model.
+    local_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    local_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ArmLlmCall(Base):
+    """A question for the local model on the owner's Mac (docs/MODELO_LOCAL.md). The server
+    writes it, the arm takes it, asks the model on the Mac and sends back only the text."""
+
+    __tablename__ = "arm_llm_calls"
+    __table_args__ = (Index("ix_arm_llm_calls_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("arm_devices.id", ondelete="SET NULL"), nullable=True
+    )
+    # pending | claimed | done | failed | expired
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    # {"messages": [{"role", "content"}], "max_output_tokens": int}
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    model: Mapped[str] = mapped_column(String(64), default="")
+    result: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(String(500), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ArmTask(Base):

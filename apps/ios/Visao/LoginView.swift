@@ -1,7 +1,8 @@
 import SwiftUI
 import VisaoKit
 
-/// The entrance of the web: the brand's words over the forest, the form in glass.
+/// The entrance (Login on the web): the mascot, "Identifique-se.", the form in a card. While
+/// the password has the focus the mascot narrows its eye to a slit: "Não estou olhando."
 struct LoginView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
@@ -17,25 +18,38 @@ struct LoginView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .center, spacing: 28) {
                 Spacer(minLength: 24)
-                Text("V.I.S.A.O.")
-                    .font(Typo.display(34, relativeTo: .largeTitle))
-                    .accessibilityLabel("Visão")
-                    .accessibilityAddTraits(.isHeader)
+                Wordmark(size: 20)
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Orb(thinking: busy, size: 64, control: false)
-                    (Text("Eu nasci sem nome e venho ").font(Typo.display(30, relativeTo: .title))
-                        + Text("decidindo quem sou.").font(Typo.display(30, relativeTo: .title, italic: true)))
-                    Text("Entre para conversar.")
+                VStack(spacing: 14) {
+                    SentinelaView(state: busy ? .thinking : .idle, size: 124, eyesClosed: field == .password)
+                        .overlay(alignment: .topTrailing) {
+                            if field == .password {
+                                Text("Não estou olhando.")
+                                    .font(Typo.text(.caption, weight: .medium))
+                                    .foregroundStyle(palette.text2)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(palette.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(palette.borderStrong))
+                                    .fixedSize()
+                                    .offset(x: 96, y: -14)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .animation(.easeOut(duration: 0.2), value: field)
+                    Text("Identifique-se.")
+                        .font(Typo.display(30, relativeTo: .title))
+                        .accessibilityAddTraits(.isHeader)
+                    Text("Acesso restrito. Só você entra aqui.")
                         .font(Typo.text(.callout))
-                        .foregroundStyle(palette.tintaSuave)
+                        .foregroundStyle(palette.textMuted)
                 }
 
                 form
-                    .padding(24)
-                    .glass(palette, cornerRadius: 32)
+                    .padding(20)
+                    .glass(palette, cornerRadius: 16)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -51,7 +65,7 @@ struct LoginView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Campo(label: "Email") {
+            Campo(label: "E-mail", focused: field == .email) {
                 TextField("voce@exemplo.com", text: $email)
                     .textContentType(.username)
                     .keyboardType(.emailAddress)
@@ -61,7 +75,7 @@ struct LoginView: View {
                     .submitLabel(.next)
                     .onSubmit { field = .password }
             }
-            Campo(label: "Senha") {
+            Campo(label: "Senha", focused: field == .password) {
                 SecureField("", text: $password)
                     .textContentType(.password)
                     .focused($field, equals: .password)
@@ -77,12 +91,12 @@ struct LoginView: View {
 
             Button(action: submit) {
                 Group {
-                    if busy { Text("Entrando…") } else { Text("Entrar") }
+                    if busy { Text("Verificando…") } else { Text("Acessar") }
                 }
                 .font(Typo.text(.body, weight: .medium))
                 .frame(maxWidth: .infinity, minHeight: 50)
-                .foregroundStyle(palette.pilulaAtivaTinta)
-                .background(palette.pilulaAtiva, in: Capsule())
+                .foregroundStyle(palette.onRed)
+                .background(palette.red, in: Capsule())
             }
             .buttonStyle(.plain)
             .disabled(busy || email.isEmpty || password.isEmpty)
@@ -121,7 +135,7 @@ struct LoginView: View {
                 try await session.login(server: server, email: email, password: password)
                 password = ""
             } catch {
-                self.error = (error as? LocalizedError)?.errorDescription ?? "Não deu para entrar"
+                self.error = (error as? LocalizedError)?.errorDescription ?? "Acesso negado. Confira o e-mail e a senha."
             }
         }
     }
@@ -130,6 +144,7 @@ struct LoginView: View {
 /// A field with its label above, rounded like the web's.
 private struct Campo<Content: View>: View {
     let label: String
+    var focused = false
     @ViewBuilder let content: Content
     @Environment(\.palette) private var palette
 
@@ -142,56 +157,11 @@ private struct Campo<Content: View>: View {
                 .font(Typo.text(.body))
                 .padding(.horizontal, 14)
                 .frame(minHeight: 48)
-                .background(palette.fundoElevado, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(palette.linha))
-        }
-    }
-}
-
-/// The orb of the "Neblina" look: a glass circle with the lantern at its core, which pulses while
-/// it thinks (ceu.css, .sky-orb).
-struct Orb: View {
-    var thinking = false
-    var size: CGFloat = 48
-    /// A button (next to the message box) floats in glass; elsewhere it is content, in a
-    /// standard material (liquid-glass.md: no Liquid Glass in the content layer).
-    var control = true
-    @Environment(\.palette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
-
-    var body: some View {
-        Circle()
-            .fill(palette.lanterna)
-            .frame(width: size / 4, height: size / 4)
-            .shadow(color: palette.lanterna.opacity(0.45), radius: 6)
-            .scaleEffect(thinking && pulse && !reduceMotion ? 1.6 : 1)
-            .opacity(thinking ? (pulse ? 0.7 : 1) : 0.55)
-            .modifier(OrbBackground(control: control, size: size))
-            .onChange(of: thinking, initial: true) { _, now in
-                if now && !reduceMotion {
-                    withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { pulse = true }
-                } else {
-                    withAnimation(.easeOut(duration: 0.2)) { pulse = false }
-                }
-            }
-            .accessibilityHidden(true)
-    }
-}
-
-private struct OrbBackground: ViewModifier {
-    let control: Bool
-    let size: CGFloat
-    @Environment(\.palette) private var palette
-
-    func body(content: Content) -> some View {
-        if control {
-            content.glassCircle(palette, size: size)
-        } else {
-            content
-                .frame(width: size, height: size)
-                .background(palette.usesGlass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(palette.fundoElevado), in: Circle())
-                .overlay(Circle().strokeBorder(palette.vidroBorda))
+                .background(focused ? palette.surface : palette.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(focused ? palette.red : palette.borderStrong, lineWidth: focused ? 2 : 1))
+                // Focus: a 2 pt red border with a soft red halo.
+                .background(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(Palette.red.opacity(focused ? 0.22 : 0), lineWidth: 4).padding(-3))
+                .animation(.easeOut(duration: 0.15), value: focused)
         }
     }
 }

@@ -31,4 +31,14 @@ final class PanelOfferTests: XCTestCase {
         XCTAssertTrue(ask.reportsInChat)
         XCTAssertTrue(VoiceRules.question(for: ask).contains("pode criar"))
     }
+
+    func testTagsByOrigin() {
+        func tag(_ origin: String) -> String? {
+            Message(id: "m", role: .user, content: "x", createdAt: Date(), origin: origin).originTag
+        }
+        XCTAssertEqual(tag("share"), "compartilhado do iPhone")
+        XCTAssertEqual(tag("initiative"), "puxou conversa")
+        XCTAssertNil(tag("turn"))
+        XCTAssertNil(tag("project"))
+    }
 }

@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import VisaoKit
 
-/// Who is logged in, against which server, and the conversation list.
+/// Who is logged in, against which server, and which conversation Chat opens.
 @MainActor
 @Observable
 final class Session {
@@ -19,16 +19,24 @@ final class Session {
     private(set) var loggedIn: Bool
     /// The name it chose, or nil while it has none: the app never calls it "VISÃO".
     private(set) var agentName: String?
-    private(set) var conversations: [Conversation] = []
+    /// The continuous conversation (docs/CONVERSA_CONTINUA.md): Chat always opens it. There is no
+    /// list of conversations; separate ones only live inside a project.
+    private(set) var continuousId: String?
+    /// Project id → name, for "Abrir o projeto «…» →" under a reply (GET /projects).
+    private(set) var projectNames: [String: String] = [:]
     private(set) var loadingList = false
     var listError: String?
 
     private let tokens: TokenStore
-    private static let serverKey = "serverURL"
+    /// The App Group and Keychain group shared with the share extension (docs/COMPARTILHAR.md).
+    static let shared = SharedConfig.main
 
     init() {
-        tokens = KeychainTokenStore(service: (Bundle.main.bundleIdentifier ?? "visao") + ".auth")
-        let url = Session.savedServer ?? Session.configuredServer
+        // The token saved before 17/11/2026 moves into the shared group on this first read.
+        let store = Session.shared.tokens()
+        store.migrateIfNeeded()
+        tokens = store
+        let url = Session.shared.server
         let client = APIClient(baseURL: url, tokens: tokens)
         api = client
         loader = AttachmentLoader(api: client)
@@ -42,16 +50,7 @@ final class Session {
     }
 
     /// From Config/Local.xcconfig (VISAO_API_BASE_URL), through Info.plist.
-    static var configuredServer: URL {
-        let raw = Bundle.main.object(forInfoDictionaryKey: "VisaoAPIBaseURL") as? String ?? ""
-        return URL(string: raw) ?? URL(string: "https://visao.example.com/api")!
-    }
-
-    /// The address typed on the login screen, when it differs from the configured one. It is not
-    /// a secret, so UserDefaults is fine; the token stays in the Keychain.
-    static var savedServer: URL? {
-        UserDefaults.standard.string(forKey: serverKey).flatMap(URL.init(string:))
-    }
+    static var configuredServer: URL { shared.configuredServer }
 
     var serverAddress: String { api.baseURL.absoluteString }
 
@@ -64,14 +63,15 @@ final class Session {
             api = APIClient(baseURL: url, tokens: tokens)
         }
         try await api.login(email: email.trimmingCharacters(in: .whitespaces), password: password)
-        UserDefaults.standard.set(url == Session.configuredServer ? nil : url.absoluteString, forKey: Session.serverKey)
+        // Not a secret: the group's defaults, so the share extension knows where to send.
+        Session.shared.saveServer(url)
         loggedIn = true
     }
 
     func logout() {
         api.logout()
         loggedIn = false
-        conversations = []
+        continuousId = nil
         agentName = nil
     }
 
@@ -84,10 +84,11 @@ final class Session {
         loadingList = true
         defer { loadingList = false }
         do {
-            async let list = api.conversations()
+            async let continuous = api.continuousConversation()
             async let status = api.status()
-            conversations = try await list
+            continuousId = try await continuous.id
             agentName = (try? await status)?.identity?.chosenName
+            await loadProjectNames()
             listError = nil
             pending.onError = { [weak self] in self?.handle($0) }
             await pending.refresh()
@@ -97,17 +98,21 @@ final class Session {
         }
     }
 
-    /// Only the list (the title may have arrived); a failure keeps the one on screen.
-    func loadConversations() async {
-        if let list = try? await api.conversations() { conversations = list }
+    func loadProjectNames() async {
+        guard let list = try? await api.projects() else { return }
+        projectNames = Dictionary(list.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func renamed(project id: String, to name: String) {
+        projectNames[id] = name
     }
 
     /// Text Início puts in the chat's message box (a suggestion, "Criar um novo painel").
     var chatDraft: String?
 
+    /// The first message made the continuous conversation (it was not there yet).
     func added(_ conversation: Conversation) {
-        conversations.removeAll { $0.id == conversation.id }
-        conversations.insert(conversation, at: 0)
+        if conversation.continuous || conversation.projectId == nil { continuousId = conversation.id }
     }
 
     var speakerName: String { agentName ?? "Ele" }

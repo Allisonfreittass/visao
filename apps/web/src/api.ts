@@ -71,6 +71,16 @@ export interface QuoteTable {
   text: string;
 }
 
+/** "nuvem": the cloud; "local": the model on the Mac first; "auto": the cloud, the Mac as reserve. */
+export type BrainMode = "nuvem" | "local" | "auto";
+
+export interface BrainState {
+  mode: BrainMode;
+  /** The model a Mac offers right now ("qwen3:4b"); null: none online. */
+  local_model: string | null;
+  mac_online: boolean;
+}
+
 export interface Message {
   id: string;
   role: Role;
@@ -86,6 +96,8 @@ export interface Message {
   quote_table?: QuoteTable | null;
   /** The reply did something in this project: "abrir o projeto" (ADR-0021). */
   project_id?: string | null;
+  /** Written by the local model on the Mac (docs/MODELO_LOCAL.md): "Visão · local". */
+  local_model?: boolean;
   /** Only here: it was shown as it was written, so it does not come in again. */
   streamed?: boolean;
   attachments?: Attachment[];
@@ -759,6 +771,19 @@ export class Api {
   /** `via: "voz"`: said in a call after it read the task aloud; the server records it. */
   decideArm(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<ArmTask> {
     return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  }
+
+  /** Which model the Visão thinks with, and whether the Mac offers a local one now. */
+  brain(): Promise<BrainState> {
+    return this.request("/arm/brain");
+  }
+
+  setBrain(mode: BrainMode): Promise<BrainState> {
+    return this.request("/arm/brain", {
+      method: "PUT",
+      body: JSON.stringify({ mode }),
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   google(): Promise<GoogleState> {

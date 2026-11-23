@@ -2,13 +2,13 @@ import SwiftUI
 import UIKit
 import VisaoKit
 
-/// One message, as in the "Neblina" look of the web: what he says in a solid bubble on the left,
+/// One message, as on the web: what he says in a solid bubble on the left,
 /// what you say in glass on the right. Names and times stay out of the way; only "puxou
 /// conversa", "no Mac", "não foi enviada" and the like are shown.
 struct MessageRow: View, Equatable {
     /// Redrawn only when the message itself changes, not on every progress check of the chat.
     nonisolated static func == (a: MessageRow, b: MessageRow) -> Bool {
-        a.message == b.message && a.speaker == b.speaker
+        a.message == b.message && a.speaker == b.speaker && a.projectName == b.projectName
     }
 
     let message: Message
@@ -16,6 +16,9 @@ struct MessageRow: View, Equatable {
     let onReply: () -> Void
     let onQuoteTap: (String) -> Void
     let onOpenPage: (Artifact) -> Void
+    /// The name of the project this reply touched (GET /projects), for "Abrir o projeto «…» →".
+    var projectName: String?
+    var onOpenProject: ((String) -> Void)?
     /// Rates a reply; answers what to say back ("Valeu…"), nil when it failed.
     var onFeedback: ((Bool, [String]) async -> String?)?
     @Environment(\.palette) private var palette
@@ -135,6 +138,9 @@ struct MessageRow: View, Equatable {
             if last, !message.sources.isEmpty {
                 SourcesPill(sources: message.sources, at: message.createdAt) { sourcesOpen = true }
             }
+            if last, !isUser, let projectId = message.projectId, let onOpenProject {
+                projectLink(projectId, open: onOpenProject)
+            }
         }
         .font(Typo.text(.body))
         .foregroundStyle(isUser ? palette.tinta : palette.bolhaDeleTinta)
@@ -156,6 +162,27 @@ struct MessageRow: View, Equatable {
                 Button("Ver fontes", systemImage: "link") { sourcesOpen = true }
             }
         }
+    }
+
+    /// One line, at least 44 pt tall; a long name ends in "…".
+    private func projectLink(_ id: String, open: @escaping (String) -> Void) -> some View {
+        Button { open(id) } label: {
+            HStack(spacing: 6) {
+                Text(projectName.map { "Abrir o projeto «\($0)»" } ?? "Abrir o projeto")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text("→").accessibilityHidden(true)
+            }
+            .font(Typo.text(.subheadline, weight: .medium))
+            .foregroundStyle(palette.tinta)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(palette.fundoHover, in: Capsule())
+            .overlay(Capsule().strokeBorder(palette.linhaForte))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 2)
     }
 
     @ViewBuilder
@@ -188,12 +215,7 @@ struct MessageRow: View, Equatable {
         case .queued: return ("na fila", false)
         default: break
         }
-        switch message.origin {
-        case "initiative": return ("puxou conversa", false)
-        case "arm": return ("no Mac", false)
-        case "google": return ("no Google", false)
-        default: return nil
-        }
+        return message.originTag.map { ($0, false) }
     }
 
     /// Only a clearly sideways drag to the right moves the bubble; vertical scrolling stays.

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>VisaoAPIBaseURL</key>
+	<string>$(VISAO_API_BASE_URL)</string>
+	<key>VisaoAppGroup</key>
+	<string>$(VISAO_APP_GROUP)</string>
+	<key>VisaoKeychainGroup</key>
+	<string>$(VISAO_KEYCHAIN_GROUP)</string>
+	<key>VisaoTokenService</key>
+	<string>$(VISAO_BUNDLE_ID).auth</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Para achar lugares perto de você quando você pergunta, como uma farmácia aberta. A posição vai só com essa mensagem e não fica guardada.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<!-- Um link (Safari e outros apps), um texto selecionado, ou até 4 entre fotos, prints e PDFs. -->
+			<key>NSExtensionActivationRule</key>
+			<string>SUBQUERY (
+  extensionItems, $item,
+  SUBQUERY ($item.attachments, $a,
+    ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url"
+    || ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.plain-text"
+    || ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+    || ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf"
+  ).@count &gt;= 1
+  AND SUBQUERY ($item.attachments, $a,
+    ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+    || ANY $a.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf"
+  ).@count &lt;= 4
+).@count &gt;= 1</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

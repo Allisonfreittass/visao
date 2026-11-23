@@ -186,10 +186,15 @@ def test_a_conversation_cap_blocks_calls_only_when_set(
 
 
 def test_a_long_conversation_fits_under_the_call_limit_instead_of_failing(
-    client: TestClient, db: Session, fake_llm: FakeLLMProvider
+    client: TestClient, db: Session, fake_llm: FakeLLMProvider, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Real case (16/11/2026): "Falha no provedor de LLM (budget_denied); sem resposta" in a long
     trip conversation, the prompt over the ledger's per-call input limit."""
+    # The question reads as one about the Visão itself, which brings excerpts of its own docs
+    # whose size changes with every doc added to the repository; this is about the history.
+    from core.identity import self_knowledge
+
+    monkeypatch.setattr(self_knowledge, "context_block", lambda text: None)
     run_genesis(db)
     headers = _login(client, db, "a@exemplo.com")
     conversation_id = _new_conversation(client, headers)

@@ -117,3 +117,85 @@ def test_one_round_of_the_loop_takes_runs_and_reports(tmp_path, monkeypatch):
         "/device/tasks/t-1/result",
     ]
     assert calls[-1][2] == {"ok": True, "result": "feito"}
+
+
+def _config_file(tmp_path: Path, local: dict) -> Path:
+    path = tmp_path / "braco.json"
+    path.write_text(
+        json.dumps(
+            {
+                "server": "https://visao.example",
+                "token": "visao-arm_x",
+                "projects": {"visao": str(tmp_path)},
+                "modelo_local": local,
+            }
+        )
+    )
+    return path
+
+
+def test_the_local_model_only_talks_to_a_model_on_this_mac(tmp_path):
+    loaded = braco.Config.load(_config_file(tmp_path, {"modelo": "qwen3:4b"}))
+    assert loaded.local_model == "qwen3:4b" and loaded.ollama == "http://127.0.0.1:11434"
+    # The questions carry the owner's conversations: never to another machine.
+    with pytest.raises(ValueError, match="deste Mac"):
+        braco.Config.load(
+            _config_file(tmp_path, {"modelo": "qwen3:4b", "endereco": "http://192.168.0.9:11434"})
+        )
+    assert braco.Config.load(_config_file(tmp_path, {})).local_model is None
+
+
+class _Answer:
+    def __init__(self, body: dict) -> None:
+        self._raw = json.dumps(body).encode()
+
+    def read(self) -> bytes:
+        return self._raw
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> None:
+        return None
+
+
+def test_a_question_goes_to_ollama_with_thinking_off_and_comes_back_as_text(tmp_path, monkeypatch):
+    sent = {}
+
+    def fake_open(request, timeout):
+        sent["url"], sent["body"] = request.full_url, json.loads(request.data)
+        return _Answer({"message": {"content": " Olá. "}, "prompt_eval_count": 9, "eval_count": 2})
+
+    monkeypatch.setattr(braco.urllib.request, "urlopen", fake_open)
+    cfg = config(tmp_path, local_model="qwen3:4b")
+    answer = braco.ask_local_model(
+        cfg, {"messages": [{"role": "user", "content": "oi"}], "max_output_tokens": 50}
+    )
+    assert answer == {"ok": True, "text": "Olá.", "input_tokens": 9, "output_tokens": 2}
+    assert sent["url"] == "http://127.0.0.1:11434/api/chat"
+    assert sent["body"]["think"] is False and sent["body"]["options"]["num_predict"] == 50
+
+
+def test_ollama_closed_is_reported_not_raised(tmp_path, monkeypatch):
+    def refuse(request, timeout):
+        raise braco.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(braco.urllib.request, "urlopen", refuse)
+    answer = braco.ask_local_model(config(tmp_path, local_model="qwen3:4b"), {"messages": []})
+    assert answer["ok"] is False and "Ollama" in answer["error"]
+
+
+def test_one_round_of_the_local_line_answers_and_reports(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_call(cfg, method, path, body=None, timeout=40):
+        calls.append((method, path, body))
+        if path.startswith("/device/llm/next"):
+            return {"id": "q-1", "model": "qwen3:4b", "messages": [], "max_output_tokens": 10}
+        return None
+
+    monkeypatch.setattr(braco, "call", fake_call)
+    monkeypatch.setattr(braco, "ask_local_model", lambda cfg, q: {"ok": True, "text": "oi"})
+    braco.local_loop(config(tmp_path, local_model="qwen3:4b"), once=True)
+    assert calls[0][1] == f"/device/llm/next?wait={braco.LONG_POLL_SECONDS}&model=qwen3%3A4b"
+    assert calls[1] == ("POST", "/device/llm/q-1/result", {"ok": True, "text": "oi"})

@@ -1,0 +1,169 @@
+/* V.I.S.A.O.: tokens da marca "Ciclope Sentinela". Metal grafite, um sensor vermelho aceso,
+   texto de sistema. Escuro é o único tema exposto (brand/theme.ts força data-theme="dark").
+   Regra do vermelho: só no olho do mascote, no botão principal, no foco, no indicador de aba,
+   em UMA palavra de destaque por tela e em erros. Atenção é âmbar, sucesso é verde, o resto é
+   grafite. Texto sobre vermelho usa --on-red, nunca branco. Espelhado em
+   apps/ios/Visao/Theme.swift. */
+:root {
+  /* Tipografia */
+  --font-display: "Space Grotesk", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tracking-display: -0.01em;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-15: 15px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-30: 30px;
+  --text-44: 44px;
+
+  /* Espaço (base 4) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Forma */
+  --radius-chip: 10px;
+  --radius-input: 12px;
+  --radius-card: 16px;
+  --radius-panel: 24px;
+  --radius-pill: 999px;
+
+  /* Movimento */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  /* Pálpebra e piscada: sensação mecânica. */
+  --ease-mech: cubic-bezier(.6, 0, .2, 1);
+  --ease-spring: cubic-bezier(.2, 1.3, .4, 1);
+  --duration-state: 220ms;
+
+  /* Camadas */
+  --layer-content: 1;
+  --layer-overlay: 60;
+
+  /* Cores fixas */
+  --red: #FF3B30;
+  --red-text: #FF5A4E;
+  --on-red: #0B0B0D;
+  --amber: #F5B544;
+  --amber-bg: #2A2212;
+  --green: #4ADE80;
+  --green-dot: #16A34A;
+  --graphite: #2B2E34;
+  --graphite-edge: #454952;
+  --graphite-line: #5A5F69;
+  --socket: #050506;
+  --sensor-mac: #3B6BFF;
+  --sensor-whatsapp: #18C27A;
+  --sensor-email: #E0A800;
+  --sensor-caderno: #9B87FF;
+}
+
+/* Escuro: o tema da marca. Sem sombras: a separação vem da borda de 1px. */
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #09090B;
+  --surface: #141518;
+  --surface-2: #1D1F24;
+  --surface-sidebar: rgb(14 15 18 / .85);
+  --bubble-user: #1F2126;
+  --bubble-user-border: #2C2E34;
+  --border: #24262B;
+  --border-strong: #34363C;
+  --text: #EDEDEF;
+  --text-2: #C2C3C8;
+  --text-muted: #9A9BA2;
+  --success: var(--green);
+  --danger: #FF3B30;
+  --warning: var(--amber);
+  --shadow-card: none;
+  --shadow-float: none;
+  --scrim: rgb(0 0 0 / .6);
+  --card-ink: #141518;
+  --card-ink-2: #1D1F24;
+  --card-ink-text: #EDEDEF;
+  --card-ink-muted: #9A9BA2;
+  /* Nomes da marca anterior, agora neutros ou vermelhos conforme a regra. */
+  --accent: var(--red);
+  --on-accent: var(--on-red);
+  --accent-text: var(--text-2);
+  --accent-strong: var(--red-text);
+  --accent-soft: rgb(255 59 48 / .22);
+  --iris: var(--surface-2);
+}
+
+/* Tema claro: guardado, não exposto (o app força o escuro em brand/theme.ts). */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F6F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #EFECE7;
+  --border: #E6E1DA;
+  --border-strong: #D3CCC2;
+  --text: #16161A;
+  --text-muted: #6B6A70;
+  --accent-text: #C2410C;
+  --accent-strong: #D9480F;
+  --accent-soft: rgb(255 106 26 / .12);
+  --success: #15803D;
+  --danger: #B91C1C;
+  --warning: #92400E;
+  --shadow-card: 0 1px 2px rgb(22 22 26 / .04), 0 8px 24px rgb(22 22 26 / .06);
+  --shadow-float: 0 2px 6px rgb(22 22 26 / .06), 0 16px 40px rgb(22 22 26 / .10);
+  --scrim: rgb(22 22 26 / .32);
+  /* O cartão escuro (páginas, pedidos de sim/não) fica escuro nos dois temas, como uma tela. */
+  --card-ink: #17181D;
+  --card-ink-2: #23252C;
+  --card-ink-text: #F2F2F3;
+  --card-ink-muted: #A1A1AA;
+}
+
+/* Foco: anel vermelho de 2px, com uma folga da cor do fundo. */
+:root {
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Nomes antigos (marca Rastros), apontando para os novos. Os estilos das telas ainda usam estes
+   nomes; não crie regras novas com eles.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --espaco-1: var(--space-1);
+  --espaco-2: var(--space-2);
+  --espaco-3: var(--space-3);
+  --espaco-4: var(--space-4);
+  --espaco-5: var(--space-5);
+  --espaco-6: var(--space-6);
+  --espaco-7: var(--space-7);
+  --espaco-8: 64px;
+  --raio-1: var(--radius-chip);
+  --raio-2: var(--radius-card);
+  --raio-3: var(--radius-panel);
+  --raio-pilula: var(--radius-pill);
+  --camada-conteudo: var(--layer-content);
+  --camada-sobreposicao: var(--layer-overlay);
+  --fundo: var(--bg);
+  --fundo-elevado: var(--surface);
+  --fundo-hover: var(--surface-2);
+  --tinta: var(--text);
+  --tinta-suave: var(--text-muted);
+  --tinta-fraca: var(--text-muted);
+  --linha: var(--border);
+  --linha-forte: var(--border-strong);
+  --borda: var(--border-strong);
+  --estanho: var(--accent-text);
+  --estanho-linha: color-mix(in srgb, var(--accent) 40%, transparent);
+  --lanterna: var(--accent);
+  --lanterna-luz: var(--accent-soft);
+  --sobre-lanterna: var(--on-accent);
+  --sobre-tinta: var(--bg);
+  --sucesso: var(--success);
+  --aviso: var(--warning);
+  --erro: var(--danger);
+  --anel-foco: var(--focus-ring);
+  --elevacao: var(--shadow-float);
+}

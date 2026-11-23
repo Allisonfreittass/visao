@@ -10,12 +10,15 @@ struct SettingsView: View {
     @Environment(\.palette) private var palette
     @State private var server: ServerSettings?
     @State private var google: GoogleState?
+    @State private var brain: BrainState?
     @State private var email: String?
     @State private var error: String?
     @State private var confirmLogout = false
     @State private var changing: AccountChange?
     @State private var confirmGoogle = false
     @State private var notice: String?
+    @State private var morningNote: String?
+    @State private var location = LocationPermission()
     @State private var speakReplies = VoicePrefs.speakReplies
     @State private var sampleVoice = VoiceEngine()
     @State private var voiceApproval = VoicePrefs.voiceApproval
@@ -30,6 +33,27 @@ struct SettingsView: View {
                     .font(Typo.text(.footnote))
                     .foregroundStyle(palette.erro)
             }
+            // Which model answers (docs/MODELO_LOCAL.md): the cloud or the local model on the Mac.
+            PageGroup(label: "Modelo") {
+                PageRow {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Quem responde").font(Typo.text(.subheadline, weight: .medium))
+                        Text(brain?.note ?? "Carregando…")
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.textMuted)
+                        Picker("Quem responde", selection: Binding(
+                            get: { brain?.mode ?? .nuvem },
+                            set: { mode in Task { await choose(mode) } }
+                        )) {
+                            ForEach(BrainMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(brain == nil)
+                    }
+                }
+            }
             // First on the page: the voice decides whether the call sounds like a robot.
             PageGroup(label: "Voz no iPhone") {
                 ForEach(LocalVoices.shared.all) { voice in
@@ -37,19 +61,23 @@ struct SettingsView: View {
                 }
                 SystemVoiceRow()
             }
+            if Appearance.forced == nil {
             PageGroup(label: "Aparência") {
-                SettingRow(
-                    title: "Floresta com neblina ao fundo",
-                    description: "Pinheiros com neblina que se mexe, nas cores da hora do dia, com vidro de névoa por cima. Desligado, volta o tema escuro.",
-                    isOn: Binding(get: { appearance.mode == .neblina }, set: { appearance.mode = $0 ? .neblina : .noite })
-                )
-                if appearance.mode == .neblina {
-                    SettingRow(
-                        title: "Neblina em movimento",
-                        description: "Desligado, a floresta fica parada e só acompanha a hora, gastando menos bateria. Para sozinha no Modo de Pouca Energia.",
-                        isOn: $appearance.moving
-                    )
+                PageRow {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Tema").font(Typo.text(.subheadline, weight: .medium))
+                        Text("Claro é o padrão. “Sistema” segue o claro ou escuro do iPhone.")
+                            .font(Typo.text(.footnote))
+                            .foregroundStyle(palette.textMuted)
+                        Picker("Tema", selection: $appearance.mode) {
+                            ForEach(Appearance.Mode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
+            }
             }
             PageGroup(label: "Voz e avisos") {
                 SettingRow(
@@ -96,6 +124,37 @@ struct SettingsView: View {
                     isOn: serverBinding(\.autoResearch) { try await session.api.setAutoResearch($0) },
                     disabled: server == nil || server?.paused == true
                 )
+                SettingRow(
+                    title: "Resumo da manhã",
+                    description: "Quando o horário silencioso acaba: agenda do dia, painéis conferidos na hora, o que espera seu sim e o que eu estudei. Sem nada novo, não mando.",
+                    isOn: serverBinding(\.morningBriefing) { try await session.api.setMorningBriefing($0) },
+                    disabled: server == nil || server?.paused == true
+                )
+                if server?.morningBriefing == true && server?.paused == false || morningNote != nil {
+                    PageRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            if server?.morningBriefing == true && server?.paused == false {
+                                linkButton("Mandar agora") { Task { await briefingNow() } }
+                            }
+                            if let morningNote {
+                                Text(morningNote).font(Typo.text(.footnote)).foregroundStyle(palette.tintaSuave)
+                            }
+                        }
+                    }
+                }
+            }
+            PageGroup(label: "Localização") {
+                SettingRow(
+                    title: "Usar minha localização",
+                    description: "Só quando você pergunta de algo perto (“tem farmácia aberta aqui perto?”). Vai só com essa mensagem, nunca fica guardada e o modelo não vê as coordenadas. Vale só neste aparelho.",
+                    isOn: Binding(get: { location.on }, set: { location.set($0) })
+                )
+                if let note = location.note {
+                    Text(note)
+                        .font(Typo.text(.footnote))
+                        .foregroundStyle(palette.tintaSuave)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             PageGroup(label: "Google") {
                 PageRow {
@@ -236,14 +295,24 @@ struct SettingsView: View {
         sampleVoice.speak("Oi! Esta é a voz \(voice.kind.name), rodando aqui no seu iPhone, sem servidor. Como você está hoje?")
     }
 
+    /// A small link, drawn small but touched at 44 pt.
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(Typo.text(.footnote, weight: .medium))
                 .underline(color: palette.linhaForte)
                 .foregroundStyle(palette.tinta)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func briefingNow() async {
+        await run {
+            let queued = try await session.api.briefingNow()
+            morningNote = queued ? "Pedido. Chega na conversa em alguns segundos." : "A autonomia está pausada."
+        }
     }
 
     private func run(_ action: () async throws -> Void) async {
@@ -260,10 +329,24 @@ struct SettingsView: View {
     private func load() async {
         async let s = try? session.api.serverSettings()
         async let g = try? session.api.google()
+        async let b = try? session.api.brain()
         async let me = try? session.api.me()
         server = await s ?? server
         google = await g ?? google
+        brain = await b ?? brain
         email = await me?.email ?? email
+    }
+
+    private func choose(_ mode: BrainMode) async {
+        guard let before = brain, mode != before.mode else { return }
+        brain = BrainState(mode: mode, localModel: before.localModel, macOnline: before.macOnline)
+        do {
+            brain = try await session.api.setBrain(mode)
+            error = nil
+        } catch {
+            brain = before
+            self.error = "Não consegui trocar o modelo agora."
+        }
     }
 }
 

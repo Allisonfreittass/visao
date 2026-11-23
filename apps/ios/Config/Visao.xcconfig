@@ -11,4 +11,10 @@ VISAO_API_BASE_URL = https:/$()/visao.example.com/api
 // ainda não existe (docs/APP_IOS.md). Desligado: o cartão é atualizado só pelo app.
 VISAO_LIVE_ACTIVITY_PUSH = NO
 
+// O app e a extensão de compartilhar leem o mesmo token e o mesmo endereço do servidor
+// (docs/COMPARTILHAR.md). Os dois nomes saem do bundle id; com a conta da Apple, o Xcode registra
+// os grupos ao assinar.
+VISAO_APP_GROUP = group.$(VISAO_BUNDLE_ID)
+VISAO_KEYCHAIN_GROUP = $(AppIdentifierPrefix)$(VISAO_BUNDLE_ID).shared
+
 #include? "Local.xcconfig"

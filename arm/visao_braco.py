@@ -17,13 +17,15 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-VERSION = "1"
+VERSION = "2"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -68,6 +70,11 @@ class Config:
     max_budget_usd: float = 2.0
     timeout_minutes: int = 30
     use_api_key: bool = False
+    # The local model (docs/MODELO_LOCAL.md): {"modelo": "qwen3:4b", "endereco": Ollama's
+    # address on this Mac}. Unset: this Mac offers no local model.
+    local_model: str | None = None
+    ollama: str = "http://127.0.0.1:11434"
+    local_context: int = 16384
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -80,6 +87,9 @@ class Config:
             raise ValueError("braco.json precisa de server e token")
         if not projects:
             raise ValueError("braco.json precisa de pelo menos um projeto em projects")
+        local = data.get("modelo_local") or {}
+        if not isinstance(local, dict):
+            raise ValueError("modelo_local precisa ser um objeto, como no exemplo")
         return cls(
             server=str(data["server"]).rstrip("/"),
             token=str(data["token"]),
@@ -90,7 +100,19 @@ class Config:
             max_budget_usd=float(data.get("max_budget_usd", 2.0)),
             timeout_minutes=int(data.get("timeout_minutes", 30)),
             use_api_key=bool(data.get("use_api_key", False)),
+            local_model=(str(local["modelo"]).strip() or None) if local.get("modelo") else None,
+            ollama=_local_address(str(local.get("endereco") or "http://127.0.0.1:11434")),
+            local_context=int(local.get("contexto", 16384)),
         )
+
+
+def _local_address(address: str) -> str:
+    """The questions carry the owner's conversations: they only go to a model on this Mac."""
+    address = address.rstrip("/")
+    host = address.split("://", 1)[-1].split("/", 1)[0].rsplit(":", 1)[0]
+    if host not in ("127.0.0.1", "localhost", "[::1]"):
+        raise ValueError("modelo_local.endereco precisa ser deste Mac (127.0.0.1 ou localhost)")
+    return address
 
 
 def call(config: Config, method: str, path: str, body: dict | None = None, timeout: float = 40):
@@ -238,6 +260,70 @@ def loop(config: Config, once: bool = False) -> None:
             return
 
 
+def ask_local_model(config: Config, question: dict) -> dict:
+    """One question to the model on this Mac (Ollama's own API: it takes the context size and
+    turns Qwen's long thinking off). Errors are reported, never raised."""
+    body = {
+        "model": config.local_model,
+        "messages": question.get("messages") or [],
+        "stream": False,
+        "think": False,
+        "options": {
+            "num_ctx": config.local_context,
+            "num_predict": int(question.get("max_output_tokens") or 1024),
+        },
+    }
+    request = urllib.request.Request(  # noqa: S310 (Ollama on this Mac, checked at load)
+        f"{config.ollama}/api/chat",
+        method="POST",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=300) as response:  # noqa: S310
+            data = json.loads(response.read() or b"{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")[:300]
+        return {"ok": False, "error": f"Ollama respondeu {exc.code}: {detail}"}
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        return {"ok": False, "error": f"Ollama não respondeu ({exc}). Ele está aberto?"}
+    text = ((data.get("message") or {}).get("content") or "").strip()
+    if not text:
+        return {"ok": False, "error": "O modelo local não escreveu nada."}
+    return {
+        "ok": True,
+        "text": text,
+        "input_tokens": int(data.get("prompt_eval_count") or 0),
+        "output_tokens": int(data.get("eval_count") or 0),
+    }
+
+
+def local_loop(config: Config, once: bool = False) -> None:
+    """The second line: questions for the local model, apart from the tasks, so a long task in
+    a project never makes the conversation wait."""
+    backoff = 5
+    model = urllib.parse.quote(config.local_model or "")
+    path = f"/device/llm/next?wait={LONG_POLL_SECONDS}&model={model}"
+    while True:
+        try:
+            question = call(config, "GET", path)
+            backoff = 5
+            if question:
+                answer = ask_local_model(config, question)
+                call(config, "POST", f"/device/llm/{question['id']}/result", answer, timeout=60)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                return
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            print(f"Modelo local sem conexão ({exc}); tento de novo em {backoff}s", file=sys.stderr)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+        if once:
+            return
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
@@ -249,6 +335,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuração inválida em {args.config}: {exc}", file=sys.stderr)
         return 2
     print(f"Braço {VERSION} ligado a {config.server}; projetos: {', '.join(config.projects)}")
+    if config.local_model and not args.once:
+        print(f"Modelo local: {config.local_model} em {config.ollama}")
+        threading.Thread(target=local_loop, args=(config,), daemon=True).start()
     loop(config, once=args.once)
     return 0
 

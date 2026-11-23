@@ -1,8 +1,8 @@
 import SwiftUI
 import VisaoKit
 
-/// The places of the web (Rail.tsx / SkyNav.tsx): Chat is home, Início holds Pendências, the
-/// avatar opens Ajustes, the drawer has the rest and the conversations.
+/// The places of the web (Rail.tsx / SkyNav.tsx): Início, Chat and Projetos on top (Chat is the
+/// continuous conversation), the avatar opens Ajustes, the drawer has what is not on top.
 enum Place: Int, Hashable, CaseIterable {
     case inicio, chat, projetos, caderno, mac, ajustes
 
@@ -25,6 +25,12 @@ struct ChatTarget: Equatable {
     var key = UUID()
     var conversationId: String?
     var projectId: String?
+    /// The continuous conversation (docs/CONVERSA_CONTINUA.md), which the Chat tab always opens.
+    var continuous = false
+
+    static func continuous(_ id: String?) -> ChatTarget {
+        ChatTarget(conversationId: id, continuous: true)
+    }
 }
 
 /// Logged in: the top bar over the forest, the place under it, the drawer over everything.
@@ -40,20 +46,29 @@ struct Shell: View {
     @State private var target: ChatTarget?
     @State private var drawerOpen = false
     @State private var onboarding: OnboardingStatus?
+    /// A project's chat is in front, under the Projetos tab (ADR-0021).
+    @State private var projectChat = false
+    @State private var openingProject = false
+    /// The 4-second opening, once a day, when the app is ready (not on the first-run questions).
+    @State private var intro = false
+
+    /// What the mascot shows outside a chat: asleep without a connection, at rest otherwise.
+    private var mascotState: CiclopeState { session.listError == nil ? .idle : .offline }
+
+    /// The chat shows on Chat, and on Projetos while a project's chat is open.
+    private var chatInFront: Bool { place == .chat || (place == .projetos && projectChat) }
 
     var body: some View {
         VStack(spacing: 0) {
-            SkyNav(place: place, pendingCount: session.pending.count, agentName: session.agentName) {
-                withAnimation(.spring(duration: 0.35)) { drawerOpen = true }
-            } onPlace: { go($0) }
+            TopBar(place: place, state: mascotState) { drawerOpen = true }
             GeometryReader { proxy in
                 ZStack {
                     chat
-                        .offset(x: place == .chat ? 0 : (place.rawValue < Place.chat.rawValue ? proxy.size.width : -proxy.size.width))
-                        .opacity(place == .chat ? 1 : 0)
-                        .allowsHitTesting(place == .chat)
-                        .accessibilityHidden(place != .chat)
-                    if place != .chat {
+                        .offset(x: chatInFront ? 0 : (place.rawValue < Place.chat.rawValue ? proxy.size.width : -proxy.size.width))
+                        .opacity(chatInFront ? 1 : 0)
+                        .allowsHitTesting(chatInFront)
+                        .accessibilityHidden(!chatInFront)
+                    if !chatInFront {
                         other
                             .id(place)
                             .transition(slide)
@@ -63,29 +78,46 @@ struct Shell: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .clipped()
             }
+            TabBar(place: place, pendingCount: session.pending.count, state: mascotState) { $0 == .chat ? openChat() : go($0) }
         }
-        .overlay {
-            Drawer(
-                open: $drawerOpen,
-                place: place,
-                current: target?.conversationId,
-                onPlace: { go($0) },
-                onConversation: { open(conversation: $0) },
-                onNew: { newConversation(projectId: nil) }
-            )
+        .sheet(isPresented: $drawerOpen) {
+            MenuSheet(place: place) { next in
+                drawerOpen = false
+                go(next)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .visaoBackground()
         }
         .visaoBackground()
-        .task {
-            await session.loadHome()
-            if target == nil {
-                // As on the web: the most recent conversation, or a new one.
-                target = ChatTarget(conversationId: session.conversations.first?.id)
+        .overlay {
+            if intro {
+                IntroView { withAnimation(.easeOut(duration: 0.25)) { intro = false } }
+                    .transition(.opacity)
             }
-            // The first run asks a few questions, once, always skippable.
-            if let status = try? await session.api.onboarding(), !status.completed { onboarding = status }
+        }
+        .task {
+            async let home: Void = session.loadHome()
+            // The first run asks a few questions, once, always skippable; the opening waits for it.
+            let status = try? await session.api.onboarding()
+            if let status, !status.completed {
+                onboarding = status
+            } else if Opening.takeTurn(reduceMotion: UIAccessibility.isReduceMotionEnabled) {
+                intro = true
+            }
+            await home
+            if target == nil {
+                // The continuous conversation; if it did not load, sending creates it.
+                target = .continuous(session.continuousId)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await session.loadHome() } }
+            guard phase == .active else { return }
+            Task { await session.loadHome() }
+            // Back the next day without having closed the app: the opening plays once.
+            if onboarding == nil, target != nil, Opening.takeTurn(reduceMotion: UIAccessibility.isReduceMotionEnabled) {
+                intro = true
+            }
         }
         .fullScreenCover(item: Binding(get: { onboarding.map(OnboardingBox.init) }, set: { onboarding = $0?.status })) { box in
             OnboardingView(status: box.status) { onboarding = nil }
@@ -108,8 +140,12 @@ struct Shell: View {
         if let target {
             ChatScreen(
                 api: session.api, conversationId: target.conversationId, projectId: target.projectId,
-                isActive: place == .chat,
-                onCreated: { self.target?.conversationId = $0.id }
+                continuous: target.continuous,
+                isActive: chatInFront,
+                onCreated: { self.target?.conversationId = $0.id },
+                onOpenProject: { openProject($0) },
+                onBackToProjects: { withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = false } },
+                onProjectDeleted: { openChat() }
             )
             .id(target.key)
         } else {
@@ -126,15 +162,14 @@ struct Shell: View {
                 onOpenConversation: { open(conversation: $0) },
                 onDraft: { text in
                     session.chatDraft = text
-                    go(.chat)
+                    openChat()
                 }
             )
         case .projetos:
-            ProjectsView(
-                currentConversation: target?.conversationId,
-                onOpen: { open(conversation: $0) },
-                onNew: { newConversation(projectId: $0) }
-            )
+            ProjectsView(onOpenProject: { openProject($0) })
+                .overlay {
+                    if openingProject { ProgressView().controlSize(.large) }
+                }
         case .caderno:
             CadernoView()
         case .mac:
@@ -155,28 +190,61 @@ struct Shell: View {
                 guard abs(dx) > 80, abs(dx) > abs(value.translation.height) * 2,
                       let index = Place.tabs.firstIndex(of: place) else { return }
                 let next = dx < 0 ? index + 1 : index - 1
-                if Place.tabs.indices.contains(next) { go(Place.tabs[next]) }
+                if Place.tabs.indices.contains(next) {
+                    Place.tabs[next] == .chat ? openChat() : go(Place.tabs[next])
+                }
             }
     }
 
     private func go(_ next: Place) {
         guard next != place else {
             withAnimation(.spring(duration: 0.35)) { drawerOpen = false }
+            // Projetos again, from a project's chat: back to the list.
+            if next == .projetos && projectChat {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = false }
+            }
             return
         }
+        projectChat = false
         forward = next.rawValue > place.rawValue
         withAnimation(.spring(duration: 0.35)) { drawerOpen = false }
         withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { place = next }
     }
 
+    /// Chat: always the continuous conversation, also from inside a project's chat.
+    private func openChat() {
+        if target?.continuous != true || target?.conversationId != session.continuousId && session.continuousId != nil {
+            target = .continuous(session.continuousId)
+        }
+        go(.chat)
+    }
+
     private func open(conversation id: String) {
+        if id == session.continuousId {
+            openChat()
+            return
+        }
         if target?.conversationId != id { target = ChatTarget(conversationId: id) }
         go(.chat)
     }
 
-    private func newConversation(projectId: String?) {
-        target = ChatTarget(conversationId: nil, projectId: projectId)
-        go(.chat)
+    /// The project's own chat (GET /conversations/project/{id}), under the Projetos tab.
+    private func openProject(_ id: String) {
+        guard !openingProject else { return }
+        openingProject = true
+        Task {
+            defer { openingProject = false }
+            do {
+                let conversation = try await session.api.projectConversation(projectId: id)
+                if target?.conversationId != conversation.id {
+                    target = ChatTarget(conversationId: conversation.id, projectId: id)
+                }
+                if place != .projetos { go(.projetos) }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { projectChat = true }
+            } catch {
+                session.handle(error)
+            }
+        }
     }
 }
 
@@ -190,283 +258,190 @@ extension Notification.Name {
     static let visaoRestartOnboarding = Notification.Name("visaoRestartOnboarding")
 }
 
-/// The web's top bar, the Apple way: the round drawer button, the three places in a glass pill
-/// whose selection slides (and follows your finger if you drag it across), the avatar.
-struct SkyNav: View {
+/// The top bar: the lockup on the left, the avatar on the right (it opens Caderno, Integrações
+/// and Ajustes). No drawer button and no pill: the places are in the tab bar.
+struct TopBar: View {
     let place: Place
-    let pendingCount: Int
-    let agentName: String?
+    let state: CiclopeState
     let onMenu: () -> Void
-    let onPlace: (Place) -> Void
     @Environment(\.palette) private var palette
-    @Namespace private var glass
-    /// Where the finger is while dragging the selection, in pill coordinates.
-    @State private var dragX: CGFloat?
-    @State private var hovered: Place?
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
+            SentinelaView(state: state, size: 26)
+            Wordmark(size: 18)
+            Spacer(minLength: 0)
             Button(action: onMenu) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(palette.tinta)
-                    .glassCircle(palette, size: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Conversas, Caderno, Mac e mais")
-            Spacer(minLength: 0)
-            pill
-            Spacer(minLength: 0)
-            Button { onPlace(.ajustes) } label: {
-                Text((agentName ?? "Visão").prefix(1).uppercased())
+                Text(String(OwnerName.value.prefix(1)))
                     .font(Typo.text(.callout, weight: .medium))
-                    .foregroundStyle(Color(rgb: 0xf4f7f8))
+                    .foregroundStyle(palette.bg)
                     .frame(width: 44, height: 44)
-                    .liquidGlass(palette, in: Circle(), tint: place == .ajustes ? palette.pilulaAtiva : palette.estanho.opacity(0.9))
+                    .background(palette.text, in: Circle())
                     .overlay {
-                        if place == .ajustes { Circle().strokeBorder(palette.vidroForte, lineWidth: 2.5).padding(-3) }
+                        if [.caderno, .mac, .ajustes].contains(place) { Circle().strokeBorder(palette.borderStrong, lineWidth: 2).padding(-4) }
                     }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Ajustes")
+            .accessibilityLabel("Caderno, Integrações e Ajustes")
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-    }
-
-    private var pill: some View {
-        let width: CGFloat = 264
-        let segment = (width - 8) / CGFloat(Place.tabs.count)
-        let selectedIndex = Place.tabs.firstIndex(of: place)
-        return ZStack(alignment: .leading) {
-            // The selection: a dark glass drop that slides to the tab (and stretches a little
-            // while you drag it, like the system tab bar).
-            if selectedIndex != nil || dragX != nil {
-                let x = thumbX(segment: segment, selected: selectedIndex ?? 1)
-                Capsule()
-                    .fill(palette.pilulaAtiva)
-                    .frame(width: segment, height: 38)
-                    .frame(height: 44)
-                    .scaleEffect(dragX == nil ? 1 : 1.12)
-                    .offset(x: x)
-                    .shadow(color: .black.opacity(dragX == nil ? 0.12 : 0.22), radius: dragX == nil ? 4 : 10, y: 2)
-                    .animation(.spring(response: 0.38, dampingFraction: 0.78), value: place)
-                    .animation(.interactiveSpring(response: 0.25, dampingFraction: 0.86), value: dragX)
-            }
-            HStack(spacing: 0) {
-                ForEach(Place.tabs, id: \.self) { tab in
-                    let lit = (hovered ?? place) == tab
-                    HStack(spacing: 5) {
-                        Text(tab.tabLabel)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        if tab == .inicio && pendingCount > 0 {
-                            Text("\(pendingCount)")
-                                .font(Typo.text(.caption2, weight: .medium))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 5)
-                                .frame(minWidth: 18, minHeight: 18)
-                                .background(palette.lanterna, in: Capsule())
-                                .accessibilityLabel("\(pendingCount) esperando você")
-                        }
-                    }
-                    .font(Typo.text(.subheadline, weight: lit ? .medium : .regular))
-                    .foregroundStyle(lit ? palette.pilulaAtivaTinta : palette.tintaFraca)
-                    .frame(width: segment, height: 44) // touch target: 44 pt, the drop is drawn at 38
-                    .contentShape(Rectangle())
-                    .onTapGesture { onPlace(tab) }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(place == tab ? [.isButton, .isSelected] : .isButton)
-                    .accessibilityAction { onPlace(tab) }
-                    .animation(.easeOut(duration: 0.18), value: lit)
-                }
-            }
-        }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1)
-        .frame(width: width)
-        .liquidGlass(palette, in: Capsule(), interactive: false)
-        .gesture(
-            DragGesture(minimumDistance: 6)
-                .onChanged { value in
-                    dragX = min(max(value.location.x - 4 - segment / 2, 0), segment * CGFloat(Place.tabs.count - 1))
-                    let next = Place.tabs[min(Place.tabs.count - 1, max(0, Int(((dragX ?? 0) + segment / 2) / segment)))]
-                    if next != hovered { hovered = next }
-                }
-                .onEnded { _ in
-                    let chosen = hovered
-                    dragX = nil
-                    hovered = nil
-                    if let chosen { onPlace(chosen) }
-                }
-        )
-        .sensoryFeedback(.selection, trigger: hovered) { _, now in now != nil }
-        .sensoryFeedback(.impact(weight: .light), trigger: place)
-    }
-
-    private func thumbX(segment: CGFloat, selected: Int) -> CGFloat {
-        dragX ?? segment * CGFloat(selected)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 }
 
-/// The drawer: the brand, the places, the conversations, and whether we are connected. Drag it
-/// to the left or tap outside to close.
-struct Drawer: View {
-    @Binding var open: Bool
-    let place: Place
-    let current: String?
-    let onPlace: (Place) -> Void
-    let onConversation: (String) -> Void
-    let onNew: () -> Void
-    @Environment(Session.self) private var session
-    @Environment(\.palette) private var palette
-    @State private var drag: CGFloat = 0
+/// The owner's first name (the API keeps only an e-mail), as on the web (brand/copy.ts).
+enum OwnerName {
+    static let value = "Allison"
+}
 
-    private let items: [(Place, String, String)] = [
-        (.chat, "Conversa", "bubble.left"),
-        (.inicio, "Pendências", "tray"),
-        (.projetos, "Projetos", "folder"),
-        (.caderno, "Caderno", "book.closed"),
-        (.mac, "Mac", "laptopcomputer"),
-        (.ajustes, "Ajustes", "slider.horizontal.3"),
-    ]
+/// "V.I.S.A.O." in Space Grotesk: the dots gray, only the last one red.
+struct Wordmark: View {
+    var size: CGFloat = 18
+    @Environment(\.palette) private var palette
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            if open {
-                Rectangle()
-                    .fill(Color(rgb: 0x1d1d1f, opacity: 0.18))
-                    .background(.ultraThinMaterial.opacity(0.6))
-                    .ignoresSafeArea()
-                    .onTapGesture { close() }
-                    .transition(.opacity)
-                    .accessibilityLabel("Fechar")
-                    .accessibilityAddTraits(.isButton)
-                panel
-                    .offset(x: min(0, drag))
-                    .gesture(
-                        DragGesture(minimumDistance: 10)
-                            .onChanged { drag = $0.translation.width }
-                            .onEnded { value in
-                                if value.translation.width < -70 || value.predictedEndTranslation.width < -160 { close() }
-                                withAnimation(.spring(duration: 0.3)) { drag = 0 }
-                            }
-                    )
-                    .transition(.move(edge: .leading))
-            }
+        let letters = Array("V.I.S.A.O.")
+        letters.indices.reduce(Text("")) { text, i in
+            let c = letters[i]
+            let color = c == "." ? (i == letters.count - 1 ? palette.red : palette.textMuted) : palette.text
+            return text + Text(String(c)).foregroundColor(color)
         }
-        .animation(.spring(duration: 0.35), value: open)
+        .font(Typo.display(size, relativeTo: .headline))
+        .tracking(size * 0.04)
+        .accessibilityLabel("Visão")
     }
+}
 
-    private func close() {
-        withAnimation(.spring(duration: 0.35)) { open = false }
-    }
+/// The tab bar at the bottom: Início (the mascot is its icon), Chat, Projetos. The active tab
+/// has a small red bar on top.
+struct TabBar: View {
+    let place: Place
+    let pendingCount: Int
+    let state: CiclopeState
+    let onPlace: (Place) -> Void
+    @Environment(\.palette) private var palette
 
-    private var panel: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("V.I.S.A.O.")
-                .font(Typo.display(30, relativeTo: .largeTitle))
-                .padding(.leading, 10)
-                .accessibilityLabel("Visão")
-            VStack(spacing: 2) {
-                ForEach(items, id: \.0) { item, label, icon in
-                    Button { onPlace(item) } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: icon)
-                                .frame(width: 20)
-                                .foregroundStyle(place == item ? palette.estanho : palette.tintaFraca)
-                            Text(label)
-                            Spacer()
-                            if item == .inicio && session.pending.count > 0 {
-                                Text("\(session.pending.count)")
-                                    .font(Typo.mono(.caption2))
-                                    .padding(.horizontal, 6)
-                                    .frame(minWidth: 20, minHeight: 20)
-                                    .overlay(Capsule().strokeBorder(palette.estanho.opacity(0.4)))
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Place.tabs, id: \.self) { tab in
+                let active = place == tab
+                Button { onPlace(tab) } label: {
+                    VStack(spacing: 4) {
+                        ZStack(alignment: .topTrailing) {
+                            icon(tab, active: active)
+                                .frame(width: 26, height: 26)
+                            if tab == .inicio && pendingCount > 0 {
+                                Text("\(pendingCount)")
+                                    .font(Typo.text(.caption2, weight: .medium))
+                                    .foregroundStyle(palette.onRed)
+                                    .padding(.horizontal, 5)
+                                    .frame(minWidth: 18, minHeight: 18)
+                                    .background(palette.amber, in: Capsule())
+                                    .offset(x: 10, y: -6)
+                                    .accessibilityLabel("\(pendingCount) esperando você")
                             }
                         }
-                        .font(Typo.text(.subheadline, weight: .medium))
-                        .foregroundStyle(place == item ? palette.tinta : palette.tintaSuave)
-                        .padding(.horizontal, 10)
-                        .frame(minHeight: 40)
-                        .background(place == item ? palette.fundoHover : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .contentShape(Rectangle())
+                        Text(tab.tabLabel)
+                            .font(Typo.text(.caption2, weight: active ? .medium : .regular))
+                            .foregroundStyle(active ? palette.text : palette.textMuted)
                     }
-                    .buttonStyle(.plain)
-                }
-            }
-            Rectangle().fill(palette.linha).frame(height: 1)
-            HStack {
-                Rotulo("Conversas")
-                Spacer()
-                Button(action: onNew) {
-                    Image(systemName: "plus")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(palette.tintaSuave)
-                        .frame(width: 28, height: 28)
-                        .overlay(Circle().strokeBorder(palette.linhaForte))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .overlay(alignment: .top) {
+                        Capsule()
+                            .fill(palette.red)
+                            .frame(width: 28, height: 3)
+                            .opacity(active ? 1 : 0)
+                            .offset(y: -6)
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Nova conversa")
+                .accessibilityAddTraits(active ? [.isSelected] : [])
             }
-            .padding(.leading, 10)
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(session.conversations) { conversation in
-                        Button { onConversation(conversation.id) } label: {
-                            HStack {
-                                if let title = conversation.title {
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(title).lineLimit(1)
-                                        Text(DayLabel.text(for: conversation.createdAt))
-                                            .font(Typo.text(.caption2))
-                                            .foregroundStyle(palette.tintaFraca)
-                                    }
-                                } else {
-                                    Text(DayLabel.text(for: conversation.createdAt))
-                                }
-                                if conversation.projectId != nil {
-                                    Image(systemName: "folder").font(.caption).foregroundStyle(palette.tintaFraca)
-                                }
-                                Spacer()
-                            }
-                            .font(Typo.text(.subheadline))
-                            .foregroundStyle(conversation.id == current && place == .chat ? palette.tinta : palette.tintaSuave)
-                            .padding(.horizontal, 10)
-                            .frame(minHeight: 38)
-                            .background(conversation.id == current && place == .chat ? palette.fundoHover : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if session.conversations.isEmpty {
-                        Text("Nenhuma ainda.")
-                            .font(Typo.text(.footnote))
-                            .foregroundStyle(palette.tintaFraca)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.leading, 10)
+        }
+        .padding(.top, 6)
+        .background(palette.bg.opacity(0.92))
+        .overlay(alignment: .top) { Rectangle().fill(palette.border).frame(height: 1) }
+        .sensoryFeedback(.selection, trigger: place)
+        .animation(.timingCurve(0.2, 0.8, 0.2, 1, duration: 0.22), value: place)
+    }
+
+    @ViewBuilder
+    private func icon(_ tab: Place, active: Bool) -> some View {
+        switch tab {
+        case .inicio: SentinelaView(state: state, size: 24, animated: active)
+        case .chat: Image(systemName: "bubble.left").font(.system(size: 19, weight: .medium)).foregroundStyle(active ? palette.text : palette.textMuted)
+        default: Image(systemName: "folder").font(.system(size: 19, weight: .medium)).foregroundStyle(active ? palette.text : palette.textMuted)
+        }
+    }
+}
+
+/// The avatar's sheet: Caderno, the integrations with their real status, and Ajustes.
+struct MenuSheet: View {
+    let place: Place
+    let onPlace: (Place) -> Void
+    @Environment(Session.self) private var session
+    @Environment(\.palette) private var palette
+    @State private var macOnline: Bool?
+    @State private var googleConnected: Bool?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Text(String(OwnerName.value.prefix(1)))
+                    .font(Typo.text(.headline, weight: .medium))
+                    .foregroundStyle(palette.bg)
+                    .frame(width: 40, height: 40)
+                    .background(palette.text, in: Circle())
+                Text(OwnerName.value).font(Typo.text(.headline, weight: .medium))
+            }
+            row(.caderno, label: "Caderno") { SensorView(kind: .caderno, size: 28) }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Integrações").font(Typo.text(.footnote, weight: .medium)).foregroundStyle(palette.textMuted)
+                row(.mac, label: "Mac", status: status(macOnline)) { SensorView(kind: .mac, size: 28, asleep: macOnline != true) }
+                row(.ajustes, label: "E-mail", status: status(googleConnected)) { SensorView(kind: .email, size: 28, asleep: googleConnected != true) }
+            }
+            row(.ajustes, label: "Ajustes") {
+                Image(systemName: "gearshape").font(.system(size: 18, weight: .medium)).frame(width: 28, height: 28).foregroundStyle(palette.text2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task {
+            macOnline = (try? await session.api.armDevices()).flatMap { list in list.isEmpty ? nil : list.contains { $0.online } }
+            googleConnected = (try? await session.api.google())?.connected
+        }
+    }
+
+    private func status(_ on: Bool?) -> (String, Color) {
+        if session.listError != nil { return ("Sem conexão", palette.textMuted) }
+        switch on {
+        case true?: return ("● Conectado", palette.green)
+        case false?: return ("Desconectado", palette.textMuted)
+        case nil: return ("Não pareado", palette.textMuted)
+        }
+    }
+
+    private func row<Icon: View>(_ target: Place, label: String, status: (String, Color)? = nil, @ViewBuilder icon: () -> Icon) -> some View {
+        Button { onPlace(target) } label: {
+            HStack(spacing: 12) {
+                icon()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label).font(Typo.text(.subheadline, weight: .medium)).foregroundStyle(palette.text)
+                    if let status {
+                        Text(status.0).font(Typo.text(.caption, weight: .medium)).foregroundStyle(status.1)
                     }
                 }
+                Spacer()
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(palette.textMuted)
             }
-            .scrollIndicators(.hidden)
-            Text(session.listError == nil ? "CONECTADO" : "SEM CONEXÃO")
-                .font(Typo.mono(.caption2))
-                .tracking(0.8)
-                .foregroundStyle(session.listError == nil ? palette.sucesso : palette.erro)
-                .padding(.leading, 10)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 52)
+            .background(place == target ? palette.surface2 : palette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(palette.border))
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 22)
-        .frame(width: 300)
-        .frame(maxHeight: .infinity)
-        .liquidGlass(palette, in: RoundedRectangle(cornerRadius: 30, style: .continuous), tint: palette.vidroForte.opacity(0.7), interactive: false)
-        .padding(.leading, 12)
-        .padding(.vertical, 12)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Navegação")
-        .accessibilityAction(.escape) { close() }
+        .buttonStyle(.plain)
     }
 }

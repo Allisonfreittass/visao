@@ -19,6 +19,7 @@ _FALLBACK_KINDS = {
     "network",
     "bad_response",
     "budget_denied",
+    "too_large",  # a host with a bigger limit may take the same request
 }
 QUOTA_COOLDOWN_SECONDS = 15 * 60
 

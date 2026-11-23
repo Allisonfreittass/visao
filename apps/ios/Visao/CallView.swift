@@ -382,7 +382,7 @@ struct CallView: View {
             Spacer(minLength: 0)
             CallOrb(state: controller.state, level: controller.level)
             VStack(spacing: 6) {
-                Text(agentName ?? "Sem nome ainda")
+                Text(agentName ?? "V.I.S.A.O.")
                     .font(Typo.display(34, relativeTo: .largeTitle, italic: agentName == nil))
                 Text(stateLabel)
                     .font(Typo.mono(.caption))
@@ -441,10 +441,7 @@ struct CallView: View {
         .padding(.vertical, 16)
         .foregroundStyle(palette.tinta)
         .background {
-            ZStack {
-                SkyBackground()
-                Rectangle().fill(.ultraThinMaterial).opacity(0.55).ignoresSafeArea()
-            }
+            AmbientBackground()
         }
         .overlay(alignment: .topTrailing) {
             if let camera = controller.camera {
@@ -553,43 +550,26 @@ struct CallView: View {
     }
 }
 
-/// The big orb of the call: glass with the lantern at the core, swelling with your voice while it
-/// listens and breathing while it thinks or speaks.
+/// The Ciclope of the call, big: it listens, thinks and speaks with the call's state, its iris
+/// pulsing with the voice.
 struct CallOrb: View {
     let state: CallController.State
     let level: Float
-    @Environment(\.palette) private var palette
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            let breathe = reduceMotion ? 0 : sin(t * (state == .thinking ? 6 : 2)) * 0.5 + 0.5
-            let swell: Double = switch state {
-            case .listening: Double(level) * 0.5
-            case .speaking: 0.15 + breathe * 0.15
-            case .thinking: breathe * 0.25
-            default: breathe * 0.05
-            }
-            ZStack {
-                Circle()
-                    .fill(palette.lanterna.opacity(0.18))
-                    .frame(width: 210, height: 210)
-                    .scaleEffect(1 + swell * 0.6)
-                    .blur(radius: 30)
-                Circle()
-                    .fill(palette.lanterna)
-                    .frame(width: 44, height: 44)
-                    .shadow(color: palette.lanterna.opacity(0.6), radius: 18)
-                    .scaleEffect(state == .failed ? 0.6 : 1 + swell)
-                    .opacity(state == .failed ? 0.4 : 1)
-            }
-            .frame(width: 220, height: 220)
-            // Content, not a control: a standard material, not Liquid Glass (liquid-glass.md).
-            .background(palette.usesGlass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(palette.fundoElevado), in: Circle())
-            .overlay(Circle().strokeBorder(palette.vidroBorda))
+        CiclopeView(state: ciclope, size: 200, level: Double(level))
+            .accessibilityHidden(true)
+    }
+
+    private var ciclope: CiclopeState {
+        switch state {
+        case .starting: .idle
+        case .listening: .listening
+        case .thinking: .thinking
+        case .speaking: .speaking
+        case .interrupted: .interrupted
+        case .failed: .error
         }
-        .accessibilityHidden(true)
     }
 }
 

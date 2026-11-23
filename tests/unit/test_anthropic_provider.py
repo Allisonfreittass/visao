@@ -136,6 +136,29 @@ def test_truncation_refusal_and_errors_map_to_the_shared_kinds():
     assert timeout.value.kind == "timeout"
 
 
+def failing_with(status: int, message: str) -> LLMError:
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    error = anthropic.APIStatusError(
+        message, response=httpx.Response(status, request=request), body=None
+    )
+    with pytest.raises(LLMError) as caught:
+        provider(FakeMessages(error=error)).complete(
+            [ChatMessage("user", "u")], max_output_tokens=10
+        )
+    return caught.value
+
+
+def test_an_account_without_credit_is_a_quota_not_a_broken_request():
+    """Real case (2026-11-18): days of http_400 with no reason in the log."""
+    empty = failing_with(
+        400, "Your credit balance is too low to access the Anthropic API. Please purchase credits."
+    )
+    assert empty.kind == "quota_exhausted" and "credit balance" in str(empty)
+    bad = failing_with(400, "messages: roles must alternate")
+    assert bad.kind == "http_400" and "roles must alternate" in str(bad)
+    assert failing_with(413, "request_too_large").kind == "too_large"
+
+
 def guard(daily="0.50", monthly="10"):
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool

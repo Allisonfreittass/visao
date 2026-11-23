@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import VisaoKit
 
-/// The message box of the "Neblina" look: the orb, then a glass pill with the text, + and send.
+/// The message box: the microphone, then a pill with the text, + and the red send button.
 /// It sits in the bottom safe area of the chat, so it rides on top of the keyboard.
 struct Composer: View {
     @Binding var text: String
@@ -11,10 +11,13 @@ struct Composer: View {
     let draft: AttachmentDraft
     let thinking: Bool
     let speaker: String
-    var placeholder = "Escreva ou cole código…"
+    var placeholder = "Dê uma ordem ao Visão"
     let onPick: (ChatScreen.Picker) -> Void
-    /// Tapping the orb calls him (as on the web).
+    /// Tapping the wave calls him (as on the web).
     var onCall: () -> Void = {}
+    /// Listening or speaking in a call, and whether there is a connection.
+    var live = false
+    var offline = false
     let onSend: () -> Void
     @Environment(\.palette) private var palette
 
@@ -28,10 +31,18 @@ struct Composer: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             Button(action: onCall) {
-                Orb(thinking: thinking, size: 50)
+                Image(systemName: "mic")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(live ? palette.bg : palette.text)
+                    .frame(width: 50, height: 50)
+                    .background(live ? palette.text : palette.surface, in: Circle())
+                    .overlay(Circle().strokeBorder(palette.border, lineWidth: 1))
+                    .opacity(offline ? 0.45 : 1)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Ligar")
+            // A machine's click when the voice starts and ends.
+            .sensoryFeedback(.impact(flexibility: .rigid), trigger: live)
+            .accessibilityLabel("Falar")
             .accessibilityHint("Conversa por voz, sem as mãos")
             VStack(alignment: .leading, spacing: 0) {
                 if let replyTo {
@@ -56,9 +67,9 @@ struct Composer: View {
                         Button(action: onSend) {
                             Image(systemName: "arrow.up")
                                 .font(.body.weight(.semibold))
-                                .foregroundStyle(palette.pilulaAtivaTinta)
+                                .foregroundStyle(palette.onRed)
                                 .frame(width: 40, height: 40)
-                                .background(palette.pilulaAtiva, in: Circle())
+                                .background(palette.red, in: Circle())
                                 .frame(width: 44, height: 44)
                                 .contentShape(Circle())
                         }
@@ -103,7 +114,7 @@ struct Composer: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Respondendo a \(message.role == .assistant ? speaker : "você")")
                     .font(Typo.text(.caption, weight: .medium))
-                    .foregroundStyle(palette.estanho)
+                    .foregroundStyle(palette.text2)
                 Text(Message.oneLine(message.content, limit: 120))
                     .font(Typo.text(.footnote))
                     .foregroundStyle(palette.tintaSuave)
@@ -127,7 +138,7 @@ struct Composer: View {
         .background(palette.fundoHover, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(alignment: .leading) {
             UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 16)
-                .fill(palette.estanho)
+                .fill(palette.borderStrong)
                 .frame(width: 3)
         }
         .padding(4)

@@ -5,9 +5,11 @@ import { type Api, ApiError } from "../api";
 interface LoginProps {
   api: Api;
   onLoggedIn: (token: string, remember: boolean) => void;
+  /** The password field got or lost the focus (the Ciclope closes its eye: "not looking"). */
+  onPasswordFocus?: (focused: boolean) => void;
 }
 
-export function Login({ api, onLoggedIn }: LoginProps) {
+export function Login({ api, onLoggedIn, onPasswordFocus }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
@@ -21,7 +23,7 @@ export function Login({ api, onLoggedIn }: LoginProps) {
     try {
       onLoggedIn(await api.login(email.trim(), password), remember);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Não consegui falar com o servidor.");
+      setError(e instanceof ApiError ? e.message : "Sem conexão com o servidor. Tente de novo.");
     } finally {
       setBusy(false);
     }
@@ -30,7 +32,7 @@ export function Login({ api, onLoggedIn }: LoginProps) {
   return (
     <form className="login" onSubmit={submit}>
       <div className="rs-campo">
-        <label htmlFor="login-email">Email</label>
+        <label htmlFor="login-email">E-mail</label>
         <input id="login-email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </div>
       <div className="rs-campo" data-estado={error ? "erro" : undefined}>
@@ -41,6 +43,8 @@ export function Login({ api, onLoggedIn }: LoginProps) {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onFocus={() => onPasswordFocus?.(true)}
+          onBlur={() => onPasswordFocus?.(false)}
           required
           aria-describedby={error ? "login-error" : undefined}
         />
@@ -51,7 +55,7 @@ export function Login({ api, onLoggedIn }: LoginProps) {
         Manter conectado neste aparelho
       </label>
       <button type="submit" className="rs-botao rs-botao--principal" disabled={busy}>
-        {busy ? "Entrando…" : "Entrar"}
+        {busy ? "Verificando…" : "Acessar"}
       </button>
     </form>
   );

@@ -5,10 +5,13 @@ from functools import lru_cache
 from pydantic import SecretStr
 
 from apps.api.settings import Settings, get_settings
+from core.arm.local_llm import LocalModelProvider
+from core.brain import BrainProvider
 from integrations.llm.anthropic_provider import AnthropicProvider
 from integrations.llm.base import LLMProvider, Pricing
 from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
 from integrations.llm.fallback import FallbackLLMProvider
+from integrations.llm.fitting import FittingProvider
 from integrations.llm.openai_compatible import OpenAICompatibleProvider
 
 logger = logging.getLogger(__name__)
@@ -52,7 +55,31 @@ def missing_fallback_settings(settings: Settings, slot: str = "fallback") -> lis
 @lru_cache
 def get_llm_provider() -> LLMProvider | None:
     # Conversation favours speed; background thinking keeps the model's full reasoning.
-    return build_llm_provider(get_settings(), fast=True)
+    settings = get_settings()
+    return with_brain(settings, build_llm_provider(settings, fast=True))
+
+
+def with_brain(
+    settings: Settings,
+    cloud: LLMProvider | None,
+    *,
+    background: bool = False,
+    session_factory=None,
+) -> LLMProvider | None:
+    """The cloud chain behind the owner's choice of model (core/brain.py): cloud, the local
+    model on the Mac first, or the cloud with it as a reserve."""
+    if cloud is None:
+        return None
+    if session_factory is None:
+        from infrastructure.database.session import get_sessionmaker
+
+        session_factory = get_sessionmaker()
+    local = LocalModelProvider(
+        session_factory,
+        timeout_seconds=settings.local_llm_timeout_seconds,
+        context_chars=settings.local_llm_context_chars,
+    )
+    return BrainProvider(cloud, local, session_factory, background=background)
 
 
 def is_anthropic(name: str | None, base_url: str | None) -> bool:
@@ -137,7 +164,10 @@ def build_llm_provider(
         settings.llm_price_output_per_mtok,
         settings.llm_fast_extra_body if fast else None,
     )
-    primary = GuardedLLMProvider(primary_raw, settings.llm_base_url, budget_guard)
+    primary = FittingProvider(
+        GuardedLLMProvider(primary_raw, settings.llm_base_url, budget_guard),
+        settings.llm_max_request_tokens,
+    )
     missing = missing_fallback_settings(settings)
     if len(missing) == 6:
         return primary
@@ -159,7 +189,10 @@ def build_llm_provider(
     )
     chain = [
         primary,
-        GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard),
+        FittingProvider(
+            GuardedLLMProvider(fallback_raw, settings.llm_fallback_base_url, budget_guard),
+            settings.llm_fallback_max_request_tokens,
+        ),
     ]
     missing = missing_fallback_settings(settings, "fallback2")
     if missing and len(missing) < 6:
@@ -178,5 +211,10 @@ def build_llm_provider(
             settings.llm_fallback2_price_output_per_mtok,
             settings.llm_fallback2_fast_extra_body if fast else None,
         )
-        chain.append(GuardedLLMProvider(second, settings.llm_fallback2_base_url, budget_guard))
+        chain.append(
+            FittingProvider(
+                GuardedLLMProvider(second, settings.llm_fallback2_base_url, budget_guard),
+                settings.llm_fallback2_max_request_tokens,
+            )
+        )
     return FallbackLLMProvider(chain)

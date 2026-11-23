@@ -4,10 +4,15 @@
 <dict>
 	<key>VisaoAPIBaseURL</key>
 	<string>$(VISAO_API_BASE_URL)</string>
+	<key>VisaoAppGroup</key>
+	<string>$(VISAO_APP_GROUP)</string>
+	<key>VisaoKeychainGroup</key>
+	<string>$(VISAO_KEYCHAIN_GROUP)</string>
+	<key>VisaoTokenService</key>
+	<string>$(VISAO_BUNDLE_ID).auth</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>InstrumentSerif-Regular.ttf</string>
-		<string>InstrumentSerif-Italic.ttf</string>
+		<string>SpaceGrotesk.ttf</string>
 		<string>InterTight-Regular.ttf</string>
 		<string>InterTight-Medium.ttf</string>
 		<string>JetBrainsMono-Regular.ttf</string>
@@ -23,6 +28,8 @@
 	<string>Para entender o que você fala na ligação. Quando o iPhone permite, o reconhecimento roda no próprio aparelho.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Para tirar uma foto e mandar na conversa, e para ele ver o que a câmera mostra numa ligação, só quando você liga a câmera.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Para achar lugares perto de você quando você pergunta, como uma farmácia aberta. A posição vai só com essa mensagem e não fica guardada.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
