@@ -38,7 +38,11 @@ guarda suas chaves. Por isso:
    editar dentro do projeto e rodar `git status`/`git diff`/testes; nada de `curl`, `rm`, `sudo`
    ou `git push` sem você acrescentar.
 4. **Limites por tarefa:** número de turnos (`--max-turns`), custo estimado (`--max-budget-usd`)
-   e tempo (o braço interrompe com SIGINT e depois SIGTERM).
+   e tempo (o braço interrompe com SIGINT e depois SIGKILL).
+   - Desde a versão 3, cada tarefa roda num grupo de processos só dela. Quando o Claude Code
+     termina, ou passa do tempo, o grupo inteiro acaba junto, inclusive um servidor de teste ou um
+     watcher que ele tenha deixado rodando. A saída vai para arquivos, não para pipes, e com isso
+     um processo deixado em segundo plano não segura mais o braço até o timeout.
 5. **Token do aparelho revogável.** O braço se identifica com um token próprio, guardado só como
    hash no servidor. Apagar o aparelho na interface corta o braço na hora.
 6. **Uma tarefa não muda o que vale para as próximas** (desde 23/11/2026, braço versão 2).
@@ -65,20 +69,64 @@ guarda suas chaves. Por isso:
    - Um resultado que chegue depois disso ainda entra e substitui a falha.
    - Braços da versão 1 não mandam esse sinal e continuam com o prazo de 3 horas.
 
+8. **Todo comando roda no sandbox do Claude Code** (desde 23/11/2026, braço versão 3).
+   - Com `Edit` e um comando de teste liberados, uma tarefa pode mudar um teste, o `Makefile` ou o
+     `package.json` e rodar o que quiser. Comando exato não resolve, porque o código que ele roda
+     foi a própria tarefa que escreveu. O que limita é o sandbox.
+   - O braço passa `--settings` com `sandbox.enabled`, e todo `Bash` da tarefa roda dentro dele:
+     - grava só na pasta do projeto e na pasta temporária;
+     - não tem rede;
+     - não lê `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/Library/Keychains` nem `~/.config/visao` (onde
+       ficam o token do braço e as fotos);
+     - não tenta de novo fora do sandbox (`allowUnsandboxedCommands: false`);
+     - não roda nada se o sandbox não subir (`failIfUnavailable: true`).
+   - Conferido de verdade em 23/11/2026 com o Claude Code 2.1.330, num Linux em que o sandbox não
+     consegue subir: a tarefa rodou `make test` com um `Makefile` que tentava acessar a rede,
+     gravar fora do projeto e ler `~/.ssh`, e o Claude Code recusou o comando em vez de rodá-lo
+     sem proteção. Nada saiu do projeto.
+   - **No Mac ainda não foi visto funcionando.** No macOS o sandbox usa o Seatbelt do sistema.
+     Depois de atualizar, peça uma tarefa que rode os testes e confira se eles rodam. Se os seus
+     testes precisam de rede ou do Docker, eles vão falhar dentro do sandbox.
+9. **O braço confere o que mudou e sabe desfazer** (versão 3).
+   - Antes e depois de cada tarefa, ele tira uma foto do projeto num git só dele, em
+     `~/.config/visao/fotos/<projeto>.git`. O `.git` do projeto não é tocado.
+   - A lista de arquivos novos, mudados e apagados entra no resultado como fato medido pelo braço,
+     e não como relato do Claude.
+   - Na página Mac, uma tarefa com arquivos mudados ganha **desfazer**. O toque é a aprovação.
+   - O braço então volta esses arquivos ao que eram, sem chamar o Claude. Se algum deles mudou de
+     novo depois da tarefa, ele não mexe em nada e diz quais foram.
+   - O que o `.gitignore` do projeto ignora (`node_modules`, `.env`) não entra na foto, então não
+     aparece na lista e não é desfeito.
+10. **Até os testes passarem** (versão 3).
+    - Escreva no pedido "até os testes passarem" (ou "até passar nos testes"), por exemplo
+      `/mac visao conserta o login até os testes passarem`. Quem reconhece a frase é o código.
+    - O comando de testes é você quem define, no Mac, por projeto, no `braco.json`:
+      `"visao": {"pasta": "~/workspace/visao", "testes": "make check"}`. Sem ele, o braço recusa
+      antes de gastar qualquer coisa.
+    - Quem diz se passou é o código de saída desse comando, não o Claude.
+    - Enquanto falhar, o braço continua na mesma sessão do Claude, mandando o final da saída.
+      Todas as tentativas ficam dentro da mesma aprovação e do mesmo limite de custo e de tempo.
+    - O máximo é `test_attempts` tentativas (3 por padrão). Cada rodada dos testes tem limite de
+      `test_timeout_minutes` (10 por padrão).
+    - Os testes rodam dentro de um sandbox do macOS (`sandbox-exec`), com os mesmos limites do
+      item 8, mas com rede liberada para o próprio Mac (`localhost`). Fora do macOS eles não rodam.
+    - Desfazer e "até os testes passarem" só vão para braços da versão 3. Um braço antigo trataria
+      o desfazer como um pedido ao Claude.
+
    **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
    `braco.json` é mantido.
 
 **O que ainda não está coberto:**
-- **Editar junto com comando liberado vira código qualquer.** Com `Edit` e
-  `Bash(npm run *)`/`Bash(make test *)` liberados, uma tarefa pode mudar o `package.json` ou o
-  `Makefile` e rodar o que quiser. A solução de verdade é o usuário separado ou o sandbox (fase 3
-  abaixo). Até lá, prefira comandos exatos (`Bash(make test)`) no `braco.json`.
-- **Processos que sobram no timeout.** Quando o braço interrompe uma tarefa por tempo, processos
-  filhos que ela abriu (um servidor de teste, por exemplo) podem continuar rodando.
+- **Leitura fora do projeto.** O sandbox bloqueia gravação e rede, mas comandos ainda leem a
+  maior parte do disco, exceto as pastas de chaves listadas acima. O que for lido só pode sair no
+  resumo que volta para você.
+- **Arquivos ignorados pelo git** não entram na foto, então não aparecem na lista nem são
+  desfeitos.
 
 ## Como roda o Claude Code
 
-O braço chama `claude -p --restricted --strict-mcp-config --tools … --output-format json
+O braço chama `claude -p --restricted --strict-mcp-config --tools … --settings '{"sandbox": …}'
+--output-format json
 --permission-mode dontAsk --allowedTools ... --disallowedTools ... --max-turns N
 --max-budget-usd X`, com o pedido pela entrada padrão, dentro da pasta do projeto e lê do JSON o
 resultado (`result`), o custo estimado (`total_cost_usd`) e a sessão (`session_id`). Uma tarefa
@@ -124,4 +172,5 @@ termos se um dia isso for oferecido a outras pessoas.
    da lista para o celular, em vez de negar.
 2. **Seus assuntos:** email e agenda já estão feitos ([GOOGLE.md](GOOGLE.md)). Faltam arquivos
    (Drive), com o mesmo portão de aprovação para qualquer coisa que envie, apague ou pague.
-3. **Isolamento mais forte:** braço num usuário macOS só dele, ou o Claude Code no sandbox.
+3. **Isolamento mais forte:** braço num usuário macOS só dele (o sandbox já está ligado desde a
+   versão 3).

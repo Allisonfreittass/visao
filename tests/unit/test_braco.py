@@ -99,13 +99,16 @@ def test_a_task_can_never_change_what_governs_the_next_ones(tmp_path):
 def test_claude_code_runs_isolated_or_not_at_all(tmp_path):
     tools = "Bash,Edit,Glob,Grep,Read,Write"
     cfg = config(tmp_path, fake_claude(tmp_path, "", RESTRICTED_HELP))
-    assert braco.isolation(cfg) == ["--restricted", "--strict-mcp-config", "--tools", tools]
+    flags = braco.isolation(cfg)
+    assert flags[:4] == ["--restricted", "--strict-mcp-config", "--tools", tools]
+    assert json.loads(flags[flags.index("--settings") + 1]) == {"sandbox": braco.SANDBOX}
 
     braco._help_text.clear()
     cfg = config(tmp_path, fake_claude(tmp_path, "", OLDER_HELP))
     flags = braco.isolation(cfg)
     assert flags[:2] == ["--setting-sources", "user"] and "--strict-mcp-config" in flags
-    assert json.loads(flags[flags.index("--settings") + 1]) == {"disableAllHooks": True}
+    settings = json.loads(flags[flags.index("--settings") + 1])
+    assert settings == {"disableAllHooks": True, "sandbox": braco.SANDBOX}
 
     braco._help_text.clear()
     ran = tmp_path / "ran"
@@ -353,3 +356,203 @@ def test_it_beats_while_a_long_task_runs(tmp_path, monkeypatch):
     braco.loop(config(tmp_path), once=True)
     beats = [c[2]["running"] for c in calls if c[1] == "/device/heartbeat"]
     assert beats[0] is None and "t-3" in beats[1:]
+
+
+# Version 3 ----------------------------------------------------------------------------------
+
+
+def test_every_command_of_a_task_runs_in_the_sandbox_with_no_way_out():
+    # "Edit + a test command" lets a task write code and run it: the sandbox is what bounds it.
+    box = braco.SANDBOX
+    assert box["enabled"] and box["failIfUnavailable"]  # nothing runs if it cannot start
+    assert box["allowUnsandboxedCommands"] is False  # no retry outside it
+    assert box["network"]["allowedDomains"] == []
+    assert "~/.config/visao" in box["filesystem"]["denyRead"]  # the arm's own token
+    assert "~/.ssh" in box["filesystem"]["denyRead"]
+
+
+def test_a_project_can_say_how_its_tests_run(tmp_path):
+    path = tmp_path / "braco.json"
+    path.write_text(
+        json.dumps(
+            {
+                "server": "https://s",
+                "token": "t",
+                "projects": {
+                    "a": str(tmp_path),
+                    "b": {"pasta": str(tmp_path), "testes": "make check"},
+                },
+                "test_attempts": 2,
+            }
+        )
+    )
+    loaded = braco.Config.load(path)
+    assert loaded.projects == {"a": tmp_path.resolve(), "b": tmp_path.resolve()}
+    assert loaded.tests == {"b": ["make", "check"]} and loaded.test_attempts == 2
+
+
+def _alive(pid: int) -> bool:
+    try:
+        braco.os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # A zombie still answers kill(0); it is dead for our purpose.
+    stat = Path(f"/proc/{pid}/stat")
+    return not (stat.exists() and stat.read_text().split(")")[-1].split()[0] == "Z")
+
+
+LEAVES_A_CHILD = (
+    "import subprocess\n"
+    "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+    "open('filho.pid', 'w').write(str(child.pid))\n"
+)
+
+
+def test_what_a_task_left_running_ends_with_it(tmp_path):
+    claude = fake_claude(tmp_path, LEAVES_A_CHILD + 'print(json.dumps({"result": "ok"}))')
+    cfg = config(tmp_path, claude)
+    assert braco.handle(cfg, {"project": "visao", "prompt": "x"})["ok"] is True
+    pid = int((cfg.projects["visao"] / "filho.pid").read_text())
+    time.sleep(0.2)
+    assert not _alive(pid)
+
+
+def test_a_timeout_ends_the_whole_process_group(tmp_path):
+    claude = fake_claude(tmp_path, LEAVES_A_CHILD + "time.sleep(60)")
+    cfg = config(tmp_path, claude, timeout_minutes=0.03)
+    assert "interrompi" in braco.handle(cfg, {"project": "visao", "prompt": "x"})["error"]
+    pid = int((cfg.projects["visao"] / "filho.pid").read_text())
+    time.sleep(0.2)
+    assert not _alive(pid)
+
+
+EDITS = (
+    "import pathlib\n"
+    "pathlib.Path('a.txt').write_text('mudado')\n"
+    "pathlib.Path('novo.txt').write_text('novo')\n"
+    "pathlib.Path('velho.txt').unlink()\n"
+    'print(json.dumps({"result": "mexi em tudo", "session_id": "s-1"}))'
+)
+
+
+def _project_with_files(cfg) -> Path:
+    folder = cfg.projects["visao"]
+    (folder / "a.txt").write_text("original")
+    (folder / "velho.txt").write_text("velho")
+    (folder / ".gitignore").write_text("segredo.env\n")
+    (folder / "segredo.env").write_text("TOKEN=1")
+    return folder
+
+
+def test_the_arm_measures_what_a_task_changed(tmp_path):
+    cfg = config(tmp_path, fake_claude(tmp_path, EDITS))
+    folder = _project_with_files(cfg)
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x"})
+    assert body["snapshot"] is True
+    assert body["changed"] == [
+        {"status": "M", "path": "a.txt"},
+        {"status": "A", "path": "novo.txt"},
+        {"status": "D", "path": "velho.txt"},
+    ]
+    assert not (folder / ".git").exists()  # the project's own git is never created or touched
+
+
+def test_undo_puts_back_what_the_task_changed_without_claude(tmp_path):
+    cfg = config(tmp_path, fake_claude(tmp_path, EDITS))
+    folder = _project_with_files(cfg)
+    braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x"})
+    (folder / "segredo.env").write_text("TOKEN=2")  # ignored by .gitignore: not ours to undo
+
+    cfg.claude = str(tmp_path / "nao-existe")  # proves Claude is not needed
+    done = braco.handle(cfg, {"id": "u-1", "kind": "undo", "undo_of": "t-1", "project": "visao"})
+    assert done["ok"] is True and len(done["changed"]) == 3
+    assert (folder / "a.txt").read_text() == "original"
+    assert (folder / "velho.txt").read_text() == "velho"
+    assert not (folder / "novo.txt").exists()
+    assert (folder / "segredo.env").read_text() == "TOKEN=2"
+
+
+def test_undo_never_overwrites_what_changed_after_the_task(tmp_path):
+    cfg = config(tmp_path, fake_claude(tmp_path, EDITS))
+    folder = _project_with_files(cfg)
+    braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x"})
+    (folder / "a.txt").write_text("o dono mexeu depois")
+
+    refused = braco.handle(cfg, {"id": "u-1", "kind": "undo", "undo_of": "t-1", "project": "visao"})
+    assert refused["ok"] is False and "a.txt" in refused["error"]
+    assert (folder / "a.txt").read_text() == "o dono mexeu depois"
+    assert (folder / "novo.txt").exists()  # nothing undone, not even the rest
+
+    unknown = braco.handle(cfg, {"id": "u-2", "kind": "undo", "undo_of": "t-9", "project": "visao"})
+    assert unknown == {"ok": False, "error": braco.NO_PHOTO}
+
+
+# The test command passes only once `ok` exists; Claude creates it only when resumed.
+PASSES_WHEN_OK = [
+    sys.executable,
+    "-c",
+    "import pathlib, sys; sys.exit(0 if pathlib.Path('ok').exists() else 1)",
+]
+FIXES_ON_RESUME = (
+    "import pathlib\n"
+    "prompt = sys.stdin.read()\n"
+    "open('prompts.log', 'a').write(prompt + '\\n---\\n')\n"
+    "if '--resume' in sys.argv: pathlib.Path('ok').write_text('1')\n"
+    'print(json.dumps({"result": "tentei", "session_id": "s-1", "total_cost_usd": 0.1}))'
+)
+
+
+@pytest.fixture
+def no_sandbox_needed(monkeypatch):
+    # sandbox-exec only exists on macOS; the loop is what is tested here.
+    monkeypatch.setattr(braco, "sandboxed", lambda argv, folder: argv)
+
+
+def test_until_the_tests_pass_goes_on_in_the_same_session(tmp_path, no_sandbox_needed):
+    cfg = config(tmp_path, fake_claude(tmp_path, FIXES_ON_RESUME), tests={"visao": PASSES_WHEN_OK})
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})
+    assert body["ok"] is True
+    assert body["tests"]["passed"] is True and body["tests"]["attempts"] == 2
+    assert body["cost_usd"] == pytest.approx(0.2)  # both runs, one budget
+    prompts = (cfg.projects["visao"] / "prompts.log").read_text()
+    assert "Os testes ainda não passam" in prompts and "tentativa 1 de 3" in prompts
+
+
+def test_tests_that_never_pass_stop_at_the_limit(tmp_path, no_sandbox_needed):
+    never = [sys.executable, "-c", "import sys; print('1 failed'); sys.exit(1)"]
+    cfg = config(tmp_path, fake_claude(tmp_path, FIXES_ON_RESUME), tests={"visao": never})
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})
+    assert body["ok"] is False and "3 tentativa" in body["error"]
+    assert body["tests"]["attempts"] == 3 and "1 failed" in body["tests"]["tail"]
+    runs = (cfg.projects["visao"] / "prompts.log").read_text().count("---")
+    assert runs == 3
+
+
+def test_the_budget_is_shared_by_every_attempt(tmp_path, no_sandbox_needed):
+    never = [sys.executable, "-c", "import sys; sys.exit(1)"]
+    cfg = config(
+        tmp_path,
+        fake_claude(tmp_path, FIXES_ON_RESUME),
+        tests={"visao": never},
+        max_budget_usd=0.12,
+    )
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})
+    assert body["tests"]["attempts"] == 1  # 0.10 spent, 0.02 left: no second attempt
+
+
+def test_until_the_tests_pass_needs_a_test_command_on_the_mac(tmp_path):
+    ran = tmp_path / "ran"
+    cfg = config(tmp_path, fake_claude(tmp_path, f"open({str(ran)!r}, 'w')"))
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})
+    assert body["ok"] is False and '"testes"' in body["error"]
+    assert not ran.exists()
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="no Mac, sandbox-exec is missing")
+def test_tests_never_run_outside_the_sandbox(tmp_path):
+    cfg = config(tmp_path, fake_claude(tmp_path, FIXES_ON_RESUME), tests={"visao": PASSES_WHEN_OK})
+    (cfg.projects["visao"] / "ok").write_text("1")
+    body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})
+    assert body["ok"] is False and body["error"] == braco.NO_TEST_SANDBOX
+    runs = (cfg.projects["visao"] / "prompts.log").read_text().count("---")
+    assert runs == 1  # an error of the arm is not for Claude to fix

@@ -61,6 +61,13 @@ class TaskOut(BaseModel):
     conversation_id: uuid.UUID | None
     created_at: datetime
     finished_at: datetime | None
+    kind: str
+    undo_of: uuid.UUID | None
+    until_tests: bool
+    changed_files: list[dict[str, str]] | None
+    tests: dict | None
+    undone_at: datetime | None
+    can_undo: bool
 
 
 class HeartbeatIn(BaseModel):
@@ -77,6 +84,14 @@ class NextOut(BaseModel):
     project: str
     prompt: str
     resume_session: str | None
+    kind: str = "work"
+    undo_of: uuid.UUID | None = None
+    until_tests: bool = False
+
+
+class ChangedIn(BaseModel):
+    path: str = Field(max_length=1000)
+    status: Literal["A", "M", "D"]
 
 
 class ResultIn(BaseModel):
@@ -85,6 +100,10 @@ class ResultIn(BaseModel):
     error: str = Field(default="", max_length=5000)
     cost_usd: Decimal | None = Field(default=None, ge=0)
     session_id: str | None = Field(default=None, max_length=128)
+    # Version 3: measured by the arm's photos, and the test command's verdict.
+    changed: list[ChangedIn] = Field(default_factory=list, max_length=2000)
+    snapshot: bool = False
+    tests: dict | None = None
 
 
 class LlmNextOut(BaseModel):
@@ -124,8 +143,10 @@ def _device_out(device: ArmDevice) -> dict:
     }
 
 
-def _task_out(task: ArmTask) -> TaskOut:
-    return TaskOut.model_validate(task, from_attributes=True)
+def _task_out(task: ArmTask, undoing: frozenset[uuid.UUID] = frozenset()) -> TaskOut:
+    """`undoing`: tasks with an undo already waiting, so the button is not offered twice."""
+    fields = {name: getattr(task, name) for name in TaskOut.model_fields if name != "can_undo"}
+    return TaskOut(**fields, can_undo=service.can_undo(task) and task.id not in undoing)
 
 
 # --- owner side ---------------------------------------------------------------------------
@@ -172,7 +193,16 @@ def tasks(
         .order_by(ArmTask.created_at.desc())
         .limit(limit)
     ).all()
-    return [_task_out(t) for t in rows]
+    undoing = frozenset(
+        db.scalars(
+            select(ArmTask.undo_of).where(
+                ArmTask.owner_user_id == user.id,
+                ArmTask.kind == "undo",
+                ArmTask.status.in_(("approved", "running")),
+            )
+        ).all()
+    )
+    return [_task_out(t, undoing) for t in rows]
 
 
 @router.post("/tasks", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
@@ -249,6 +279,22 @@ def reject(
     return _decide(service.reject, task_id, user, db, "reject", via)
 
 
+@router.post("/tasks/{task_id}/undo", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
+def undo(task_id: uuid.UUID, user: CurrentUser, db: DbSession) -> TaskOut:
+    """The tap is the approval: the arm puts the files back without Claude."""
+    try:
+        task = service.undo(db, user.id, task_id)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarefa não encontrada") from exc
+    except service.ArmError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    record_audit(
+        db, "arm.undo", "success", actor_user_id=user.id, details={"project": task.project}
+    )
+    db.commit()
+    return _task_out(task)
+
+
 @router.get("/brain", response_model=BrainOut)
 def brain_status(user: CurrentUser, db: DbSession) -> BrainOut:
     """Which model the Visão thinks with, and whether the Mac offers a local one now."""
@@ -305,6 +351,9 @@ def device_next(
                 project=task.project,
                 prompt=task.prompt,
                 resume_session=task.resume_session,
+                kind=task.kind,
+                undo_of=task.undo_of,
+                until_tests=task.until_tests,
             )
         if time.monotonic() >= deadline:
             return None
@@ -323,10 +372,30 @@ def device_result(task_id: uuid.UUID, body: ResultIn, device: Device, db: DbSess
             error=body.error,
             cost_usd=body.cost_usd,
             claude_session_id=body.session_id,
+            changed=[c.model_dump() for c in body.changed],
+            snapshot=body.snapshot,
+            tests=_tests(body.tests),
         )
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarefa não está com este aparelho") from exc
     db.commit()
+
+
+def _tests(report: dict | None) -> dict | None:
+    """Only the fields the summary uses, each bounded: it comes from the Mac."""
+    if not isinstance(report, dict):
+        return None
+    out: dict = {
+        "command": str(report.get("command") or "")[:200],
+        "passed": report.get("passed") is True,
+        "attempts": max(0, min(int(report.get("attempts") or 0), 20))
+        if str(report.get("attempts") or "0").isdigit()
+        else 0,
+    }
+    for key, limit in (("tail", 3000), ("error", 500)):
+        if report.get(key):
+            out[key] = str(report[key])[-limit:]
+    return out
 
 
 @router.get("/device/llm/next", response_model=LlmNextOut | None)

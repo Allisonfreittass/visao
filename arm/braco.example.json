@@ -2,12 +2,17 @@
   "server": "https://54-20-150-130.sslip.io",
   "token": "cole aqui o token mostrado ao parear o Mac",
   "projects": {
-    "visao": "~/workspace/visao"
+    "visao": {
+      "pasta": "~/workspace/visao",
+      "testes": "make check"
+    }
   },
   "claude": "claude",
   "max_turns": 30,
   "max_budget_usd": 2.0,
   "timeout_minutes": 30,
+  "test_attempts": 3,
+  "test_timeout_minutes": 10,
   "use_api_key": false,
   "modelo_local": {
     "modelo": "qwen3:4b",

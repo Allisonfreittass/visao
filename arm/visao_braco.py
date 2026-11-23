@@ -15,9 +15,11 @@ import argparse
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -29,7 +31,9 @@ from pathlib import Path
 
 # 2: runs Claude Code isolated, keeps results until the server takes them, beats while working,
 # and can answer with a local model.
-VERSION = "2"
+# 3: Bash inside Claude Code's sandbox, the whole process group ends with the task, a photo of
+# the project before and after (changed files, undo), and "until the tests pass".
+VERSION = "3"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -67,6 +71,18 @@ NEVER = [
     "Bash(git push *)",
     *(f"{tool}({path})" for tool in ("Edit", "Write") for path in PROTECTED),
 ]
+# Every Bash command of a task runs in Claude Code's sandbox: writes only in the project and the
+# temporary folder, no network, no retry outside it, and nothing runs if it cannot start. This
+# is what bounds "edit + run the tests": a task can change a test and run it, but that code
+# cannot reach the network or write outside the project. It also cannot read the keys below.
+SECRETS = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config/visao", "~/Library/Keychains"]
+SANDBOX = {
+    "enabled": True,
+    "failIfUnavailable": True,
+    "allowUnsandboxedCommands": False,
+    "network": {"allowedDomains": [], "strictAllowlist": True},
+    "filesystem": {"denyRead": SECRETS},
+}
 TOO_OLD = (
     "Este Claude Code não tem como rodar isolado (falta --restricted ou --setting-sources), "
     "então não rodei nada. Atualize com `claude update` e peça de novo."
@@ -96,14 +112,27 @@ class Config:
     local_context: int = 16384
     # Where results wait until the server takes them, next to braco.json.
     state_dir: Path = field(default_factory=lambda: DEFAULT_CONFIG.parent)
+    # The command that says whether a project's tests pass, per project (argv). Only projects
+    # listed here accept "until the tests pass".
+    tests: dict[str, list[str]] = field(default_factory=dict)
+    test_attempts: int = 3
+    test_timeout_minutes: int = 10
 
     @classmethod
     def load(cls, path: Path) -> Config:
         data = json.loads(path.read_text())
-        projects = {
-            str(name): Path(folder).expanduser().resolve()
-            for name, folder in (data.get("projects") or {}).items()
-        }
+        projects, tests = {}, {}
+        for name, entry in (data.get("projects") or {}).items():
+            # "nome": "~/pasta", or "nome": {"pasta": "~/pasta", "testes": "make check"}
+            if isinstance(entry, dict):
+                folder, check = entry.get("pasta"), str(entry.get("testes") or "").strip()
+            else:
+                folder, check = entry, ""
+            if not folder:
+                raise ValueError(f"o projeto {name} precisa de pasta")
+            projects[str(name)] = Path(str(folder)).expanduser().resolve()
+            if check:
+                tests[str(name)] = shlex.split(check)
         if not data.get("server") or not data.get("token"):
             raise ValueError("braco.json precisa de server e token")
         if not projects:
@@ -125,6 +154,9 @@ class Config:
             ollama=_local_address(str(local.get("endereco") or "http://127.0.0.1:11434")),
             local_context=int(local.get("contexto", 16384)),
             state_dir=path.expanduser().resolve().parent,
+            tests=tests,
+            test_attempts=max(1, int(data.get("test_attempts", 3))),
+            test_timeout_minutes=max(1, int(data.get("test_timeout_minutes", 10))),
         )
 
 
@@ -181,22 +213,32 @@ def isolation(config: Config) -> list[str] | None:
     if _has(text, "--restricted"):
         # Ignores user, project and local settings; confines file tools to the project; only a
         # person or the permission handler may approve writes to settings, git and tool files
-        # (none here: dontAsk denies). It removes Bash unless --tools names it.
-        return ["--restricted", "--strict-mcp-config", "--tools", tools]
+        # (none here: dontAsk denies). It removes Bash unless --tools names it. --settings still
+        # applies under --restricted: that is where the sandbox comes from.
+        return [
+            "--restricted",
+            "--strict-mcp-config",
+            "--tools",
+            tools,
+            "--settings",
+            json.dumps({"sandbox": SANDBOX}),
+        ]
     if _has(text, "--setting-sources") and _has(text, "--strict-mcp-config"):
         # Older Claude Code: your own settings only, no hooks, no MCP servers.
         flags = [
             "--setting-sources",
             "user",
             "--settings",
-            json.dumps({"disableAllHooks": True}),
+            json.dumps({"disableAllHooks": True, "sandbox": SANDBOX}),
             "--strict-mcp-config",
         ]
         return flags + (["--tools", tools] if _has(text, "--tools") else [])
     return None
 
 
-def command(config: Config, task: dict, isolated: list[str]) -> list[str]:
+def command(
+    config: Config, task: dict, isolated: list[str], budget: float | None = None
+) -> list[str]:
     """The prompt goes on stdin, so no flag can ever swallow it or be injected through it."""
     args = [
         config.claude,
@@ -213,7 +255,7 @@ def command(config: Config, task: dict, isolated: list[str]) -> list[str]:
         "--max-turns",
         str(config.max_turns),
         "--max-budget-usd",
-        str(config.max_budget_usd),
+        str(round(config.max_budget_usd if budget is None else budget, 2)),
         "--append-system-prompt",
         SYSTEM_NOTE,
     ]
@@ -230,43 +272,92 @@ def _environment(config: Config) -> dict[str, str]:
     return env
 
 
-def run_claude(config: Config, task: dict, folder: Path, isolated: list[str]) -> dict:
-    """Runs one task and returns the body for /result. Never raises for a task failure."""
+def _end_group(process: subprocess.Popen, sig: int = signal.SIGTERM) -> None:
+    """Each task runs in its own process group: a dev server or watcher it left behind ends
+    with it instead of living on in the Mac."""
     try:
+        os.killpg(process.pid, sig)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _run_group(
+    argv: list[str], folder: Path, env: dict[str, str], stdin: str, seconds: float
+) -> tuple[int | None, str, str]:
+    """Runs argv in a new process group. Returns (exit code, out, err); the code is None when
+    it passed `seconds` and was stopped. Raises FileNotFoundError when argv[0] is missing.
+
+    Output goes to files, not pipes: a process the task left in the background would hold a
+    pipe open and keep us waiting until the timeout. When the main process ends, so does the
+    rest of its group."""
+    with (
+        tempfile.TemporaryFile("w+") as given,
+        tempfile.TemporaryFile("w+") as out_file,
+        tempfile.TemporaryFile("w+") as err_file,
+    ):
+        given.write(stdin)
+        given.seek(0)
         process = subprocess.Popen(  # noqa: S603 (fixed argv; the prompt goes on stdin)
-            command(config, task, isolated),
+            argv,
             cwd=folder,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdin=given,
+            stdout=out_file,
+            stderr=err_file,
             text=True,
-            env=_environment(config),
+            env=env,
+            start_new_session=True,
+        )
+        code: int | None
+        try:
+            code = process.wait(timeout=max(1.0, seconds))
+        except subprocess.TimeoutExpired:
+            _end_group(process, signal.SIGINT)  # ends Claude's turn cleanly
+            try:
+                process.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                _end_group(process, signal.SIGKILL)
+                process.wait()
+            code = None
+        _end_group(process)
+        time.sleep(0.05)
+        _end_group(process, signal.SIGKILL)
+        out_file.seek(0)
+        err_file.seek(0)
+        return code, out_file.read(), err_file.read()
+
+
+def run_claude(
+    config: Config,
+    task: dict,
+    folder: Path,
+    isolated: list[str],
+    budget: float | None = None,
+    seconds: float | None = None,
+) -> dict:
+    """Runs one task and returns the body for /result. Never raises for a task failure."""
+    limit = config.timeout_minutes * 60 if seconds is None else seconds
+    try:
+        code, out, err = _run_group(
+            command(config, task, isolated, budget),
+            folder,
+            _environment(config),
+            task["prompt"],
+            limit,
         )
     except FileNotFoundError:
         return {"ok": False, "error": f"Não achei o Claude Code ({config.claude}) neste Mac."}
-    try:
-        out, err = process.communicate(task["prompt"], timeout=config.timeout_minutes * 60)
-    except subprocess.TimeoutExpired:
-        process.send_signal(signal.SIGINT)  # ends the turn cleanly
-        try:
-            out, err = process.communicate(timeout=20)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            out, err = process.communicate()
+    if code is None:
         return {
             "ok": False,
             "error": f"Passou de {config.timeout_minutes} min e eu interrompi.",
-            "result": (out or "")[-MAX_RESULT:],
+            "result": out[-MAX_RESULT:],
         }
     try:
         data = json.loads(out)
     except (json.JSONDecodeError, TypeError):
         detail = (err or out or "").strip()[-400:]
-        return {
-            "ok": False,
-            "error": f"O Claude Code saiu com erro: {detail or process.returncode}",
-        }
-    failed = process.returncode != 0 or bool(data.get("is_error"))
+        return {"ok": False, "error": f"O Claude Code saiu com erro: {detail or code}"}
+    failed = code != 0 or bool(data.get("is_error"))
     body = {
         "ok": not failed,
         "result": str(data.get("result") or "")[:MAX_RESULT],
@@ -278,18 +369,277 @@ def run_claude(config: Config, task: dict, folder: Path, isolated: list[str]) ->
     return body
 
 
+# --- photos of the project: what a task changed, and how to undo it ------------------------
+# A git of the arm's own, in ~/.config/visao/fotos/<projeto>.git, with the project as its work
+# tree. The project's .git is never touched. Its .gitignore is respected: what it ignores
+# (node_modules, .env) is neither listed nor undone.
+
+
+class PhotoError(RuntimeError):
+    pass
+
+
+def _photo_git(config: Config, project: str, folder: Path, *args: str, timeout: int = 120) -> str:
+    repo = config.state_dir / "fotos" / f"{project}.git"
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(
+        GIT_DIR=str(repo),
+        GIT_WORK_TREE=str(folder),
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL=os.devnull,
+        GIT_LITERAL_PATHSPECS="1",
+        GIT_AUTHOR_NAME="Visão",
+        GIT_AUTHOR_EMAIL="braco@visao.local",
+        GIT_COMMITTER_NAME="Visão",
+        GIT_COMMITTER_EMAIL="braco@visao.local",
+    )
+    if not (repo / "HEAD").is_file():
+        repo.parent.mkdir(parents=True, exist_ok=True)
+        _git_run(["git", "init", "-q"], folder, env, timeout)
+    argv = ["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", *args]
+    return _git_run(argv, folder, env, timeout)
+
+
+def _git_run(argv: list[str], folder: Path, env: dict[str, str], timeout: int) -> str:
+    try:
+        done = subprocess.run(  # noqa: S603 (git with fixed arguments)
+            argv, cwd=folder, env=env, capture_output=True, text=True, timeout=timeout
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise PhotoError(str(exc)) from exc
+    if done.returncode != 0:
+        raise PhotoError((done.stderr or done.stdout).strip()[-300:])
+    return done.stdout
+
+
+def photo(config: Config, project: str, folder: Path, label: str) -> str:
+    """Records the project as it is now, under refs/visao/<label>. Returns the commit."""
+    _photo_git(config, project, folder, "add", "-A", "--", ".")
+    tree = _photo_git(config, project, folder, "write-tree").strip()
+    commit = _photo_git(config, project, folder, "commit-tree", tree, "-m", label).strip()
+    _photo_git(config, project, folder, "update-ref", f"refs/visao/{label}", commit)
+    return commit
+
+
+def _ref(config: Config, project: str, folder: Path, label: str) -> str | None:
+    try:
+        return _photo_git(config, project, folder, "rev-parse", "--verify", "-q", label).strip()
+    except PhotoError:
+        return None
+
+
+def changed(config: Config, project: str, folder: Path, before: str, after: str) -> list[dict]:
+    """The files that differ between two photos: A added, M changed, D deleted."""
+    raw = _photo_git(
+        config, project, folder, "diff", "--name-status", "--no-renames", "-z", before, after
+    )
+    parts = raw.split("\0")
+    return [
+        {"status": parts[i][:1], "path": parts[i + 1]}
+        for i in range(0, len(parts) - 1, 2)
+        if parts[i] and parts[i + 1]
+    ]
+
+
+def undo(config: Config, task: dict, folder: Path) -> dict:
+    """Puts back the files an earlier task changed, without Claude. Refuses when one of them
+    was changed again since: that is your work, and it is not mine to overwrite."""
+    project, original = str(task.get("project", "")), str(task.get("undo_of") or "")
+    try:
+        before = _ref(config, project, folder, f"refs/visao/{original}/antes")
+        after = _ref(config, project, folder, f"refs/visao/{original}/depois")
+        if not original or before is None or after is None:
+            return {"ok": False, "error": NO_PHOTO}
+        touched = changed(config, project, folder, before, after)
+        now = photo(config, project, folder, f"{task['id']}/agora")
+        since = {c["path"] for c in changed(config, project, folder, after, now)}
+        conflicts = sorted(c["path"] for c in touched if c["path"] in since)
+        if conflicts:
+            listed = ", ".join(conflicts[:10]) + ("…" if len(conflicts) > 10 else "")
+            return {"ok": False, "error": f"{CHANGED_SINCE} {listed}"[:500]}
+        root = folder.resolve()
+        restore = [c["path"] for c in touched if c["status"] != "A"]
+        for item in touched:
+            if item["status"] == "A":
+                target = (root / item["path"]).resolve()
+                if target.is_relative_to(root) and target.is_file():
+                    target.unlink()
+        if restore:
+            _photo_git(config, project, folder, "checkout", before, "--", *restore)
+    except PhotoError as exc:
+        return {"ok": False, "error": f"Não consegui desfazer: {exc}"[:500]}
+    if not touched:
+        return {"ok": True, "result": "A tarefa não tinha mudado nenhum arquivo.", "changed": []}
+    return {
+        "ok": True,
+        "result": f"Voltei {len(touched)} arquivo(s) ao que eram antes da tarefa.",
+        "changed": touched,
+    }
+
+
+NO_PHOTO = "Não tenho neste Mac a foto de antes dessa tarefa, então não mexi em nada."
+CHANGED_SINCE = "Não desfiz: estes arquivos mudaram de novo depois da tarefa:"
+
+
+# --- until the tests pass -------------------------------------------------------------------
+# Whether they passed is the exit code of the command in braco.json, never what Claude says.
+
+
+def sandboxed(argv: list[str], folder: Path) -> list[str] | None:
+    """The tests run code a task may just have written: on the Mac they run in a sandbox with
+    no network beyond this Mac and writes only in the project and the temporary folders. None
+    where that is not available: then they do not run."""
+    if sys.platform != "darwin" or not Path("/usr/bin/sandbox-exec").is_file():
+        return None
+    writable = {
+        os.path.realpath(folder),
+        os.path.realpath(tempfile.gettempdir()),
+        "/private/tmp",
+        "/private/var/folders",
+    }
+    hidden = {os.path.realpath(os.path.expanduser(p)) for p in SECRETS}
+    if any('"' in p or "\\" in p for p in writable | hidden):
+        return None
+    allow = " ".join(f'(subpath "{p}")' for p in sorted(writable))
+    deny = " ".join(f'(subpath "{p}")' for p in sorted(hidden))
+    profile = (
+        "(version 1)(allow default)"
+        '(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
+        f'(deny file-write*)(allow file-write* {allow} (subpath "/dev"))'
+        f"(deny file-read* {deny})"
+    )
+    return ["/usr/bin/sandbox-exec", "-p", profile, *argv]
+
+
+def run_tests(config: Config, project: str, folder: Path, seconds: float) -> dict:
+    argv = config.tests[project]
+    shown = shlex.join(argv)
+    wrapped = sandboxed(argv, folder)
+    if wrapped is None:
+        return {"command": shown, "passed": False, "error": NO_TEST_SANDBOX}
+    env = _environment(config)
+    env.pop("ANTHROPIC_API_KEY", None)
+    try:
+        code, out, err = _run_group(wrapped, folder, env, "", seconds)
+    except FileNotFoundError:
+        return {"command": shown, "passed": False, "error": f"Não achei o comando {argv[0]}."}
+    tail = (out + ("\n" if out and err else "") + err)[-TEST_TAIL:]
+    if code is None:
+        return {
+            "command": shown,
+            "passed": False,
+            "tail": tail,
+            "error": "Os testes passaram do tempo.",
+        }
+    if code != 0 and err.lstrip().startswith("sandbox-exec:"):
+        return {
+            "command": shown,
+            "passed": False,
+            "error": f"{NO_TEST_SANDBOX} ({err.strip()[:200]})",
+        }
+    return {"command": shown, "passed": code == 0, "tail": tail}
+
+
+TEST_TAIL = 3000
+NO_TEST_SANDBOX = "Não consegui isolar os testes neste Mac, então não rodei."
+NO_TESTS = (
+    "Você pediu até os testes passarem, mas o braco.json não diz como rodar os testes de "
+    '{project}. Escreva "{project}": {{"pasta": "…", "testes": "make check"}} e peça de novo.'
+)
+RETRY = (
+    "Os testes ainda não passam (`{command}`, tentativa {attempt} de {attempts}). Final da "
+    "saída:\n\n{tail}\n\nCorrija o que falta para eles passarem, sem desligar nem pular testes."
+)
+
+
+def _cost(body: dict) -> float:
+    try:
+        return float(body.get("cost_usd") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def until_tests_pass(config: Config, task: dict, folder: Path, isolated: list[str]) -> dict:
+    """Claude works, the tests run, and while they fail Claude goes on in the same session:
+    the same approval, the same budget and the same time limit for every attempt."""
+    project = str(task["project"])
+    started, limit = time.monotonic(), config.timeout_minutes * 60
+    body = run_claude(config, task, folder, isolated, config.max_budget_usd, limit)
+    spent, attempt, report = _cost(body), 0, None
+    while body.get("ok"):
+        attempt += 1
+        left = limit - (time.monotonic() - started)
+        report = run_tests(config, project, folder, min(config.test_timeout_minutes * 60, left))
+        report["attempts"] = attempt
+        budget = config.max_budget_usd - spent
+        if report["passed"] or "error" in report:  # an error is not for Claude to fix
+            break
+        if attempt >= config.test_attempts or budget < 0.05 or left < 120:
+            break
+        if not body.get("session_id"):
+            break
+        follow = {
+            **task,
+            "resume_session": body["session_id"],
+            "prompt": RETRY.format(
+                command=report["command"],
+                attempt=attempt,
+                attempts=config.test_attempts,
+                tail=report.get("tail", ""),
+            ),
+        }
+        body = run_claude(config, follow, folder, isolated, budget, left)
+        spent += _cost(body)
+    body["cost_usd"] = round(spent, 6)
+    if report is None:
+        return body
+    body["tests"] = report
+    if not report["passed"] and body.get("ok"):
+        body["ok"] = False
+        body["error"] = report.get("error") or (
+            f"Os testes (`{report['command']}`) não passaram depois de {attempt} tentativa(s)."
+        )
+    return body
+
+
 def handle(config: Config, task: dict) -> dict:
-    folder = config.projects.get(task.get("project", ""))
+    project = str(task.get("project", ""))
+    folder = config.projects.get(project)
     if folder is None:
         names = ", ".join(sorted(config.projects)) or "nenhum"
         return {"ok": False, "error": f"Projeto não liberado neste Mac. Liberados: {names}."}
     if not folder.is_dir():
         return {"ok": False, "error": f"A pasta do projeto não existe: {folder}"}
+    if task.get("kind") == "undo":
+        return undo(config, task, folder)
+    until = bool(task.get("until_tests"))
+    if until and project not in config.tests:
+        return {"ok": False, "error": NO_TESTS.format(project=project)}
     isolated = isolation(config)
     if isolated is None:
         missing = f"Não achei o Claude Code ({config.claude}) neste Mac."
         return {"ok": False, "error": TOO_OLD if _help(config.claude) else missing}
-    return run_claude(config, task, folder, isolated)
+    task_id = str(task.get("id", ""))
+    try:
+        before = photo(config, project, folder, f"{task_id}/antes") if task_id else None
+    except PhotoError as exc:
+        print(f"Sem foto de antes ({exc}); a tarefa roda sem desfazer", file=sys.stderr)
+        before = None
+    if until:
+        body = until_tests_pass(config, task, folder, isolated)
+    else:
+        body = run_claude(config, task, folder, isolated)
+    if before is not None:
+        try:
+            after = photo(config, project, folder, f"{task_id}/depois")
+            body["changed"] = changed(config, project, folder, before, after)[:MAX_CHANGED]
+            body["snapshot"] = True
+        except PhotoError as exc:
+            print(f"Sem foto de depois ({exc})", file=sys.stderr)
+    return body
+
+
+MAX_CHANGED = 2000
 
 
 def heartbeat(config: Config, running: str | None = None) -> None:

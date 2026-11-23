@@ -122,6 +122,9 @@ def detect(
     if data.get("mac_task") is not True or project not in projects or len(task) < 6:
         usage.outcome = "no_task" if isinstance(data, dict) and data else "bad_output"
         return None
+    if arm.wants_tests(text) and not arm.wants_tests(task):
+        # The goal is the owner's words, checked in code: the rewrite must not drop it.
+        task = f"{task} (até os testes passarem)"[: arm.MAX_PROMPT]
     return MacIntent(project, task)
 
 

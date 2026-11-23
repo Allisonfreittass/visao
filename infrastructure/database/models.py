@@ -966,6 +966,19 @@ class ArmTask(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # work: Claude Code does it | undo: the arm puts back what `undo_of` changed, no Claude.
+    kind: Mapped[str] = mapped_column(String(16), default="work", server_default="work")
+    undo_of: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("arm_tasks.id", ondelete="SET NULL"), nullable=True
+    )
+    # "até os testes passarem": done only when the project's test command passes on the Mac.
+    until_tests: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Measured by the arm (photo before and after), not told by Claude: [{"path", "status"}].
+    changed_files: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, nullable=True)
+    snapshot: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # {"command", "passed", "attempts", "tail"?, "error"?}
+    tests: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OwnerQuestion(Base):

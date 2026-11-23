@@ -5,10 +5,15 @@ Rules enforced here, not in a prompt:
 - an arm only ever receives approved tasks of its own owner, one at a time (`claim`);
 - the result goes back to the conversation it came from, with a push when the app is closed;
 - a result is never lost: sent twice it is taken once, and one that arrives after the task was
-  given up (the Mac was silent) still replaces the failure.
+  given up (the Mac was silent) still replaces the failure;
+- what a task changed is the list the arm measured with its photos, not what Claude says; undo
+  is a task of its own, approved by the tap, that the arm runs without Claude;
+- "até os testes passarem" is read from the owner's words in code, and the arm decides it by the
+  exit code of the test command in braco.json.
 """
 
 import hashlib
+import re
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -35,6 +40,14 @@ CLAIM_GRACE = timedelta(minutes=2)
 STALE_ERROR = "O Mac não respondeu (desligou no meio?)."
 LOST_ERROR = "O Mac não estava mais com essa tarefa (o braço reiniciou no meio?)."
 OPEN = ("proposed", "approved", "running")
+# Undo and "until the tests pass" need an arm of version 3; an older one would take the first as
+# a prompt for Claude and run the second only once.
+NEW_KINDS_VERSION = 3
+TESTS_GOAL = re.compile(
+    r"(?i)\bat[eé]\s+(?:que\s+)?(?:(?:todos\s+)?os?\s+)?testes?\s+pass\w*"
+    r"|\bat[eé]\s+passar(?:em)?\s+(?:n[oa]s?\s+|em\s+)?(?:(?:todos\s+)?os?\s+)?testes?\b"
+)
+MAX_CHANGED_SHOWN = 30
 
 
 class ArmError(ValueError):
@@ -84,6 +97,18 @@ def device_for_token(session: Session, token: str) -> ArmDevice | None:
 def online(device: ArmDevice, now: datetime | None = None) -> bool:
     seen = _utc(device.last_seen_at)
     return seen is not None and (now or _now()) - seen < ONLINE_WINDOW
+
+
+def wants_tests(prompt: str) -> bool:
+    return TESTS_GOAL.search(prompt) is not None
+
+
+def _version(device: ArmDevice) -> int:
+    return int(device.version) if device.version.isdigit() else 0
+
+
+def can_do_new_kinds(device: ArmDevice) -> bool:
+    return _version(device) >= NEW_KINDS_VERSION
 
 
 def beats_while_working(device: ArmDevice) -> bool:
@@ -139,6 +164,9 @@ def request(
 ) -> ArmTask:
     """The owner asked: that request is the approval."""
     project, prompt = _validated(project, prompt)
+    until = wants_tests(prompt)
+    if until:
+        _needs_new_arm(session, owner_id, "Para ir até os testes passarem")
     now = _now()
     task = ArmTask(
         owner_user_id=owner_id,
@@ -147,6 +175,7 @@ def request(
         prompt=prompt,
         status="approved",
         requested_by="owner",
+        until_tests=until,
         resume_session=(resume_session or None),
         result="",
         error="",
@@ -176,6 +205,7 @@ def propose(
         prompt=prompt,
         status="proposed",
         requested_by="agent",
+        until_tests=wants_tests(prompt),
         result="",
         error="",
     )
@@ -191,6 +221,56 @@ def propose(
         url="/?mac=1",
         tag=f"visao-arm-{task.id}",
     )
+    return task
+
+
+def _needs_new_arm(session: Session, owner_id: uuid.UUID, what: str) -> None:
+    devices = session.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == owner_id)).all()
+    if devices and not any(can_do_new_kinds(d) for d in devices):
+        raise ArmError(f"{what}, atualize o braço no Mac: bash arm/instalar-mac.sh")
+
+
+def can_undo(task: ArmTask) -> bool:
+    return (
+        task.kind == "work"
+        and task.snapshot
+        and task.undone_at is None
+        and task.status in ("done", "failed")
+        and bool(task.changed_files)
+    )
+
+
+def undo(session: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> ArmTask:
+    """The tap on Desfazer is the approval. One undo per task, and only of a task whose photos
+    the arm kept (version 3)."""
+    original = _owned(session, owner_id, task_id)
+    if not can_undo(original):
+        raise ArmError("Essa tarefa não tem o que desfazer.")
+    waiting = session.scalar(
+        select(ArmTask.id).where(
+            ArmTask.undo_of == original.id, ArmTask.status.in_(("approved", "running"))
+        )
+    )
+    if waiting is not None:
+        raise ArmError("Já pedi para desfazer essa tarefa.")
+    _needs_new_arm(session, owner_id, "Para desfazer")
+    now = _now()
+    task = ArmTask(
+        owner_user_id=owner_id,
+        conversation_id=original.conversation_id,
+        project=original.project,
+        prompt=f"Desfazer: {_clip(original.prompt, 200)}",
+        status="approved",
+        requested_by="owner",
+        kind="undo",
+        undo_of=original.id,
+        result="",
+        error="",
+        created_at=now,
+        approved_at=now,
+    )
+    session.add(task)
+    session.flush()
     return task
 
 
@@ -242,12 +322,12 @@ def expire_stale(session: Session, owner_id: uuid.UUID, now: datetime | None = N
 def claim(session: Session, device: ArmDevice) -> ArmTask | None:
     """The oldest approved task of this device's owner, marked running for this device. The
     conditional update means two arms polling at once never get the same task."""
-    candidate = session.scalar(
-        select(ArmTask)
-        .where(ArmTask.owner_user_id == device.owner_user_id, ArmTask.status == "approved")
-        .order_by(ArmTask.approved_at)
-        .limit(1)
+    query = select(ArmTask).where(
+        ArmTask.owner_user_id == device.owner_user_id, ArmTask.status == "approved"
     )
+    if not can_do_new_kinds(device):
+        query = query.where(ArmTask.kind == "work", ArmTask.until_tests.is_(False))
+    candidate = session.scalar(query.order_by(ArmTask.approved_at).limit(1))
     if candidate is None:
         return None
     taken = session.execute(
@@ -262,14 +342,59 @@ def claim(session: Session, device: ArmDevice) -> ArmTask | None:
     return candidate
 
 
+_FILE_WORDS = {"A": "novo", "M": "mudou", "D": "apagado"}
+
+
+def _files_line(task: ArmTask) -> str:
+    """What the arm measured, in the task's own words: the agent and the owner see the same."""
+    files = task.changed_files or []
+    if task.kind == "undo":
+        if task.status != "done" or not files:
+            return ""
+    elif not task.snapshot:
+        return ""
+    if not files:
+        return "Nenhum arquivo mudou (conferido pelo braço)."
+    shown = [
+        f"- `{f.get('path', '')}` ({_FILE_WORDS.get(f.get('status', ''), '?')})" for f in files
+    ]
+    more = len(shown) - MAX_CHANGED_SHOWN
+    lines = shown[:MAX_CHANGED_SHOWN] + ([f"- e mais {more}"] if more > 0 else [])
+    head = (
+        "Arquivos que voltaram:"
+        if task.kind == "undo"
+        else "Arquivos mudados (conferido pelo braço):"
+    )
+    return head + "\n" + "\n".join(lines)
+
+
+def _tests_line(task: ArmTask) -> str:
+    report = task.tests or {}
+    if not report:
+        return ""
+    command, attempts = report.get("command", "?"), int(report.get("attempts") or 0)
+    if report.get("passed"):
+        where = "de primeira" if attempts <= 1 else f"na {attempts}ª tentativa"
+        return f"Testes (`{command}`): passaram {where}."
+    if report.get("error"):
+        return f"Testes (`{command}`): {report['error']}"
+    tail = str(report.get("tail") or "").strip()[-1500:]
+    line = f"Testes (`{command}`): não passaram depois de {attempts} tentativa(s)."
+    return f"{line}\n\n```\n{tail}\n```" if tail else line
+
+
 def _summary(task: ArmTask) -> str:
+    undo = task.kind == "undo"
     if task.status == "done":
-        head = f"Terminei no Mac, em **{task.project}**."
+        head = f"{'Desfiz' if undo else 'Terminei'} no Mac, em **{task.project}**."
         body = task.result.strip() or "Sem nada a relatar."
     else:
-        head = f"Não deu certo no Mac, em **{task.project}**."
+        head = f"Não {'consegui desfazer' if undo else 'deu certo'} no Mac, em **{task.project}**."
         body = task.error or "Erro sem detalhe."
-    return f"{head}\n\n{body}"[:MAX_RESULT]
+        if task.result.strip() and not undo:
+            body += "\n\n" + task.result.strip()
+    parts = [head, body, _tests_line(task), _files_line(task)]
+    return "\n\n".join(p for p in parts if p)[:MAX_RESULT]
 
 
 def finish(
@@ -282,6 +407,9 @@ def finish(
     error: str = "",
     cost_usd: Decimal | None = None,
     claude_session_id: str | None = None,
+    changed: list[dict[str, str]] | None = None,
+    snapshot: bool = False,
+    tests: dict | None = None,
 ) -> ArmTask:
     task = session.get(ArmTask, task_id)
     if task is None or task.device_id != device.id:
@@ -298,6 +426,17 @@ def finish(
     task.cost_usd = cost_usd
     task.claude_session_id = (claude_session_id or None) and claude_session_id[:128]
     task.finished_at = now
+    task.snapshot = bool(snapshot) and task.kind == "work"
+    task.changed_files = [
+        {"path": str(c.get("path", ""))[:500], "status": str(c.get("status", ""))[:1]}
+        for c in (changed or [])
+        if isinstance(c, dict) and c.get("path")
+    ] or ([] if snapshot or task.kind == "undo" else None)
+    task.tests = tests if isinstance(tests, dict) else None
+    if task.kind == "undo" and ok and task.undo_of is not None:
+        original = session.get(ArmTask, task.undo_of)
+        if original is not None and original.owner_user_id == task.owner_user_id:
+            original.undone_at = now
     text = _summary(task)
     if task.conversation_id is not None:
         conversation = session.get(Conversation, task.conversation_id)
@@ -315,7 +454,9 @@ def finish(
     push.send_to_owner(
         session,
         task.owner_user_id,
-        title="Terminei no Mac" if ok else "Não deu certo no Mac",
+        title=("Desfiz no Mac" if task.kind == "undo" else "Terminei no Mac")
+        if ok
+        else "Não deu certo no Mac",
         body=text,
         url=f"/?c={task.conversation_id}" if task.conversation_id else "/?mac=1",
         tag=f"visao-arm-{task.id}",
@@ -405,5 +546,11 @@ def work_record(
             line += f". Resultado devolvido pelo Claude Code: {result}"
         elif task.status == "failed" and task.error:
             line += f". Erro: {_clip(task.error, 200)}"
+        if task.snapshot:
+            line += f". Arquivos mudados, conferidos pelo braço: {len(task.changed_files or [])}"
+        if task.tests:
+            line += f". {_clip(_tests_line(task).split(chr(10))[0], 200)}"
+        if task.undone_at:
+            line += f". Desfeita pelo dono às {local(task.undone_at)}"
         lines.append(line + ".")
     return "\n".join(lines)

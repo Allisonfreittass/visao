@@ -119,7 +119,9 @@ class Capabilities:
             items.append(
                 "pedir trabalho ao Claude Code no Mac do interlocutor, só nos projetos "
                 + ", ".join(self.mac_projects)
-                + "; o que eu proponho só roda depois da aprovação dele"
+                + "; o que eu proponho só roda depois da aprovação dele; o braço confere quais "
+                'arquivos cada tarefa mudou e ele pode desfazer na página Mac; com "até os '
+                'testes passarem" no pedido, o braço repete até o comando de testes do Mac passar'
             )
         if self.continuous:
             items.append(

@@ -40,8 +40,17 @@ reinicia. Os três apanharam disso em produção e têm regras claras para cada 
 - **F4 e F5** (braço versão 2): `tests/unit/test_braco.py` e `tests/integration/test_arm.py`.
   - Os flags do Claude Code foram conferidos de verdade com a versão 2.1.330.
   - Para valer no Mac, é preciso rodar `arm/instalar-mac.sh` de novo.
-  - Continua em aberto: "editar + comando liberado" e os processos que sobram no timeout
-    (veja [BRACO.md](../BRACO.md)).
+- **Braço versão 3** (também em 23/11/2026, mesmos arquivos de teste):
+  - "Editar + comando liberado": todo `Bash` da tarefa roda no sandbox do Claude Code, que não
+    roda nada se não subir. Comando exato não resolvia, porque o código que ele roda foi a própria
+    tarefa que escreveu.
+  - Processos que sobram: cada tarefa roda num grupo de processos só dela, e o grupo inteiro
+    acaba junto com a tarefa.
+  - Do item 14, entrou o desfazer, com foto antes e depois e a lista de arquivos medida pelo
+    braço. Os perfis `olhar`/`mexer`, o fechamento e o "recusar com ajuste" continuam em aberto.
+  - Do item 19, entrou só o critério `testes_do_braco_passam`, como "até os testes passarem" no
+    pedido.
+  - Veja [BRACO.md](../BRACO.md), itens 8 a 10.
 
 | # | O que pode acontecer | Onde | Ideia de |
 |---|---|---|---|
