@@ -126,6 +126,14 @@ class Capabilities:
                 'arquivos cada tarefa mudou e ele pode desfazer na página Mac; com "até os '
                 'testes passarem" no pedido, o braço repete até o comando de testes do Mac passar'
             )
+            items.append(
+                "codar no Mac sem o Claude Code, quando o braco.json do Mac escolhe o executor do "
+                "próprio Visão: a cada passo o servidor pede a próxima ação a um modelo da "
+                "corrente (só Claude ou OpenAI leem o código do interlocutor, nunca o Gemini "
+                "grátis) e o braço executa uma ferramenta fechada (ler, listar, buscar, editar um "
+                "trecho, criar arquivo, rodar os testes do Mac, git status e git diff); sem "
+                "shell, sem rede, sem .env nem chaves, com limite de passos e de custo por tarefa"
+            )
         if self.continuous:
             items.append(
                 "lembrar desta conversa contínua inteira: a conversa com o interlocutor é uma só, "

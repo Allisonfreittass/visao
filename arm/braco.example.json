@@ -7,6 +7,7 @@
       "testes": "make check"
     }
   },
+  "executor": "claude_code",
   "claude": "claude",
   "max_turns": 30,
   "max_budget_usd": 2.0,

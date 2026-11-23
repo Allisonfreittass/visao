@@ -18,8 +18,9 @@ celular ──HTTPS──> Visão (servidor) <──HTTPS, de dentro pra fora─
 
 - **Nenhuma porta aberta em casa.** O braço só faz requisições de saída para o servidor, como um
   navegador. Funciona atrás de CGNAT, no Wi-Fi de qualquer lugar e com o Mac em qualquer rede.
-- **O Visão não ganha um terminal.** Ele pede; quem trabalha é o Claude Code, com uma lista
-  fechada de ferramentas, dentro de um projeto da lista que você escreveu no Mac.
+- **O Visão não ganha um terminal.** Ele pede; quem trabalha é o Claude Code (ou, se você
+  escolher, o executor do próprio braço, item 11), com uma lista fechada de ferramentas, dentro
+  de um projeto da lista que você escreveu no Mac.
 
 ## Por que é feito assim (o risco que isso evita)
 
@@ -109,9 +110,55 @@ guarda suas chaves. Por isso:
     - O máximo é `test_attempts` tentativas (3 por padrão). Cada rodada dos testes tem limite de
       `test_timeout_minutes` (10 por padrão).
     - Os testes rodam dentro de um sandbox do macOS (`sandbox-exec`), com os mesmos limites do
-      item 8, mas com rede liberada para o próprio Mac (`localhost`). Fora do macOS eles não rodam.
+      item 8, mas com rede liberada para o próprio Mac (`localhost`). Desde a versão 4, eles
+      também não gravam em `.git`, `.claude`, `.mcp.json` nem `CLAUDE.md`, e no Linux rodam no
+      `bubblewrap`, sem rede nenhuma. Sem nenhum dos dois, eles não rodam.
     - Desfazer e "até os testes passarem" só vão para braços da versão 3. Um braço antigo trataria
       o desfazer como um pedido ao Claude.
+
+11. **Executor do próprio Visão, com qualquer modelo da corrente** (versão 4,
+    [ADR-0023](decisions/0023-executor-de-codigo-proprio.md)).
+    - No `braco.json`, `"executor": "visao"` (para o Mac inteiro, ou dentro de um projeto) troca
+      o Claude Code pelo executor do braço. O padrão continua `"claude_code"`.
+    - O ciclo roda no Mac e a cabeça no servidor. A cada passo, o braço manda ao servidor o
+      pedido e o que aconteceu até ali, e recebe uma ação. O servidor chama o modelo pela corrente
+      de sempre, com o propósito `arm_code`: orçamento, fallback, tetos pagos e uma linha em
+      `ModelUsage` por passo. As chaves nunca vão para o Mac, e o servidor não guarda o código.
+    - **Só Claude e OpenAI leem o seu código.** O Gemini grátis pode usar o que recebe para
+      treinar, inclusive repositório privado, e por isso fica fora, nem como último recurso. Se
+      os dois falharem, a tarefa para e avisa. Escolha sua, em 23/11/2026.
+    - O modelo só escolhe uma entre estas ferramentas, e quem as executa e confere é o braço:
+      `ler`, `listar`, `buscar` (texto literal), `editar` (um trecho que aparece uma vez),
+      `criar` (só arquivo novo), `rodar_testes` (o comando do `braco.json`), `git_status`,
+      `git_diff` e `terminar`. Não há shell nem rede.
+    - O braço recusa, qualquer que seja o pedido:
+      - caminho fora do projeto, absoluto, com `..` ou por symlink;
+      - `.git`, `.claude`, `.mcp.json` e `CLAUDE.md`;
+      - arquivos de segredo, para ler e para gravar: `.env` e `.env.*` (menos os de exemplo),
+        `*.pem`, `*.key`, chaves SSH, `.netrc`, `.npmrc` e `.pypirc`. Escolha sua: o que é lido
+        vai para o provedor.
+    - Testes e git rodam no sandbox do próprio braço (item 10). O git roda sem hooks, sem
+      fsmonitor, sem diff externo e sem mostrar arquivos de segredo.
+    - Para modelos baratos errarem menos (estudo do Goose, OpenClaw, Hermes e Grok Build):
+      - a edição tolera espaço no fim da linha, aspas curvas e recuo diferente, e devolve o diff;
+      - quando o trecho não bate, o erro mostra as linhas mais parecidas;
+      - o servidor conserta nomes e argumentos de outros agentes e lê o `<tool_call>` do Qwen;
+      - a mesma chamada pela 3ª vez seguida volta como erro;
+      - quem mudou arquivos sem rodar os testes ouve "rode os testes" antes de terminar (no
+        máximo 2 vezes);
+      - o prompt é montado para o cache (Anthropic e OpenAI).
+    - Antes de virar o padrão, o plano é medir com tarefas reais contra o Claude Code (ADR-0023,
+      "Próximos passos").
+    - O que as ferramentas devolvem vai ao modelo marcado como dado, nunca como instrução. Mas a
+      proteção é a recusa: mesmo um modelo que obedeça a um texto escondido num arquivo só
+      consegue pedir o que está na lista.
+    - Limites: os passos (`max_turns`) e o tempo do `braco.json`, e no servidor o menor entre o
+      `braco.json` e 20 passos / US$ 0,50 por tarefa (`VISION_ARM_CODE_MAX_STEPS`,
+      `VISION_ARM_CODE_MAX_USD`). Na produção, o teto é de 40 chamadas por hora, divididas com a
+      conversa.
+    - O custo que aparece na tarefa é o que o servidor somou. Foto, desfazer e "até os testes
+      passarem" funcionam igual. No resultado aparece "Feito pelo executor do Visão, em N passos".
+    - Ainda não visto rodando no Mac: os testes passaram no Linux, com o `bubblewrap` de verdade.
 
    **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
    `braco.json` é mantido.
@@ -136,6 +183,18 @@ Autenticação: o braço usa o login do Claude Code no Mac (sua assinatura) ou `
 se você preferir pagar por uso. A documentação do Agent SDK pede chave de API para produtos de
 terceiros; para uso pessoal seu, no seu Mac, o login comum é o caminho mais simples. Confirme os
 termos se um dia isso for oferecido a outras pessoas.
+
+## Como roda o executor do Visão
+
+`"executor": "visao"` no `braco.json`. O braço tira a foto de antes e, a cada passo, chama
+`POST /api/arm/device/tasks/{id}/step` com as ferramentas liberadas, os passos feitos e os seus
+limites. O servidor responde com `action` (`{"tool", "args"}`), `invalid` (a resposta do modelo
+não era uma ação válida: volta para ele como erro e gasta um passo) ou `stop` (limite de passos
+ou de custo, nenhum provedor permitido, o modelo falhou). Quando chega `terminar`, o braço tira a
+foto de depois e manda o resultado com `"executor": "visao"`.
+
+As ferramentas vão nativas para a Anthropic e a OpenAI. Os outros provedores recebem o mesmo
+catálogo no prompt, como protocolo de ação em JSON.
 
 ## Primeira versão (feita)
 

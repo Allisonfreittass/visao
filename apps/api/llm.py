@@ -67,6 +67,13 @@ def get_llm_provider() -> LLMProvider | None:
     return with_brain(settings, build_llm_provider(settings, fast=True))
 
 
+@lru_cache
+def get_code_provider() -> LLMProvider | None:
+    """The arm's own executor (ADR-0023): the background chain, only with the providers allowed
+    to read the owner's code. None when none of them is configured."""
+    return build_llm_provider(get_settings(), only=llm_routing.CODE_KINDS)
+
+
 def with_brain(
     settings: Settings,
     cloud: LLMProvider | None,
@@ -187,10 +194,12 @@ def build_llm_provider(
     budget_guard: BudgetGuard | None = None,
     fast: bool = False,
     session_factory=None,
+    only: tuple[llm_routing.Kind, ...] | None = None,
 ) -> LLMProvider | None:
     """Returns None unless every primary setting, prices included, is present. A fully
     configured fallback is chained after the primary; a partial one is ignored with a warning.
-    With more than one provider, the owner's switch may reorder them per task (ADR-0022)."""
+    With more than one provider, the owner's switch may reorder them per task (ADR-0022).
+    `only`: the kinds allowed in this chain; the others are left out of it entirely."""
     if missing_llm_settings(settings):
         return None
     factory = session_factory or _session_factory
@@ -217,6 +226,9 @@ def build_llm_provider(
         name = getattr(settings, f"{prefix}provider_name")
         base_url = getattr(settings, f"{prefix}base_url")
         api_key = getattr(settings, f"{prefix}api_key")
+        kind = llm_routing.provider_kind(name, base_url)
+        if only is not None and kind not in only:
+            continue
         raw = _openai_compatible(
             settings,
             name,
@@ -238,7 +250,9 @@ def build_llm_provider(
                 getattr(settings, f"{prefix}max_request_tokens"),
             )
         )
-        kinds.append(llm_routing.provider_kind(name, base_url))
+        kinds.append(kind)
+    if not chain:
+        return None
     if len(chain) == 1:
         return chain[0]
     return FallbackLLMProvider(
