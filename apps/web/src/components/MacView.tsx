@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-import { type Api, type ArmDevice, utcDate } from "../api";
+import { type Api, type ArmDevice, type ArmTask, utcDate } from "../api";
+import { taskDetail, undoQuestion } from "../arm";
 import type { Pending } from "../hooks/usePending";
 import { dayLabel, TASK_STATUS } from "../labels";
 
@@ -33,6 +34,12 @@ export function MacView({ api, pending, onError }: MacViewProps) {
   async function unpair(device: ArmDevice) {
     if (!window.confirm(`Desconectar ${device.name}? O braço dele para na hora.`)) return;
     await api.unpairArm(device.id).catch(onError);
+    pending.refresh();
+  }
+
+  async function undo(task: ArmTask) {
+    if (!window.confirm(undoQuestion(task))) return;
+    await api.undoArm(task.id).catch(onError);
     pending.refresh();
   }
 
@@ -90,16 +97,23 @@ export function MacView({ api, pending, onError }: MacViewProps) {
           <h2 className="rotulo">O que eu fiz lá</h2>
           {history.length === 0 && <p className="note">Nada ainda.</p>}
           <ul className="task-list">
-            {history.map((t) => (
-              <li key={t.id} className={`task task--${t.status}`}>
-                <span className="task-status">{TASK_STATUS[t.status] ?? t.status}</span>
-                <span className="task-what"><b>{t.project}</b> {t.prompt}</span>
-                <time className="panel-time">{dayLabel(utcDate(t.finished_at ?? t.created_at))}</time>
-                {t.status === "approved" && (
-                  <button type="button" className="link-button" onClick={() => void pending.decideArm(t, "reject")}>cancelar</button>
-                )}
-              </li>
-            ))}
+            {history.map((t) => {
+              const detail = taskDetail(t);
+              return (
+                <li key={t.id} className={`task task--${t.status}`}>
+                  <span className="task-status">{TASK_STATUS[t.status] ?? t.status}</span>
+                  <span className="task-what"><b>{t.project}</b> {t.prompt}</span>
+                  <time className="panel-time">{dayLabel(utcDate(t.finished_at ?? t.created_at))}</time>
+                  {detail && <span className="task-detail">{detail}</span>}
+                  {t.status === "approved" && (
+                    <button type="button" className="link-button" onClick={() => void pending.decideArm(t, "reject")}>cancelar</button>
+                  )}
+                  {t.can_undo && (
+                    <button type="button" className="link-button" onClick={() => void undo(t)}>desfazer</button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>

@@ -30,7 +30,7 @@ export function checkedLabel(panel: Pick<Panel, "checked_at" | "checked_today">)
 }
 
 /** What is already known about a panel: the total, or the sum of the prices it has with what is
- * still missing ("R$ 164 + voo"); the amber tag for what is pending; whether data is missing. */
+ * still missing ("R$ 164 + voo"); a grey tag for what is pending; whether data is missing. */
 export function panelKnown(panel: Pick<Panel, "total" | "items">): { amount: string; tag: string | null; missingData: boolean } {
   if (panel.items.length === 0) return { amount: "—", tag: "Faltam dados", missingData: true };
   const total = brl(panel.total);
@@ -82,7 +82,7 @@ function PanelCard({ api, panel, onChanged, onDraft }: { api: Api; panel: Panel;
         <span className="live-panel-top">
           <span className="live-panel-icon" aria-hidden="true"><Icon name={flight ? "plane" : hotel ? "bed" : "coin"} size={18} /></span>
           <h3>{panel.title}</h3>
-          {panel.status === "paused" ? <span className="tag">Pausado</span> : known.tag && <span className="tag tag--amber">{known.tag}</span>}
+          {panel.status === "paused" ? <span className="tag">Pausado</span> : known.tag && <span className="tag">{known.tag}</span>}
         </span>
         <span className="live-panel-total" key={panel.total ?? "x"}>{known.amount}</span>
         {panel.spec.travelers && panel.spec.travelers > 1 && <span className="live-panel-sub">total para {panel.spec.travelers}</span>}

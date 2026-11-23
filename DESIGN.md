@@ -40,7 +40,9 @@ Regras:
 
 - Botão primário é **papel com texto tinta**. Nunca vermelho, nunca âmbar sólido em "Aprovar":
   aprovar é calmo.
-- Âmbar aparece no máximo em **um** bloco por tela além do olho (ex.: o cartão de pedido).
+- Âmbar é dele: o anel e o olho (presença), o filete da fala dele e o cartão de pedido. Nunca de
+  fundo, nunca em texto da interface, nunca decorativo.
+- A gênese conta como presença: o ponto do peito, as faíscas e o lampejo da falha são dele.
 - Sem degradê em botão, cartão ou fundo. O único degradê permitido é o da revelação do Muninn
   (papel → cinza, de cima para baixo).
 - Verde só para "conectado" (ponto de 6 px). Erro usa texto, não cor de fundo.

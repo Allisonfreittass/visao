@@ -54,7 +54,7 @@ const WORD = "V.I.S.A.O.";
 /** The opening (≈2.4 s), a short genesis of Muninn (DESIGN.md §6, T_CURTA): the amber dot at the
  * chest, the strokes growing out of it, the illustration and its eye, the ring closing from the
  * gap and the gap's flash, all by 1.45 s; then Muninn slides left and the name is typed beside
- * it, the last dot amber, and the lockup flies to the side bar's logo as the app shows through.
+ * it, and the lockup flies to the side bar's logo as the app shows through.
  * A click or a key skips it. */
 export function Intro({ onDone }: { onDone: () => void }) {
   const root = useRef<HTMLDivElement>(null);
@@ -78,7 +78,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
 
     // 1–3. The genesis plays by itself in the canvas (Genesis, T_CURTA).
 
-    // 4. Muninn slides left and the name is typed, 40 ms a letter; the last dot is amber.
+    // 4. Muninn slides left and the name is typed, 40 ms a letter.
     const lockup = q<HTMLElement>(".intro-lockup");
     const word = q<HTMLElement>(".intro-word");
     const shift = word ? (word.offsetWidth + 20) / 2 : 0;

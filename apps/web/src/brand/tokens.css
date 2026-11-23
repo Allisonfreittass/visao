@@ -78,8 +78,8 @@
   --text-muted: var(--cinza);
   --success: var(--text-2);
   --danger: var(--vermelho-erro);
-  --warning: var(--ambar);
-  --warning-bg: color-mix(in srgb, var(--ambar) 14%, var(--tinta));
+  /* Avisos falam em texto, na cor do texto: âmbar é só dele (DESIGN.md §2). */
+  --warning: var(--text);
   --shadow-card: none;
   --shadow-float: none;
   --scrim: rgb(0 0 0 / .6);
@@ -110,13 +110,12 @@
   --accent: var(--tinta);
   --accent-hover: #000000;
   --on-accent: var(--papel);
-  --accent-text: var(--ambar-fundo);
+  --accent-text: var(--text-2);
   --accent-strong: var(--tinta);
   --accent-soft: color-mix(in srgb, var(--tinta) 8%, transparent);
   --success: var(--text-2);
   --danger: #B3261E;
-  --warning: var(--ambar-fundo);
-  --warning-bg: color-mix(in srgb, var(--ambar) 18%, var(--papel));
+  --warning: var(--text);
   --shadow-card: none;
   --shadow-float: none;
   --scrim: rgb(16 18 20 / .32);

@@ -7,7 +7,6 @@
 .intro-word { font: 500 44px/1 var(--font-mono); letter-spacing: var(--tracking-mono); color: var(--text); white-space: nowrap; }
 .intro-word > span { opacity: 0; }
 .intro-word b { color: var(--text-muted); font-weight: 500; }
-.intro-word > span:last-child b { color: var(--ambar); }
 @media (max-width: 560px) { .intro-hero { width: 132px; height: 132px; } .intro-word { font-size: 28px; } .intro-lockup { gap: 14px; } }
 @media (max-width: 359px) { .intro-hero { width: 112px; height: 112px; } .intro-word { font-size: 24px; } }
 @media (prefers-reduced-motion: reduce) { .intro { display: none; } }

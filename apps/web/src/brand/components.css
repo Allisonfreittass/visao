@@ -25,7 +25,7 @@
 .rs-mensagem p { grid-column: 2; margin: 0; font: 400 15px/1.55 var(--font-sans); color: var(--text-muted); }
 .rs-mensagem i { font-style: normal; font: 500 14px/1.5 var(--font-sans); }
 .rs-mensagem--sucesso b, .rs-mensagem--sucesso i { color: var(--success); }
-.rs-mensagem--aviso b, .rs-mensagem--aviso i { color: var(--warning); }
+.rs-mensagem--aviso b, .rs-mensagem--aviso i { color: var(--text); }
 .rs-mensagem--erro b, .rs-mensagem--erro i { color: var(--danger); }
 .rs-mensagem--info b, .rs-mensagem--info i { color: var(--text-2); }
 

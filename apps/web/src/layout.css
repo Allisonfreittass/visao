@@ -33,9 +33,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .lockup { display: inline-flex; align-items: center; gap: 10px; color: var(--text); }
 .lockup .anel { flex: none; }
 .lockup-word { font: 500 19px/1 var(--font-mono); letter-spacing: var(--tracking-mono); white-space: nowrap; }
-/* Os pontos em cinza; só o último aceso em âmbar, como o ponto do anel. */
 .lockup-word b { color: var(--text-muted); font-weight: 500; }
-.lockup-word b:last-child { color: var(--ambar); }
 
 /* ---------- Barra lateral ---------- */
 .rail { display: flex; flex: 0 0 248px; width: 248px; flex-direction: column; gap: var(--space-5); padding: var(--space-5) var(--space-3) var(--space-4);
@@ -48,12 +46,12 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .rail-nav button[aria-current] { background: var(--surface-2); color: var(--text); font-weight: 500; box-shadow: none; }
 .rail-nav .icon { flex-shrink: 0; color: currentColor; }
 .rail-badge { margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-pill);
-  background: var(--warning-bg); color: var(--ambar); font: 500 12px/1 var(--font-sans); }
+  background: var(--grafite); color: var(--papel); font: 500 12px/1 var(--font-sans); box-shadow: inset 0 0 0 1px var(--linha); }
 .rail-dot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
 .rail-dot.on { background: var(--success); }
 .rail-preparing { padding: 0 12px; font-size: 13px; }
 .rail-bottom { margin-top: auto; display: grid; gap: var(--space-3); padding: 0; }
-.rail-offline { margin: 0; padding: 0 12px; font: 500 13px/1.4 var(--font-sans); color: var(--ambar); }
+.rail-offline { margin: 0; padding: 0 12px; font: 500 13px/1.4 var(--font-sans); color: var(--text); }
 .rail-section { display: grid; gap: 4px; }
 .rail-heading { margin: 0; padding: 0 12px 4px; font: 500 12px/1.4 var(--font-sans); color: var(--text-muted); }
 .rail-integrations { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -76,7 +74,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .mobile-bar-button { position: relative; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border);
   border-radius: 50%; background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
 .mobile-bar-badge { position: absolute; top: -2px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--radius-pill); background: var(--ambar); color: var(--tinta); font: 500 11px/1 var(--font-sans); }
+  border-radius: var(--radius-pill); background: var(--grafite); color: var(--papel); font: 500 11px/1 var(--font-sans); box-shadow: 0 0 0 1px var(--linha); }
 .mobile-bar-brand { min-height: 44px; padding: 0 8px; border: 0; background: transparent; border-radius: var(--radius-chip); }
 .mobile-bar-avatar { width: 44px; height: 44px; padding: 0; border: 0; }
 .mobile-bar-avatar[aria-current] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--border-strong); }
@@ -250,7 +248,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .project-head { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-card); }
 
 /* Cartões de passo e de pedido (Mac, email, agenda): claros, com o mini-personagem. */
-.action-card { gap: 10px; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
+.action-card { gap: 10px; padding: var(--space-4); border: 1px solid var(--ambar); border-radius: var(--radius-card); background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
 .action-card-label { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1.3 var(--font-sans); color: var(--text-muted); letter-spacing: 0; }
 .action-card-detail { background: var(--surface-2); color: var(--text); }
 .action-card-no { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
@@ -301,7 +299,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .call-name { font: 300 44px/1.08 var(--font-display); }
 .call-state, .call-engine { font: 500 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .call-transcript span { font: 500 12px/1.4 var(--font-sans); color: var(--text-muted); }
-.call-ask { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow-float); }
+.call-ask { background: var(--surface); color: var(--text); border: 1px solid var(--ambar); box-shadow: var(--shadow-float); }
 .call-ask-label, .call-ask-voice { color: var(--text-muted); }
 .call-ask-detail { background: var(--surface-2); color: var(--text); }
 .call-ask-no { border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
@@ -320,7 +318,6 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 
 /* ---------- Sentinela: etiquetas, cards de painel, rótulos do chat, cartões de passo ---------- */
 .tag { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--text-muted); font: 500 12px/1 var(--font-sans); white-space: nowrap; }
-.tag--amber { background: var(--warning-bg); color: var(--ambar); }
 .tag--green { color: var(--success); }
 .live-panel-top { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .live-panel-icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-chip); background: var(--surface-2); color: var(--text-2); }
@@ -332,7 +329,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .home-greeting em { white-space: nowrap; }
 .home-summary { font: 500 15px/1.45 var(--font-sans); }
 .message-label { font: 500 13px/1.3 var(--font-sans); color: var(--text-muted); }
-.message-label--working { color: var(--ambar); }
+.message-label--working { color: var(--text); }
 .step-cards { display: grid; gap: 8px; margin: 2px 0 10px 46px; padding: 0; list-style: none; }
 .step-card { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-input); background: var(--surface); }
 .step-card-text { min-width: 0; display: grid; gap: 2px; font: 500 14px/1.3 var(--font-sans); color: var(--text); }

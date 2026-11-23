@@ -222,6 +222,29 @@ export interface ArmTask {
   conversation_id: string | null;
   created_at: string;
   finished_at: string | null;
+  /** work: Claude Code did it; undo: the arm put back what `undo_of` changed. */
+  kind: "work" | "undo";
+  undo_of: string | null;
+  until_tests: boolean;
+  /** Measured by the arm's photos before and after, not told by Claude. */
+  changed_files: ArmChangedFile[] | null;
+  tests: ArmTests | null;
+  undone_at: string | null;
+  can_undo: boolean;
+}
+
+export interface ArmChangedFile {
+  path: string;
+  /** A added, M changed, D deleted */
+  status: "A" | "M" | "D";
+}
+
+export interface ArmTests {
+  command: string;
+  passed: boolean;
+  attempts: number;
+  tail?: string;
+  error?: string;
 }
 
 export interface PushDelivery {
@@ -772,6 +795,11 @@ export class Api {
   /** `via: "voz"`: said in a call after it read the task aloud; the server records it. */
   decideArm(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<ArmTask> {
     return this.request(`/arm/tasks/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  }
+
+  /** The tap is the approval: the arm puts the files back without Claude. */
+  undoArm(id: string): Promise<ArmTask> {
+    return this.request(`/arm/tasks/${encodeURIComponent(id)}/undo`, { method: "POST" });
   }
 
   /** Which model the Visão thinks with, and whether the Mac offers a local one now. */
