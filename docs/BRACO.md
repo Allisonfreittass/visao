@@ -41,11 +41,46 @@ guarda suas chaves. Por isso:
    e tempo (o braço interrompe com SIGINT e depois SIGTERM).
 5. **Token do aparelho revogável.** O braço se identifica com um token próprio, guardado só como
    hash no servidor. Apagar o aparelho na interface corta o braço na hora.
+6. **Uma tarefa não muda o que vale para as próximas** (desde 23/11/2026, braço versão 2).
+   - O Claude Code roda isolado, com `--restricted --strict-mcp-config --tools …`:
+     - ignora as configurações do projeto (`.claude/`) e as suas;
+     - não carrega servidores MCP;
+     - prende as ferramentas de arquivo à pasta do projeto;
+     - não deixa gravar arquivos de configuração e de git sem uma pessoa aprovar.
+   - Num Claude Code mais antigo, sem `--restricted`, o braço usa `--setting-sources user` com os
+     hooks desligados e `--strict-mcp-config`. Sem nenhuma das duas opções, ele não roda nada e
+     pede `claude update`.
+   - Além disso, editar ou criar `.claude/**`, `.mcp.json`, `CLAUDE.md`, `CLAUDE.local.md` e
+     `.git/**` fica sempre negado, mesmo que o `braco.json` libere.
+   - Conferido de verdade em 23/11/2026 com o Claude Code 2.1.330: o pedido de criar
+     `.claude/settings.local.json` foi negado, e o `nota.txt` do mesmo pedido foi criado.
+7. **O resultado não se perde.**
+   - O braço grava o resultado em `~/.config/visao/saida/` antes de enviar e só apaga quando o
+     servidor recebe. Se a rede cair, ele reenvia na rodada seguinte; o servidor aceita a
+     repetição sem duplicar a mensagem.
+   - Se o Mac desligar ou o braço reiniciar no meio, a tarefa volta como "interrompida" e
+     **nunca é refeita sozinha**, porque pode ter mexido em arquivos pela metade.
+   - Durante a tarefa, o braço manda sinal de vida a cada minuto dizendo em qual tarefa está.
+     Com isso, um Mac que some faz a tarefa falhar em 10 minutos, e não em 3 horas.
+   - Um resultado que chegue depois disso ainda entra e substitui a falha.
+   - Braços da versão 1 não mandam esse sinal e continuam com o prazo de 3 horas.
+
+   **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
+   `braco.json` é mantido.
+
+**O que ainda não está coberto:**
+- **Editar junto com comando liberado vira código qualquer.** Com `Edit` e
+  `Bash(npm run *)`/`Bash(make test *)` liberados, uma tarefa pode mudar o `package.json` ou o
+  `Makefile` e rodar o que quiser. A solução de verdade é o usuário separado ou o sandbox (fase 3
+  abaixo). Até lá, prefira comandos exatos (`Bash(make test)`) no `braco.json`.
+- **Processos que sobram no timeout.** Quando o braço interrompe uma tarefa por tempo, processos
+  filhos que ela abriu (um servidor de teste, por exemplo) podem continuar rodando.
 
 ## Como roda o Claude Code
 
-O braço chama `claude -p "<pedido>" --output-format json --permission-mode dontAsk
---allowedTools ... --max-turns N --max-budget-usd X` dentro da pasta do projeto e lê do JSON o
+O braço chama `claude -p --restricted --strict-mcp-config --tools … --output-format json
+--permission-mode dontAsk --allowedTools ... --disallowedTools ... --max-turns N
+--max-budget-usd X`, com o pedido pela entrada padrão, dentro da pasta do projeto e lê do JSON o
 resultado (`result`), o custo estimado (`total_cost_usd`) e a sessão (`session_id`). Uma tarefa
 pode continuar a anterior com `--resume <session_id>`.
 

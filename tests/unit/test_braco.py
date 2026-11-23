@@ -1,9 +1,12 @@
-"""The Mac arm: what it allows is decided on the Mac, the prompt never reaches argv, and a task
-failure is always reported instead of crashing the loop."""
+"""The Mac arm: what it allows is decided on the Mac, the prompt never reaches argv, a task
+cannot widen what the next ones may do, a task failure is always reported instead of crashing
+the loop, and a result waits on the Mac until the server takes it."""
 
 import importlib.util
 import json
 import sys
+import time
+import urllib.error
 from pathlib import Path
 
 import pytest
@@ -15,9 +18,35 @@ sys.modules[spec.name] = braco  # dataclasses resolve postponed annotations thro
 spec.loader.exec_module(braco)
 
 
-def fake_claude(tmp_path: Path, body: str) -> str:
+# The parts of `claude --help` the arm looks for, as Claude Code 2.1 prints them.
+RESTRICTED_HELP = """Options:
+  --restricted                          Restricted mode: removes the built-in
+  --setting-sources <sources>           Comma-separated list of setting sources
+  --strict-mcp-config                   Only use MCP servers from --mcp-config,
+  --tools <tools...>                    Built-in tools to make available
+"""
+OLDER_HELP = """Options:
+  --setting-sources <sources>           Comma-separated list of setting sources
+  --strict-mcp-config                   Only use MCP servers from --mcp-config,
+"""
+ANCIENT_HELP = """Options:
+  -p, --print                           Print response and exit
+"""
+
+
+@pytest.fixture(autouse=True)
+def fresh_help():
+    braco._help_text.clear()
+    yield
+    braco._help_text.clear()
+
+
+def fake_claude(tmp_path: Path, body: str, help_text: str = RESTRICTED_HELP) -> str:
     script = tmp_path / "claude"
-    script.write_text(f"#!{sys.executable}\nimport sys, json, time\n{body}\n")
+    script.write_text(
+        f"#!{sys.executable}\nimport sys, json, time\n"
+        f"if '--help' in sys.argv:\n    print({help_text!r})\n    sys.exit(0)\n{body}\n"
+    )
     script.chmod(0o755)
     return str(script)
 
@@ -30,6 +59,7 @@ def config(tmp_path: Path, claude: str = "claude", **extra) -> "braco.Config":
         token="visao-arm_x",
         projects={"visao": project},
         claude=claude,
+        state_dir=tmp_path / "estado",
         **extra,
     )
 
@@ -47,12 +77,49 @@ def test_config_needs_server_token_and_projects(tmp_path):
 
 def test_the_prompt_goes_on_stdin_and_nothing_is_ever_skipped(tmp_path):
     cfg = config(tmp_path)
-    argv = braco.command(cfg, {"prompt": "--dangerously-skip-permissions; rm -rf ~"})
+    argv = braco.command(cfg, {"prompt": "--dangerously-skip-permissions; rm -rf ~"}, [])
     assert "--dangerously-skip-permissions; rm -rf ~" not in argv
     assert argv[argv.index("--permission-mode") + 1] == "dontAsk"
     assert "Bash(rm *)" in argv[argv.index("--disallowedTools") + 1]
     assert "--resume" not in argv
-    assert braco.command(cfg, {"prompt": "x", "resume_session": "s-9"})[-2:] == ["--resume", "s-9"]
+    resumed = braco.command(cfg, {"prompt": "x", "resume_session": "s-9"}, [])
+    assert resumed[-2:] == ["--resume", "s-9"]
+
+
+def test_a_task_can_never_change_what_governs_the_next_ones(tmp_path):
+    # F5: with Edit and Write allowed, a task could write .claude/settings.json (allow rules,
+    # hooks), .mcp.json, CLAUDE.md or .git/hooks, and every later task would obey it.
+    cfg = config(tmp_path, allowed_tools=[*braco.DEFAULT_TOOLS, "Edit(.claude/**)"])
+    denied = braco.command(cfg, {"prompt": "x"}, [])
+    denied = denied[denied.index("--disallowedTools") + 1].split(",")
+    for path in (".claude/**", ".mcp.json", "**/CLAUDE.md", ".git/**"):
+        assert f"Edit({path})" in denied and f"Write({path})" in denied
+
+
+def test_claude_code_runs_isolated_or_not_at_all(tmp_path):
+    tools = "Bash,Edit,Glob,Grep,Read,Write"
+    cfg = config(tmp_path, fake_claude(tmp_path, "", RESTRICTED_HELP))
+    assert braco.isolation(cfg) == ["--restricted", "--strict-mcp-config", "--tools", tools]
+
+    braco._help_text.clear()
+    cfg = config(tmp_path, fake_claude(tmp_path, "", OLDER_HELP))
+    flags = braco.isolation(cfg)
+    assert flags[:2] == ["--setting-sources", "user"] and "--strict-mcp-config" in flags
+    assert json.loads(flags[flags.index("--settings") + 1]) == {"disableAllHooks": True}
+
+    braco._help_text.clear()
+    ran = tmp_path / "ran"
+    cfg = config(tmp_path, fake_claude(tmp_path, f"open({str(ran)!r}, 'w')", ANCIENT_HELP))
+    assert braco.isolation(cfg) is None
+    refused = braco.handle(cfg, {"project": "visao", "prompt": "x"})
+    assert refused["ok"] is False and "claude update" in refused["error"]
+    assert not ran.exists()  # nothing ran
+
+
+def test_the_flags_go_to_claude_code(tmp_path):
+    claude = fake_claude(tmp_path, 'print(json.dumps({"result": " ".join(sys.argv[1:])}))')
+    result = braco.handle(config(tmp_path, claude), {"project": "visao", "prompt": "x"})
+    assert "--restricted --strict-mcp-config --tools" in result["result"]
 
 
 def test_only_projects_listed_on_the_mac_run(tmp_path):
@@ -117,3 +184,90 @@ def test_one_round_of_the_loop_takes_runs_and_reports(tmp_path, monkeypatch):
         "/device/tasks/t-1/result",
     ]
     assert calls[-1][2] == {"ok": True, "result": "feito"}
+
+
+# F4: the result is never lost --------------------------------------------------------------
+
+
+def _server(calls, *, task=None, fail_results=0):
+    """A fake server: hands out `task` once, and refuses the first `fail_results` results as if
+    the network dropped."""
+    state = {"task": task, "fail": fail_results}
+
+    def fake_call(cfg, method, path, body=None, timeout=40):
+        calls.append((method, path, body))
+        if path.startswith("/device/next"):
+            given, state["task"] = state["task"], None
+            return given
+        if path.endswith("/result") and state["fail"]:
+            state["fail"] -= 1
+            raise urllib.error.URLError("rede caiu")
+        return None
+
+    return fake_call
+
+
+def _results(calls):
+    return [(c[1], c[2]) for c in calls if c[1].endswith("/result")]
+
+
+def test_a_result_the_network_dropped_is_sent_on_the_next_round(tmp_path, monkeypatch):
+    calls = []
+    task = {"id": "t-1", "project": "visao", "prompt": "oi"}
+    monkeypatch.setattr(braco, "call", _server(calls, task=task, fail_results=1))
+    monkeypatch.setattr(braco, "handle", lambda cfg, t: {"ok": True, "result": "feito"})
+    monkeypatch.setattr(braco.time, "sleep", lambda s: None)
+    cfg = config(tmp_path)
+
+    braco.loop(cfg, once=True)  # ran it; sending failed
+    assert len(list((cfg.state_dir / "saida").glob("*.json"))) == 1
+    braco.loop(cfg, once=True)  # next round: sent before anything else
+    sent = _results(calls)
+    assert sent == [("/device/tasks/t-1/result", {"ok": True, "result": "feito"})] * 2
+    assert list((cfg.state_dir / "saida").glob("*.json")) == []
+    assert calls[-3][1] == "/device/tasks/t-1/result"  # before the heartbeat and the next poll
+
+
+def test_a_task_cut_off_by_a_restart_is_reported_never_run_again(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(braco, "call", _server(calls))
+    ran = []
+    monkeypatch.setattr(braco, "handle", lambda cfg, t: ran.append(t))
+    cfg = config(tmp_path)
+    braco._write(braco._running_file(cfg), {"task_id": "t-7"})  # the Mac died mid-task
+
+    braco.loop(cfg, once=True)
+    [(path, body)] = _results(calls)
+    assert path == "/device/tasks/t-7/result" and body["ok"] is False
+    assert "reiniciou no meio" in body["error"] and ran == []
+    assert not braco._running_file(cfg).exists()
+
+
+def test_a_result_the_server_refuses_for_good_is_dropped(tmp_path, monkeypatch):
+    calls = []
+
+    def refusing(cfg, method, path, body=None, timeout=40):
+        calls.append(path)
+        if path.endswith("/result"):
+            raise urllib.error.HTTPError(path, 404, "não é deste aparelho", None, None)
+
+    monkeypatch.setattr(braco, "call", refusing)
+    cfg = config(tmp_path)
+    braco.keep(cfg, "t-9", {"ok": True, "result": "x"})
+    braco.deliver(cfg)
+    assert list((cfg.state_dir / "saida").glob("*.json")) == []
+
+
+def test_it_beats_while_a_long_task_runs(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(braco, "call", _server(calls, task={"id": "t-3", "project": "visao"}))
+    monkeypatch.setattr(braco, "HEARTBEAT_SECONDS", 0.02)
+
+    def slow(cfg, task):
+        time.sleep(0.2)
+        return {"ok": True, "result": "ok"}
+
+    monkeypatch.setattr(braco, "handle", slow)
+    braco.loop(config(tmp_path), once=True)
+    beats = [c[2]["running"] for c in calls if c[1] == "/device/heartbeat"]
+    assert beats[0] is None and "t-3" in beats[1:]
