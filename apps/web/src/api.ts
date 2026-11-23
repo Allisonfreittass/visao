@@ -425,13 +425,14 @@ export class Api {
     this.token = token;
   }
 
-  async login(email: string, password: string): Promise<string> {
+  async login(email: string, password: string, signal?: AbortSignal): Promise<string> {
     // OAuth2 password form: credentials go in the body, never in the URL.
     const body = new URLSearchParams({ username: email, password });
     const data = await this.request<{ access_token: string }>("/auth/login", {
       method: "POST",
       body,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal,
     });
     this.token = data.access_token;
     return data.access_token;
