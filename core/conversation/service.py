@@ -226,13 +226,18 @@ def reply(
     browser_fallback: str = "",
     did_in_app: bool | None = None,
     quote_table: dict | None = None,
+    client_message_id: uuid.UUID | None = None,
 ) -> TurnResult:
     """`browser_fallback` is the sentence that closes a reply that denied the browser and could
     not be rewritten (browser_guard.FALLBACK when empty)."""
     check_budgets(session, conversation, budgets)
 
     user_message = Message(
-        conversation_id=conversation.id, role="user", content=user_text, reply_to_id=reply_to_id
+        conversation_id=conversation.id,
+        role="user",
+        content=user_text,
+        reply_to_id=reply_to_id,
+        client_message_id=client_message_id,
     )
     session.add(user_message)
     session.flush()
@@ -417,6 +422,81 @@ def reply(
         browser_guard=guarded,
         claimed_undone=claimed,
     )
+
+
+# The model could not write the reply, but the turn had already done things: the owner is told
+# what, in words written by code from the turn's own facts (F3 in
+# docs/research/comparativo_agentes.md). Without it the app showed only an error, and sending
+# the message again did the things again.
+REPLY_BY_CODE_ORIGIN = "fallback"
+REPLY_BY_CODE_OPENING = "Não consegui escrever a resposta agora, mas isto já ficou feito:"
+REPLY_BY_CODE_CLOSING = "Se quiser, me pergunte de novo daqui a pouco."
+
+
+def reply_by_code(
+    session: Session,
+    *,
+    conversation: Conversation,
+    user_text: str,
+    facts: list[str],
+    since: datetime,
+    modality: str = "text",
+    reply_to_id: uuid.UUID | None = None,
+    client_message_id: uuid.UUID | None = None,
+) -> TurnResult:
+    """Stores the reply made of `facts` (each one thing done, in the first person). The owner's
+    message is the one this turn stored (after `since`); if it failed before storing it (the
+    budget check), it is stored now."""
+    user_message = session.scalar(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation.id,
+            Message.role == "user",
+            Message.content == user_text,
+            Message.created_at >= since,
+        )
+        .order_by(Message.created_at.desc())
+        .limit(1)
+    )
+    if user_message is None:
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=user_text,
+            reply_to_id=reply_to_id,
+            client_message_id=client_message_id,
+        )
+        session.add(user_message)
+        session.flush()
+    said = [f[:1].upper() + f[1:] for f in facts]
+    if modality == "voice":
+        content = " ".join([REPLY_BY_CODE_OPENING, *(f"{s}." for s in said), REPLY_BY_CODE_CLOSING])
+    else:
+        content = "\n".join(
+            [REPLY_BY_CODE_OPENING, *(f"- {s}" for s in said), "", REPLY_BY_CODE_CLOSING]
+        )
+    progress.final(content)
+    assistant_message = Message(
+        conversation_id=conversation.id,
+        role="assistant",
+        content=content,
+        origin=REPLY_BY_CODE_ORIGIN,
+    )
+    session.add(assistant_message)
+    session.commit()
+    # Nothing was spent on it: a usage row would count as a model call that did not happen.
+    usage = ModelUsage(
+        conversation_id=conversation.id,
+        purpose=PURPOSE_CHAT,
+        provider="",
+        model="",
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=Decimal(0),
+        latency_ms=None,
+        outcome="by_code",
+    )
+    return TurnResult(user_message, assistant_message, usage, [])
 
 
 FIT_MARGIN_BYTES = 512

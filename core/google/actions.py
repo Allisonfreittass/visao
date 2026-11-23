@@ -1,12 +1,17 @@
 """Email to send and events to schedule: proposed by the agent, shown in full, run only after the
 owner approves. The approval shows exactly what goes out (recipient, subject, text, time,
-guests), so an email that tries to give orders can at most produce a proposal the owner reads."""
+guests), so an email that tries to give orders can at most produce a proposal the owner reads.
+
+An approval goes out once. It is claimed in the database (proposed -> sending) and committed
+before anything is sent, so a tap and a spoken "sim", or two phones, cannot send it twice. A
+proposal left waiting more than EXPIRES_AFTER expires. One that stopped in "sending" (the server
+died mid-send) becomes "unknown" and is never sent again on its own: the owner is told to check."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from core.google import account as accounts
@@ -15,6 +20,15 @@ from infrastructure.database.models import Conversation, GoogleAction, Message, 
 from integrations.google.client import GoogleError
 
 MAX_PENDING = 5
+# A reply or an invitation older than this is stale: asked again, it is written again.
+EXPIRES_AFTER = timedelta(hours=24)
+# A send takes seconds; one still "sending" after this died with the process that ran it.
+STUCK_AFTER = timedelta(minutes=5)
+EXPIRED_TEXT = "Passou um dia sem resposta, então não fiz. Se ainda quiser, me peça de novo."
+UNKNOWN_TEXT = (
+    "O servidor caiu enquanto eu fazia isso, então não sei se saiu. Confira em Enviados ou na "
+    "agenda antes de pedir de novo."
+)
 
 
 class ActionError(ValueError):
@@ -32,7 +46,31 @@ def _zone(owner: User) -> ZoneInfo:
         return ZoneInfo("America/Sao_Paulo")
 
 
+def _tidy(session: Session, owner_id: uuid.UUID, now: datetime) -> None:
+    """Old proposals expire, and a send that never finished becomes "unknown" (the owner is told
+    in the conversation it came from). Neither is ever sent."""
+    for action in session.scalars(
+        select(GoogleAction).where(
+            GoogleAction.owner_user_id == owner_id,
+            GoogleAction.status == "proposed",
+            GoogleAction.created_at <= now - EXPIRES_AFTER,
+        )
+    ):
+        action.status, action.result, action.decided_at = "expired", EXPIRED_TEXT, now
+    for action in session.scalars(
+        select(GoogleAction).where(
+            GoogleAction.owner_user_id == owner_id,
+            GoogleAction.status == "sending",
+            GoogleAction.decided_at <= now - STUCK_AFTER,
+        )
+    ):
+        action.status, action.result = "unknown", UNKNOWN_TEXT
+        _report(session, action, f"{describe(action)}. {UNKNOWN_TEXT}")
+    session.flush()
+
+
 def _pending(session: Session, owner_id: uuid.UUID) -> list[GoogleAction]:
+    _tidy(session, owner_id, datetime.now(UTC))
     return list(
         session.scalars(
             select(GoogleAction)
@@ -157,11 +195,43 @@ def reject(session: Session, owner_id: uuid.UUID, action_id: uuid.UUID) -> Googl
     return action
 
 
+def _claim(session: Session, owner_id: uuid.UUID, action_id: uuid.UUID, now: datetime) -> bool:
+    """proposed -> sending in one statement: of two approvals at once, only one gets the row."""
+    claimed = session.execute(
+        update(GoogleAction)
+        .where(
+            GoogleAction.id == action_id,
+            GoogleAction.owner_user_id == owner_id,
+            GoogleAction.status == "proposed",
+            GoogleAction.created_at > now - EXPIRES_AFTER,
+        )
+        .values(status="sending", decided_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    return claimed.rowcount == 1
+
+
+def _finish(session: Session, owner: User, action: GoogleAction) -> GoogleAction:
+    _report(session, action, action.result)
+    session.flush()
+    if action.status == "done" and action.conversation_id is None:
+        push.send_to_owner(session, owner.id, title="Feito", body=action.result, url="/")
+    return action
+
+
 def approve(session: Session, owner: User, action_id: uuid.UUID, secret_key: str) -> GoogleAction:
     action = _owned(session, owner.id, action_id)
-    if action.status != "proposed":
-        return action
-    action.decided_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+    if not _claim(session, owner.id, action_id, now):
+        session.refresh(action)
+        if action.status == "proposed":
+            # Still waiting, so it was too old to claim.
+            action.status, action.result, action.decided_at = "expired", EXPIRED_TEXT, now
+            return _finish(session, owner, action)
+        return action  # already decided, or being sent right now by the other approval
+    # The claim reaches every other request before anything goes out.
+    session.commit()
+    session.refresh(action)
     account = accounts.get(session, owner.id)
     google = accounts.client_for(account, secret_key) if account is not None else None
     if google is None:
@@ -169,6 +239,12 @@ def approve(session: Session, owner: User, action_id: uuid.UUID, secret_key: str
         session.flush()
         return action
     p = action.payload
+    if action.kind == "create_event" and datetime.fromisoformat(p["start"]) < now - timedelta(
+        hours=1
+    ):
+        # Checked when proposed; the time can pass while it waits for the tap.
+        action.status, action.result = "failed", "O horário desse evento já passou; não marquei."
+        return _finish(session, owner, action)
     try:
         if action.kind == "send_email":
             original = google.headers(p["reply_to"]) if p.get("reply_to") else None
@@ -193,11 +269,7 @@ def approve(session: Session, owner: User, action_id: uuid.UUID, secret_key: str
     except GoogleError as exc:
         accounts.note_failure(session, account, exc)
         action.status, action.result = "failed", f"Não deu: {exc}."
-    _report(session, action, action.result)
-    session.flush()
-    if action.status == "done" and action.conversation_id is None:
-        push.send_to_owner(session, owner.id, title="Feito", body=action.result, url="/")
-    return action
+    return _finish(session, owner, action)
 
 
 def pending(session: Session, owner_id: uuid.UUID) -> list[GoogleAction]:

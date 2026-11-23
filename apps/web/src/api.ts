@@ -515,6 +515,7 @@ export class Api {
     replyToId: string | null = null,
     signal?: AbortSignal,
     location: Position | null = null,
+    clientMessageId: string | null = null,
   ): Promise<Turn> {
     return this.request(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
       method: "POST",
@@ -525,6 +526,8 @@ export class Api {
         attachment_ids: attachmentIds,
         reply_to_id: replyToId,
         ...(location ? { location } : {}),
+        // Once per message: the same message sent again gets the turn already made.
+        ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
       }),
       headers: { "Content-Type": "application/json" },
     });

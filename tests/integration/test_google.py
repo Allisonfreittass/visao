@@ -11,6 +11,7 @@ from email import message_from_bytes
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import sessionmaker
 
 from core.decision.pipeline import run_turn
 from core.google import account as accounts
@@ -177,6 +178,79 @@ def test_a_rejected_action_never_runs_and_too_many_waiting_is_refused(db, google
         actions.propose_email(db, owner.id, to="a@b.com", subject=str(i), body="x")
     with pytest.raises(actions.ActionError):
         actions.propose_email(db, owner.id, to="a@b.com", subject="mais", body="x")
+
+
+def test_two_approvals_at_the_same_time_send_once(db, google):
+    # A tap on Aprovar and a spoken "sim" (or two phones) arrive together: the second request
+    # reads the action while the first one is still sending it.
+    owner = setup(db)
+    connected(db, owner)
+    action = actions.propose_email(db, owner.id, to="joao@exemplo.com", subject="Oi", body="x")
+    db.commit()
+    other = sessionmaker(bind=db.get_bind(), expire_on_commit=False)()
+    seen = []
+    send = google.send
+
+    def send_while_the_other_approves(**kwargs):
+        seen.append(actions.approve(other, owner, action.id, KEY).status)
+        return send(**kwargs)
+
+    google.send = send_while_the_other_approves
+    actions.approve(db, owner, action.id, KEY)
+    assert len(google.sent) == 1 and action.status == "done"
+    assert seen == ["sending"]  # the other one found it already taken and sent nothing
+    other.close()
+
+
+def test_a_proposal_left_for_more_than_a_day_expires_and_is_not_sent(db, google):
+    owner = setup(db)
+    connected(db, owner)
+    conversation = chat(db, owner)
+    old = actions.propose_email(
+        db, owner.id, to="a@b.com", subject="Velho", body="x", conversation_id=conversation.id
+    )
+    old.created_at = datetime.now(UTC) - actions.EXPIRES_AFTER - timedelta(minutes=1)
+    db.flush()
+    actions.approve(db, owner, old.id, KEY)
+    assert old.status == "expired" and google.sent == []
+    told = db.scalar(select(Message).where(Message.origin == "google"))
+    assert "Passou um dia sem resposta" in told.content
+    # An expired one no longer counts against the limit of waiting proposals.
+    another = actions.propose_email(db, owner.id, to="a@b.com", subject="Velho 2", body="x")
+    another.created_at = old.created_at
+    db.flush()
+    assert actions.pending(db, owner.id) == [] and another.status == "expired"
+
+
+def test_a_send_cut_by_a_crash_is_reported_and_never_sent_again(db, google):
+    owner = setup(db)
+    connected(db, owner)
+    conversation = chat(db, owner)
+    action = actions.propose_email(
+        db, owner.id, to="a@b.com", subject="Oi", body="x", conversation_id=conversation.id
+    )
+    # The server died between the claim and the end of the send.
+    action.status = "sending"
+    action.decided_at = datetime.now(UTC) - actions.STUCK_AFTER - timedelta(minutes=1)
+    db.flush()
+    assert actions.pending(db, owner.id) == []
+    assert action.status == "unknown"
+    told = db.scalar(select(Message).where(Message.origin == "google"))
+    assert "não sei se saiu" in told.content and "Email para a@b.com" in told.content
+    actions.approve(db, owner, action.id, KEY)
+    assert google.sent == [] and action.status == "unknown"
+
+
+def test_an_event_whose_time_passed_while_waiting_is_not_created(db, google):
+    owner = setup(db)
+    connected(db, owner)
+    soon = datetime.now(UTC) + timedelta(minutes=30)
+    event = actions.propose_event(db, owner, title="Café", start=soon.isoformat())
+    event.payload = {**event.payload, "start": (soon - timedelta(hours=3)).isoformat()}
+    db.flush()
+    actions.approve(db, owner, event.id, KEY)
+    assert event.status == "failed" and google.created == []
+    assert "já passou" in event.result
 
 
 # In the conversation ---------------------------------------------------------------------------

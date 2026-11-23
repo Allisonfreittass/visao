@@ -27,7 +27,15 @@ mostra o destinatário, o assunto e o texto inteiro, ou o título, a hora e os c
   compromissos das próximas 24 h e os assuntos dos emails não lidos dos últimos 2 dias, nunca o
   texto. É assim que ele pode lembrar de uma reunião que está perto.
 - **Limites:** no máximo 5 pedidos esperando. Um evento precisa ser no futuro (até 2 anos) e durar
-  de 5 minutos a 24 horas. Aprovar duas vezes nunca manda duas vezes.
+  de 5 minutos a 24 horas.
+- **Sai uma vez só.** Aprovar duas vezes nunca manda duas vezes, nem quando as duas aprovações
+  chegam juntas (um toque e um "sim" falado, ou dois aparelhos). A primeira reserva o pedido no
+  banco antes de enviar; a outra encontra o pedido já reservado e não faz nada.
+- **Validade de um dia.** Um pedido esperando há mais de 24 h vence e não sai; a conversa avisa
+  ("Passou um dia sem resposta…"). Um evento cujo horário passou enquanto esperava também não é
+  marcado.
+- **Se o servidor cair no meio do envio**, o pedido fica como "não sei se saiu" e nunca é
+  reenviado sozinho. A conversa pede para você conferir em Enviados ou na agenda.
 
 ## Configurar (uma vez, uns 10 minutos)
 

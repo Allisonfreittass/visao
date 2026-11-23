@@ -116,3 +116,61 @@ def test_postgres_reservation_race_respects_shared_limit(pg_factory):
     with pg_factory() as db:
         state = db.get(SystemFlag, LEDGER).value
         assert sum(results) == state["calls"] == len(state["active"]) == 5
+
+
+def test_postgres_turn_lock_holds_across_commits_and_sessions(pg_factory):
+    # The advisory lock lives on a connection of its own: the turn's commits do not release it,
+    # and a turn in another process (another session here) waits for it.
+    from core.conversation import turn_lock
+
+    conversation = uuid.uuid4()
+    with pg_factory() as first, pg_factory() as second:
+        with turn_lock._database(first, conversation, deadline=0):
+            first.execute(text("SELECT 1"))
+            first.commit()
+            with pytest.raises(turn_lock.Busy):
+                with turn_lock._database(second, conversation, deadline=0):
+                    pass
+        with turn_lock._database(second, conversation, deadline=0):
+            pass
+
+
+def test_postgres_two_approvals_at_once_send_one_email(pg_factory, monkeypatch):
+    import threading
+    import time
+
+    from core.google import account as accounts
+    from core.google import actions
+    from tests.integration.test_google import KEY, FakeGoogle, connected
+    from tests.integration.test_mind import setup
+
+    google = FakeGoogle()
+    slow_send = google.send
+
+    def send(**kwargs):
+        time.sleep(0.3)  # the other approval arrives while this one is sending
+        return slow_send(**kwargs)
+
+    google.send = send
+    monkeypatch.setattr(accounts, "client_for", lambda account, key: google)
+    with pg_factory() as db:
+        owner = setup(db)
+        connected(db, owner)
+        action = actions.propose_email(db, owner.id, to="a@b.com", subject="Oi", body="x")
+        db.commit()
+        owner_id, action_id = owner.id, action.id
+    start = threading.Barrier(2)
+
+    def approve(_):
+        with pg_factory() as db:
+            from infrastructure.database.models import User
+
+            start.wait(5)
+            done = actions.approve(db, db.get(User, owner_id), action_id, KEY)
+            db.commit()
+            return done.status
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = sorted(pool.map(approve, range(2)))
+    assert len(google.sent) == 1
+    assert statuses == ["done", "sending"]

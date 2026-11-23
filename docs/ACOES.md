@@ -42,6 +42,13 @@ Desde 17/11/2026, a organização segue o que o Hark faz (o comportamento, não 
 - **Ele só diz que fez o que fez.** Se a resposta disser "anotei" ou "criei" sem ter feito, a
   frase é tirada antes de chegar a você. "Não consigo acrescentar" também sai, porque ele
   consegue; "não consigo comprar" fica, porque é verdade.
+- **Uma mensagem, um turno.** O app manda um id com cada mensagem. Se a mesma mensagem chegar duas
+  vezes (rede ruim), a segunda recebe a resposta que já foi dada, sem fazer nada de novo. Duas
+  mensagens da mesma conversa ao mesmo tempo (texto e voz, dois aparelhos) são respondidas uma
+  depois da outra (`core/conversation/turn_lock.py`).
+- **Se o modelo falhar depois de fazer**, a resposta é escrita pelo código a partir do que foi
+  feito ("Não consegui escrever a resposta agora, mas isto já ficou feito: - Criei o projeto
+  «…»"), em vez de só um erro. Sem nada feito, continua o erro de sempre.
 - **Fora daqui:** comprar, reservar e mandar mensagem.
 
 ## API (por acréscimo)

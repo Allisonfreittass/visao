@@ -29,7 +29,15 @@ from apps.api.routes.conversations import (
 from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from core import location
-from core.conversation import artifacts, attachments, progress, segments, share, title
+from core.conversation import (
+    artifacts,
+    attachments,
+    progress,
+    segments,
+    share,
+    title,
+    turn_lock,
+)
 from core.conversation.links import LinkReader
 from core.decision.pipeline import run_turn
 from core.identity.genesis import get_identity
@@ -139,7 +147,10 @@ def answer(
             return
         try:
             files = attachments.pending(db, owner.id, attachment_ids)
-            with progress.tracking(conversation.id, "text"):
+            with (
+                turn_lock.held(db, conversation.id),
+                progress.tracking(conversation.id, "text"),
+            ):
                 turn = run_turn(
                     db,
                     conversation=conversation,

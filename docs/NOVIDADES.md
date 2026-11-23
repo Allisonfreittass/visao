@@ -5,6 +5,19 @@ em você?" e "o que você consegue fazer agora?" com fatos. Cada item aponta par
 detalhes. O que está ligado **agora** vem do manifesto de capacidades
 (`core/identity/capabilities.py`), que entra em todo prompt; este arquivo conta a história.
 
+## 23/11/2026
+
+- **Mais firme quando algo dá errado** (estudo comparativo com OpenClaw, Goose e OpenCode,
+  [research/comparativo_agentes.md](research/comparativo_agentes.md)).
+  - Um email ou evento aprovado sai uma vez só, mesmo com duas aprovações juntas. Pedido parado há
+    mais de um dia vence. Se o servidor cair no meio do envio, ele avisa que não sabe se saiu e não
+    reenvia ([GOOGLE.md](GOOGLE.md)).
+  - A mesma mensagem enviada duas vezes recebe uma resposta só, e o que ela pedia (criar projeto,
+    anotar) acontece uma vez. Duas mensagens ao mesmo tempo na mesma conversa são respondidas em
+    fila ([ACOES.md](ACOES.md)).
+  - Se o modelo falhar depois de ele já ter feito algo no app, a resposta diz o que foi feito em
+    vez de só mostrar um erro.
+
 ## 17/11/2026
 
 - **Telas mais fáceis de usar e uma abertura.**

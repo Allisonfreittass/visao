@@ -34,7 +34,7 @@ from apps.api.search import get_search_provider
 from apps.api.settings import Settings
 from apps.worker.handlers import autonomy_room
 from core import location, projects
-from core.conversation import artifacts, attachments, progress, segments, title
+from core.conversation import artifacts, attachments, progress, segments, title, turn_lock
 from core.conversation.links import LinkReader
 from core.conversation.service import (
     BudgetExceededError,
@@ -60,6 +60,7 @@ from infrastructure.database.models import (
     Conversation,
     ConversationSegment,
     Message,
+    ModelUsage,
     User,
 )
 from integrations.browser.base import Browser
@@ -165,6 +166,8 @@ class MessageIn(BaseModel):
     # Uploaded first through POST /attachments; a photo alone is a whole message.
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=attachments.MAX_PER_MESSAGE)
     location: LocationIn | None = None
+    # Made by the app once per message: sent again (a retry), it gets the turn already made.
+    client_message_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _says_something(self) -> "MessageIn":
@@ -749,24 +752,34 @@ def send_message(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
     try:
-        with progress.tracking(conversation.id, body.modality):
-            turn = run_turn(
-                db,
-                conversation=conversation,
-                identity=identity,
-                owner=user,
-                text=body.content,
-                provider=provider,
-                search=search,
-                config=turn_config(settings),
-                modality=body.modality,
-                links=links,
-                files=files,
-                browser=browser,
-                reply_to_id=body.reply_to_id,
-                position=body.location.here() if body.location else None,
-            )
-        result, outcome = turn.result, turn.curiosity
+        with turn_lock.held(db, conversation.id):
+            if body.client_message_id is not None:
+                made = _turn_already_made(db, conversation, body.client_message_id)
+                if made is not None:
+                    return made
+            with progress.tracking(conversation.id, body.modality):
+                turn = run_turn(
+                    db,
+                    conversation=conversation,
+                    identity=identity,
+                    owner=user,
+                    text=body.content,
+                    provider=provider,
+                    search=search,
+                    config=turn_config(settings),
+                    modality=body.modality,
+                    links=links,
+                    files=files,
+                    browser=browser,
+                    reply_to_id=body.reply_to_id,
+                    position=body.location.here() if body.location else None,
+                    client_message_id=body.client_message_id,
+                )
+            result, outcome = turn.result, turn.curiosity
+    except turn_lock.Busy as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Ainda respondendo a mensagem anterior; tente de novo"
+        ) from exc
     except progress.TurnCancelled as exc:
         db.rollback()
         raise _stream_error(conversation.id, status.HTTP_409_CONFLICT, "Parado por você") from exc
@@ -877,6 +890,53 @@ def send_message(
         progress.publish(conversation.id, "action", {})
     progress.publish(conversation.id, "done", out.model_dump(mode="json"))
     return out
+
+
+def _turn_already_made(
+    db: Session, conversation: Conversation, client_message_id: uuid.UUID
+) -> TurnOut | None:
+    """The same message, sent again: its turn as it was stored, nothing run again. A copy left
+    without a reply (the turn failed before answering) gives up its id to this new attempt."""
+    asked = db.scalar(
+        select(Message).where(
+            Message.conversation_id == conversation.id,
+            Message.client_message_id == client_message_id,
+        )
+    )
+    if asked is None:
+        return None
+    answer = db.scalar(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation.id,
+            Message.role == "assistant",
+            Message.origin.in_(("turn", "fallback")),
+            Message.created_at >= asked.created_at,
+            Message.id != asked.id,
+        )
+        .order_by(Message.created_at)
+        .limit(1)
+    )
+    if answer is None:
+        asked.client_message_id = None
+        db.flush()
+        return None
+    usage = db.get(ModelUsage, answer.model_usage_id) if answer.model_usage_id else None
+    quoted = db.get(Message, asked.reply_to_id) if asked.reply_to_id else None
+    return TurnOut(
+        user_message=_message_out(
+            asked, attachments.for_messages(db, [asked.id]).get(asked.id, []), quoted=quoted
+        ),
+        assistant_message=_message_out(answer),
+        usage=UsageOut(
+            provider=usage.provider if usage else "",
+            model=usage.model if usage else "",
+            input_tokens=usage.input_tokens if usage else 0,
+            output_tokens=usage.output_tokens if usage else 0,
+            cost_usd=usage.cost_usd if usage else Decimal(0),
+            latency_ms=usage.latency_ms if usage else None,
+        ),
+    )
 
 
 # A turn that leaves something waiting for the owner's tap: the app refreshes its cards.

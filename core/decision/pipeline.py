@@ -19,7 +19,15 @@ from core.arm import intent as mac_intent
 from core.autonomy import continuity
 from core.conversation import browser_guard, progress, share
 from core.conversation import links as conversation_links
-from core.conversation.service import Budgets, TurnResult, context_history, reply
+from core.conversation.service import (
+    BudgetExceededError,
+    Budgets,
+    EmptyReplyError,
+    TurnResult,
+    context_history,
+    reply,
+    reply_by_code,
+)
 from core.curiosity.engine import (
     ASK_USER,
     DEFER,
@@ -31,6 +39,7 @@ from core.curiosity.engine import (
 )
 from core.decision import record as deed_record
 from core.decision.turn import TurnPlan
+from core.google import actions as google_actions
 from core.google import assist as google_assist
 from core.identity import name_deliberation, self_knowledge
 from core.identity.capabilities import CapabilityInputs, build_capabilities
@@ -61,7 +70,7 @@ from infrastructure.database.models import (
 )
 from infrastructure.jobs import queue
 from integrations.browser.base import Browser, Visit
-from integrations.llm.base import LLMProvider
+from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
 THINK_AFTER_IDLE = timedelta(minutes=2)
@@ -118,8 +127,14 @@ def run_turn(
     reply_to_id: uuid.UUID | None = None,
     shared: bool = False,
     position: location.Here | None = None,
+    client_message_id: uuid.UUID | None = None,
 ) -> TurnOutcome:
+    """The caller holds core/conversation/turn_lock.py for the conversation: what runs here
+    before the reply (projects, notes, proposals) must not run twice at once."""
     plan = TurnPlan()
+    started = datetime.now(UTC)
+    # Proposals left waiting for a tap, in the first person: said by code if the reply fails.
+    waiting: list[str] = []
     blocks: list[str] = []
     progress.step("Pensando")
     if shared:
@@ -192,6 +207,7 @@ def run_turn(
                 task_id=str(task.id),
                 project=task.project,
             )
+            waiting.append(f"deixei o pedido ao Mac esperando o seu Aprovar ({task.project})")
             blocks.append(
                 "Pedido ao Mac montado a partir desta mensagem, esperando o toque da pessoa (há um "
                 f"botão Aprovar logo abaixo da conversa): {task.project}: {task.prompt}. Diga em "
@@ -241,6 +257,10 @@ def run_turn(
                     executed=True,
                     reason="owner_asked",
                     action_ids=[str(a.id) for a in helped.proposed],
+                )
+                waiting.extend(
+                    f"deixei esperando o seu Aprovar: {google_actions.describe(a)}"
+                    for a in helped.proposed
                 )
 
     # Projects, notes and panels changed from the conversation, before the reply, so "anotei" is
@@ -622,39 +642,61 @@ def run_turn(
         browser_fallback = browser_guard.TRIED
     else:
         browser_fallback = browser_guard.FALLBACK
-    result = reply(
-        session,
-        conversation=conversation,
-        identity=identity,
-        owner=owner,
-        user_text=text,
-        provider=provider,
-        budgets=config.budgets,
-        max_output_tokens=config.reply_max_tokens,
-        context_char_budget=config.context_char_budget,
-        extra_system="\n\n".join(b for b in blocks if b),
-        capabilities=capabilities,
-        modality=modality,
-        name_history_summary=name_deliberation.history_summary(session, identity),
-        self_text=mind_state.current_self(session) if config.mind_enabled else None,
-        owner_profile=owner_profile,
-        owner_rules=owner_rules,
-        attachment="\n\n".join(
-            part
-            for part in (
-                conversation_links.context_block(list(read)) if read else "",
-                browsed.block if browsed and browsed.visits else "",
-            )
-            if part
-        ),
-        files=files,
-        reply_to_id=reply_to_id,
-        browser_fallback=browser_fallback,
-        quote_table=quote_table,
-        did_in_app=any(d.done and not d.waiting for d in deeds)
-        or accepted is not None
-        or edited is not None,
-    )
+    try:
+        result = reply(
+            session,
+            conversation=conversation,
+            identity=identity,
+            owner=owner,
+            user_text=text,
+            provider=provider,
+            budgets=config.budgets,
+            max_output_tokens=config.reply_max_tokens,
+            context_char_budget=config.context_char_budget,
+            extra_system="\n\n".join(b for b in blocks if b),
+            capabilities=capabilities,
+            modality=modality,
+            name_history_summary=name_deliberation.history_summary(session, identity),
+            self_text=mind_state.current_self(session) if config.mind_enabled else None,
+            owner_profile=owner_profile,
+            owner_rules=owner_rules,
+            attachment="\n\n".join(
+                part
+                for part in (
+                    conversation_links.context_block(list(read)) if read else "",
+                    browsed.block if browsed and browsed.visits else "",
+                )
+                if part
+            ),
+            files=files,
+            reply_to_id=reply_to_id,
+            browser_fallback=browser_fallback,
+            quote_table=quote_table,
+            client_message_id=client_message_id,
+            did_in_app=any(d.done and not d.waiting for d in deeds)
+            or accepted is not None
+            or edited is not None,
+        )
+    except (LLMError, EmptyReplyError, BudgetExceededError) as exc:
+        facts = _done_before_the_reply(deeds, created, edited, waiting)
+        if not facts:
+            raise
+        # The model failed after the turn had done things: code says what, from the facts.
+        result = reply_by_code(
+            session,
+            conversation=conversation,
+            user_text=text,
+            facts=facts,
+            since=started,
+            modality=modality,
+            reply_to_id=reply_to_id,
+            client_message_id=client_message_id,
+        )
+        plan.add(
+            "reply_by_code",
+            executed=True,
+            reason=getattr(exc, "kind", None) or type(exc).__name__,
+        )
     linked = next(
         (
             d.project_id
@@ -762,6 +804,24 @@ def run_turn(
         browsed=tuple(browsed.visits) if browsed else (),
         panel=created or edited,
     )
+
+
+def _done_before_the_reply(
+    deeds: list[app_actions.Deed],
+    created: Panel | None,
+    edited: Panel | None,
+    waiting: list[str],
+) -> list[str]:
+    """What this turn did before the reply, in the first person, for when the reply fails."""
+    facts = [
+        d.said.removesuffix(": espera o sim dela") + ": espera o seu sim" if d.waiting else d.said
+        for d in deeds
+    ]
+    if created is not None:
+        facts.append(f"montei o painel «{created.title}» no Início")
+    if edited is not None:
+        facts.append(f"mudei o painel «{edited.title}»")
+    return facts + waiting
 
 
 def _quote_table(

@@ -103,6 +103,11 @@ function requestedConversation(): string | null {
   return new URLSearchParams(window.location.search).get("c");
 }
 
+/** One per message sent, so the server runs its turn once even if it arrives twice. */
+function messageId(): string | null {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : null;
+}
+
 type LiveAsk = Ask & {
   spoken: SpokenAsk;
   decide: (decision: "approve" | "reject", via: "toque" | "voz") => Promise<boolean>;
@@ -620,7 +625,7 @@ export function App() {
       turnRef.current = { conversationId, controller };
       // Only for "near here" questions with the switch on (docs/LOCALIZACAO.md); never stored.
       const where = await positionFor(text);
-      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal, where);
+      const turn = await api.send(conversationId, text, spoken ? "voice" : "text", files.map((f) => f.id), replyTo?.id ?? null, controller.signal, where, messageId());
       const llmMs = performance.now() - llmStarted;
       streamStop?.abort();
       // The bubble that was writing becomes the reply: its text finishes coming in, then it is

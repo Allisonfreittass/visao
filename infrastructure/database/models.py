@@ -236,12 +236,21 @@ class Message(Base):
     __tablename__ = "messages"
     __table_args__ = (
         Index("ix_messages_conversation_id_created_at", "conversation_id", "created_at"),
+        Index(
+            "uq_messages_conversation_client_id",
+            "conversation_id",
+            "client_message_id",
+            unique=True,
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     conversation_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("conversations.id", ondelete="CASCADE")
     )
+    # Made by the app once per message it sends: the same message sent again (a retry on a bad
+    # network) is answered with the turn already made, never run twice (migration 0035).
+    client_message_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
     # "turn" answers a message; "initiative" was started by the agent on its own.
@@ -984,7 +993,7 @@ class GoogleAction(Base):
     )
     kind: Mapped[str] = mapped_column(String(32))  # send_email | create_event
     payload: Mapped[dict[str, Any]] = mapped_column(JSON)
-    # proposed | done | failed | rejected
+    # proposed | sending | done | failed | rejected | expired | unknown (core/google/actions.py)
     status: Mapped[str] = mapped_column(String(16), default="proposed")
     result: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
