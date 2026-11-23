@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """O braço do Visão no Mac (docs/BRACO.md). Só biblioteca padrão: roda com o Python do sistema.
 
-Busca no servidor tarefas que você aprovou, roda o Claude Code no projeto pedido, com uma lista
-fechada de ferramentas, e devolve o resultado. Só faz requisições de saída: nenhuma porta aberta.
+Busca no servidor tarefas que você aprovou, roda o Claude Code no projeto pedido (ou o executor
+do próprio Visão, com qualquer modelo da corrente: "executor": "visao"), com uma lista fechada
+de ferramentas, e devolve o resultado. Só faz requisições de saída: nenhuma porta aberta.
 
 O que é permitido fica aqui no Mac, em ~/.config/visao/braco.json; o servidor não muda isso.
 Uso: python3 visao_braco.py [--config caminho] [--once]
@@ -12,16 +13,20 @@ Uso: python3 visao_braco.py [--config caminho] [--once]
 from __future__ import annotations
 
 import argparse
+import difflib
+import fnmatch
 import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -33,7 +38,9 @@ from pathlib import Path
 # and can answer with a local model.
 # 3: Bash inside Claude Code's sandbox, the whole process group ends with the task, a photo of
 # the project before and after (changed files, undo), and "until the tests pass".
-VERSION = "3"
+# 4: the arm's own executor (ADR-0023): tools implemented here, the model asked step by step
+# through the server, tests and git in a sandbox of the arm's own (bubblewrap on Linux too).
+VERSION = "4"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -117,15 +124,23 @@ class Config:
     tests: dict[str, list[str]] = field(default_factory=dict)
     test_attempts: int = 3
     test_timeout_minutes: int = 10
+    # Who codes (ADR-0023): "claude_code" (default) or "visao", for the Mac and per project.
+    executor: str = "claude_code"
+    executors: dict[str, str] = field(default_factory=dict)
+
+    def executor_for(self, project: str) -> str:
+        return self.executors.get(project, self.executor)
 
     @classmethod
     def load(cls, path: Path) -> Config:
         data = json.loads(path.read_text())
-        projects, tests = {}, {}
+        projects, tests, executors = {}, {}, {}
         for name, entry in (data.get("projects") or {}).items():
             # "nome": "~/pasta", or "nome": {"pasta": "~/pasta", "testes": "make check"}
             if isinstance(entry, dict):
                 folder, check = entry.get("pasta"), str(entry.get("testes") or "").strip()
+                if entry.get("executor"):
+                    executors[str(name)] = _executor(entry["executor"])
             else:
                 folder, check = entry, ""
             if not folder:
@@ -157,7 +172,18 @@ class Config:
             tests=tests,
             test_attempts=max(1, int(data.get("test_attempts", 3))),
             test_timeout_minutes=max(1, int(data.get("test_timeout_minutes", 10))),
+            executor=_executor(data.get("executor") or "claude_code"),
+            executors=executors,
         )
+
+
+EXECUTORS = ("claude_code", "visao")
+
+
+def _executor(value: object) -> str:
+    if value not in EXECUTORS:
+        raise ValueError('executor precisa ser "claude_code" ou "visao"')
+    return str(value)
 
 
 def _local_address(address: str) -> str:
@@ -486,13 +512,22 @@ CHANGED_SINCE = "Não desfiz: estes arquivos mudaram de novo depois da tarefa:"
 
 
 def sandboxed(argv: list[str], folder: Path) -> list[str] | None:
-    """The tests run code a task may just have written: on the Mac they run in a sandbox with
-    no network beyond this Mac and writes only in the project and the temporary folders. None
-    where that is not available: then they do not run."""
-    if sys.platform != "darwin" or not Path("/usr/bin/sandbox-exec").is_file():
-        return None
+    """What runs code a task may just have written (the tests, and git, which reads files the
+    tests could have written) runs in a sandbox: no network beyond this Mac, writes only in the
+    project and the temporary folders, never in .git, .claude, .mcp.json or CLAUDE.md (a hook
+    planted there would run outside, later), and the key folders hidden. macOS: sandbox-exec.
+    Linux: bubblewrap, without any network. None where neither exists: then nothing runs."""
+    if sys.platform == "darwin" and Path("/usr/bin/sandbox-exec").is_file():
+        return _seatbelt(argv, folder)
+    if sys.platform.startswith("linux") and shutil.which("bwrap"):
+        return _bubblewrap(argv, folder)
+    return None
+
+
+def _seatbelt(argv: list[str], folder: Path) -> list[str] | None:
+    root = os.path.realpath(folder)
     writable = {
-        os.path.realpath(folder),
+        root,
         os.path.realpath(tempfile.gettempdir()),
         "/private/tmp",
         "/private/var/folders",
@@ -502,13 +537,51 @@ def sandboxed(argv: list[str], folder: Path) -> list[str] | None:
         return None
     allow = " ".join(f'(subpath "{p}")' for p in sorted(writable))
     deny = " ".join(f'(subpath "{p}")' for p in sorted(hidden))
+    guarded = (
+        f'(subpath "{root}/.git") (subpath "{root}/.claude") (literal "{root}/.mcp.json") '
+        # macOS ignores case: claude.md is the same file.
+        '(regex #"/[Cc][Ll][Aa][Uu][Dd][Ee](\\.[Ll][Oo][Cc][Aa][Ll])?\\.[Mm][Dd]$")'
+    )
+    # The last matching rule wins: the guarded paths stay read-only inside the project.
     profile = (
         "(version 1)(allow default)"
         '(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
         f'(deny file-write*)(allow file-write* {allow} (subpath "/dev"))'
+        f"(deny file-write* {guarded})"
         f"(deny file-read* {deny})"
     )
     return ["/usr/bin/sandbox-exec", "-p", profile, *argv]
+
+
+def _bubblewrap(argv: list[str], folder: Path) -> list[str]:
+    root = os.path.realpath(folder)
+    temp = os.path.realpath(tempfile.gettempdir())
+    args = [
+        shutil.which("bwrap") or "bwrap",
+        "--die-with-parent",
+        "--new-session",
+        "--unshare-net",
+        "--unshare-pid",
+        "--ro-bind", "/", "/",
+        "--dev", "/dev",
+        "--proc", "/proc",
+    ]  # fmt: skip
+    for path in sorted({temp, "/tmp"}):  # noqa: S108 (writable inside the sandbox, as on the Mac)
+        if os.path.isdir(path):
+            args += ["--bind", path, path]
+    args += ["--bind", root, root]
+    # Only what exists can be mounted read-only; .git always exists in a repository.
+    for name in (".git", ".claude", ".mcp.json", "CLAUDE.md", "CLAUDE.local.md"):
+        path = os.path.join(root, name)
+        if os.path.lexists(path) and not os.path.islink(path):
+            args += ["--ro-bind", path, path]
+    for secret in sorted({os.path.realpath(os.path.expanduser(p)) for p in SECRETS}):
+        if os.path.isdir(secret) and not root.startswith(secret + os.sep):
+            args += ["--tmpfs", secret]
+    return [*args, "--chdir", root, "--", *argv]
+
+
+_SANDBOX_ERRORS = ("sandbox-exec:", "bwrap:")
 
 
 def run_tests(config: Config, project: str, folder: Path, seconds: float) -> dict:
@@ -531,7 +604,7 @@ def run_tests(config: Config, project: str, folder: Path, seconds: float) -> dic
             "tail": tail,
             "error": "Os testes passaram do tempo.",
         }
-    if code != 0 and err.lstrip().startswith("sandbox-exec:"):
+    if code != 0 and err.lstrip().startswith(_SANDBOX_ERRORS):
         return {
             "command": shown,
             "passed": False,
@@ -602,6 +675,574 @@ def until_tests_pass(config: Config, task: dict, folder: Path, isolated: list[st
     return body
 
 
+# --- the arm's own executor (ADR-0023) -------------------------------------------------------
+# The loop runs here and the head on the server: at each step the arm sends the server what
+# happened so far and gets one action back. The model only picks among these tools; each one is
+# implemented and checked here, whatever the model or the server says. No shell, no network.
+
+
+class Refused(Exception):
+    """A tool call the arm does not do. The reason goes back to the model."""
+
+
+# Names and arguments the arm accepts, with their types. The server describes the same tools
+# (core/arm/coder.py); this table is the one that decides.
+VISAO_TOOLS: dict[str, dict[str, type]] = {
+    "ler": {"caminho": str, "de_linha": int, "ate_linha": int},
+    "listar": {"pasta": str},
+    "buscar": {"texto": str, "pasta": str},
+    "editar": {"caminho": str, "trecho": str, "novo": str},
+    "criar": {"caminho": str, "conteudo": str},
+    "rodar_testes": {},
+    "git_status": {},
+    "git_diff": {"caminho": str},
+    "terminar": {"resumo": str},
+}
+VISAO_REQUIRED = {
+    "ler": {"caminho"},
+    "buscar": {"texto"},
+    "editar": {"caminho", "trecho"},
+    "criar": {"caminho", "conteudo"},
+    "terminar": {"resumo"},
+}
+# Never read or written by the executor, a choice of the owner: what is read goes to the model's
+# provider. The examples stay readable.
+SECRET_FILES = (
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "id_rsa*",
+    "id_ed25519*",
+    "id_ecdsa*",
+    "id_dsa*",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+)
+SECRET_EXAMPLES = {".env.example", ".env.sample", ".env.template"}
+# The same as PROTECTED, for paths: what would widen what the next tasks may do.
+GUARDED_DIRS = {".git", ".claude"}
+GUARDED_FILES = {"claude.md", "claude.local.md"}
+SKIPPED_DIRS = {
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".next",
+}
+MAX_OBSERVATION = 16_000
+READ_LINES = 300
+MAX_FILE_BYTES = 1_000_000
+MAX_WRITE_CHARS = 200_000
+MAX_LISTED = 400
+MAX_FOUND = 100
+STEP_TIMEOUT = 300
+STEP_RETRIES = 3
+
+
+def is_secret(name: str) -> bool:
+    name = name.lower()
+    return name not in SECRET_EXAMPLES and any(fnmatch.fnmatchcase(name, p) for p in SECRET_FILES)
+
+
+def _guarded(parts: tuple[str, ...]) -> bool:
+    lower = [p.lower() for p in parts]
+    if any(p in GUARDED_DIRS for p in lower):
+        return True
+    return bool(lower) and (lower[-1] in GUARDED_FILES or lower == [".mcp.json"])
+
+
+def inside(folder: Path, given: object, what: str = "caminho") -> Path:
+    """The real path of `given` inside the project. Refuses absolute paths, `..` and symlinks
+    that leave it, the guarded files and the secret ones, before anything is opened."""
+    if not isinstance(given, str) or not given.strip() or "\0" in given:
+        raise Refused(f"{what} vazio ou inválido")
+    if given.startswith("~") or Path(given).is_absolute():
+        raise Refused(f"{given} fica fora do projeto; use um caminho relativo à raiz dele")
+    root = folder.resolve()
+    target = (root / given).resolve()
+    if target != root and not target.is_relative_to(root):
+        raise Refused(f"{given} fica fora do projeto")
+    real = target.relative_to(root).parts
+    written = tuple(p for p in Path(given).parts if p not in ("", "."))
+    if _guarded(real) or _guarded(written):
+        raise Refused(f"{given} é protegido (.git, .claude, .mcp.json, CLAUDE.md)")
+    if (real and is_secret(real[-1])) or (written and is_secret(written[-1])):
+        raise Refused(f"{given} é arquivo de segredo; fica fora de alcance")
+    return target
+
+
+def _relative(folder: Path, path: Path) -> str:
+    return path.relative_to(folder.resolve()).as_posix() or "."
+
+
+def _text_of(path: Path) -> str:
+    if not path.is_file():
+        raise Refused(f"{path.name} não é um arquivo")
+    if path.stat().st_size > MAX_FILE_BYTES:
+        raise Refused(f"{path.name} passa de 1 MB")
+    raw = path.read_bytes()
+    if b"\0" in raw[:8192]:
+        raise Refused(f"{path.name} é binário")
+    return raw.decode("utf-8", errors="replace")
+
+
+def tool_read(folder: Path, args: dict) -> str:
+    path = inside(folder, args["caminho"])
+    lines = _text_of(path).splitlines()
+    start = max(1, int(args.get("de_linha") or 1))
+    end = min(len(lines), int(args.get("ate_linha") or start + READ_LINES - 1))
+    end = min(end, start + READ_LINES - 1)
+    shown, size = [], 0
+    for number in range(start, end + 1):
+        line = f"{number:>5}  {lines[number - 1]}"
+        if size + len(line) > MAX_OBSERVATION - 200:
+            end = number - 1
+            break
+        shown.append(line)
+        size += len(line) + 1
+    head = f"{_relative(folder, path)} ({len(lines)} linhas)"
+    more = f"\n(continua: de_linha={end + 1})" if end < len(lines) else ""
+    return head + "\n" + "\n".join(shown) + more
+
+
+def _walk(start: Path):
+    """Files and folders under start, without following symlinks or entering skipped folders."""
+    for current, dirs, files in os.walk(start, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if d not in SKIPPED_DIRS)
+        yield Path(current), dirs, sorted(files)
+
+
+def _size_of(path: Path) -> str:
+    """Lines of a text file, so the model knows what is big before opening it."""
+    if is_secret(path.name):
+        return " (segredo, fora de alcance)"
+    try:
+        if path.is_symlink() or path.stat().st_size > MAX_FILE_BYTES:
+            return ""
+        raw = path.read_bytes()
+    except OSError:
+        return ""
+    if b"\0" in raw[:8192]:
+        return ""
+    return f" ({raw.count(chr(10).encode())} linhas)"
+
+
+def tool_list(folder: Path, args: dict) -> str:
+    start = inside(folder, args.get("pasta") or ".", "pasta")
+    if not start.is_dir():
+        raise Refused(f"{args.get('pasta')} não é uma pasta")
+    entries: list[str] = []
+    for current, dirs, files in _walk(start):
+        for name in dirs:
+            entries.append(_relative(folder, current / name) + "/")
+        for name in files:
+            entries.append(_relative(folder, current / name) + _size_of(current / name))
+        if len(entries) >= MAX_LISTED:
+            break
+    cut = len(entries) > MAX_LISTED
+    listed = "\n".join(sorted(entries[:MAX_LISTED])) or "(vazia)"
+    return listed + ("\n(mais itens; liste uma subpasta)" if cut else "")
+
+
+def tool_search(folder: Path, args: dict) -> str:
+    wanted = args["texto"]
+    if not wanted.strip():
+        raise Refused("texto vazio")
+    start = inside(folder, args.get("pasta") or ".", "pasta")
+    needle, found = wanted.lower(), []
+    for current, _, files in _walk(start):
+        for name in files:
+            path = current / name
+            if is_secret(name) or path.is_symlink():
+                continue
+            try:
+                text = _text_of(path)
+            except (Refused, OSError):
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                if needle in line.lower():
+                    found.append(f"{_relative(folder, path)}:{number}: {line.strip()[:200]}")
+                    if len(found) >= MAX_FOUND:
+                        return "\n".join(found) + f"\n(parei em {MAX_FOUND} resultados)"
+    return "\n".join(found) or "Nada encontrado."
+
+
+def _save_text(path: Path, text: str) -> None:
+    partial = path.with_name(f".{path.name}.visao-tmp")
+    partial.write_text(text, encoding="utf-8")
+    if path.exists():
+        os.chmod(partial, path.stat().st_mode & 0o7777)
+    os.replace(partial, path)
+
+
+# Where cheap models fail most (docs/research: Goose, OpenClaw, Hermes): a snippet copied with a
+# trailing space, a different indentation or curly quotes. Each failed edit costs a whole step,
+# so an exact match comes first, then these, in order, and only a single match is ever applied.
+_LOOKALIKES = str.maketrans(
+    {"“": '"', "”": '"', "‘": "'", "’": "'", "–": "-", "—": "-", "\u00a0": " "}
+)
+
+
+def _plain(line: str) -> str:
+    return unicodedata.normalize("NFKC", line).translate(_LOOKALIKES).rstrip()
+
+
+_LOOSE = (
+    ("sem espaço no fim", lambda line: line.rstrip()),
+    ("aspas e traços normalizados", _plain),
+    ("recuo diferente", lambda line: _plain(line).strip()),
+)
+
+
+def _indent(line: str) -> str:
+    return line[: len(line) - len(line.lstrip())]
+
+
+def _loose_match(lines: list[str], old: list[str], new: str) -> tuple[str, int, list[str]] | None:
+    """(how, first line, the file's lines with the snippet replaced) for the first loose way
+    that finds the snippet exactly once."""
+    size = len(old)
+    for how, norm in _LOOSE:
+        wanted = [norm(line) for line in old]
+        found = [
+            i
+            for i in range(len(lines) - size + 1)
+            if [norm(line) for line in lines[i : i + size]] == wanted
+        ]
+        if len(found) != 1:
+            continue
+        i = found[0]
+        replacement = new.split("\n") if new else []
+        if how == "recuo diferente" and old and replacement:
+            # The model's indentation was off by a constant: shift the new lines the same way.
+            have, gave = _indent(lines[i]), _indent(old[0])
+            replacement = [
+                have + line[len(gave) :] if line.startswith(gave) else line for line in replacement
+            ]
+        return how, i + 1, lines[:i] + replacement + lines[i + size :]
+    return None
+
+
+def _numbered(lines: list[str], center: int, around: int = 10) -> str:
+    start, end = max(0, center - around), min(len(lines), center + around)
+    return "\n".join(f"{n + 1:>5}  {lines[n]}" for n in range(start, end))
+
+
+def _closest(lines: list[str], old: str) -> str:
+    """ "Você quis dizer": the line most like the snippet's first one, with 20 lines around."""
+    first = next((line for line in old.splitlines() if line.strip()), old).strip()
+    best, score = 0, 0.0
+    for n, line in enumerate(lines):
+        ratio = difflib.SequenceMatcher(None, first, line.strip()).ratio()
+        if ratio > score:
+            best, score = n, ratio
+    if score < 0.5:
+        return ""
+    return f" O mais parecido está perto da linha {best + 1}:\n{_numbered(lines, best)}"
+
+
+def _diff(before: str, after: str, name: str) -> str:
+    lines = difflib.unified_diff(
+        before.splitlines(), after.splitlines(), f"a/{name}", f"b/{name}", n=2, lineterm=""
+    )
+    return "\n".join(lines)[:4000]
+
+
+def tool_edit(folder: Path, args: dict) -> str:
+    path = inside(folder, args["caminho"])
+    old, new = args["trecho"], args.get("novo", "")
+    if not old:
+        raise Refused("trecho vazio")
+    if len(new) > MAX_WRITE_CHARS:
+        raise Refused("o trecho novo é grande demais")
+    if not path.is_file():
+        raise Refused(f"{args['caminho']} não existe; para um arquivo novo, use criar")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise Refused(f"{args['caminho']} não é texto UTF-8") from exc
+    name, lines = _relative(folder, path), text.split("\n")
+    count, how = text.count(old), ""
+    if count > 1:
+        where = [str(text[: m.start()].count("\n") + 1) for m in re.finditer(re.escape(old), text)]
+        raise Refused(
+            f"o trecho aparece {count} vezes (linhas {', '.join(where[:10])}); inclua mais "
+            "linhas em volta para ficar único"
+        )
+    if count == 1:
+        after = text.replace(old, new, 1)
+        first = text[: text.index(old)].count("\n") + 1
+    else:
+        loose = _loose_match(lines, old.strip("\n").split("\n"), new.strip("\n"))
+        if loose is None:
+            raise Refused(
+                "o trecho não está no arquivo."
+                + _closest(lines, old)
+                + (" Leia de novo e copie exatamente; o arquivo pode ter mudado.")
+            )
+        how, first, changed_lines = loose
+        after = "\n".join(changed_lines)
+    _save_text(path, after)
+    note = f" (achei com {how})" if how else ""
+    return f"Editei {name}{note}, a partir da linha {first}.\n{_diff(text, after, name)}"
+
+
+def tool_create(folder: Path, args: dict) -> str:
+    path = inside(folder, args["caminho"])
+    content = args["conteudo"]
+    if len(content) > MAX_WRITE_CHARS:
+        raise Refused("o conteúdo é grande demais")
+    if path.exists() or path.is_symlink():
+        raise Refused(f"{args['caminho']} já existe; para mudar, use editar")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.parent.resolve().is_relative_to(folder.resolve()):
+        raise Refused(f"{args['caminho']} fica fora do projeto")
+    with open(path, "x", encoding="utf-8") as handle:
+        handle.write(content)
+    return f"Criei {_relative(folder, path)}."
+
+
+# Git reads config and attributes the tests could have written: hooks, fsmonitor, external diff
+# and textconv off, and it runs in the sandbox like the tests. Secret files never show.
+GIT = [
+    "git",
+    "-c",
+    "core.fsmonitor=false",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "-c",
+    "core.pager=cat",
+    "--no-pager",
+    "--no-optional-locks",
+]
+NOT_SECRETS = [f":(exclude,glob,icase)**/{p}" for p in SECRET_FILES]
+
+
+def tool_git(config: Config, folder: Path, which: str, args: dict, seconds: float) -> str:
+    if which == "status":
+        argv = [*GIT, "status", "--short", "--untracked-files=all"]
+    else:
+        target = _relative(folder, inside(folder, args["caminho"])) if args.get("caminho") else "."
+        argv = [*GIT, "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--", target]
+        argv += NOT_SECRETS
+    wrapped = sandboxed(argv, folder)
+    if wrapped is None:
+        raise Refused("não consegui isolar o git neste computador, então não rodei")
+    env = _environment(config)
+    env.pop("ANTHROPIC_API_KEY", None)
+    code, out, err = _run_group(wrapped, folder, env, "", max(5.0, min(60.0, seconds)))
+    if code is None:
+        raise Refused("o git passou do tempo")
+    if code != 0:
+        raise Refused(f"o git saiu com erro: {(err or out).strip()[-500:]}")
+    return out.strip() or "(nada)"
+
+
+def tool_tests(config: Config, project: str, folder: Path, seconds: float) -> tuple[bool, str]:
+    report = run_tests(config, project, folder, seconds)
+    if "error" in report:
+        return False, report["error"]
+    verdict = "Passaram." if report["passed"] else "Não passaram."
+    return report["passed"], f"`{report['command']}`: {verdict}\n\n{report.get('tail', '')}"
+
+
+def check_args(tool: str, args: object) -> str | None:
+    if not isinstance(args, dict):
+        return "args precisa ser um objeto"
+    accepted = VISAO_TOOLS[tool]
+    for name, value in args.items():
+        if name not in accepted:
+            return f"{tool} não aceita {name}"
+        kind = accepted[name]
+        if not isinstance(value, kind) or (kind is int and isinstance(value, bool)):
+            return f"{name} precisa ser {'texto' if kind is str else 'número'}"
+    missing = sorted(VISAO_REQUIRED.get(tool, set()) - set(args))
+    return f"falta {', '.join(missing)}" if missing else None
+
+
+def execute(
+    config: Config,
+    project: str,
+    folder: Path,
+    tool: object,
+    args: object,
+    allowed: list[str],
+    seconds: float,
+) -> tuple[bool, str]:
+    """Runs one tool call. Never raises: a refusal or an error is the observation."""
+    if not isinstance(tool, str) or tool not in allowed or tool not in VISAO_TOOLS:
+        listed = ", ".join(allowed)
+        return False, f"Recusado: {tool!r} não é uma ferramenta liberada neste Mac ({listed})."
+    problem = check_args(tool, args)
+    if problem:
+        return False, f"Recusado: {problem}."
+    assert isinstance(args, dict)
+    try:
+        if tool == "ler":
+            text = tool_read(folder, args)
+        elif tool == "listar":
+            text = tool_list(folder, args)
+        elif tool == "buscar":
+            text = tool_search(folder, args)
+        elif tool == "editar":
+            text = tool_edit(folder, args)
+        elif tool == "criar":
+            text = tool_create(folder, args)
+        elif tool == "rodar_testes":
+            return tool_tests(config, project, folder, seconds)
+        elif tool in ("git_status", "git_diff"):
+            text = tool_git(config, folder, tool[4:], args, seconds)
+        else:
+            return False, f"Recusado: {tool} não se executa."
+    except Refused as exc:
+        return False, f"Recusado: {exc}."
+    except (OSError, UnicodeError, ValueError) as exc:
+        return False, f"Erro: {exc}"[:2000]
+    return True, text
+
+
+class StepFailed(RuntimeError):
+    pass
+
+
+def ask_step(config: Config, task_id: str, tools: list[str], steps: list[dict]) -> dict:
+    """The next action from the server. Retries a dropped connection; a task the server no
+    longer has with this Mac ends here."""
+    body = {
+        "tools": tools,
+        "steps": steps[-200:],
+        "max_steps": config.max_turns,
+        "max_usd": round(config.max_budget_usd, 2),
+    }
+    for attempt in range(STEP_RETRIES):
+        try:
+            reply = call(config, "POST", f"/device/tasks/{task_id}/step", body, STEP_TIMEOUT)
+            return reply if isinstance(reply, dict) else {}
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 409, 401):
+                raise StepFailed("O servidor não está mais com essa tarefa neste Mac.") from exc
+            if exc.code < 500 or attempt == STEP_RETRIES - 1:
+                raise StepFailed(f"O servidor recusou o passo ({exc.code}).") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt == STEP_RETRIES - 1:
+                raise StepFailed(f"Perdi a conexão com o servidor no meio ({exc}).") from exc
+        time.sleep(5 * (attempt + 1))
+    raise StepFailed("O servidor não respondeu.")
+
+
+def _entry(tool: str | None, args: dict, note: object, ok: bool, result: str) -> dict:
+    return {
+        "tool": tool,
+        "args": args if tool else {},
+        "note": str(note or "")[:4000],
+        "ok": ok,
+        "result": result[:MAX_OBSERVATION],
+    }
+
+
+MAX_NUDGES = 2
+NO_PROOF = (
+    "Você mudou {files} e não rodou os testes depois disso. Rode rodar_testes antes de "
+    "terminar. Se não der para rodar, termine de novo e diga por quê; não diga que funciona "
+    "sem o resultado dos testes."
+)
+
+
+def run_visao(config: Config, task: dict, folder: Path) -> dict:
+    """The arm's own executor. Ends at `terminar`, at the limits of steps and time of braco.json,
+    or when the server says stop (its limits of steps and cost, no provider). With "until the
+    tests pass", `terminar` runs the tests, and while they fail the loop goes on."""
+    project, task_id = str(task["project"]), str(task["id"])
+    until = bool(task.get("until_tests"))
+    tools = [t for t in VISAO_TOOLS if t != "rodar_testes" or project in config.tests]
+    started, limit = time.monotonic(), config.timeout_minutes * 60
+    steps: list[dict] = []
+    cost, attempts, report = 0.0, 0, None
+    nudges, unproven = 0, []  # files changed since the tests last ran
+
+    def end(ok: bool, result: str = "", error: str = "") -> dict:
+        body: dict = {"ok": ok, "result": result[:MAX_RESULT], "cost_usd": round(cost, 6)}
+        body["executor"] = "visao"
+        if error:
+            body["error"] = error[:500]
+        if report is not None:
+            body["tests"] = report
+        return body
+
+    while True:
+        left = limit - (time.monotonic() - started)
+        if left <= 0:
+            return end(False, error=f"Passou de {config.timeout_minutes} min e eu parei.")
+        if len(steps) >= config.max_turns:
+            return end(False, error=f"Cheguei ao limite de {config.max_turns} passos e parei.")
+        try:
+            reply = ask_step(config, task_id, tools, steps)
+        except StepFailed as exc:
+            return end(False, error=str(exc))
+        try:
+            cost = float(reply.get("cost_usd") or cost)
+        except (TypeError, ValueError):
+            pass
+        if reply.get("stop"):
+            return end(False, error=str(reply["stop"]))
+        action = reply.get("action")
+        if not isinstance(action, dict):
+            reason = str(reply.get("invalid") or "a resposta não trouxe uma ação")
+            steps.append(_entry(None, {}, reply.get("note"), False, reason))
+            continue
+        tool, args = action.get("tool"), action.get("args") or {}
+        if tool == "terminar" and check_args("terminar", args) is None:
+            summary = str(args["resumo"]).strip() or "Terminei, sem nada a relatar."
+            if not until and unproven and "rodar_testes" in tools and nudges < MAX_NUDGES:
+                # No proof, no end (Hermes): it changed files and never ran the tests since.
+                nudges += 1
+                files = ", ".join(sorted(set(unproven))[:10])
+                steps.append(
+                    _entry("terminar", args, reply.get("note"), False, NO_PROOF.format(files=files))
+                )
+                continue
+            if not until:
+                return end(True, summary)
+            attempts += 1
+            seconds = min(config.test_timeout_minutes * 60, max(1.0, left))
+            report = run_tests(config, project, folder, seconds)
+            report["attempts"] = attempts
+            if report["passed"]:
+                return end(True, summary)
+            if "error" in report or attempts >= config.test_attempts or left < 120:
+                failed = report.get("error") or (
+                    f"Os testes (`{report['command']}`) não passaram depois de "
+                    f"{attempts} tentativa(s)."
+                )
+                return end(False, summary, failed)
+            retry = RETRY.format(
+                command=report["command"],
+                attempt=attempts,
+                attempts=config.test_attempts,
+                tail=report.get("tail", ""),
+            )
+            steps.append(_entry("terminar", args, reply.get("note"), False, retry))
+            continue
+        ok, result = execute(config, project, folder, tool, args, tools, left)
+        if tool == "rodar_testes":
+            unproven = []
+        elif ok and tool in ("editar", "criar") and isinstance(args, dict):
+            unproven.append(str(args.get("caminho")))
+        steps.append(
+            _entry(str(tool), args if isinstance(args, dict) else {}, reply.get("note"), ok, result)
+        )
+
+
 def handle(config: Config, task: dict) -> dict:
     project = str(task.get("project", ""))
     folder = config.projects.get(project)
@@ -615,20 +1256,27 @@ def handle(config: Config, task: dict) -> dict:
     until = bool(task.get("until_tests"))
     if until and project not in config.tests:
         return {"ok": False, "error": NO_TESTS.format(project=project)}
-    isolated = isolation(config)
-    if isolated is None:
-        missing = f"Não achei o Claude Code ({config.claude}) neste Mac."
-        return {"ok": False, "error": TOO_OLD if _help(config.claude) else missing}
+    visao = config.executor_for(project) == "visao"
+    isolated: list[str] = []
+    if not visao:
+        found = isolation(config)
+        if found is None:
+            missing = f"Não achei o Claude Code ({config.claude}) neste Mac."
+            return {"ok": False, "error": TOO_OLD if _help(config.claude) else missing}
+        isolated = found
     task_id = str(task.get("id", ""))
     try:
         before = photo(config, project, folder, f"{task_id}/antes") if task_id else None
     except PhotoError as exc:
         print(f"Sem foto de antes ({exc}); a tarefa roda sem desfazer", file=sys.stderr)
         before = None
-    if until:
+    if visao:
+        body = run_visao(config, task, folder)
+    elif until:
         body = until_tests_pass(config, task, folder, isolated)
     else:
         body = run_claude(config, task, folder, isolated)
+    body.setdefault("executor", "claude_code")
     if before is not None:
         try:
             after = photo(config, project, folder, f"{task_id}/depois")

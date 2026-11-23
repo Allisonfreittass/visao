@@ -143,6 +143,7 @@ def test_a_successful_run_reports_result_cost_and_session(tmp_path):
     )
     assert result == {
         "ok": True,
+        "executor": "claude_code",
         "result": "fiz: rode os testes",
         "session_id": "s-1",
         "cost_usd": 0.02,
@@ -548,8 +549,8 @@ def test_until_the_tests_pass_needs_a_test_command_on_the_mac(tmp_path):
     assert not ran.exists()
 
 
-@pytest.mark.skipif(sys.platform == "darwin", reason="no Mac, sandbox-exec is missing")
-def test_tests_never_run_outside_the_sandbox(tmp_path):
+def test_tests_never_run_outside_the_sandbox(tmp_path, monkeypatch):
+    monkeypatch.setattr(braco, "sandboxed", lambda argv, folder: None)  # neither exists here
     cfg = config(tmp_path, fake_claude(tmp_path, FIXES_ON_RESUME), tests={"visao": PASSES_WHEN_OK})
     (cfg.projects["visao"] / "ok").write_text("1")
     body = braco.handle(cfg, {"id": "t-1", "project": "visao", "prompt": "x", "until_tests": True})

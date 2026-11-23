@@ -12,7 +12,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
-from integrations.llm.base import ChatMessage, LLMError, LLMResponse, Pricing
+from integrations.llm.base import (
+    ChatMessage,
+    LLMError,
+    LLMResponse,
+    Pricing,
+    ToolCall,
+    cache_key,
+    offered_tools,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +53,7 @@ class OpenAICompatibleProvider:
         max_retries: int = 2,
         transport: httpx.BaseTransport | None = None,
         extra_body: dict | None = None,
+        native_tools: bool | None = None,
     ) -> None:
         self.name = name
         self.model = model
@@ -56,6 +65,11 @@ class OpenAICompatibleProvider:
         # (Gemini, Groq, OpenRouter) keep the classic name.
         self._output_param = (
             "max_completion_tokens" if "api.openai.com" in base_url.lower() else "max_tokens"
+        )
+        # Tools go natively only where they were checked (OpenAI); elsewhere (Gemini, Groq,
+        # OpenRouter) the caller's prompt carries them as a JSON protocol (ADR-0023).
+        self._native_tools = (
+            "api.openai.com" in base_url.lower() if native_tools is None else native_tools
         )
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
@@ -71,6 +85,21 @@ class OpenAICompatibleProvider:
             "messages": [{"role": m.role, "content": _content(m)} for m in messages],
             self._output_param: max_output_tokens,
         }
+        if self._native_tools and cache_key():
+            payload["prompt_cache_key"] = cache_key()
+        tools = offered_tools() if self._native_tools else ()
+        if tools:
+            payload["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    },
+                }
+                for t in tools
+            ]
         started = time.monotonic()
         response = self._post_with_retries(payload)
         latency_ms = int((time.monotonic() - started) * 1000)
@@ -79,7 +108,8 @@ class OpenAICompatibleProvider:
             body = response.json()
             choice = body["choices"][0]
             usage = body["usage"]
-            text = choice["message"]["content"] or ""
+            text = choice["message"].get("content") or ""
+            calls = _tool_calls(choice["message"].get("tool_calls"))
             input_tokens = int(usage["prompt_tokens"])
             output_tokens = int(usage["completion_tokens"])
             configured_cost = self.pricing.cost(input_tokens, output_tokens)
@@ -101,6 +131,7 @@ class OpenAICompatibleProvider:
             finish_reason=choice.get("finish_reason"),
             # Never hide a positive provider-reported cost behind configured free prices.
             cost_usd=max(configured_cost, reported_cost),
+            tool_calls=calls,
         )
 
     def _post_with_retries(self, payload: dict) -> httpx.Response:
@@ -143,6 +174,23 @@ class OpenAICompatibleProvider:
             )
             time.sleep(delay)
         raise AssertionError("unreachable")
+
+
+def _tool_calls(raw: object) -> tuple[ToolCall, ...]:
+    """Calls whose arguments are not a JSON object are dropped: the caller then sees no call and
+    tells the model its answer was not an action."""
+    calls = []
+    for item in raw if isinstance(raw, list) else []:
+        function = item.get("function") if isinstance(item, dict) else None
+        if not isinstance(function, dict) or not function.get("name"):
+            continue
+        try:
+            arguments = json.loads(function.get("arguments") or "{}")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(arguments, dict):
+            calls.append(ToolCall(str(function["name"]), arguments))
+    return tuple(calls)
 
 
 def _retry_delay(response: httpx.Response | None, attempt: int) -> float:

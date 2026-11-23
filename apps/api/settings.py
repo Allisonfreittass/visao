@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     # the owner switches to it and a Mac offers one. A small model reads little at once.
     local_llm_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     local_llm_context_chars: int = Field(default=40_000, ge=4000)
+    # The arm's own executor (ADR-0023): steps and cost per task counted by the server, on top of
+    # what braco.json allows (the smaller wins). A choice of the owner: in production the paid
+    # chain takes 40 calls an hour, shared with the conversation.
+    arm_code_max_steps: int = Field(default=20, ge=1, le=200)
+    arm_code_max_usd: Decimal = Field(default=Decimal("0.50"), ge=0)
+    # The prompt of each step, in characters (bytes are what the budget guard measures).
+    arm_code_context_chars: int = Field(default=48_000, ge=8000)
 
     # Optional fallback provider, tried when the primary is out of quota, rate-limited or down.
     llm_fallback_provider_name: str | None = None

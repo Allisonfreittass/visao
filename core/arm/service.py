@@ -9,7 +9,9 @@ Rules enforced here, not in a prompt:
 - what a task changed is the list the arm measured with its photos, not what Claude says; undo
   is a task of its own, approved by the tap, that the arm runs without Claude;
 - "até os testes passarem" is read from the owner's words in code, and the arm decides it by the
-  exit code of the test command in braco.json.
+  exit code of the test command in braco.json;
+- with the arm's own executor (ADR-0023, core/arm/coder.py) the cost of a task is what the server
+  counted step by step, not what the Mac reports.
 """
 
 import hashlib
@@ -383,6 +385,16 @@ def _tests_line(task: ArmTask) -> str:
     return f"{line}\n\n```\n{tail}\n```" if tail else line
 
 
+EXECUTORS = ("claude_code", "visao")
+
+
+def _executor_line(task: ArmTask) -> str:
+    if task.executor != "visao":
+        return ""
+    steps = f"{task.steps} passo{'s' if task.steps != 1 else ''}"
+    return f"Feito pelo executor do Visão, em {steps} (US$ {task.model_cost_usd or 0:.4f})."
+
+
 def _summary(task: ArmTask) -> str:
     undo = task.kind == "undo"
     if task.status == "done":
@@ -393,7 +405,7 @@ def _summary(task: ArmTask) -> str:
         body = task.error or "Erro sem detalhe."
         if task.result.strip() and not undo:
             body += "\n\n" + task.result.strip()
-    parts = [head, body, _tests_line(task), _files_line(task)]
+    parts = [head, body, _tests_line(task), _files_line(task), _executor_line(task)]
     return "\n\n".join(p for p in parts if p)[:MAX_RESULT]
 
 
@@ -410,6 +422,7 @@ def finish(
     changed: list[dict[str, str]] | None = None,
     snapshot: bool = False,
     tests: dict | None = None,
+    executor: str | None = None,
 ) -> ArmTask:
     task = session.get(ArmTask, task_id)
     if task is None or task.device_id != device.id:
@@ -423,7 +436,10 @@ def finish(
     task.status = "done" if ok else "failed"
     task.result = result[:MAX_RESULT]
     task.error = error[:500]
-    task.cost_usd = cost_usd
+    if executor in EXECUTORS:
+        task.executor = executor
+    # The server counted every step of its own executor; the Mac's figure is only a report.
+    task.cost_usd = task.model_cost_usd if task.executor == "visao" else cost_usd
     task.claude_session_id = (claude_session_id or None) and claude_session_id[:128]
     task.finished_at = now
     task.snapshot = bool(snapshot) and task.kind == "work"
@@ -543,7 +559,8 @@ def work_record(
             line += f" às {local(task.finished_at)}"
         if task.status == "done" and task.result.strip():
             result = _clip(task.result, RECORD_RESULT_CHARS)
-            line += f". Resultado devolvido pelo Claude Code: {result}"
+            who = "pelo executor do Visão" if task.executor == "visao" else "pelo Claude Code"
+            line += f". Resultado devolvido {who}: {result}"
         elif task.status == "failed" and task.error:
             line += f". Erro: {_clip(task.error, 200)}"
         if task.snapshot:

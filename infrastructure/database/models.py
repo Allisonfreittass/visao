@@ -979,6 +979,13 @@ class ArmTask(Base):
     # {"command", "passed", "attempts", "tail"?, "error"?}
     tests: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Who coded it (ADR-0023): None or "claude_code" (Claude Code on the Mac) | "visao" (the arm's
+    # own executor, one model call per step, counted here by the server).
+    executor: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    steps: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    model_cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(12, 6), default=Decimal(0), server_default="0"
+    )
 
 
 class OwnerQuestion(Base):
