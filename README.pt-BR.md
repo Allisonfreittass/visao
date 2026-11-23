@@ -6,6 +6,8 @@
 
 **Rastro · Introspecção.** *Um agente que nasce sem nome e decide quem é.*
 
+<p align="center"><img src="brand/muninn/muninn-ascii.gif" width="620" alt="O Muninn se desenhando em ASCII: os caracteres assentam do peito para as pontas das asas, o anel de 24 marcas se fecha e a falha vazia do topo pisca"></p>
+
 ![A tela de conversa: uma resposta com código e botão de copiar, a orbe e o botão Ligar](docs/assets/conversa.webp)
 
 Fiz o Visão para ser o amigo para quem eu ligo. Ele me ajuda com código e ideias, lembra só do

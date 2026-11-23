@@ -7,8 +7,8 @@ primeiro, depois o código.
 > **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 5 da
 > [Migração](#migração) estão feitos: tokens e fontes em todo o app, o `<Anel>` no lugar do
 > Ciclope, os sensores como ícones de traço, o login no Muninn e os textos na voz da seção 7.
-> Faltam os ícones do app (passo 6) e o iPhone inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem
-> este arquivo.
+> Os ícones e imagens (passo 6) saem do anel por `brand/generate_assets.py`. Falta o iPhone
+> inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem este arquivo.
 
 ## 1. Ideia
 
@@ -87,6 +87,14 @@ um `.json` ao lado dizendo de onde veio. `strokes.json` fica na mesma pasta.
 Tamanhos: acima de 120 px, Muninn + anel. Entre 32 e 120 px, só o anel. Abaixo de 32 px, anel
 sem as marcas apagadas.
 
+### Muninn em ASCII
+
+Para o terminal e o README: `brand/muninn/muninn_ascii.py` (só biblioteca padrão) toca a gênese
+em caracteres, 120 × 60, rampa ` .:-=+*#%@`, papel com âmbar no olho, no ponto inicial e no
+`null`. Roda no `make start` e quando o Braço é iniciado à mão num terminal; sem terminal, com
+`NO_COLOR` ou `VISAO_NO_ANIM=1`, mostra só o quadro final ou nada. `ascii_build.py --gif` refaz o
+JSON e o `muninn-ascii.gif` a partir da ilustração.
+
 ## 6. Movimento
 
 A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-eng`, `choreograph`):
@@ -147,7 +155,10 @@ Sem exclamação, sem emoji.
 5. Textos: seção 7. **Feito** no web: "Acompanhando…", "Fala comigo…", "Acompanhar um preço";
    saíram "Nada sob vigilância ainda", "Sistemas prontos" e "Pronto para a ordem"; avaliar uma
    resposta é "Ajudou" / "Não ajudou", sem emoji.
-6. `brand/generate-assets.swift`: regenerar ícones a partir do anel.
+6. Ícones e imagens a partir do anel. **Feito**: `brand/generate_assets.py` (Python, roda em
+   qualquer máquina, no lugar do `generate-assets.swift`) gera o ícone do iPhone (normal, escuro e
+   tingido), os do PWA, o favicon, o wordmark `VISÃO` em contornos, o `muninn-512.png` e a
+   `og-image`. Ícones pequenos levam só o anel (seção 5); o Muninn entra a partir de 120 px.
 
 Referência visual completa (telas de computador e celular, estados, animação): canvas
 "Visão — identidade" no Claude.

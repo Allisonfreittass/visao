@@ -6,6 +6,8 @@ English · [Português](README.pt-BR.md)
 
 **Trace · Introspection.** *An agent that is born without a name and decides who it is.*
 
+<p align="center"><img src="brand/muninn/muninn-ascii.gif" width="620" alt="The Muninn being drawn in ASCII: characters settle from the chest to the wing tips, the ring of 24 marks closes and the empty gap at the top blinks"></p>
+
 ![The conversation screen: a code answer with a copy button, the orb and the Call button](docs/assets/conversa.webp)
 
 I built Visão to be the friend I can call. It helps me with code and ideas, it remembers only what

@@ -489,6 +489,26 @@ def local_loop(config: Config, once: bool = False) -> None:
             return
 
 
+def genesis() -> None:
+    """The Muninn in ASCII when the arm is started by hand in a terminal (under launchd there is
+    no terminal, so the log stays clean). Missing player files just skip it."""
+    if not sys.stdout.isatty():
+        return
+    here = Path(__file__).resolve().parent
+    for folder in (here, here.parent / "brand/muninn"):
+        if (folder / "muninn_ascii.py").is_file() and (folder / "muninn-ascii.json").is_file():
+            sys.path.insert(0, str(folder))
+            try:
+                import muninn_ascii
+
+                muninn_ascii.main([])
+            except (ImportError, OSError, ValueError):
+                pass
+            finally:
+                sys.path.remove(str(folder))
+            return
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
@@ -499,6 +519,8 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"Configuração inválida em {args.config}: {exc}", file=sys.stderr)
         return 2
+    if not args.once:
+        genesis()
     print(f"Braço {VERSION} ligado a {config.server}; projetos: {', '.join(config.projects)}")
     if config.local_model and not args.once:
         print(f"Modelo local: {config.local_model} em {config.ollama}")

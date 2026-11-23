@@ -4,6 +4,9 @@
 set -eo pipefail
 cd "$(dirname "$0")/.."
 
+# The Muninn being drawn in ASCII (brand/muninn); skipped without a terminal or with VISAO_NO_ANIM=1.
+python3 brand/muninn/muninn_ascii.py || true
+
 # lsof ships with macOS; minimal Linux installs may only have ss, or neither (then bash's
 # /dev/tcp: a successful connection means something is listening).
 port_in_use() {

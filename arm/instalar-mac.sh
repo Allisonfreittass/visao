@@ -11,6 +11,8 @@ label=digital.visao.braco
 mkdir -p "$dir" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 chmod 700 "$dir"
 install -m 700 "$here/visao_braco.py" "$dir/visao_braco.py"
+# The Muninn in ASCII, shown when the arm starts in a terminal (optional: the arm runs without it).
+install -m 600 "$here/../brand/muninn/muninn_ascii.py" "$here/../brand/muninn/muninn-ascii.json" "$dir/"
 if [ ! -f "$dir/braco.json" ]; then
   install -m 600 "$here/braco.example.json" "$dir/braco.json"
   echo "Criei $dir/braco.json: cole o token do pareamento e ajuste os projetos, depois rode de novo."
@@ -43,5 +45,6 @@ PLIST
 
 launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist"
+python3 "$dir/muninn_ascii.py" || true
 echo "Braço ligado. Log: tail -f ~/Library/Logs/visao-braco.log"
 echo "Para desligar: launchctl bootout gui/$(id -u)/$label"
