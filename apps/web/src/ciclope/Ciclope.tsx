@@ -263,20 +263,20 @@ export function Ciclope({ state, size = 96, lookAt, level, animated = true, eyes
         </linearGradient>
       </defs>
       {/* working: the outer ring turning, 1.6 s */}
-      <circle data-part="outer" cx="50" cy="50" r="55" fill="none" stroke="#FF3B30" strokeWidth="5" strokeLinecap="round" strokeDasharray="110 248" style={{ opacity: 0 }} />
+      <circle data-part="outer" cx="50" cy="50" r="55" fill="none" stroke="#F0A23B" strokeWidth="5" strokeLinecap="round" strokeDasharray="110 248" style={{ opacity: 0 }} />
       <g data-part="body">
         <rect width="100" height="100" rx="30" fill="#2B2E34" />
         <rect width="100" height="100" rx="30" fill={`url(#${hl})`} />
         <rect x="1" y="1" width="98" height="98" rx="29" fill="none" stroke="#454952" strokeWidth="1.5" />
         {/* power LED */}
-        <circle data-part="led" cx="83" cy="17" r="2.6" fill="#FF3B30" style={tiny ? { display: "none" } : undefined} />
+        <circle data-part="led" cx="83" cy="17" r="2.6" fill="#F0A23B" style={tiny ? { display: "none" } : undefined} />
         {/* the eye */}
         <circle cx="50" cy="46" r="23" fill="#050506" stroke="#3E424A" strokeWidth="2" />
         <g data-part="iris">
-          <circle data-part="glow" cx="50" cy="47" r="13" fill="#FF3B30" style={{ opacity: 0.7 }} filter={tiny ? undefined : `url(#${glow})`} />
-          <circle data-part="ring" cx="50" cy="47" r="10.5" fill="none" stroke="#FF3B30" strokeWidth="3" />
-          <circle data-part="core" cx="50" cy="47" r="4.5" fill="#FF3B30" />
-          <circle cx="50" cy="47" r="1.7" fill="#FFE2E0" />
+          <circle data-part="glow" cx="50" cy="47" r="13" fill="#F0A23B" style={{ opacity: 0.7 }} filter={tiny ? undefined : `url(#${glow})`} />
+          <circle data-part="ring" cx="50" cy="47" r="10.5" fill="none" stroke="#F0A23B" strokeWidth="3" />
+          <circle data-part="core" cx="50" cy="47" r="4.5" fill="#F0A23B" />
+          <circle cx="50" cy="47" r="1.7" fill="#FFF1DC" />
         </g>
         {/* the lids (metal), cut by the eye */}
         <g clipPath={`url(#${clip})`}>
@@ -289,7 +289,7 @@ export function Ciclope({ state, size = 96, lookAt, level, animated = true, eyes
         {!tiny && (
           <>
             <path d="M41 79 H59 M44 84 H56" stroke="#15171A" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-            <path data-part="grille-lit" d="M41 79 H59 M44 84 H56" stroke="#FF3B30" strokeWidth="2.6" strokeLinecap="round" fill="none" style={{ opacity: 0 }} />
+            <path data-part="grille-lit" d="M41 79 H59 M44 84 H56" stroke="#F0A23B" strokeWidth="2.6" strokeLinecap="round" fill="none" style={{ opacity: 0 }} />
           </>
         )}
       </g>

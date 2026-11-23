@@ -153,7 +153,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         <div className="intro-lockup">
           <div className="intro-hero">
             <svg className="intro-ring" viewBox="-80 -80 160 160" width="168" height="168">
-              <circle r="76" fill="none" stroke="#FF3B30" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90)" />
+              <circle r="76" fill="none" stroke="#F0A23B" strokeWidth="1.5" strokeLinecap="round" transform="rotate(-90)" />
             </svg>
             {SENSORS.map((kind) => (
               <span className="intro-sensor" key={kind}>

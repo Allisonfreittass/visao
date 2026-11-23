@@ -4,9 +4,11 @@ Fonte única do visual do Visão. Todo agente (Claude Code, Codex, Cursor) e tod
 em interface lê este arquivo antes. Se uma tela nova não couber nestas regras, a regra muda aqui
 primeiro, depois o código.
 
-> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). O código ainda usa a marca anterior,
-> Ciclope Sentinela (`brand/README.md`, `apps/web/src/brand/tokens.css`). A migração está na
-> seção [Migração](#migração). Até lá, telas novas já seguem este arquivo.
+> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1, 2 e 4 da
+> [Migração](#migração) estão feitos: tokens e fontes do Muninn em todo o app
+> (`apps/web/src/brand/tokens.css`, `fonts.css`) e o login no Muninn. Ainda da marca anterior: o
+> mascote Ciclope (com o olho já em âmbar), as cores dos sensores, os ícones e o iPhone
+> (`Theme.swift`). Telas novas já seguem este arquivo.
 
 ## 1. Ideia
 
@@ -77,6 +79,11 @@ Arquivos em `brand/muninn/`:
 Uso estático: a ilustração a 76% do tamanho do anel, centralizada (+1,4% no eixo y), com
 `mix-blend-mode: screen` e o olho em âmbar em (51,6%; 35,7%).
 
+No app web, a ilustração sai de `apps/web/public/muninn/` em dois tamanhos, gerados da mestre:
+`muninn-720.webp` e `muninn-1024.webp`. O canvas usa a de 1024 quando a ilustração passa de
+720 px de tela (tamanho × `devicePixelRatio` × 0,76), e a de 720 nos outros casos. Cada uma tem
+um `.json` ao lado dizendo de onde veio. `strokes.json` fica na mesma pasta.
+
 Tamanhos: acima de 120 px, Muninn + anel. Entre 32 e 120 px, só o anel. Abaixo de 32 px, anel
 sem as marcas apagadas.
 
@@ -92,7 +99,8 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
   4. 8,4 s: o anel se fecha, marca a marca (50 ms entre elas); a falha do topo pisca em âmbar.
 - Entradas usam `ease-out`; nada de `ease-in` em elemento que entra.
 - Estados do anel no app: ocioso (hora local acesa), ouvindo (marcas em onda), pensando (um
-  rastro percorre), fala primeiro (ponto sobe à falha), pede aprovação (falha acesa), pausado
+  rastro percorre o anel em 1,6 s por volta: a marca da frente em âmbar, a cauda apagando em
+  papel → cinza), fala primeiro (ponto sobe à falha), pede aprovação (falha acesa), pausado
   (ponto vazado), silêncio (tudo apagado).
 - `prefers-reduced-motion`: mostrar o quadro final, sem movimento.
 - Canvas 2D, `devicePixelRatio` até 2, um `requestAnimationFrame`, cancelado ao desmontar.
@@ -114,9 +122,12 @@ Sem exclamação, sem emoji.
 ## 8. Migração
 
 1. Tokens: trocar `apps/web/src/brand/tokens.css` pelos da seção 2 (e `Theme.swift` no iPhone).
+   **Feito** no web; os nomes antigos (`--accent`, `--red`…) apontam para a paleta nova.
 2. Fontes: Newsreader, Geist e Geist Mono no lugar de Space Grotesk, Inter Tight e JetBrains Mono.
+   **Feito** no web, servidas pelo app (`public/fonts/`), sem Google Fonts.
 3. Mascote: `<Ciclope>` vira `<Anel estado=…>` (estados da seção 6) e `<Muninn>` (gênese).
-4. Login: Muninn grande + "Bem-vindo de volta." no lugar de "Identifique-se.".
+4. Login: Muninn grande + "Bem-vindo de volta." no lugar de "Identifique-se.". **Feito** no app
+   web (`apps/web/src/muninn/`). O iPhone (`LoginView`) ainda não mudou.
 5. Textos: seção 7.
 6. `brand/generate-assets.swift`: regenerar ícones a partir do anel.
 

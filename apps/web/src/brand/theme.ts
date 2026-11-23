@@ -1,4 +1,4 @@
-// The look. The brand ("Ciclope Sentinela") shows only the dark theme: FORCED_THEME wins over
+// The look. The brand ("Muninn") shows only the dark theme: FORCED_THEME wins over
 // any saved choice. The light theme and the Claro/Escuro/Sistema choice stay in the code,
 // hidden, in case they come back. Only appearance lives here.
 import { loadPreference, savePreference } from "../session";
@@ -8,7 +8,7 @@ export type Theme = "light" | "dark";
 
 const KEY = "theme";
 /** The browser bar and the home-screen splash follow the page's floor (--bg). */
-export const THEME_COLOR: Record<Theme, string> = { light: "#F6F4F1", dark: "#09090B" };
+export const THEME_COLOR: Record<Theme, string> = { light: "#F3F1EC", dark: "#101214" };
 /** The theme the brand shows, whatever is saved. null would bring the choice back. */
 export const FORCED_THEME: Theme | null = "dark";
 

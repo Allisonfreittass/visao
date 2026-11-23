@@ -1,15 +1,27 @@
-/* V.I.S.A.O.: tokens da marca "Ciclope Sentinela". Metal grafite, um sensor vermelho aceso,
-   texto de sistema. Escuro é o único tema exposto (brand/theme.ts força data-theme="dark").
-   Regra do vermelho: só no olho do mascote, no botão principal, no foco, no indicador de aba,
-   em UMA palavra de destaque por tela e em erros. Atenção é âmbar, sucesso é verde, o resto é
-   grafite. Texto sobre vermelho usa --on-red, nunca branco. Espelhado em
-   apps/ios/Visao/Theme.swift. */
+/* V.I.S.A.O.: tokens da identidade "Muninn" (DESIGN.md §2 e §3). Uma luz só: âmbar é presença e
+   iniciativa dele; o resto é tinta, grafite, linha, cinza e papel. O botão principal é papel com
+   texto tinta. Vermelho só em erro, e como texto. Escuro é o único tema exposto (brand/theme.ts
+   força data-theme="dark"). Espelhado em apps/ios/Visao/Theme.swift (ainda na marca anterior). */
+@import "./fonts.css";
+
 :root {
-  /* Tipografia */
-  --font-display: "Space Grotesk", "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-sans: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --tracking-display: -0.01em;
+  /* Paleta (DESIGN.md §2) */
+  --tinta: #101214;
+  --grafite: #1A1D20;
+  --linha: #2C3136;
+  --cinza: #9AA1A8;
+  --papel: #F3F1EC;
+  --ambar: #F0A23B;
+  --ambar-fundo: #8A5A12;
+  /* Erro: o único vermelho, só em texto e em borda de campo. 6,7:1 sobre --tinta, 6:1 sobre --grafite. */
+  --vermelho-erro: #FF6B5E;
+
+  /* Tipografia (DESIGN.md §3): voz dele, interface, rastros. */
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --tracking-display: -0.005em;
+  --tracking-mono: .07em;
   --text-12: 12px;
   --text-13: 13px;
   --text-15: 15px;
@@ -45,18 +57,21 @@
   --layer-content: 1;
   --layer-overlay: 60;
 
-  /* Cores fixas */
-  --red: #FF3B30;
-  --red-text: #FF5A4E;
-  --on-red: #0B0B0D;
-  --amber: #F5B544;
-  --amber-bg: #2A2212;
+  /* Cores fixas. Os nomes da marca anterior ficam apontando para a paleta nova; o vermelho não
+     existe mais fora do erro. */
+  --red: var(--vermelho-erro);
+  --red-text: var(--vermelho-erro);
+  --on-red: var(--tinta);
+  --amber: var(--ambar);
+  --amber-bg: color-mix(in srgb, var(--ambar) 14%, var(--tinta));
+  /* Verde só no ponto de 6 px de "conectado". */
   --green: #4ADE80;
   --green-dot: #16A34A;
-  --graphite: #2B2E34;
-  --graphite-edge: #454952;
-  --graphite-line: #5A5F69;
-  --socket: #050506;
+  --graphite: var(--grafite);
+  --graphite-edge: var(--linha);
+  --graphite-line: color-mix(in srgb, var(--linha), var(--cinza) 25%);
+  --socket: #0A0B0C;
+  /* Cores dos sensores do mascote: saem no passo 3 da migração (DESIGN.md §8). */
   --sensor-mac: #3B6BFF;
   --sensor-whatsapp: #18C27A;
   --sensor-email: #E0A800;
@@ -66,65 +81,70 @@
 /* Escuro: o tema da marca. Sem sombras: a separação vem da borda de 1px. */
 :root, [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #09090B;
-  --surface: #141518;
-  --surface-2: #1D1F24;
-  --surface-sidebar: rgb(14 15 18 / .85);
-  --bubble-user: #1F2126;
-  --bubble-user-border: #2C2E34;
-  --border: #24262B;
-  --border-strong: #34363C;
-  --text: #EDEDEF;
-  --text-2: #C2C3C8;
-  --text-muted: #9A9BA2;
-  --success: var(--green);
-  --danger: #FF3B30;
-  --warning: var(--amber);
+  --bg: var(--tinta);
+  --surface: var(--grafite);
+  --surface-2: color-mix(in srgb, var(--grafite), var(--linha) 45%);
+  --surface-sidebar: color-mix(in srgb, var(--tinta) 88%, transparent);
+  --bubble-user: var(--grafite);
+  --bubble-user-border: var(--linha);
+  --border: var(--linha);
+  --border-strong: color-mix(in srgb, var(--linha), var(--cinza) 22%);
+  --text: var(--papel);
+  --text-2: color-mix(in srgb, var(--papel), var(--cinza) 45%);
+  --text-muted: var(--cinza);
+  --success: var(--text-2);
+  --danger: var(--vermelho-erro);
+  --warning: var(--ambar);
   --shadow-card: none;
   --shadow-float: none;
   --scrim: rgb(0 0 0 / .6);
-  --card-ink: #141518;
-  --card-ink-2: #1D1F24;
-  --card-ink-text: #EDEDEF;
-  --card-ink-muted: #9A9BA2;
-  /* Nomes da marca anterior, agora neutros ou vermelhos conforme a regra. */
-  --accent: var(--red);
-  --on-accent: var(--on-red);
+  --card-ink: var(--grafite);
+  --card-ink-2: color-mix(in srgb, var(--grafite), var(--linha) 45%);
+  --card-ink-text: var(--papel);
+  --card-ink-muted: var(--cinza);
+  /* Ação principal: papel com texto tinta (DESIGN.md §2). */
+  --accent: var(--papel);
+  --accent-hover: #FFFFFF;
+  --on-accent: var(--tinta);
   --accent-text: var(--text-2);
-  --accent-strong: var(--red-text);
-  --accent-soft: rgb(255 59 48 / .22);
+  --accent-strong: var(--text);
+  --accent-soft: color-mix(in srgb, var(--papel) 12%, transparent);
   --iris: var(--surface-2);
 }
 
-/* Tema claro: guardado, não exposto (o app força o escuro em brand/theme.ts). */
+/* Tema claro (o "dia": papel com texto tinta). Guardado, não exposto. */
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #F6F4F1;
+  --bg: var(--papel);
   --surface: #FFFFFF;
-  --surface-2: #EFECE7;
-  --border: #E6E1DA;
-  --border-strong: #D3CCC2;
-  --text: #16161A;
-  --text-muted: #6B6A70;
-  --accent-text: #C2410C;
-  --accent-strong: #D9480F;
-  --accent-soft: rgb(255 106 26 / .12);
-  --success: #15803D;
-  --danger: #B91C1C;
-  --warning: #92400E;
-  --shadow-card: 0 1px 2px rgb(22 22 26 / .04), 0 8px 24px rgb(22 22 26 / .06);
-  --shadow-float: 0 2px 6px rgb(22 22 26 / .06), 0 16px 40px rgb(22 22 26 / .10);
-  --scrim: rgb(22 22 26 / .32);
+  --surface-2: color-mix(in srgb, var(--papel), var(--tinta) 5%);
+  --border: color-mix(in srgb, var(--papel), var(--tinta) 12%);
+  --border-strong: color-mix(in srgb, var(--papel), var(--tinta) 22%);
+  --text: var(--tinta);
+  --text-2: color-mix(in srgb, var(--tinta), var(--papel) 25%);
+  --text-muted: #5C6268;
+  --accent: var(--tinta);
+  --accent-hover: #000000;
+  --on-accent: var(--papel);
+  --accent-text: var(--ambar-fundo);
+  --accent-strong: var(--tinta);
+  --accent-soft: color-mix(in srgb, var(--tinta) 8%, transparent);
+  --success: var(--text-2);
+  --danger: #B3261E;
+  --warning: var(--ambar-fundo);
+  --shadow-card: none;
+  --shadow-float: none;
+  --scrim: rgb(16 18 20 / .32);
   /* O cartão escuro (páginas, pedidos de sim/não) fica escuro nos dois temas, como uma tela. */
-  --card-ink: #17181D;
-  --card-ink-2: #23252C;
-  --card-ink-text: #F2F2F3;
-  --card-ink-muted: #A1A1AA;
+  --card-ink: var(--tinta);
+  --card-ink-2: var(--grafite);
+  --card-ink-text: var(--papel);
+  --card-ink-muted: var(--cinza);
 }
 
-/* Foco: anel vermelho de 2px, com uma folga da cor do fundo. */
+/* Foco: anel papel de 2px, com uma folga da cor do fundo. */
 :root {
-  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--red);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -149,10 +169,8 @@
   --fundo: var(--bg);
   --fundo-elevado: var(--surface);
   --fundo-hover: var(--surface-2);
-  --tinta: var(--text);
   --tinta-suave: var(--text-muted);
   --tinta-fraca: var(--text-muted);
-  --linha: var(--border);
   --linha-forte: var(--border-strong);
   --borda: var(--border-strong);
   --estanho: var(--accent-text);
