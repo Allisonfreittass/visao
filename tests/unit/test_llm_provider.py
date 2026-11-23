@@ -282,3 +282,24 @@ def test_a_request_too_big_for_the_host_is_its_own_kind():
     with pytest.raises(LLMError) as caught:
         llm.complete([ChatMessage("user", "oi")], max_output_tokens=10)
     assert caught.value.kind == "too_large" and "Limit 8000" in str(caught.value)
+
+
+def test_openai_gets_max_completion_tokens() -> None:
+    """Real case (2026-11-23): OpenAI's reasoning models answer 400 to max_tokens."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=OK_BODY)
+
+    provider = OpenAICompatibleProvider(
+        name="openai",
+        base_url="https://api.openai.com/v1",
+        api_key="k",
+        model="gpt-6-luna",
+        pricing=PRICING,
+        transport=httpx.MockTransport(handler),
+    )
+    provider.complete([ChatMessage("user", "oi")], max_output_tokens=50)
+    payload = json.loads(seen[0].content)
+    assert payload["max_completion_tokens"] == 50 and "max_tokens" not in payload

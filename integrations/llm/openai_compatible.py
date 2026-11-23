@@ -51,6 +51,12 @@ class OpenAICompatibleProvider:
         self.pricing = pricing
         self._max_retries = max_retries
         self._extra_body = extra_body or {}
+        # OpenAI's reasoning models (gpt-5 and later) refuse max_tokens with a 400 and take
+        # max_completion_tokens, which bounds the reasoning plus the answer. Other hosts
+        # (Gemini, Groq, OpenRouter) keep the classic name.
+        self._output_param = (
+            "max_completion_tokens" if "api.openai.com" in base_url.lower() else "max_tokens"
+        )
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {api_key}"},
@@ -63,7 +69,7 @@ class OpenAICompatibleProvider:
             **self._extra_body,
             "model": self.model,
             "messages": [{"role": m.role, "content": _content(m)} for m in messages],
-            "max_tokens": max_output_tokens,
+            self._output_param: max_output_tokens,
         }
         started = time.monotonic()
         response = self._post_with_retries(payload)
