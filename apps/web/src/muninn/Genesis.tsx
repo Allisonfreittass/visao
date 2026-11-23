@@ -7,6 +7,7 @@ import {
   MARKS,
   RING,
   T,
+  type Timeline,
   chestDot,
   eyeProgress,
   gapFlash,
@@ -18,6 +19,7 @@ import {
   strokeStart,
   thinkingBoost,
 } from "./genesis";
+import "./genesis.css";
 
 // Colours of DESIGN.md §2, read from the scoped tokens so the canvas follows the CSS.
 interface Palette {
@@ -73,9 +75,18 @@ function readPalette(el: Element): Palette {
   };
 }
 
+interface GenesisProps {
+  /** Runs a trace round the ring while true. */
+  thinking?: boolean;
+  /** T (14 s, the login) or T_CURTA (1.8 s, the opening). */
+  timeline?: Timeline;
+  /** How long to wait for strokes.json and the plate before starting without them. */
+  assetWaitMs?: number;
+}
+
 /** Muninn inside the ring of traces. Plays the genesis once on mount (the final frame alone with
  * reduced motion), then stays still; `thinking` runs a trace round the ring while it is true. */
-export function Genesis({ thinking = false }: { thinking?: boolean }) {
+export function Genesis({ thinking = false, timeline = T, assetWaitMs = ASSET_WAIT_MS }: GenesisProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const thinkingRef = useRef(thinking);
@@ -129,7 +140,8 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
     };
 
     const draw = (now: number) => {
-      const t = started === null ? 0 : still ? T.total : (now - started) / 1000;
+      const tl = timeline;
+      const t = started === null ? 0 : still ? tl.total : (now - started) / 1000;
       const k = (size / 1000) * dpr;
       const W = size * dpr;
       ctx.globalCompositeOperation = "source-over";
@@ -139,7 +151,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       if (started === null) return false;
 
       // 1. The first amber dot, at the chest.
-      const dot = chestDot(t);
+      const dot = chestDot(t, tl);
       if (dot > 0) {
         ctx.globalAlpha = dot;
         ctx.fillStyle = palette.ambar;
@@ -149,9 +161,9 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       }
 
       // 2. The strokes, in the order trace.py gave them, fading out as the illustration arrives.
-      const reveal = tinted ? revealProgress(t) : 0;
+      const reveal = tinted ? revealProgress(t, tl) : 0;
       const strokeAlpha = 1 - reveal;
-      if (strokes.length && strokeAlpha > 0.01 && t > T.strokesStart) {
+      if (strokes.length && strokeAlpha > 0.01 && t > tl.strokesStart) {
         ctx.globalAlpha = 0.85 * strokeAlpha;
         ctx.strokeStyle = palette.papel;
         ctx.lineWidth = Math.max(0.7, size / 700) * dpr;
@@ -160,8 +172,8 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
         ctx.beginPath();
         const n = strokes.length;
         for (let i = 0; i < n; i++) {
-          if (t < strokeStart(i, n)) break; // in order: none after this has started
-          const p = strokeProgress(t, i, n);
+          if (t < strokeStart(i, n, tl)) break; // in order: none after this has started
+          const p = strokeProgress(t, i, n, tl);
           const { pts, len, total } = strokes[i];
           const upTo = total * p;
           ctx.moveTo(pts[0] * k, pts[1] * k);
@@ -216,7 +228,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
         ctx.drawImage(tinted, x, y, s, s);
         ctx.globalCompositeOperation = "source-over";
       }
-      const eye = tinted || strokes.length ? eyeProgress(t) : 0;
+      const eye = tinted || strokes.length ? eyeProgress(t, tl) : 0;
       if (eye > 0) {
         ctx.globalAlpha = eye;
         ctx.fillStyle = palette.ambar;
@@ -230,7 +242,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       const thinkingNow = thinkingRef.current;
       ctx.lineCap = "round";
       for (let h = 1; h < MARKS; h++) {
-        const m = markProgress(t, h);
+        const m = markProgress(t, h, tl);
         if (m <= 0) continue;
         const boost = thinkingNow && !still ? thinkingBoost(h, now / 1000) : 0;
         const isLit = h === lit;
@@ -249,7 +261,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
         ctx.lineTo((500 + cos * from) * k, (500 + sin * from) * k);
         ctx.stroke();
       }
-      const fl = still ? 0 : gapFlash(t);
+      const fl = still ? 0 : gapFlash(t, tl);
       if (fl > 0) {
         const r = (RING.inner + RING.outer) / 2;
         ctx.globalAlpha = fl;
@@ -261,7 +273,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       }
       ctx.globalAlpha = 1;
 
-      return t < T.total || sparks.length > 0 || (thinkingNow && !still);
+      return t < tl.total || sparks.length > 0 || (thinkingNow && !still);
     };
 
     const frame = (now: number) => {
@@ -311,7 +323,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       img.src = artUrl(size * dpr * ART.scale);
     });
     void Promise.all([loadStrokes, loadArt]).then(start);
-    const fallback = window.setTimeout(start, ASSET_WAIT_MS);
+    const fallback = window.setTimeout(start, assetWaitMs);
 
     return () => {
       alive = false;
@@ -321,6 +333,7 @@ export function Genesis({ thinking = false }: { thinking?: boolean }) {
       window.clearTimeout(fallback);
       wakeRef.current = () => {};
     };
+    // Plays once, with the timeline it mounted with.
   }, []);
 
   return (

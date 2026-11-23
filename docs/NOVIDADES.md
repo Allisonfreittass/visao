@@ -7,6 +7,18 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 23/11/2026
 
+- **Braço versão 3: desfazer, até os testes passarem, e todo comando no sandbox**
+  ([BRACO.md](BRACO.md), itens 4, 8, 9 e 10).
+  - Todo comando que uma tarefa roda no Mac fica no sandbox do Claude Code: grava só no projeto,
+    não usa a rede e não lê as pastas de chaves.
+  - O que a tarefa deixou rodando acaba junto com ela.
+  - O braço tira uma foto do projeto antes e depois, e a lista de arquivos mudados vem dessa foto,
+    não do relato do Claude. Na página Mac, **desfazer** volta esses arquivos sem chamar o Claude,
+    e não mexe em nada se algum deles mudou de novo depois.
+  - "Até os testes passarem" no pedido: o braço roda o comando de testes definido no
+    `braco.json`, e enquanto falhar o Claude continua na mesma sessão. São até 3 tentativas, todas
+    dentro da mesma aprovação e do mesmo limite de custo.
+
 - **O anel no lugar do Ciclope** ([DESIGN.md](../DESIGN.md) §6, §8 passos 1 a 3).
   - O app inteiro usa as cores e as fontes do Muninn; vermelho só aparece em erro.
   - O anel mostra o que ele está fazendo: a hora local acesa quando parado, uma onda ouvindo, um
@@ -15,7 +27,10 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
     acesa quando algo espera o seu sim, o ponto vazado com a autonomia pausada e tudo apagado sem
     conexão.
   - Mac, e-mail, Caderno e projetos viraram ícones de traço, sem cor própria.
-  - A abertura do dia agora fecha o anel marca a marca e escreve o nome ao lado.
+  - O Muninn aparece também no topo do Início e na ligação, com os estados do anel em volta, e a
+    abertura do dia toca uma gênese curta dele (os traços nascendo do peito, o olho acendendo, o
+    anel fechando) antes de escrever o nome.
+  - O que ele está pensando, no Início, aparece como fala dele: itálico com um filete âmbar.
   - Os textos falam como ele: "Acompanhando 2 painéis", "Fala comigo…", "Acompanhar um preço".
     Saíram "vigilância", "Dê uma ordem" e "Sistemas prontos"; avaliar uma resposta é "Ajudou" ou
     "Não ajudou", sem emoji.

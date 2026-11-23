@@ -87,6 +87,19 @@ um `.json` ao lado dizendo de onde veio. `strokes.json` fica na mesma pasta.
 Tamanhos: acima de 120 px, Muninn + anel. Entre 32 e 120 px, só o anel. Abaixo de 32 px, anel
 sem as marcas apagadas.
 
+Onde ele aparece no app web:
+
+| Tela | Forma | Tamanho |
+|---|---|---|
+| Entrada (login) | Muninn + anel, gênese de 14 s | até 560 px |
+| Abertura depois do login e a do dia | Muninn + anel, gênese curta (1,8 s) | 180 px; 132 px no celular |
+| Início, no topo | Muninn + anel, com os estados da seção 6 | 200 px; 150 px no celular |
+| Ligação | Muninn + anel, com a onda do "ouvindo" | 140 a 220 px |
+| Avatar das respostas no chat | só o anel | 36 px |
+| Logo do menu lateral e da barra do celular | anel sem as marcas apagadas | 28 e 26 px |
+
+Sensores (Mac, e-mail, Caderno, projetos) são ícones de traço, nunca o corvo.
+
 ### Muninn em ASCII
 
 Para o terminal e o README: `brand/muninn/muninn_ascii.py` (só biblioteca padrão) toca a gênese
@@ -105,6 +118,9 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
      soltando faíscas (7% de chance por ponta; 15% delas âmbar).
   3. 6,2–8,4 s: a ilustração aparece por cima, tingida de papel → cinza; o olho acende.
   4. 8,4 s: o anel se fecha, marca a marca (50 ms entre elas); a falha do topo pisca em âmbar.
+- **Gênese curta** (abertura depois do login e a do dia, `T_CURTA`), 1,8 s, a mesma história: o
+  ponto no peito, os traços até 0,85 s, a ilustração e o olho em 1,0 s, o anel fechado em 1,43 s
+  e um piscar da falha; aos 1,5 s o nome é digitado ao lado.
 - Entradas usam `ease-out`; nada de `ease-in` em elemento que entra.
 - Estados do anel no app: ocioso (hora local acesa), ouvindo (marcas em onda), pensando (um
   rastro percorre o anel em 1,6 s por volta: a marca da frente em âmbar, a cauda apagando em

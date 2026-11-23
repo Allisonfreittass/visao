@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-import { Anel } from "../anel/Anel";
+import { Genesis } from "../muninn/Genesis";
+import { T_CURTA } from "../muninn/genesis";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end. */
@@ -50,10 +51,11 @@ export function introAfterLogin(): boolean {
 
 const WORD = "V.I.S.A.O.";
 
-/** The opening (≈2.4 s), a short genesis of the ring (DESIGN.md §6): the amber dot lights; the
- * ring closes from the gap, mark by mark; the empty gap flashes amber twice; the ring slides left
- * and the name is typed beside it, the last dot amber; then the lockup flies to the side bar's
- * logo as the app shows through. A click or a key skips it. */
+/** The opening (≈2.4 s), a short genesis of Muninn (DESIGN.md §6, T_CURTA): the amber dot at the
+ * chest, the strokes growing out of it, the illustration and its eye, the ring closing from the
+ * gap and the gap's flash, all by 1.45 s; then Muninn slides left and the name is typed beside
+ * it, the last dot amber, and the lockup flies to the side bar's logo as the app shows through.
+ * A click or a key skips it. */
 export function Intro({ onDone }: { onDone: () => void }) {
   const root = useRef<HTMLDivElement>(null);
 
@@ -74,16 +76,9 @@ export function Intro({ onDone }: { onDone: () => void }) {
       anims.push(node.animate(frames, { fill: "both", ...options }));
     };
 
-    // 1. The amber dot lights at the centre.
-    run(q(".anel-ponto-forma"), [{ opacity: 0, transform: "scale(.2)" }, { opacity: 1, transform: "scale(1)" }], { delay: 150, duration: 260, easing: EASE });
-    // 2. The ring closes clockwise from the gap, one mark every 45 ms, each to its own resting look.
-    all<SVGLineElement>(".anel-marca").forEach((mark, i) => {
-      run(mark, [{ opacity: 0 }], { delay: 300 + i * 45, duration: 160, easing: EASE, fill: "backwards" });
-    });
-    // 3. The empty gap flashes amber twice: the name is not chosen yet.
-    run(q(".anel-falha"), [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }], { delay: 1320, duration: 420, easing: "ease-in-out", fill: "none" });
+    // 1–3. The genesis plays by itself in the canvas (Genesis, T_CURTA).
 
-    // 4. The ring slides left and the name is typed, 40 ms a letter; the last dot is amber.
+    // 4. Muninn slides left and the name is typed, 40 ms a letter; the last dot is amber.
     const lockup = q<HTMLElement>(".intro-lockup");
     const word = q<HTMLElement>(".intro-word");
     const shift = word ? (word.offsetWidth + 20) / 2 : 0;
@@ -122,7 +117,8 @@ export function Intro({ onDone }: { onDone: () => void }) {
       <div className="intro-stage">
         <div className="intro-lockup">
           <div className="intro-hero">
-            <Anel estado="ocioso" size={112} decorative />
+            {/* The assets are usually cached by the login; if not, the ring still closes on time. */}
+            <Genesis timeline={T_CURTA} assetWaitMs={250} />
           </div>
           <span className="intro-word">
             {WORD.split("").map((c, i) => (c === "." ? <span key={i}><b>.</b></span> : <span key={i}>{c}</span>))}

@@ -63,7 +63,8 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
-  const size = Math.min(220, Math.round(window.innerWidth * 0.5));
+  // Muninn inside the ring (above 120 px, DESIGN.md §5), with the listening wave round him.
+  const size = Math.min(220, Math.max(140, Math.round(window.innerWidth * 0.5)));
 
   return (
     <div className="call" role="dialog" aria-modal="true" aria-label="Ligação">

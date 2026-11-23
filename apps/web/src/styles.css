@@ -260,6 +260,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 .task-what { color: var(--text-muted); overflow-wrap: anywhere; }
 .task-what b { font-weight: 500; color: var(--text); margin-right: 6px; }
 .task .link-button { grid-column: 2; justify-self: start; }
+.task-detail { grid-column: 2; font: 400 11px/1.5 var(--font-mono); color: var(--text-muted); }
 .settings { gap: var(--espaco-7); }
 .settings-group { display: grid; }
 .settings-group > h2 { margin: 0 0 var(--espaco-2); }
@@ -378,6 +379,8 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
   .task { grid-template-columns: minmax(0, 1fr) auto; }
   .task-what { grid-column: 1 / -1; order: 3; }
   .task .link-button { grid-column: 1; }
+  .task-detail { grid-column: 1 / -1; order: 4; }
+  .task .link-button { order: 5; }
   .call-button { padding: 0 14px; }
   .bubble.user { max-width: 92%; padding: 12px 14px; }
   .call { padding-left: var(--espaco-4); padding-right: var(--espaco-4); }
@@ -668,3 +671,8 @@ button.projects-primary { background: var(--text); color: var(--bg); border-colo
 .project-link { gap: 6px; max-width: 100%; }
 .project-link-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-link:focus-visible { outline: 2px solid currentColor; }
+
+/* His speech in a block (DESIGN.md §3): Newsreader italic with a 2 px amber rule on the left, no
+   card, no radius. */
+.fala-dele { margin: 0; padding: 2px 0 2px 16px; border-left: 2px solid var(--ambar); font: italic 300 20px/1.45 var(--font-display); color: var(--text); }
+.fala-dele p { margin: 0; }

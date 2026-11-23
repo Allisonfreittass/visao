@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MARKS, T, gapFlash, flash, litHour, markProgress, revealProgress, strokeProgress, strokeStart, thinkingBoost } from "./genesis";
+import { MARKS, T, T_CURTA, flash, flashOf, gapFlash, litHour, markProgress, revealProgress, strokeProgress, strokeStart, thinkingBoost } from "./genesis";
 
 describe("genesis timeline", () => {
   it("draws the strokes in order between 0.4 s and 6.4 s", () => {
@@ -42,5 +42,24 @@ describe("ring at rest", () => {
     expect(thinkingBoost(6, s)).toBeCloseTo(1);
     expect(thinkingBoost(4, s)).toBeGreaterThan(0);
     expect(thinkingBoost(10, s)).toBe(0);
+  });
+});
+
+describe("short genesis (the opening after login)", () => {
+  it("tells the same story, in order, before the name is typed at 1.5 s", () => {
+    const n = 1965;
+    expect(strokeStart(n - 1, n, T_CURTA) + T_CURTA.strokeDur).toBeCloseTo(T_CURTA.strokesEnd);
+    expect(T_CURTA.strokesEnd).toBeLessThan(T_CURTA.revealEnd);
+    expect(T_CURTA.eyeAt).toBeLessThan(T_CURTA.ringStart);
+    for (let h = 1; h < MARKS; h++) expect(markProgress(1.5, h, T_CURTA)).toBe(1);
+    const f = flashOf(T_CURTA);
+    expect(f.start).toBeLessThan(1.5);
+    expect(f.start + f.dur).toBeLessThanOrEqual(T_CURTA.total);
+    expect(gapFlash(T_CURTA.total, T_CURTA)).toBe(0);
+  });
+
+  it("leaves the full genesis unchanged", () => {
+    expect(flashOf(T)).toEqual(flash);
+    expect(revealProgress(6.2)).toBe(revealProgress(6.2, T));
   });
 });

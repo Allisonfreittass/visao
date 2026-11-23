@@ -1,12 +1,13 @@
-/* A abertura (components/Intro.tsx): uma gênese curta do anel, ~2,4 s, uma vez por dia e após o
+/* A abertura (components/Intro.tsx): uma gênese curta do Muninn, ~2,4 s, uma vez por dia e após o
    login, pulada por clique ou tecla, desligada com movimento reduzido. Só transform e opacity. */
 .intro { position: fixed; inset: 0; z-index: calc(var(--layer-overlay) + 20); display: grid; place-items: center; overflow: hidden; cursor: pointer; background: var(--tinta); }
 .intro-stage { position: relative; display: grid; place-items: center; }
 .intro-lockup { display: flex; align-items: center; gap: 20px; will-change: transform; }
-.intro-hero { position: relative; display: grid; place-items: center; width: 112px; height: 112px; will-change: transform; }
+.intro-hero { position: relative; width: 180px; height: 180px; will-change: transform; }
 .intro-word { font: 500 44px/1 var(--font-mono); letter-spacing: var(--tracking-mono); color: var(--text); white-space: nowrap; }
 .intro-word > span { opacity: 0; }
 .intro-word b { color: var(--text-muted); font-weight: 500; }
 .intro-word > span:last-child b { color: var(--ambar); }
-@media (max-width: 560px) { .intro-word { font-size: 32px; } }
+@media (max-width: 560px) { .intro-hero { width: 132px; height: 132px; } .intro-word { font-size: 28px; } .intro-lockup { gap: 14px; } }
+@media (max-width: 359px) { .intro-hero { width: 112px; height: 112px; } .intro-word { font-size: 24px; } }
 @media (prefers-reduced-motion: reduce) { .intro { display: none; } }

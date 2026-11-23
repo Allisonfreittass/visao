@@ -53,8 +53,6 @@
 }
 
 .muninn-marca { justify-self: center; width: min(560px, 46vw, 72vh); }
-.genesis { position: relative; width: 100%; aspect-ratio: 1; }
-.genesis canvas { display: block; width: 100%; height: 100%; }
 
 .muninn-acesso { display: grid; gap: 32px; min-width: 0; }
 .muninn-acesso h1 {

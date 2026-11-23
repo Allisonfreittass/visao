@@ -130,7 +130,8 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
     <section className="home" aria-labelledby="home-title">
       <div className="home-scroll">
         <header className="home-hero">
-          <Anel estado={call.anel} size={96} level={call.levelActive ? call.level : undefined} />
+          {/* Muninn inside the ring (DESIGN.md §5): 200 px here, 150 px on a phone (layout.css). */}
+          <Anel estado={call.anel} size={200} level={call.levelActive ? call.level : undefined} className="home-muninn" />
           <h1 id="home-title" className="home-greeting">
             <span>{hello}</span>{watchCount(panels) && <> Acompanhando <em>{watchCount(panels)}</em>.</>}
           </h1>
@@ -141,11 +142,11 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
         </header>
 
         {thought && (
-          <section className="home-card home-thought" aria-labelledby="home-thought">
-            <h2 id="home-thought" className="rotulo">Em análise</h2>
-            <p>{thought.content}</p>
-            <time>{dayLabel(utcDate(thought.created_at))}</time>
-          </section>
+          // What he is thinking, in his own voice (DESIGN.md §3): Newsreader italic, a 2 px amber rule.
+          <figure className="home-thought" aria-label="O que estou pensando">
+            <blockquote className="fala-dele"><p>{thought.content}</p></blockquote>
+            <figcaption><time>{dayLabel(utcDate(thought.created_at))}</time></figcaption>
+          </figure>
         )}
 
         <PanelsBoard api={api} nothingPending={empty} onDraft={onDraft} onPanels={onPanels} />
