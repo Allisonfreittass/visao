@@ -7,6 +7,17 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 23/11/2026
 
+- **A entrada agora é o Muninn** (primeira tela da identidade nova, [DESIGN.md](../DESIGN.md) §8
+  passo 4).
+  - No lugar do Ciclope e de "Identifique-se.", o corvo dentro do anel de rastros e "Bem-vindo de
+    volta.". A gênese roda uma vez ao abrir a tela; o formulário funciona desde o começo, e quem
+    pediu menos movimento vê só o quadro final.
+  - Enquanto confere a senha, um rastro âmbar percorre o anel.
+  - O erro diz o que aconteceu: "E-mail ou senha não conferem." só quando é isso; servidor fora,
+    demora ou muitas tentativas aparecem como tal, sem culpar a senha. Se o servidor não respondeu
+    à última verificação, a tela avisa antes de você digitar.
+  - O resto do app continua com a marca anterior até os passos 1 e 2 da migração.
+
 - **Mais firme quando algo dá errado** (estudo comparativo com OpenClaw, Goose e OpenCode,
   [research/comparativo_agentes.md](research/comparativo_agentes.md)).
   - Um email ou evento aprovado sai uma vez só, mesmo com duas aprovações juntas. Pedido parado há

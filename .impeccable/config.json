@@ -1,0 +1,21 @@
+{
+  "buildPath": "comp",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-11-23T15:05:21.501Z",
+        "reason": "DESIGN.md §3 pins Geist as the interface face of the approved Muninn identity"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist mono",
+        "createdAt": "2026-11-23T15:05:21.513Z",
+        "reason": "DESIGN.md §3 pins Geist Mono for traces/metadata in the approved Muninn identity"
+      }
+    ]
+  }
+}

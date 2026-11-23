@@ -309,13 +309,8 @@ button.active, button[aria-pressed="true"] { border-color: var(--estanho); color
 /* Login and demo: the entrance screen may carry the indirect light. */
 .auth-main { justify-content: center; overflow-y: auto; }
 .auth-main > * { max-width: 380px; }
-.auth-main .presence { flex-direction: column; text-align: center; }
 .entrance { display: grid; gap: var(--espaco-4); }
-.auth-main .orb-wrap { width: 240px; height: 240px; }
-.auth-main .presence-copy { justify-items: center; }
-.login { display: grid; gap: var(--espaco-4); }
 .login .rs-campo input { width: 100%; }
-.login .rs-botao--principal { justify-content: center; }
 .demo { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--espaco-2); max-width: 520px !important; }
 
 /* Call: the whole screen is the conversation. */

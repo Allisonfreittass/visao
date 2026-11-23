@@ -1,0 +1,185 @@
+/* Muninn (DESIGN.md), scoped to the logged-out entrance until §8 steps 1–2 move the whole app.
+   Fonts are self-hosted; the browser only fetches them when this screen uses them. */
+
+@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 300; font-display: swap;
+  src: url("/fonts/newsreader-300-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 300; font-display: swap;
+  src: url("/fonts/newsreader-300-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Newsreader"; font-style: italic; font-weight: 300; font-display: swap;
+  src: url("/fonts/newsreader-300-italic-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Newsreader"; font-style: italic; font-weight: 300; font-display: swap;
+  src: url("/fonts/newsreader-300-italic-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400 500; font-display: swap;
+  src: url("/fonts/geist-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist"; font-style: normal; font-weight: 400 500; font-display: swap;
+  src: url("/fonts/geist-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Geist Mono"; font-style: normal; font-weight: 400 500; font-display: swap;
+  src: url("/fonts/geist-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist Mono"; font-style: normal; font-weight: 400 500; font-display: swap;
+  src: url("/fonts/geist-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+
+.muninn-entrada {
+  --tinta: #101214;
+  --grafite: #1A1D20;
+  --linha: #2C3136;
+  --cinza: #9AA1A8;
+  --papel: #F3F1EC;
+  --ambar: #F0A23B;
+  --m-voz: "Newsreader", Georgia, serif;
+  --m-ui: "Geist", system-ui, sans-serif;
+  --m-mono: "Geist Mono", ui-monospace, monospace;
+  --m-saida: cubic-bezier(.16, 1, .3, 1);
+
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--tinta);
+  color: var(--papel);
+  font: 400 16px/1.5 var(--m-ui);
+  color-scheme: dark;
+  caret-color: var(--papel);
+  scrollbar-color: var(--linha) var(--tinta);
+}
+/* Pinned to the whole screen, whatever the app's keyboard heuristic says: with the keyboard open
+   the focused field scrolls into view inside this box. `.app > :not(.ambient)` (layout.css) makes
+   every child relative, so this needs the higher specificity. */
+.app > main.muninn-entrada { position: fixed; inset: 0; z-index: 2; }
+.muninn-entrada ::selection { background: var(--papel); color: var(--tinta); }
+
+.muninn-barra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: max(16px, env(safe-area-inset-top)) clamp(16px, 4vw, 40px) 0;
+  font: 500 12px/1 var(--m-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--cinza);
+}
+.muninn-hora { font-variant-numeric: tabular-nums; }
+
+/* The stage: safe centring, so a short screen scrolls from the top instead of hiding it. */
+.muninn-palco {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  align-items: center;
+  align-content: safe center;
+  justify-content: center;
+  column-gap: clamp(48px, 7vw, 120px);
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vh, 48px) clamp(16px, 4vw, 40px) max(32px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.muninn-marca { justify-self: center; width: min(560px, 46vw, 72vh); }
+.genesis { position: relative; width: 100%; aspect-ratio: 1; }
+.genesis canvas { display: block; width: 100%; height: 100%; }
+
+.muninn-acesso { display: grid; gap: 32px; min-width: 0; }
+.muninn-acesso h1 {
+  margin: 0;
+  font: 300 clamp(44px, 4.4vw, 56px)/1.04 var(--m-voz);
+  letter-spacing: -.015em;
+  color: var(--papel);
+  text-wrap: balance;
+}
+
+/* The form, in Muninn's terms: grafite fields, 1 px linha, papel pill. No card around it. */
+.muninn-entrada .login { display: grid; gap: 18px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.muninn-entrada .rs-campo { gap: 8px; }
+.muninn-entrada .rs-campo label { font: 500 14px/1.3 var(--m-ui); color: var(--cinza); }
+.muninn-entrada .rs-campo input {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+  background: var(--grafite);
+  color: var(--papel);
+  font: 400 16px/1.2 var(--m-ui);
+  transition: border-color .15s var(--m-saida);
+}
+.muninn-entrada .rs-campo input:hover { border-color: #3C4248; }
+.muninn-entrada .rs-campo input:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; border-color: var(--cinza); background: var(--grafite); box-shadow: none; }
+.muninn-entrada .rs-campo input:-webkit-autofill,
+.muninn-entrada .rs-campo input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--papel);
+  -webkit-box-shadow: 0 0 0 40px var(--grafite) inset;
+  caret-color: var(--papel);
+}
+/* Error is said in text (DESIGN.md §2); the field only firms its border. */
+.muninn-entrada .rs-campo[data-estado="erro"] input { border-color: var(--cinza); }
+.muninn-entrada .rs-campo small { font: 400 13px/1.4 var(--m-ui); color: var(--cinza); }
+
+.muninn-entrada .memory-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font: 400 15px/1.3 var(--m-ui); color: var(--papel); cursor: pointer; }
+.muninn-entrada .memory-toggle input {
+  appearance: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--cinza);
+  border-radius: 6px;
+  background: var(--grafite) center / 14px no-repeat;
+  cursor: pointer;
+  transition: background-color .15s var(--m-saida), border-color .15s var(--m-saida);
+}
+.muninn-entrada .memory-toggle input:checked {
+  border-color: var(--papel);
+  background-color: var(--papel);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23101214' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7.4l2.6 2.6L11 4.4'/%3E%3C/svg%3E");
+}
+.muninn-entrada .memory-toggle input:focus-visible { outline: 2px solid var(--papel); outline-offset: 3px; }
+
+.muninn-entrada .login-erro { margin: 0; text-wrap: pretty; font: 500 15px/1.45 var(--m-ui); color: var(--papel); }
+.muninn-entrada .login-aviso { margin: 0; font: 400 15px/1.45 var(--m-ui); color: var(--cinza); }
+
+.muninn-entrada .rs-botao--principal {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 6px;
+  border: 1px solid var(--papel);
+  border-radius: 999px;
+  background: var(--papel);
+  color: var(--tinta);
+  font: 500 16px/1 var(--m-ui);
+  transition: background-color .15s var(--m-saida), transform .12s var(--m-saida);
+}
+.muninn-entrada .rs-botao--principal:hover { background: #E2DFD8; border-color: #E2DFD8; }
+.muninn-entrada .rs-botao--principal:active { transform: scale(.985); }
+.muninn-entrada .rs-botao--principal:focus-visible { outline: 2px solid var(--papel); outline-offset: 3px; box-shadow: none; }
+/* Checking: the button stays legible; the ring shows the work ("pensando"). */
+.muninn-entrada .rs-botao--principal:disabled { opacity: 1; background: var(--grafite); border-color: var(--linha); color: var(--cinza); cursor: progress; }
+
+/* Phone and narrow windows: stacked, the mark small enough that "Acessar" shows at 320 × 568. */
+@media (max-width: 959px) {
+  .muninn-palco { grid-template-columns: minmax(0, 400px); row-gap: clamp(16px, 3vh, 32px); padding-top: clamp(12px, 2vh, 24px); }
+  .muninn-marca { width: clamp(132px, min(52vw, 26vh), 240px); }
+  .muninn-acesso { gap: clamp(20px, 3vh, 28px); }
+  .muninn-acesso h1 { font-size: clamp(32px, 9vw, 40px); text-align: center; }
+  .muninn-entrada .login { gap: 14px; }
+}
+
+/* Short phones (320 × 568 and the like): tighter rhythm, the mark down to 128 px (still Muninn
+   and the ring, §5), so "Acessar" stays on screen even with an error line above it. */
+@media (max-width: 959px) and (max-height: 640px) {
+  .muninn-barra { padding-top: max(12px, env(safe-area-inset-top)); }
+  .muninn-palco { row-gap: 12px; padding-top: 8px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .muninn-marca { width: 128px; }
+  .muninn-acesso { gap: 16px; }
+  .muninn-acesso h1 { font-size: 30px; }
+  .muninn-entrada .login { gap: 10px; }
+  .muninn-entrada .rs-campo { gap: 4px; }
+  .muninn-entrada .rs-botao--principal { margin-top: 0; }
+}

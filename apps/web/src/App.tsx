@@ -21,6 +21,7 @@ import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
 import { Intro, introAfterLogin, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
+import { MuninnEntrance } from "./muninn/MuninnEntrance";
 import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
@@ -152,8 +153,8 @@ export function App() {
   // Measured each turn; shown in no screen of this brand (kept for whoever reads it later).
   const [, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<CiclopeState>("idle");
-  // The password field has the focus: the Ciclope on the entrance closes its eye.
-  const [notLooking, setNotLooking] = useState(false);
+  // The login is checking the credentials: the ring on the entrance shows "pensando".
+  const [loginBusy, setLoginBusy] = useState(false);
   const demoLevel = useDemoLevel(demo && (demoState === "listening" || demoState === "speaking"));
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
@@ -862,7 +863,7 @@ export function App() {
 
   return (
     <div className={`app${desk && ready && !firstRun ? " app--mesa" : ""}${!ready && !firstRun ? " app--entrada" : ""}`}>
-      <AmbientBackground state={ciclope} />
+      {(loggedIn || demo) && <AmbientBackground state={ciclope} />}
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {ready && !firstRun && (
         <MobileBar
@@ -1054,22 +1055,28 @@ export function App() {
         </div>
       )}
 
-      {!firstRun && !ready && (
+      {!firstRun && !ready && !loggedIn && !demo && (
+        <MuninnEntrance thinking={loginBusy}>
+          <Login
+            api={api}
+            online={online}
+            onBusyChange={setLoginBusy}
+            onLoggedIn={(token, remember) => {
+              saveToken(token, remember);
+              setLoggedIn(true);
+              if (introAfterLogin()) setIntro(true);
+            }}
+          />
+        </MuninnEntrance>
+      )}
+      {!firstRun && !ready && (loggedIn || demo) && (
         <div className="layout">
           <main className="main auth-main">
             <div className="entrance">
               <div className="entrance-mascot">
-                <Ciclope state={ciclope} size={124} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" eyesClosed={notLooking} />
-                {notLooking && <span className="entrance-bubble" role="status">Não estou olhando.</span>}
+                <Ciclope state={ciclope} size={124} level={demo ? demoLevel : voice.speaking || voice.inCall ? voice.level : undefined} lookAt="pointer" />
               </div>
-              {demo ? (
-                <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>
-              ) : (
-                <div className="entrance-words">
-                  <h1>Identifique-se.</h1>
-                  <p className="lede">Acesso restrito. Só você entra aqui.</p>
-                </div>
-              )}
+              {demo && <p className="rotulo state-label">{CICLOPE_LABELS[ciclope]}</p>}
             </div>
             {demo ? (
               <div className="demo">
@@ -1079,16 +1086,6 @@ export function App() {
                   </button>
                 ))}
               </div>
-            ) : !loggedIn ? (
-              <Login
-                api={api}
-                onPasswordFocus={setNotLooking}
-                onLoggedIn={(token, remember) => {
-                  saveToken(token, remember);
-                  setLoggedIn(true);
-                  if (introAfterLogin()) setIntro(true);
-                }}
-              />
             ) : status && !status.genesis_completed ? (
               <div className="rs-mensagem rs-mensagem--aviso" role="alert">
                 <i aria-hidden="true">!</i><b>Aviso</b>

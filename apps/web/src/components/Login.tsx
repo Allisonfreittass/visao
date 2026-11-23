@@ -32,11 +32,11 @@ interface LoginProps {
   onLoggedIn: (token: string, remember: boolean) => void;
   /** Last health check: false means the server did not answer it. */
   online?: boolean;
-  /** The password field got or lost the focus (the Ciclope closes its eye: "not looking"). */
-  onPasswordFocus?: (focused: boolean) => void;
+  /** The credentials are being checked (the ring shows "pensando" meanwhile). */
+  onBusyChange?: (busy: boolean) => void;
 }
 
-export function Login({ api, onLoggedIn, online = true, onPasswordFocus }: LoginProps) {
+export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
@@ -47,6 +47,7 @@ export function Login({ api, onLoggedIn, online = true, onPasswordFocus }: Login
 
   // Leaving the screen mid-request cancels it instead of logging in behind the user's back.
   useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -120,11 +121,7 @@ export function Login({ api, onLoggedIn, online = true, onPasswordFocus }: Login
           onChange={(e) => edit(setPassword, e.target.value)}
           onKeyDown={watchCapsLock}
           onKeyUp={watchCapsLock}
-          onFocus={() => onPasswordFocus?.(true)}
-          onBlur={() => {
-            setCapsLock(false);
-            onPasswordFocus?.(false);
-          }}
+          onBlur={() => setCapsLock(false)}
           aria-invalid={error?.credentials || undefined}
           aria-describedby={[describedBy, capsLock ? "login-caps" : undefined].filter(Boolean).join(" ") || undefined}
           required
