@@ -112,6 +112,13 @@ def input_estimate(messages: list[ChatMessage]) -> int:
     )
 
 
+def credential_fingerprint(secret: str) -> str:
+    """Tells one API key from another without keeping it: the circuit and the quota pause of a
+    provider belong to the key in use, so a new key starts clean (real case, 2026-11-23: a key
+    pasted wrong opened the circuit, and the right one waited 15 minutes for nothing)."""
+    return hashlib.sha256(b"visao-credential:" + secret.encode()).hexdigest()[:16]
+
+
 class BudgetGuard:
     def __init__(
         self,
@@ -167,12 +174,16 @@ class BudgetGuard:
     def _paid(provider: LLMProvider) -> bool:
         return provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0
 
-    def _grant(self, provider: LLMProvider, endpoint: str, now: datetime) -> str:
+    def _grant(
+        self, provider: LLMProvider, endpoint: str, now: datetime, credential: str | None = None
+    ) -> str:
+        # The key in use joins the circuit's identity; without one it stays as it always was.
+        tail = [credential] if credential else []
         if self._paid(provider):
             if not self.admits_paid:
                 raise _deny("paid or unknown provider price")
             return hashlib.sha256(
-                json.dumps(["paid", provider.name, endpoint, provider.model]).encode()
+                json.dumps(["paid", provider.name, endpoint, provider.model, *tail]).encode()
             ).hexdigest()
         for grant in self.grants:
             if (
@@ -182,17 +193,24 @@ class BudgetGuard:
                 and grant.verified_at <= now < grant.expires_at
             ):
                 return hashlib.sha256(
-                    json.dumps([grant.provider, grant.endpoint, grant.model]).encode()
+                    json.dumps([grant.provider, grant.endpoint, grant.model, *tail]).encode()
                 ).hexdigest()
         if self.trust_zero_price:
             return hashlib.sha256(
-                json.dumps([provider.name, endpoint, provider.model]).encode()
+                json.dumps([provider.name, endpoint, provider.model, *tail]).encode()
             ).hexdigest()
         raise _deny("no current zero-price evidence for this exact endpoint/model")
 
-    def reserve(self, provider: LLMProvider, endpoint: str, messages, output: int) -> str:
+    def reserve(
+        self,
+        provider: LLMProvider,
+        endpoint: str,
+        messages,
+        output: int,
+        credential: str | None = None,
+    ) -> str:
         now = self.clock().astimezone(UTC)
-        key = self._grant(provider, endpoint, now)
+        key = self._grant(provider, endpoint, now, credential)
         input_tokens = input_estimate(messages)
         if not 0 < output <= self.limits.output_tokens_per_call:
             raise _deny("output reservation exceeds per-call limit")
@@ -326,15 +344,23 @@ class BudgetGuard:
 
 
 class GuardedLLMProvider:
-    def __init__(self, provider: LLMProvider, endpoint: str, guard: BudgetGuard):
+    def __init__(
+        self,
+        provider: LLMProvider,
+        endpoint: str,
+        guard: BudgetGuard,
+        credential: str | None = None,
+    ):
         self._provider, self._endpoint, self._guard = provider, endpoint, guard
         self.name, self.model, self.pricing = provider.name, provider.model, provider.pricing
         self.admits_paid = guard.admits_paid
+        # credential_fingerprint of the key in use (never the key): read by the quota pause too.
+        self.credential = credential or ""
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
         try:
             reservation = self._guard.reserve(
-                self._provider, self._endpoint, messages, max_output_tokens
+                self._provider, self._endpoint, messages, max_output_tokens, self.credential
             )
         except LLMError:
             raise

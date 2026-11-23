@@ -19,6 +19,7 @@ from integrations.llm.budget import (
     BudgetLimits,
     FreeEndpointGrant,
     GuardedLLMProvider,
+    credential_fingerprint,
 )
 from integrations.llm.fallback import FallbackLLMProvider
 from tests.fakes import FakeLLMProvider
@@ -451,3 +452,30 @@ def test_every_fallback_slot_receives_its_fast_extra_body(factory):
     assert [p._provider._extra_body for p in fast._providers] == [{"a": 1}, {"b": 2}, {"c": 3}]
     slow = build_llm_provider(settings, budget_guard=make_guard(factory))
     assert [p._provider._extra_body for p in slow._providers] == [{}, {}, {}]
+
+
+def test_a_new_api_key_starts_with_a_closed_circuit(factory):
+    """Real case (2026-11-23): a key pasted wrong opened the circuit; the right one waited."""
+    wrong, right = credential_fingerprint("sk-errada"), credential_fingerprint("sk-certa")
+    p = fake(fail_with="http_401")
+    for _ in range(3):
+        with pytest.raises(LLMError):
+            GuardedLLMProvider(p, ENDPOINT, make_guard(factory), wrong).complete(
+                PROMPT, max_output_tokens=512
+            )
+    with pytest.raises(LLMError, match="cooling down"):
+        GuardedLLMProvider(p, ENDPOINT, make_guard(factory), wrong).complete(
+            PROMPT, max_output_tokens=512
+        )
+    p.fail_with = None
+    GuardedLLMProvider(p, ENDPOINT, make_guard(factory), right).complete(
+        PROMPT, max_output_tokens=512
+    )
+    assert len(p.prompts) == 4
+
+
+def test_the_fingerprint_never_carries_the_key():
+    key = "sk-proj-" + "x" * 150
+    fingerprint = credential_fingerprint(key)
+    assert len(fingerprint) == 16 and "sk-" not in fingerprint
+    assert fingerprint == credential_fingerprint(key) != credential_fingerprint(key + "y")

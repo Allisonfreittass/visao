@@ -56,6 +56,10 @@ descobriam cada um por si.
   Gemini diz que a cota diária acabou. Sem essa informação, valem os 15 minutos de antes. A
   pausa fica entre 1 minuto e 24 horas. Se o banco não responder, vale a pausa na memória do
   processo, e a ordem configurada.
+- **Uma chave nova recomeça limpa.** O circuito do razão (3 falhas, 15 minutos) e a pausa por
+  cota passam a ser da chave em uso: entra na identidade um hash dela
+  (`credential_fingerprint`, 16 caracteres, nunca a chave). Caso real de 23/11/2026: uma chave
+  colada errada abriu o circuito da OpenAI, e a chave certa esperou 15 minutos à toa.
 - **Também conta como cota esgotada** um 429 `insufficient_quota` da OpenAI (conta sem crédito).
 - **Não confundir com o `brain`** (`core/brain.py`). O "auto" do brain põe o modelo local do Mac
   atrás da nuvem. Este ajuste só ordena os provedores da nuvem, e os dois combinam.

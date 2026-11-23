@@ -20,6 +20,8 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
   - Um provedor sem cota fica pausado no banco, para a API e o worker juntos, até o reset que
     ele mesmo informou (meia-noite do Pacífico para a cota diária do Gemini). Antes eram 15
     minutos, e cada processo descobria por si.
+  - Trocar a chave de um provedor zera o circuito e a pausa dele: a chave nova não espera pelas
+    falhas da antiga.
 
 - **Braço versão 3: desfazer, até os testes passarem, e todo comando no sandbox**
   ([BRACO.md](BRACO.md), itens 4, 8, 9 e 10).

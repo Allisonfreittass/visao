@@ -73,7 +73,8 @@ class FallbackLLMProvider:
             # A provider whose quota ran out is skipped for a while instead of wasting a call.
             if time.monotonic() < self._skip_until[index]:
                 continue
-            if shared.get(key(provider.name, provider.model), 0) > time.time():
+            credential = getattr(provider, "credential", "") or ""
+            if shared.get(key(provider.name, provider.model, credential), 0) > time.time():
                 continue
             paid = provider.pricing.input_per_mtok != 0 or provider.pricing.output_per_mtok != 0
             # A priced provider only when its guard has spending caps (budget.py enforces them).
@@ -100,4 +101,5 @@ class FallbackLLMProvider:
         self._skip_until[index] = time.monotonic() + seconds
         if self._pauses is not None:
             provider = self._providers[index]
-            self._pauses.pause(provider.name, provider.model, now + seconds)
+            credential = getattr(provider, "credential", "") or ""
+            self._pauses.pause(provider.name, provider.model, now + seconds, credential)

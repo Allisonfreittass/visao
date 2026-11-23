@@ -11,7 +11,12 @@ from core.arm.local_llm import LocalModelProvider
 from core.brain import BrainProvider
 from integrations.llm.anthropic_provider import AnthropicProvider
 from integrations.llm.base import LLMProvider, Pricing, current_purpose
-from integrations.llm.budget import BudgetGuard, BudgetLimits, GuardedLLMProvider
+from integrations.llm.budget import (
+    BudgetGuard,
+    BudgetLimits,
+    GuardedLLMProvider,
+    credential_fingerprint,
+)
 from integrations.llm.fallback import FallbackLLMProvider
 from integrations.llm.fitting import FittingProvider
 from integrations.llm.openai_compatible import OpenAICompatibleProvider
@@ -211,11 +216,12 @@ def build_llm_provider(
     for prefix in chained_slots(settings, warn=True):
         name = getattr(settings, f"{prefix}provider_name")
         base_url = getattr(settings, f"{prefix}base_url")
+        api_key = getattr(settings, f"{prefix}api_key")
         raw = _openai_compatible(
             settings,
             name,
             base_url,
-            getattr(settings, f"{prefix}api_key"),
+            api_key,
             getattr(settings, f"{prefix}model"),
             getattr(settings, f"{prefix}price_input_per_mtok"),
             getattr(settings, f"{prefix}price_output_per_mtok"),
@@ -223,7 +229,12 @@ def build_llm_provider(
         )
         chain.append(
             FittingProvider(
-                GuardedLLMProvider(raw, base_url, budget_guard),
+                GuardedLLMProvider(
+                    raw,
+                    base_url,
+                    budget_guard,
+                    credential_fingerprint(api_key.get_secret_value()),
+                ),
                 getattr(settings, f"{prefix}max_request_tokens"),
             )
         )

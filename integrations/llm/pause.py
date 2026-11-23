@@ -32,8 +32,9 @@ def pause_seconds(retry_at: float | None, now: float) -> float:
     return min(max(retry_at - now, MIN_SECONDS), MAX_SECONDS)
 
 
-def key(name: str, model: str) -> str:
-    return f"{name}|{model}"
+def key(name: str, model: str, credential: str = "") -> str:
+    """A new API key (its fingerprint, never the key) starts with no pause."""
+    return f"{name}|{model}|{credential}" if credential else f"{name}|{model}"
 
 
 class PauseBoard:
@@ -58,7 +59,7 @@ class PauseBoard:
         now = self._clock()
         return {k: float(v) for k, v in value.items() if isinstance(v, int | float) and v > now}
 
-    def pause(self, name: str, model: str, until: float) -> None:
+    def pause(self, name: str, model: str, until: float, credential: str = "") -> None:
         try:
             with self._factory() as db:
                 dialect = db.get_bind().dialect.name
@@ -74,7 +75,8 @@ class PauseBoard:
                     for k, v in (flag.value or {}).items()
                     if isinstance(v, int | float) and v > now
                 }
-                value[key(name, model)] = max(until, float(value.get(key(name, model), 0)))
+                entry = key(name, model, credential)
+                value[entry] = max(until, float(value.get(entry, 0)))
                 flag.value = value
                 db.commit()
         except Exception:  # noqa: BLE001

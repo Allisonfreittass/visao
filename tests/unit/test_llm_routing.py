@@ -301,3 +301,20 @@ def test_the_manifest_says_the_code_chooses() -> None:
     assert not any("regra no código" in a for a in Capabilities().actions())
     line = next(a for a in Capabilities(provider_by_task=True).actions() if "regra no" in a)
     assert "não é você nem outro modelo que escolhe" in line
+
+
+def test_a_new_api_key_is_not_held_by_the_old_quota_pause(engine) -> None:
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    board = PauseBoard(factory)
+    board.pause("openai", "openai-m", time.time() + 3600, "chave-velha")
+    old, new = _fakes()[1], _fakes()[1]
+    old.credential, new.credential = "chave-velha", "chave-nova"  # type: ignore[attr-defined]
+    backup = _fakes()[0]
+    assert (
+        FallbackLLMProvider([old, backup], pauses=board).complete(PROMPT, max_output_tokens=5).text
+        == "do claude"
+    )
+    assert (
+        FallbackLLMProvider([new, backup], pauses=board).complete(PROMPT, max_output_tokens=5).text
+        == "do openai"
+    )
