@@ -33,9 +33,15 @@ reinicia. Os três apanharam disso em produção e têm regras claras para cada 
 
 ## 1. Falhas encontradas no Visão
 
-**Corrigidas em 23/11/2026:** F1, F2 e F3, cada uma com um teste que falha no código anterior
-(`tests/integration/test_google.py`, `tests/integration/test_turn_once.py`,
-`tests/unit/test_turn_lock.py` e, no PostgreSQL, `tests/integration/test_hardening_postgres.py`).
+**Corrigidas em 23/11/2026:**
+- **F1, F2 e F3**, cada uma com um teste que falha no código anterior:
+  `tests/integration/test_google.py`, `tests/integration/test_turn_once.py`,
+  `tests/unit/test_turn_lock.py` e, no PostgreSQL, `tests/integration/test_hardening_postgres.py`.
+- **F4 e F5** (braço versão 2): `tests/unit/test_braco.py` e `tests/integration/test_arm.py`.
+  - Os flags do Claude Code foram conferidos de verdade com a versão 2.1.330.
+  - Para valer no Mac, é preciso rodar `arm/instalar-mac.sh` de novo.
+  - Continua em aberto: "editar + comando liberado" e os processos que sobram no timeout
+    (veja [BRACO.md](../BRACO.md)).
 
 | # | O que pode acontecer | Onde | Ideia de |
 |---|---|---|---|

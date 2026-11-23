@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -22,9 +23,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# 2: runs Claude Code isolated, keeps results until the server takes them, beats while working,
+# and can answer with a local model.
 VERSION = "2"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
@@ -51,7 +55,22 @@ DEFAULT_TOOLS = [
     "Bash(pytest *)",
     "Bash(.venv/bin/pytest *)",
 ]
-NEVER = ["Bash(rm *)", "Bash(sudo *)", "Bash(curl *)", "Bash(wget *)", "Bash(git push *)"]
+# What a task must never change, because it would widen what the NEXT tasks may do: permission
+# rules and hooks (.claude/), MCP servers (.mcp.json), instructions read at the start of every
+# task (CLAUDE.md) and git hooks (.git/). Denied even if allowed_tools says otherwise.
+PROTECTED = [".claude/**", ".mcp.json", "**/CLAUDE.md", "**/CLAUDE.local.md", ".git/**"]
+NEVER = [
+    "Bash(rm *)",
+    "Bash(sudo *)",
+    "Bash(curl *)",
+    "Bash(wget *)",
+    "Bash(git push *)",
+    *(f"{tool}({path})" for tool in ("Edit", "Write") for path in PROTECTED),
+]
+TOO_OLD = (
+    "Este Claude Code não tem como rodar isolado (falta --restricted ou --setting-sources), "
+    "então não rodei nada. Atualize com `claude update` e peça de novo."
+)
 SYSTEM_NOTE = (
     "Esta tarefa veio do Visão, o assistente pessoal do dono deste Mac, e foi aprovada por ele. "
     "Trabalhe só dentro deste projeto. No fim, responda em português do Brasil com um resumo "
@@ -75,6 +94,8 @@ class Config:
     local_model: str | None = None
     ollama: str = "http://127.0.0.1:11434"
     local_context: int = 16384
+    # Where results wait until the server takes them, next to braco.json.
+    state_dir: Path = field(default_factory=lambda: DEFAULT_CONFIG.parent)
 
     @classmethod
     def load(cls, path: Path) -> Config:
@@ -103,6 +124,7 @@ class Config:
             local_model=(str(local["modelo"]).strip() or None) if local.get("modelo") else None,
             ollama=_local_address(str(local.get("endereco") or "http://127.0.0.1:11434")),
             local_context=int(local.get("contexto", 16384)),
+            state_dir=path.expanduser().resolve().parent,
         )
 
 
@@ -131,11 +153,55 @@ def call(config: Config, method: str, path: str, body: dict | None = None, timeo
     return json.loads(raw) if raw else None
 
 
-def command(config: Config, task: dict) -> list[str]:
+_help_text: dict[str, str] = {}
+
+
+def _help(claude: str) -> str:
+    if claude not in _help_text:
+        try:
+            done = subprocess.run(  # noqa: S603 (the configured claude, fixed argv)
+                [claude, "--help"], capture_output=True, text=True, timeout=30
+            )
+            _help_text[claude] = done.stdout or ""
+        except (OSError, subprocess.TimeoutExpired):
+            return ""  # not cached: maybe it is being installed
+    return _help_text[claude]
+
+
+def _has(help_text: str, flag: str) -> bool:
+    return re.search(rf"^\s+(?:-\w, )?{re.escape(flag)}\b", help_text, re.MULTILINE) is not None
+
+
+def isolation(config: Config) -> list[str] | None:
+    """Flags that keep a task from loading, or changing, what governs the next tasks: project
+    settings and hooks, MCP servers, files of settings and git. None when this Claude Code
+    cannot run isolated; then nothing runs."""
+    text = _help(config.claude)
+    tools = ",".join(sorted({t.split("(", 1)[0] for t in config.allowed_tools}))
+    if _has(text, "--restricted"):
+        # Ignores user, project and local settings; confines file tools to the project; only a
+        # person or the permission handler may approve writes to settings, git and tool files
+        # (none here: dontAsk denies). It removes Bash unless --tools names it.
+        return ["--restricted", "--strict-mcp-config", "--tools", tools]
+    if _has(text, "--setting-sources") and _has(text, "--strict-mcp-config"):
+        # Older Claude Code: your own settings only, no hooks, no MCP servers.
+        flags = [
+            "--setting-sources",
+            "user",
+            "--settings",
+            json.dumps({"disableAllHooks": True}),
+            "--strict-mcp-config",
+        ]
+        return flags + (["--tools", tools] if _has(text, "--tools") else [])
+    return None
+
+
+def command(config: Config, task: dict, isolated: list[str]) -> list[str]:
     """The prompt goes on stdin, so no flag can ever swallow it or be injected through it."""
     args = [
         config.claude,
         "-p",
+        *isolated,
         "--output-format",
         "json",
         "--permission-mode",
@@ -164,11 +230,11 @@ def _environment(config: Config) -> dict[str, str]:
     return env
 
 
-def run_claude(config: Config, task: dict, folder: Path) -> dict:
+def run_claude(config: Config, task: dict, folder: Path, isolated: list[str]) -> dict:
     """Runs one task and returns the body for /result. Never raises for a task failure."""
     try:
         process = subprocess.Popen(  # noqa: S603 (fixed argv; the prompt goes on stdin)
-            command(config, task),
+            command(config, task, isolated),
             cwd=folder,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -219,32 +285,131 @@ def handle(config: Config, task: dict) -> dict:
         return {"ok": False, "error": f"Projeto não liberado neste Mac. Liberados: {names}."}
     if not folder.is_dir():
         return {"ok": False, "error": f"A pasta do projeto não existe: {folder}"}
-    return run_claude(config, task, folder)
+    isolated = isolation(config)
+    if isolated is None:
+        missing = f"Não achei o Claude Code ({config.claude}) neste Mac."
+        return {"ok": False, "error": TOO_OLD if _help(config.claude) else missing}
+    return run_claude(config, task, folder, isolated)
 
 
-def heartbeat(config: Config) -> None:
+def heartbeat(config: Config, running: str | None = None) -> None:
+    """`running`: the task being worked on now, so the server knows it is not lost."""
     call(
         config,
         "POST",
         "/device/heartbeat",
-        {"projects": sorted(config.projects), "version": VERSION},
+        {"projects": sorted(config.projects), "version": VERSION, "running": running},
     )
+
+
+@contextmanager
+def beating(config: Config, task_id: str):
+    """Keeps the heartbeat going while a task runs (it can take 30 min): without it the server
+    cannot tell a long task from a Mac that died."""
+    stop = threading.Event()
+
+    def beat() -> None:
+        while not stop.wait(HEARTBEAT_SECONDS):
+            try:
+                heartbeat(config, running=task_id)
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+                pass  # the next beat tries again; the task goes on
+
+    thread = threading.Thread(target=beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        thread.join(5)
+
+
+# Results are written here before they are sent, and removed only once the server took them: a
+# network drop after a 30-minute task no longer throws the result away.
+def _outbox(config: Config) -> Path:
+    folder = config.state_dir / "saida"
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def _running_file(config: Config) -> Path:
+    return config.state_dir / "em-andamento.json"
+
+
+def _write(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    partial = path.with_name(path.name + ".tmp")
+    partial.write_text(json.dumps(data))
+    os.replace(partial, path)
+
+
+def keep(config: Config, task_id: str, result: dict) -> None:
+    _write(_outbox(config) / f"{task_id}.json", {"task_id": task_id, "result": result})
+    _running_file(config).unlink(missing_ok=True)
+
+
+def recover(config: Config) -> None:
+    """A task that was running when the Mac or the arm stopped is reported as cut off. It is
+    never run again on its own: it may have changed files halfway."""
+    running = _running_file(config)
+    try:
+        task_id = json.loads(running.read_text())["task_id"]
+    except (OSError, ValueError, KeyError, TypeError):
+        running.unlink(missing_ok=True)
+        return
+    print(f"Tarefa {task_id} foi interrompida quando o braço parou", flush=True)
+    keep(config, task_id, {"ok": False, "error": CUT_OFF})
+
+
+CUT_OFF = (
+    "O Mac desligou ou o braço reiniciou no meio desta tarefa. Nada foi refeito; confira o "
+    "projeto (git status) antes de pedir de novo."
+)
+
+
+def deliver(config: Config) -> None:
+    """Sends every result still waiting, oldest first. A network error stops here and is raised
+    (the loop waits and tries again); a result the server refuses for good is dropped."""
+    for path in sorted(_outbox(config).glob("*.json"), key=lambda p: p.stat().st_mtime):
+        try:
+            data = json.loads(path.read_text())
+            task_id, result = str(data["task_id"]), dict(data["result"])
+        except (OSError, ValueError, KeyError, TypeError):
+            path.unlink(missing_ok=True)
+            continue
+        try:
+            call(config, "POST", f"/device/tasks/{task_id}/result", result, timeout=60)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (404, 409, 422):
+                raise
+            print(f"O servidor recusou o resultado de {task_id} ({exc.code})", file=sys.stderr)
+        path.unlink(missing_ok=True)
+        print(f"Tarefa {task_id}: {'ok' if result.get('ok') else 'falhou'}", flush=True)
+
+
+def work(config: Config, task: dict) -> None:
+    task_id = str(task["id"])
+    print(f"Tarefa {task_id} em {task.get('project')}", flush=True)
+    _write(_running_file(config), {"task_id": task_id})
+    with beating(config, task_id):
+        result = handle(config, task)
+    keep(config, task_id, result)
 
 
 def loop(config: Config, once: bool = False) -> None:
     backoff, last_beat = 5, 0.0
+    recover(config)
     while True:
         try:
+            deliver(config)
             if time.monotonic() - last_beat > HEARTBEAT_SECONDS:
                 heartbeat(config)
                 last_beat = time.monotonic()
             task = call(config, "GET", f"/device/next?wait={LONG_POLL_SECONDS}")
             backoff = 5
             if task:
-                print(f"Tarefa {task['id']} em {task['project']}", flush=True)
-                result = handle(config, task)
-                call(config, "POST", f"/device/tasks/{task['id']}/result", result, timeout=60)
-                print(f"Tarefa {task['id']}: {'ok' if result['ok'] else 'falhou'}", flush=True)
+                work(config, task)
+                deliver(config)
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
                 print("Token recusado: pareie este Mac de novo na interface.", file=sys.stderr)

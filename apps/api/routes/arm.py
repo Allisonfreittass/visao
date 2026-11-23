@@ -68,6 +68,8 @@ class HeartbeatIn(BaseModel):
 
     projects: list[str] = Field(default_factory=list, max_length=50)
     version: str = Field(default="", max_length=32)
+    # The task it is working on now (version 2 arms beat while they work).
+    running: uuid.UUID | None = None
 
 
 class NextOut(BaseModel):
@@ -283,7 +285,7 @@ Device = Annotated[ArmDevice, Depends(current_device)]
 
 @router.post("/device/heartbeat", status_code=status.HTTP_204_NO_CONTENT)
 def device_heartbeat(body: HeartbeatIn, device: Device, db: DbSession) -> None:
-    service.heartbeat(db, device, body.projects, body.version)
+    service.heartbeat(db, device, body.projects, body.version, body.running)
     db.commit()
 
 

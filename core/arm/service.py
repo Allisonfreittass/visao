@@ -3,7 +3,9 @@
 Rules enforced here, not in a prompt:
 - only the owner approves; the agent can only propose (`propose`), and a proposal never runs;
 - an arm only ever receives approved tasks of its own owner, one at a time (`claim`);
-- the result goes back to the conversation it came from, with a push when the app is closed.
+- the result goes back to the conversation it came from, with a push when the app is closed;
+- a result is never lost: sent twice it is taken once, and one that arrives after the task was
+  given up (the Mac was silent) still replaces the failure.
 """
 
 import hashlib
@@ -24,8 +26,14 @@ TOKEN_PREFIX = "visao-arm_"  # noqa: S105 (a prefix to recognise device tokens, 
 MAX_PROMPT = 8000
 MAX_RESULT = 12_000
 ONLINE_WINDOW = timedelta(seconds=90)
-# A task an arm took and never answered (Mac closed mid-task) stops counting as running.
+# A task an arm took and never answered (Mac closed mid-task) stops counting as running. Arms
+# from version 2 beat while they work, so their silence says it much sooner.
 STALE_RUNNING = timedelta(hours=3)
+SILENT_ARM = timedelta(minutes=10)
+# Between taking a task and the first beat that names it.
+CLAIM_GRACE = timedelta(minutes=2)
+STALE_ERROR = "O Mac não respondeu (desligou no meio?)."
+LOST_ERROR = "O Mac não estava mais com essa tarefa (o braço reiniciou no meio?)."
 OPEN = ("proposed", "approved", "running")
 
 
@@ -78,10 +86,34 @@ def online(device: ArmDevice, now: datetime | None = None) -> bool:
     return seen is not None and (now or _now()) - seen < ONLINE_WINDOW
 
 
-def heartbeat(session: Session, device: ArmDevice, projects: list[str], version: str) -> None:
+def beats_while_working(device: ArmDevice) -> bool:
+    """Version 1 arms sent no beat during a task: their silence there means nothing."""
+    return device.version not in ("", "1")
+
+
+def heartbeat(
+    session: Session,
+    device: ArmDevice,
+    projects: list[str],
+    version: str,
+    running: uuid.UUID | None = None,
+) -> None:
+    now = _now()
     device.projects = [p[:64] for p in projects[:50] if isinstance(p, str) and p.strip()]
     device.version = version[:32]
-    device.last_seen_at = _now()
+    device.last_seen_at = now
+    if beats_while_working(device):
+        # It says what it is working on: anything else it took (and is past the first beat)
+        # was lost. A late result from it still lands (`finish`).
+        for task in session.scalars(
+            select(ArmTask).where(
+                ArmTask.device_id == device.id,
+                ArmTask.status == "running",
+                ArmTask.started_at < now - CLAIM_GRACE,
+            )
+        ):
+            if task.id != running:
+                task.status, task.error, task.finished_at = "failed", LOST_ERROR, now
     session.flush()
 
 
@@ -190,18 +222,21 @@ def reject(session: Session, owner_id: uuid.UUID, task_id: uuid.UUID) -> ArmTask
 
 def expire_stale(session: Session, owner_id: uuid.UUID, now: datetime | None = None) -> None:
     moment = now or _now()
-    cutoff = moment - STALE_RUNNING
-    session.execute(
-        update(ArmTask)
-        .where(
-            ArmTask.owner_user_id == owner_id,
-            ArmTask.status == "running",
-            ArmTask.started_at < cutoff,
+    for task in session.scalars(
+        select(ArmTask).where(ArmTask.owner_user_id == owner_id, ArmTask.status == "running")
+    ):
+        device = session.get(ArmDevice, task.device_id) if task.device_id else None
+        started = _utc(task.started_at) or moment
+        seen = _utc(device.last_seen_at) if device is not None else None
+        silent = (
+            device is not None
+            and beats_while_working(device)
+            and started < moment - CLAIM_GRACE
+            and (seen is None or seen < moment - SILENT_ARM)
         )
-        .values(
-            status="failed", error="O Mac não respondeu (desligou no meio?).", finished_at=moment
-        )
-    )
+        if silent or started < moment - STALE_RUNNING:
+            task.status, task.error, task.finished_at = "failed", STALE_ERROR, moment
+    session.flush()
 
 
 def claim(session: Session, device: ArmDevice) -> ArmTask | None:
@@ -249,7 +284,12 @@ def finish(
     claude_session_id: str | None = None,
 ) -> ArmTask:
     task = session.get(ArmTask, task_id)
-    if task is None or task.device_id != device.id or task.status != "running":
+    if task is None or task.device_id != device.id:
+        raise LookupError("task")
+    given_up = task.status == "failed" and task.error in (STALE_ERROR, LOST_ERROR)
+    if task.status in ("done", "failed") and not given_up:
+        return task  # the same result sent again (the arm keeps it until it gets an answer)
+    if task.status != "running" and not given_up:
         raise LookupError("task")
     now = _now()
     task.status = "done" if ok else "failed"

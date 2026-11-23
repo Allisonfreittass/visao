@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from core.arm import service
 from core.initiatives import push
-from infrastructure.database.models import ArmTask, Message
+from infrastructure.database.models import ArmDevice, ArmTask, Message
 from tests.integration.test_mind import _owner_client
 from tests.integration.test_push import RecordingSender, _subscribe
 
@@ -226,3 +226,99 @@ def test_an_approval_said_in_a_call_is_recorded_as_by_voice(client, db, sender):
     log = db.scalars(select(AuditLog).where(AuditLog.action == "arm.approve")).all()[-1]
     assert log.details == {"via": "voz"}
     assert client.post(f"/arm/tasks/{task.id}/approve?via=grito", headers=owner).status_code == 422
+
+
+# F4: a result is never lost ------------------------------------------------------------------
+
+
+def _running(client, db, owner, arm, version="2"):
+    import uuid
+
+    client.post(
+        "/arm/device/heartbeat", json={"projects": ["visao"], "version": version}, headers=arm
+    )
+    client.post("/arm/tasks", json={"project": "visao", "prompt": "longa"}, headers=owner)
+    job = client.get("/arm/device/next", headers=arm).json()
+    return db.get(ArmTask, uuid.UUID(job["id"]))
+
+
+def _arm_replies(db):
+    return db.scalars(
+        select(Message).where(Message.origin == "arm", Message.role == "assistant")
+    ).all()
+
+
+def test_the_same_result_sent_twice_is_taken_once(client, db, sender):
+    owner_user, owner = _owner_client(client, db)
+    _subscribe(db, owner_user)
+    _, arm = _pair(client, owner)
+    task = _running(client, db, owner, arm)
+    for _ in range(2):  # the arm sends again when it did not hear back
+        sent = client.post(
+            f"/arm/device/tasks/{task.id}/result", json={"ok": True, "result": "ok"}, headers=arm
+        )
+        assert sent.status_code == 204
+    assert len(sender.sent) == 1  # one "Terminei no Mac", not two
+
+
+def test_a_result_that_arrives_after_the_task_was_given_up_still_lands(client, db, sender):
+    from datetime import UTC, datetime, timedelta
+
+    _, owner = _owner_client(client, db)
+    _, arm = _pair(client, owner)
+    task = _running(client, db, owner, arm, version="1")
+    task.started_at = datetime.now(UTC) - timedelta(hours=4)
+    db.commit()
+    [listed] = client.get("/arm/tasks", headers=owner).json()
+    assert listed["status"] == "failed"
+    late = client.post(
+        f"/arm/device/tasks/{task.id}/result",
+        json={"ok": True, "result": "613 passed"},
+        headers=arm,
+    )
+    assert late.status_code == 204
+    [listed] = client.get("/arm/tasks", headers=owner).json()
+    assert listed["status"] == "done" and listed["result"] == "613 passed"
+
+
+def test_a_beat_that_names_another_task_gives_up_the_lost_one(client, db):
+    from datetime import UTC, datetime, timedelta
+
+    _, owner = _owner_client(client, db)
+    _, arm = _pair(client, owner)
+    task = _running(client, db, owner, arm)
+
+    def beat(running):
+        client.post(
+            "/arm/device/heartbeat",
+            json={"projects": ["visao"], "version": "2", "running": running},
+            headers=arm,
+        )
+        db.refresh(task)
+
+    beat(None)
+    assert task.status == "running"  # just taken: the first beat that names it may not have come
+    task.started_at = datetime.now(UTC) - timedelta(minutes=5)
+    db.commit()
+    beat(str(task.id))
+    assert task.status == "running"
+    beat(None)
+    assert task.status == "failed" and task.error == service.LOST_ERROR
+
+
+def test_a_silent_mac_gives_up_its_task_in_minutes_not_hours(client, db):
+    from datetime import UTC, datetime, timedelta
+
+    _, owner = _owner_client(client, db)
+    _, arm = _pair(client, owner)
+    old_arm = _pair(client, owner, "Mac antigo")[1]
+    task = _running(client, db, owner, arm)
+    old_task = _running(client, db, owner, old_arm, version="1")
+    quiet = datetime.now(UTC) - timedelta(minutes=15)
+    for each in (task, old_task):
+        each.started_at = quiet
+        db.get(ArmDevice, each.device_id).last_seen_at = quiet
+    db.commit()
+    listed = {t["id"]: t["status"] for t in client.get("/arm/tasks", headers=owner).json()}
+    # Version 2 beats while working, so 15 min of silence means it is gone; version 1 does not.
+    assert listed[str(task.id)] == "failed" and listed[str(old_task.id)] == "running"

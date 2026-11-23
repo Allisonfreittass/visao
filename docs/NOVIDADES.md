@@ -17,6 +17,14 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
     fila ([ACOES.md](ACOES.md)).
   - Se o modelo falhar depois de ele já ter feito algo no app, a resposta diz o que foi feito em
     vez de só mostrar um erro.
+  - **Braço do Mac, versão 2** ([BRACO.md](BRACO.md)):
+    - o Claude Code roda isolado, e uma tarefa não consegue mudar as permissões, os hooks ou o
+      `CLAUDE.md` das próximas;
+    - o resultado fica guardado no Mac até o servidor receber;
+    - uma tarefa cortada por um reinício volta como interrompida e não é refeita;
+    - um Mac que some faz a tarefa falhar em minutos.
+
+    Para valer no Mac, é preciso rodar o instalador de novo.
 
 ## 17/11/2026
 
