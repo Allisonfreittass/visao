@@ -31,8 +31,10 @@
 .anel--muninn .anel-ponto { opacity: 0; transition: transform .6s var(--ease-out), opacity .3s var(--ease-out); }
 .anel--muninn[data-estado="fala"] .anel-ponto { opacity: 1; }
 
-/* Ouvindo: the marks rise and fall in a wave round the ring; a voice makes it deeper. */
+/* Ouvindo: the marks rise and fall in a wave round the ring. A voice (the owner's, or his own
+   while it plays) pulls the wave: the marks thicken with its volume, every frame. */
 .anel[data-estado="ouvindo"] .anel-marca {
+  stroke-width: calc(1.5 + var(--nivel) * 1.8);
   animation: anel-onda 1.2s ease-in-out infinite alternate;
   animation-delay: calc(var(--h) * -.1s);
 }

@@ -341,7 +341,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
       >
         {messages.length === 0 && !sending && (
           <div className="empty-conversation">
-            <h2>Pronto para a <em>ordem.</em></h2>
+            <h2>Por onde a gente <em>começa?</em></h2>
             <p>Escreva, cole código, mande uma foto ou um arquivo, ou fale pelo microfone.</p>
           </div>
         )}

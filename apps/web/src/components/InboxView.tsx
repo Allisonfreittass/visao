@@ -41,11 +41,11 @@ interface StatusSignals {
   panels: Pick<Panel, "items">[] | null;
 }
 
-/** The status line under the greeting, from real data: "Sistemas prontos · Mac conectado ·
- * 1 voo aguardando preço". */
+/** The status line under the greeting, from real data: "Mac conectado · 1 voo aguardando preço".
+ * Empty when there is nothing to say (DESIGN.md §7: no "systems ready"). */
 export function statusLine({ online, macOnline, pendingCount, panels }: StatusSignals): string {
   if (!online) return "Sem conexão com o servidor.";
-  const parts = ["Sistemas prontos"];
+  const parts: string[] = [];
   if (macOnline === true) parts.push("Mac conectado");
   if (macOnline === false) parts.push("Sem conexão com o Mac");
   const items = (panels ?? []).flatMap((p) => p.items).filter((i) => i.cost === null);
@@ -68,8 +68,8 @@ interface Suggestion {
 export function homeSuggestions(panels: Pick<Panel, "title" | "items">[] | null, project: { id: string; name: string } | null, openProject: (id: string) => void): Suggestion[] {
   const list: Suggestion[] = [{ label: "Relatório do dia", draft: "Me dá o relatório do dia" }];
   const flight = (panels ?? []).find((p) => p.items.some((i) => i.kind === "flight"));
-  if (flight) list.push({ label: "Vigiar preço dos voos", draft: `Vigie o preço dos voos de «${flight.title}» e me avise se cair` });
-  else list.push({ label: "Vigiar um preço", draft: "Quero acompanhar " });
+  if (flight) list.push({ label: "Acompanhar preço dos voos", draft: `Acompanha o preço dos voos de «${flight.title}» e me avisa se cair` });
+  else list.push({ label: "Acompanhar um preço", draft: "Quero acompanhar " });
   if (project) list.push({ label: `Abrir projeto ${project.name}`, open: () => openProject(project.id) });
   else list.push({ label: "Pedir ao Mac", draft: "/mac " });
   return list;
@@ -125,15 +125,16 @@ export function InboxView({ api, call, onDraft, onSend, pending, current, onRepl
     return () => clearInterval(id);
   }, []);
 
+  const summary = statusLine({ online, macOnline, pendingCount: pending.count, panels });
   return (
     <section className="home" aria-labelledby="home-title">
       <div className="home-scroll">
         <header className="home-hero">
           <Anel estado={call.anel} size={96} level={call.levelActive ? call.level : undefined} />
           <h1 id="home-title" className="home-greeting">
-            <span>{hello}</span> {watchCount(panels) ? <>Estou de olho em <em>{watchCount(panels)}</em>.</> : "Nada sob vigilância ainda."}
+            <span>{hello}</span>{watchCount(panels) && <> Acompanhando <em>{watchCount(panels)}</em>.</>}
           </h1>
-          <p className="home-summary">{statusLine({ online, macOnline, pendingCount: pending.count, panels })}</p>
+          {summary && <p className="home-summary">{summary}</p>}
           {call.speaking && (
             <button type="button" className="rs-botao rs-botao--compacto" onClick={call.onStopSpeaking}>Parar de falar</button>
           )}
@@ -301,7 +302,7 @@ function HomeComposer({ call, onSend, suggestions }: { call: CallControls; onSen
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Dê uma ordem ao Visão"
+            placeholder="Fala comigo…"
             rows={1}
             maxLength={8000}
             aria-label="Mensagem"

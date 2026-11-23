@@ -21,11 +21,11 @@ export function FeedbackBar({ onSend }: Props) {
 
   return (
     <div className="feedback" aria-label="Avaliar resposta">
-      <button className="ghost" onClick={() => send(1)} aria-label="Resposta boa">
-        👍
+      <button className="ghost" onClick={() => send(1)}>
+        Ajudou
       </button>
-      <button className="ghost" onClick={() => send(-1)} aria-label="Resposta ruim">
-        👎
+      <button className="ghost" onClick={() => send(-1)}>
+        Não ajudou
       </button>
       {TAGS.map((tag) => (
         <button

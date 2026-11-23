@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ART, EYE, MARKS, RING, litHour, markAngle } from "../muninn/genesis";
-import { ANEL_LABELS, type AnelEstado } from "./state";
+import { ANEL_LABELS, type AnelEstado, anelForma } from "./state";
 import "./anel.css";
 
 interface AnelProps {
@@ -60,8 +60,9 @@ export function Anel({ estado, size = 36, level, animated = true, decorative = f
   const id = useId().replace(/:/g, "");
   const root = useRef<SVGSVGElement>(null);
   const now = useNow();
-  const muninn = size > 120;
-  const tiny = size < 32;
+  const forma = anelForma(size);
+  const muninn = forma === "muninn";
+  const tiny = forma === "mini";
   const geo = muninn ? R : SMALL;
   const lit = estado === "silencio" ? null : litHour(now);
   const voiced = estado === "ouvindo";

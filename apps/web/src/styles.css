@@ -599,7 +599,7 @@ button.projects-primary { background: var(--text); color: var(--bg); border-colo
 .live-panel-sub { font: 400 12px/1.3 var(--font-sans); color: var(--text-muted); }
 .live-panel-goal { font: 500 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .live-panel-goal--below { color: var(--success); }
-.live-panel-change { font: 400 12px/1.4 var(--font-mono); color: var(--danger); }
+.live-panel-change { font: 400 12px/1.4 var(--font-mono); color: var(--text-2); }
 .live-panel-change--down { color: var(--success); }
 .panel-items { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .panel-item { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; }

@@ -1001,7 +1001,7 @@ export function App() {
               segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
               olderLeft={olderLeft}
               onLoadOlder={() => void loadOlder()}
-              placeholder="Dê uma ordem ao Visão"
+              placeholder="Fala comigo…"
               composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
               anel={anel}
               macWorking={macWorking}

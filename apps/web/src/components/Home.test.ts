@@ -18,16 +18,16 @@ describe("Início", () => {
   it("builds the status line from real data", () => {
     expect(statusLine({ online: false, macOnline: true, pendingCount: 0, panels: [] })).toBe("Sem conexão com o servidor.");
     expect(statusLine({ online: true, macOnline: true, pendingCount: 0, panels: [{ items: [item("flight", null), item("hotel", "164")] }] }))
-      .toBe("Sistemas prontos · Mac conectado · 1 voo aguardando preço");
-    expect(statusLine({ online: true, macOnline: false, pendingCount: 2, panels: null })).toBe("Sistemas prontos · Sem conexão com o Mac · 2 pedidos esperando você");
-    expect(statusLine({ online: true, macOnline: null, pendingCount: 0, panels: null })).toBe("Sistemas prontos");
+      .toBe("Mac conectado · 1 voo aguardando preço");
+    expect(statusLine({ online: true, macOnline: false, pendingCount: 2, panels: null })).toBe("Sem conexão com o Mac · 2 pedidos esperando você");
+    expect(statusLine({ online: true, macOnline: null, pendingCount: 0, panels: null })).toBe("");
   });
 
   it("suggests from what is there", () => {
     const open = () => undefined;
     const withFlight = homeSuggestions([{ title: "Chile", items: [item("flight", null)] }], { id: "p", name: "Chile" }, open);
-    expect(withFlight.map((s) => s.label)).toEqual(["Relatório do dia", "Vigiar preço dos voos", "Abrir projeto Chile"]);
-    expect(homeSuggestions(null, null, open).map((s) => s.label)).toEqual(["Relatório do dia", "Vigiar um preço", "Pedir ao Mac"]);
+    expect(withFlight.map((s) => s.label)).toEqual(["Relatório do dia", "Acompanhar preço dos voos", "Abrir projeto Chile"]);
+    expect(homeSuggestions(null, null, open).map((s) => s.label)).toEqual(["Relatório do dia", "Acompanhar um preço", "Pedir ao Mac"]);
   });
 
   it("shows what is already known on a panel", () => {

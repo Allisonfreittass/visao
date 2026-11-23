@@ -10,11 +10,15 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 - **O anel no lugar do Ciclope** ([DESIGN.md](../DESIGN.md) §6, §8 passos 1 a 3).
   - O app inteiro usa as cores e as fontes do Muninn; vermelho só aparece em erro.
   - O anel mostra o que ele está fazendo: a hora local acesa quando parado, uma onda ouvindo, um
-    rastro âmbar pensando, o ponto subindo à falha quando ele fala ou abriu uma conversa, a falha
+    rastro âmbar pensando (a onda segue o volume quando ele fala), o ponto subindo à falha
+    quando ele abriu uma conversa que você não leu, a falha
     acesa quando algo espera o seu sim, o ponto vazado com a autonomia pausada e tudo apagado sem
     conexão.
   - Mac, e-mail, Caderno e projetos viraram ícones de traço, sem cor própria.
   - A abertura do dia agora fecha o anel marca a marca e escreve o nome ao lado.
+  - Os textos falam como ele: "Acompanhando 2 painéis", "Fala comigo…", "Acompanhar um preço".
+    Saíram "vigilância", "Dê uma ordem" e "Sistemas prontos"; avaliar uma resposta é "Ajudou" ou
+    "Não ajudou", sem emoji.
 
 - **A entrada agora é o Muninn** (primeira tela da identidade nova, [DESIGN.md](../DESIGN.md) §8
   passo 4).

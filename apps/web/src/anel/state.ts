@@ -32,6 +32,16 @@ export const ANEL_LABELS: Record<AnelEstado, string> = {
   silencio: "em silêncio",
 };
 
+/** How the ring is drawn at a size (DESIGN.md §5): Muninn inside it above 120 px, the ring alone
+ * from 32 to 120 px, and below 32 px a thin circle without the dim marks. */
+export type AnelForma = "muninn" | "anel" | "mini";
+
+export function anelForma(size: number): AnelForma {
+  if (size > 120) return "muninn";
+  if (size < 32) return "mini";
+  return "anel";
+}
+
 interface Signals {
   state: AssistantState;
   /** A task is running on the Mac right now: he is working, the ring thinks. */

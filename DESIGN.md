@@ -4,10 +4,10 @@ Fonte única do visual do Visão. Todo agente (Claude Code, Codex, Cursor) e tod
 em interface lê este arquivo antes. Se uma tela nova não couber nestas regras, a regra muda aqui
 primeiro, depois o código.
 
-> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 4 da
+> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 5 da
 > [Migração](#migração) estão feitos: tokens e fontes em todo o app, o `<Anel>` no lugar do
-> Ciclope, os sensores como ícones de traço e o login no Muninn. Faltam os textos (passo 5), os
-> ícones do app (passo 6) e o iPhone inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem
+> Ciclope, os sensores como ícones de traço, o login no Muninn e os textos na voz da seção 7.
+> Faltam os ícones do app (passo 6) e o iPhone inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem
 > este arquivo.
 
 ## 1. Ideia
@@ -105,12 +105,15 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
 - No app web os estados moram em `<Anel estado=…>` (`apps/web/src/anel/`), em SVG com CSS (uma
   linha de avatares não roda script; só a voz usa um `requestAnimationFrame`). O que liga cada um:
   - silêncio: sem conexão com o servidor;
-  - ouvindo: em ligação, ou logo depois de ser interrompido;
+  - ouvindo: em ligação, logo depois de ser interrompido, ou com a voz dele tocando; a onda
+    segue o volume da voz (a do dono ou a dele);
   - pensando: escrevendo a resposta, ou uma tarefa rodando no Mac;
-  - fala primeiro: falando em voz, ou com uma conversa que ele abriu ainda não lida;
+  - fala primeiro: só uma conversa que ele abriu e o dono ainda não leu;
   - pede aprovação: algo preparado esperando sim (Mac, e-mail, agenda, painel);
-  - pausado: autonomia pausada em Ajustes.
-  O que acontece agora vence o que espera; parado, a ordem é Mac, aprovação, pausa, abertura.
+  - pausado: autonomia pausada em Ajustes; o anel muda no toque do botão, e a checagem de 15 s
+    só confirma.
+  Sem conexão vence tudo. O que acontece agora vence o que espera; parado, a ordem é Mac,
+  aprovação, pausa, abertura.
   Em volta do Muninn o olho fica no lugar e um segundo ponto sobe à falha.
 - `prefers-reduced-motion`: mostrar o quadro final, sem movimento.
 - Canvas 2D, `devicePixelRatio` até 2, um `requestAnimationFrame`, cancelado ao desmontar.
@@ -141,7 +144,9 @@ Sem exclamação, sem emoji.
    o Ciclope.
 4. Login: Muninn grande + "Bem-vindo de volta." no lugar de "Identifique-se.". **Feito** no app
    web (`apps/web/src/muninn/`). O iPhone (`LoginView`) ainda não mudou.
-5. Textos: seção 7.
+5. Textos: seção 7. **Feito** no web: "Acompanhando…", "Fala comigo…", "Acompanhar um preço";
+   saíram "Nada sob vigilância ainda", "Sistemas prontos" e "Pronto para a ordem"; avaliar uma
+   resposta é "Ajudou" / "Não ajudou", sem emoji.
 6. `brand/generate-assets.swift`: regenerar ícones a partir do anel.
 
 Referência visual completa (telas de computador e celular, estados, animação): canvas
