@@ -22,7 +22,6 @@ import { type Ask, ChatView } from "./components/ChatView";
 import { Intro, introAfterLogin, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
 import { MuninnEntrance } from "./muninn/MuninnEntrance";
-import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
 import { ProjectsView } from "./components/ProjectsView";
@@ -44,12 +43,12 @@ import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { NotYetView } from "./components/NotYetView";
 import { RoutinesView } from "./components/RoutinesView";
 import { PanelView } from "./components/PanelView";
+import { NotebookView } from "./components/NotebookView";
 import { ShareDialog, Toast } from "./components/ShareDialog";
 import type { ToolsMode } from "./components/ChatView";
 import { useRoutines } from "./hooks/useRoutines";
 import { saveTheme, THEMES } from "./brand/theme";
 import { MicButton, MobileBar } from "./components/SkyNav";
-import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Anel } from "./anel/Anel";
@@ -1073,15 +1072,7 @@ export function App() {
                   <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
                 )}
                 {view === "study" && (
-                  <section className="page page--caderno" aria-labelledby="study-title">
-                    <header className="page-head">
-                      <span className="rotulo">Caderno</span>
-                      <h1 id="study-title" className="page-voice">O que eu fiz <em>enquanto você não estava.</em></h1>
-                      <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
-                    </header>
-                    <MindPanel api={api} onError={handleError} />
-                    <StudyPanel api={api} onError={handleError} />
-                  </section>
+                  <NotebookView api={api} memoryEnabled={memoryEnabled} onToggleMemory={() => void toggleMemory()} onError={handleError} />
                 )}
                 {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
             {view === "routines" && <RoutinesView routines={routines} />}

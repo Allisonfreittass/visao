@@ -1020,6 +1020,11 @@ export class Api {
     return this.request(`/memory/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
+  /** Everything remembered, as the server exports it (JSON). */
+  memoryExport(): Promise<unknown> {
+    return this.request("/memory/export");
+  }
+
   quietHours(): Promise<QuietHours> {
     return this.request("/notifications/settings");
   }
