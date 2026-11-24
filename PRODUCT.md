@@ -75,8 +75,8 @@ interesses, reflexão, metas, orçamento) mora no código em volta.
 
 ## Evidence on Hand
 
-- Capturas reais: `docs/assets/conversa.webp`, `docs/assets/ligacao.webp`,
-  `docs/assets/celular.webp`.
+- Capturas com dados de demonstração: `docs/assets/inicio.webp`, `docs/assets/conversa.webp`,
+  `docs/assets/entrar.webp`, `docs/assets/celular.webp`.
 - Benchmarks no README: memória curada 8/8, passiva 6/8, sem memória 1/8; −69% de palavras após
   retorno com adaptação, desfazer volta à linha de base.
 - Pesquisa comparativa: `docs/research/comparativo_agentes.md` (OpenClaw, Goose, OpenCode).
