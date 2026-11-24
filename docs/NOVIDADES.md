@@ -24,6 +24,34 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
     ele não faz essas coisas ainda e não deve dizer que faz.
   - É só a aparência: ele não troca o tema sozinho e nada mudou na memória ou no que ele faz.
 
+- **Na ligação, o Muninn vira a ferramenta que ele está usando** ([DESIGN.md](../DESIGN.md),
+  seção 6, "Nanorrobôs").
+  - As partículas do corvo viram um envelope no Gmail, um calendário na agenda, uma lupa na
+    pesquisa, uma janela de navegador num site ou cotação, um notebook no Mac e uma página num
+    arquivo. Quando ele termina, voltam a ser o corvo.
+  - Cada passo do turno diz agora que ferramenta usa (`kind`, no `/progress` e no stream).
+  - Com "reduzir movimento" ligado no aparelho, o corvo só troca por um ícone de traço.
+
+- **Ele mexe no mouse e no teclado do seu PC, quando você pede com `/pc`** ([MEXER.md](MEXER.md),
+  [ADR-0024](decisions/0024-mouse-e-teclado.md), braço versão 6).
+  - `/pc abre o YouTube e procura jazz`: uma sessão de até 10 minutos no seu desktop de verdade,
+    escolha sua. Você vê o cursor se mexer.
+  - A cada passo ele olha a tela e faz uma ação: clicar, digitar, tecla ou rolar.
+  - Para parar: mexer o mouse, `/pc parar` ou Parar na página Mac.
+  - Só com `"mexer": true` no `braco.json`, só no Linux com X11, e só Claude ou OpenAI veem a
+    tela.
+  - Ele não abre o terminal e não digita comandos. Fica o risco de uma página com instrução
+    escondida dentro das suas contas logadas, durante a sessão.
+
+- **Ele olha a sua tela quando você pede** ([TELA.md](TELA.md), braço versão 5).
+  - "Olha minha tela", "o que é esse erro na tela?" ou `/tela`, no chat ou na ligação. O braço
+    captura o monitor onde está o mouse, avisa no computador, e a captura aparece na sua
+    mensagem.
+  - Só com `"tela": true` no `braco.json`. Quem reconhece o pedido é o código, e só as suas
+    palavras pedem.
+  - Só Claude e OpenAI veem a captura, nunca o Gemini grátis.
+  - Ele só olha: não mexe no mouse nem no teclado.
+
 ## 23/11/2026
 
 - **Braço versão 4: ele coda sem o Claude Code, com qualquer modelo da corrente**

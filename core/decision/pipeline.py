@@ -16,8 +16,9 @@ from sqlalchemy.orm import Session
 from core import actions as app_actions
 from core import browse, location, projects
 from core.arm import intent as mac_intent
+from core.arm import screen
 from core.autonomy import continuity
-from core.conversation import browser_guard, progress, share
+from core.conversation import attachments, browser_guard, progress, share
 from core.conversation import links as conversation_links
 from core.conversation.service import (
     BudgetExceededError,
@@ -128,6 +129,7 @@ def run_turn(
     shared: bool = False,
     position: location.Here | None = None,
     client_message_id: uuid.UUID | None = None,
+    screen_provider: LLMProvider | None = None,
 ) -> TurnOutcome:
     """The caller holds core/conversation/turn_lock.py for the conversation: what runs here
     before the reply (projects, notes, proposals) must not run twice at once."""
@@ -141,6 +143,29 @@ def run_turn(
         # Shared from another app on the phone (core/conversation/share.py, ADR-0018).
         blocks.append(share.BLOCK)
         plan.add("shared", executed=True, reason="owner_shared_from_phone")
+    # "Olha minha tela" (docs/TELA.md): the owner's words, read by code, ask the arm for a look.
+    # The picture joins the files of this message (the caller's own list, so the answer it
+    # returns shows it), and the reply that sees it goes only to Claude or OpenAI.
+    reply_provider = provider
+    if not shared and screen.wants_screen(text):
+        progress.step("Olhando sua tela", kind="mac")
+        files = files if files is not None else []
+        if screen_provider is None:
+            looked = screen.Look(None, screen.NO_PROVIDER)
+        elif len(files) >= attachments.MAX_PER_MESSAGE:
+            looked = screen.Look(None, screen.TOO_MANY)
+        else:
+            looked = screen.look(session, owner.id)
+        picture = session.get(Attachment, looked.attachment_id) if looked.attachment_id else None
+        if picture is not None:
+            files.append(picture)
+            reply_provider = screen_provider or provider
+        blocks.append(screen.fact(looked, owner.timezone or "UTC"))
+        plan.add(
+            "screen_captured" if picture is not None else "screen_failed",
+            executed=picture is not None,
+            reason="owner_asked_to_see_screen",
+        )
     if files:
         photos = [f for f in files if f.kind == "image"]
         documents = [f for f in files if f.kind != "image"]
@@ -148,9 +173,12 @@ def run_turn(
             progress.step(
                 "Lendo " + (documents[0].filename if len(documents) == 1 else "os arquivos"),
                 ", ".join(f.filename for f in documents) if len(documents) > 1 else None,
+                kind="arquivo",
             )
         elif photos:
-            progress.step("Olhando a foto" if len(photos) == 1 else "Olhando as fotos")
+            progress.step(
+                "Olhando a foto" if len(photos) == 1 else "Olhando as fotos", kind="arquivo"
+            )
         plan.add(
             "read_attachments",
             executed=True,
@@ -161,7 +189,7 @@ def run_turn(
     urls = conversation_links.find(text) if links is not None else []
     if urls:
         hosts = list(dict.fromkeys(urlsplit(u).hostname or u for u in urls))
-        progress.step("Abrindo " + hosts[0], ", ".join(hosts[1:]) or None)
+        progress.step("Abrindo " + hosts[0], ", ".join(hosts[1:]) or None, kind="site")
     read = tuple(links.read(text)) if links is not None else ()
     if read:
         opened = [r.url for r in read if r.ok]
@@ -198,6 +226,8 @@ def run_turn(
             provider=provider,
             budgets=config.budgets,
         )
+        if wanted:
+            progress.step("Montando o pedido ao Mac", wanted.project, kind="mac")
         task = mac_intent.propose(session, owner.id, wanted, conversation.id) if wanted else None
         if task is not None:
             plan.add(
@@ -348,7 +378,7 @@ def run_turn(
             if changed:
                 rechecked = False
                 if set(changed) & panels.SEARCH_FIELDS and browser is not None:
-                    progress.step("Conferindo os preços de novo")
+                    progress.step("Conferindo os preços de novo", kind="site")
                     outcome_of_check = panels.recheck(
                         session,
                         target,
@@ -598,7 +628,7 @@ def run_turn(
             )
         optional.append(mind_temperament.compute(session, owner, now).chat_block())
     if self_knowledge.about_self(text):
-        progress.step("Lendo o próprio código")
+        progress.step("Lendo o próprio código", kind="arquivo")
     own_code = self_knowledge.context_block(text)
     if own_code:
         optional.append(own_code)
@@ -652,7 +682,7 @@ def run_turn(
             identity=identity,
             owner=owner,
             user_text=text,
-            provider=provider,
+            provider=reply_provider,
             budgets=config.budgets,
             max_output_tokens=config.reply_max_tokens,
             context_char_budget=config.context_char_budget,

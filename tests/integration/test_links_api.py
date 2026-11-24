@@ -36,10 +36,11 @@ def world(client, db, reads):
 REPO = LinkRead("https://github.com/dono/projeto", "github", "Repositório dono/projeto\nREADME: oi")
 
 
-def test_a_sent_repository_is_read_and_listed_as_a_source(client, db):
+def test_a_sent_repository_is_read_and_listed_as_a_source(client, db, steps):
     llm, links = world(client, db, [REPO])
     headers = _login(client, db)
     _, body = _turn(client, headers, "o que acha disso? https://github.com/dono/projeto")
+    assert ("Abrindo github.com", "site") in steps
     system, message = llm.prompts[-1][0].content, llm.prompts[-1][-1]
     # The page goes with the message itself, the last thing the model reads.
     assert message.role == "user" and message.content.startswith("o que acha disso?")

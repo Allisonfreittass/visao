@@ -18,6 +18,9 @@ interface AnelProps {
   decorative?: boolean;
   label?: string;
   className?: string;
+  /** Above 120 px: the ring of Muninn's size without Muninn and his eye, because something else
+   * draws him inside it (the call's nanorrobôs, muninn/Nanorrobos.tsx). */
+  vazio?: boolean;
 }
 
 // One clock for every ring on screen: the lit mark is the local hour (DESIGN.md §6, "ocioso").
@@ -56,7 +59,7 @@ const GAP_HALF = Math.PI / MARKS / 1.4;
  * motion: a wave while listening, a trace running round while thinking, the dot rising to the gap
  * when he speaks first, the gap lit while a yes is waiting, a hollow dot when paused, all dark in
  * silence. SVG and CSS, so a row of them costs no script; one frame loop only for a voice level. */
-export function Anel({ estado, size = 36, level, animated = true, decorative = false, label, className }: AnelProps) {
+export function Anel({ estado, size = 36, level, animated = true, decorative = false, label, className, vazio = false }: AnelProps) {
   const id = useId().replace(/:/g, "");
   const root = useRef<SVGSVGElement>(null);
   const now = useNow();
@@ -109,7 +112,7 @@ export function Anel({ estado, size = 36, level, animated = true, decorative = f
       focusable="false"
       style={{ ["--ponto-x" as string]: `${rest.x}px`, ["--ponto-y" as string]: `${rest.y}px`, ["--falha-y" as string]: `${gapY}px` }}
     >
-      {muninn && (
+      {muninn && !vazio && (
         <>
           <defs>
             <linearGradient id={`${id}-tinta`} x1="0" y1="0" x2="0" y2="1">
@@ -155,7 +158,7 @@ export function Anel({ estado, size = 36, level, animated = true, decorative = f
         d={`M ${-Math.sin(GAP_HALF) * -gapY} ${gapY * Math.cos(GAP_HALF)} A ${-gapY} ${-gapY} 0 0 1 ${Math.sin(GAP_HALF) * -gapY} ${gapY * Math.cos(GAP_HALF)}`}
         vectorEffect="non-scaling-stroke"
       />
-      {muninn && <circle className="anel-olho" cx={u(EYE.x)} cy={u(EYE.y)} r={dotR} vectorEffect="non-scaling-stroke" />}
+      {muninn && !vazio && <circle className="anel-olho" cx={u(EYE.x)} cy={u(EYE.y)} r={dotR} vectorEffect="non-scaling-stroke" />}
       <g className="anel-ponto">
         <circle className="anel-ponto-forma" r={dotR} vectorEffect="non-scaling-stroke" />
       </g>

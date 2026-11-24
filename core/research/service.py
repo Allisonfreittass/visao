@@ -40,7 +40,7 @@ def run_research(
     )
     session.add(research)
     session.flush()
-    progress.step(f"Pesquisando “{query}”", _where(search.name))
+    progress.step(f"Pesquisando “{query}”", _where(search.name), kind="pesquisa")
     try:
         results = search.search(query, max_results)
     except SearchError as exc:

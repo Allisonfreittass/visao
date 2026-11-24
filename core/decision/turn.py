@@ -56,6 +56,11 @@ _DESCRIBE = {
         "as fotos e arquivos que a pessoa mandou nesta mensagem estão nela, acima; fale só do"
         " que eles mostram"
     ),
+    "screen_captured": (
+        "a pessoa pediu e o braço capturou a tela dela agora: é a imagem anexada à mensagem; fale"
+        " só do que ela mostra"
+    ),
+    "screen_failed": "a pessoa pediu para ver a tela e não deu (motivo acima); não descreva a tela",
     "read_links_failed": "tentei abrir os links que a pessoa mandou e não consegui (motivo acima)",
     "read_own_code": (
         "trechos do seu próprio código e documentação foram lidos agora e estão acima; dizer que"

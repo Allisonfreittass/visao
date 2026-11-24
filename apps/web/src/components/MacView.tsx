@@ -55,6 +55,11 @@ export function MacView({ api, pending, onError }: MacViewProps) {
     pending.refresh();
   }
 
+  async function stopDesktop() {
+    await api.stopDesktop().catch(onError);
+    pending.refresh();
+  }
+
   async function copy(token: string) {
     try {
       await navigator.clipboard.writeText(token);
@@ -94,7 +99,7 @@ export function MacView({ api, pending, onError }: MacViewProps) {
               </button>
             ))}
           </div>
-          {current && <TaskLog task={current} onCancel={() => void pending.decideArm(current, "reject")} onUndo={() => void undo(current)} />}
+          {current && <TaskLog task={current} onCancel={() => void pending.decideArm(current, "reject")} onStop={() => void stopDesktop()} onUndo={() => void undo(current)} />}
         </div>
       )}
       <div className="page-body">
@@ -137,7 +142,7 @@ export function MacView({ api, pending, onError }: MacViewProps) {
 
 /** The selected task as a terminal: what was asked, what came back, the files and tests the arm
  * measured, the cost. The server sends the result when the task ends, not each line as it runs. */
-function TaskLog({ task, onCancel, onUndo }: { task: ArmTask; onCancel: () => void; onUndo: () => void }) {
+function TaskLog({ task, onCancel, onStop, onUndo }: { task: ArmTask; onCancel: () => void; onStop: () => void; onUndo: () => void }) {
   const detail = taskDetail(task);
   const live = task.status === "running" || task.status === "approved";
   return (
@@ -152,7 +157,10 @@ function TaskLog({ task, onCancel, onUndo }: { task: ArmTask; onCancel: () => vo
         {detail && <span className="mac-log-dim">{detail}</span>}
       </pre>
       <div className="mac-log-foot">
-        {task.status === "approved" && <button type="button" className="btn-secondary btn-small" onClick={onCancel}>Cancelar</button>}
+        {task.status === "approved" && task.kind !== "desktop" && <button type="button" className="btn-secondary btn-small" onClick={onCancel}>Cancelar</button>}
+        {task.kind === "desktop" && (task.status === "approved" || task.status === "running") && (
+          <button type="button" className="btn-secondary btn-small" onClick={onStop}>Parar</button>
+        )}
         {task.can_undo && <button type="button" className="btn-secondary btn-small" onClick={onUndo}>Desfazer</button>}
         <span>{task.requested_by === "agent" ? "pedido por ele · aprovado por você" : "pedido por você"}</span>
         {task.cost_usd && <span className="mac-log-cost">custo: US$ {Number(task.cost_usd).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}

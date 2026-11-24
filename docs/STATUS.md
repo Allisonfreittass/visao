@@ -41,6 +41,8 @@ fim.
 
 - [`core/conversation/progress.py`](../core/conversation/progress.py): cada passo chama
   `progress.step(...)`; a rota de mensagem abre `progress.tracking(conversa)` em volta do turno.
+  Um passo que usa uma ferramenta diz qual em `kind` (`gmail`, `agenda`, `pesquisa`, `site`,
+  `mac`, `arquivo`): na ligação o Muninn toma a forma dela (DESIGN.md §6, "Nanorrobôs").
   Fica só no processo da API, fora do banco (é uma vista ao vivo, não um registro; o registro é o
   plano do turno).
 - `GET /conversations/{id}/stream`: os mesmos passos e o texto como eventos numerados

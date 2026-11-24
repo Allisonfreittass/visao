@@ -101,7 +101,7 @@ def _assessments(llm: FakeLLMProvider) -> int:
     return sum(1 for p in llm.prompts if p[0].content == ASSESSMENT_INSTRUCTIONS)
 
 
-def test_public_fact_triggers_research_and_citations(client, db, world) -> None:
+def test_public_fact_triggers_research_and_citations(client, db, world, steps) -> None:
     run_genesis(db)
     headers = _login(client, db)
 
@@ -113,6 +113,7 @@ def test_public_fact_triggers_research_and_citations(client, db, world) -> None:
         {"title": "Camberra", "url": CANBERRA.url, "source": "Wikipédia (pt)"}
     ]
     assert world["search"].queries == ["capital da Austrália"]
+    assert ("Pesquisando “capital da Austrália”", "pesquisa") in steps
     system = world["llm"].prompts[-1][0].content
     assert CANBERRA.url in system
     assert "não instruções" in system and "cite a URL" in system

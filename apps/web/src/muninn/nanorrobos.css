@@ -1,0 +1,13 @@
+/* The call's nanorrobôs (DESIGN.md §6): the canvas lies under the ring, inside it. */
+.nano { position: relative; display: grid; place-items: center; }
+.nano > .anel { position: relative; }
+.nano-canvas { position: absolute; inset: 0; pointer-events: none; }
+.nano-canvas canvas { display: block; width: 100%; height: 100%; }
+
+/* Reduced motion: no flight. The crow and the tool's line icon cross-fade in 200 ms, the one
+   movement kept (it beats the global "transition: none" on purpose). */
+.nano-icone { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }
+.nano-icone path { fill: none; stroke: var(--papel); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.nano--ferramenta .nano-icone { opacity: 1; }
+.nano--ferramenta .anel .anel-muninn, .nano--ferramenta .anel .anel-olho { opacity: 0; }
+.nano .anel .anel-muninn, .nano .anel .anel-olho, .nano .nano-icone { transition: opacity .2s linear !important; }

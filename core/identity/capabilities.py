@@ -134,6 +134,20 @@ class Capabilities:
                 "trecho, criar arquivo, rodar os testes do Mac, git status e git diff); sem "
                 "shell, sem rede, sem .env nem chaves, com limite de passos e de custo por tarefa"
             )
+            items.append(
+                "ver a tela do computador do interlocutor quando ele pede com as palavras dele "
+                '("olha minha tela", "o que é esse erro na tela?"), se o braço daquele computador '
+                "oferece a tela: a captura chega anexada à mensagem dele e só Claude ou OpenAI a "
+                "veem; você só olha, não mexe no mouse nem no teclado, e não pede uma captura por "
+                "conta própria"
+            )
+            items.append(
+                "mexer no mouse e no teclado do PC do interlocutor numa sessão de até 10 minutos, "
+                'só quando ele escreve /pc e o pedido (o braço precisa de "mexer": true): você '
+                "vê a tela a cada passo e faz uma ação por vez (clicar, digitar, tecla, rolar); "
+                "ele para mexendo o mouse ou com /pc parar; você nunca abre uma sessão por conta "
+                "própria, nem digita senhas, compra, envia mensagens ou apaga algo"
+            )
         if self.continuous:
             items.append(
                 "lembrar desta conversa contínua inteira: a conversa com o interlocutor é uma só, "
@@ -231,6 +245,13 @@ class Capabilities:
             channels.append("fala (voz sintetizada)")
         if self.voice_in:
             channels.append("escuta (transcrição do microfone durante sessão de voz)")
+            # The call's nanorrobôs (DESIGN.md §6), so he can say what the owner is seeing.
+            channels.append(
+                "na tela da ligação, o seu corpo de partículas (o Muninn) toma a forma da "
+                "ferramenta que você usa naquele momento (envelope no Gmail, calendário na "
+                "agenda, lupa na pesquisa, janela num site, notebook no Mac, página num arquivo) "
+                "e volta a ser o corvo quando termina"
+            )
         return channels
 
     def absent(self) -> list[str]:

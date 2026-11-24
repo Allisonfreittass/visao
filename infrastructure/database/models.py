@@ -905,7 +905,35 @@ class ArmDevice(Base):
     # asked for a question to answer with it. Unset: this Mac offers no local model.
     local_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
     local_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When it last asked for a look at the screen (docs/TELA.md); None: it offers none.
+    screen_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ArmScreenRequest(Base):
+    """A look at the owner's screen (docs/TELA.md), asked only by the owner's own message. The
+    arm sends a picture back, which becomes an attachment of that message."""
+
+    __tablename__ = "arm_screen_requests"
+    __table_args__ = (Index("ix_arm_screen_requests_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    device_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("arm_devices.id", ondelete="SET NULL"), nullable=True
+    )
+    # The picture, once it came (an attachment of the owner's message after the reply).
+    attachment_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("attachments.id", ondelete="SET NULL"), nullable=True
+    )
+    # pending | claimed | done | failed | expired
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    error: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ArmLlmCall(Base):
@@ -966,7 +994,8 @@ class ArmTask(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # work: Claude Code does it | undo: the arm puts back what `undo_of` changed, no Claude.
+    # work: Claude Code does it | undo: the arm puts back what `undo_of` changed, no Claude |
+    # desktop: the Visão at the mouse and keyboard, a session of up to 10 min (docs/MEXER.md).
     kind: Mapped[str] = mapped_column(String(16), default="work", server_default="work")
     undo_of: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("arm_tasks.id", ondelete="SET NULL"), nullable=True
@@ -986,6 +1015,8 @@ class ArmTask(Base):
     model_cost_usd: Mapped[Decimal] = mapped_column(
         Numeric(12, 6), default=Decimal(0), server_default="0"
     )
+    # The owner asked a running desktop session to stop (docs/MEXER.md): the next step says so.
+    stop_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class OwnerQuestion(Base):

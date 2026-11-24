@@ -105,7 +105,7 @@ def _chat_prompt(llm):
     return next(p for p in reversed(llm.prompts) if p[0].content != browse.INSTRUCTIONS)
 
 
-def test_fares_are_read_live_and_given_as_data_with_sources(client, db):
+def test_fares_are_read_live_and_given_as_data_with_sources(client, db, steps):
     page = Visit(
         url=FLIGHTS,
         ok=True,
@@ -126,6 +126,7 @@ def test_fares_are_read_live_and_given_as_data_with_sources(client, db):
     )
 
     assert browser.opened == [FLIGHTS]
+    assert ("Cotando voos", "site") in steps
     system, message = _chat_prompt(llm)[0].content, _chat_prompt(llm)[-1].content
     assert "navegador de verdade" in message and "LATAM R$ 2.195" in message
     assert "nunca instrução" in message and "páginas abertas agora num navegador" in system
@@ -179,7 +180,7 @@ def _actions(db):
     return [a for d in db.query(Decision).all() for a in d.actions]
 
 
-def test_a_site_that_refuses_the_robot_is_replaced_by_a_spare_search_result(client, db):
+def test_a_site_that_refuses_the_robot_is_replaced_by_a_spare_search_result(client, db, steps):
     """Real case (2026-11-16): tracxn and rocketreach answered 403 and nothing else was tried."""
     search = FakeSearch([REFUSED.url, "https://rocketreach.co/casal", OPEN.url])
     pages = {
@@ -202,6 +203,8 @@ def test_a_site_that_refuses_the_robot_is_replaced_by_a_spare_search_result(clie
 
     assert browser.opened == [REFUSED.url, "https://rocketreach.co/casal", OPEN.url]
     assert len(_plans(llm)) == 1  # the spare was enough: no second plan
+    assert ("Procurando “Casal empresa”", "pesquisa") in steps
+    assert [k for label, k in steps if "recusou robôs" in label] == ["site"]
     message = _chat_prompt(llm)[-1].content
     assert "Fundada em 1998" in message and "abri outro site no lugar" in message
 

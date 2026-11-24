@@ -131,7 +131,7 @@ Onde ele aparece no app web hoje (cada linha troca para o corvo na etapa indicad
 | Entrada (login) | Muninn + anel, gênese de 14 s | até 560 px |
 | Abertura depois do login e a do dia | Muninn + anel, gênese curta (1,8 s) | 180 px; 132 px no celular |
 | Início, no topo | Muninn + anel, com os estados da seção 6 | 200 px; 150 px no celular |
-| Ligação | Muninn + anel, com a onda do "ouvindo" | 140 a 220 px |
+| Ligação | entre os turnos, o corvo no eclipse grande; durante um passo, Muninn + anel com os nanorrobôs (seção 6) | até 380 px |
 | Avatar das respostas no chat | só o anel (**sai**: corvo, etapa 6) | 36 px |
 | Logo do menu lateral e da barra do celular | anel sem as marcas apagadas (**sai**: corvo + VISAO, etapas 2 e 11) | 28 e 26 px |
 
@@ -178,6 +178,49 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
   Em volta do Muninn o olho fica no lugar e um segundo ponto sobe à falha.
 - `prefers-reduced-motion`: mostrar o quadro final, sem movimento.
 - Canvas 2D, `devicePixelRatio` até 2, um `requestAnimationFrame`, cancelado ao desmontar.
+
+### Nanorrobôs
+
+Só na ligação (`CallView`), onde o Muninn já é grande: quando ele usa uma ferramenta, as
+partículas do corpo dele viram a forma dela e voltam a ser o corvo quando termina. Código em
+`apps/web/src/muninn/` (`nanorrobos.ts` puro e testado, `Nanorrobos.tsx` o canvas,
+`MuninnDaLigacao.tsx` a escolha da forma).
+
+- **De onde vem a forma.** Cada passo do turno (`core/conversation/progress.py`, no `/progress` e
+  no stream) pode ter um `kind`:
+
+  | `kind` | Passos | Forma |
+  |---|---|---|
+  | `gmail` | "Procurando no seu Gmail" | envelope |
+  | `agenda` | "Olhando sua agenda" | calendário |
+  | `pesquisa` | "Pesquisando …", "Procurando …" (pesquisa e busca do navegador) | lupa |
+  | `site` | "Abrindo …", "Cotando voos", "Olhando hotéis", "Lendo site", "… recusou robôs", "Conferindo os preços de novo" | janela de navegador |
+  | `mac` | "Montando o pedido ao Mac", "Olhando sua tela" | notebook |
+  | `arquivo` | "Lendo arquivo", "Olhando a foto", "Lendo o próprio código" | página |
+
+- **O desenho.** Canvas 2D com 3.000 partículas (2.000 abaixo de 400 px de largura de tela). O
+  corvo sai amostrado de `strokes.json`, ao longo dos traços. As seis formas são desenhos de traço
+  simples feitos em código, centralizados no anel.
+- **A transformação.** Os pontos de cada forma são ordenados pelo ângulo em volta do centro, e a
+  partícula i vai para o ponto i. Cada partícula anda em 1,6 s, `ease-in-out` cúbico, com atraso
+  aleatório de até 0,5 s e uma curva lateral: deslocamento perpendicular × sin(πt) × 0,22 × um
+  valor fixo da partícula entre -1 e 1. 2,5% das partículas são âmbar, as mesmas em todas as
+  formas. Paradas, tremem 0,6 px.
+- **O corvo.** Quando as partículas assentam no corvo, a ilustração aparece por cima delas (0,8 s)
+  e elas somem, como na gênese; depois o olho acende. Ao sair do corvo, a ilustração e o olho se
+  apagam em 0,3 s.
+- **Regras.**
+  - Só muda com um `kind` real; um passo sem `kind` mantém a forma.
+  - "Pensando", "Escrevendo a resposta" e o fim do turno voltam ao corvo.
+  - Cada forma fica no mínimo 1,2 s depois de formada (1,6 s + o atraso). Se vierem passos
+    rápidos nesse meio-tempo, vai direto para o último.
+  - O anel em volta continua com os estados de sempre (ouvindo, pensando): o `<Anel vazio>` desenha
+    as marcas e o ponto, o canvas desenha o Muninn por baixo.
+  - Em repouso no corvo nada se mexe e o `requestAnimationFrame` para; numa forma de ferramenta as
+    partículas tremem.
+- **`prefers-reduced-motion`:** sem transformação. O corvo e um ícone de traço da ferramenta (o
+  mesmo desenho) trocam com um fade de 200 ms, o único movimento mantido.
+- O texto do passo continua embaixo do nome, com `aria-live`.
 
 ## 7. Voz
 

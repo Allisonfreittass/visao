@@ -15,6 +15,16 @@ export function parseMacCommand(text: string): MacCommand | "usage" | null {
   return { project, prompt: prompt.trim() };
 }
 
+/** `/pc <pedido>`: a session of up to 10 min at the mouse and keyboard (docs/MEXER.md). */
+export function parsePcCommand(text: string): { prompt: string } | "stop" | "usage" | null {
+  const match = text.trim().match(/^\/pc(?:\s+([\s\S]+))?$/i);
+  if (!match) return null;
+  const prompt = match[1]?.trim() ?? "";
+  if (!prompt) return "usage";
+  if (/^(parar|pare|para|stop)[.!]?$/i.test(prompt)) return "stop";
+  return { prompt };
+}
+
 function files(count: number): string {
   return count === 1 ? "1 arquivo" : `${count} arquivos`;
 }
