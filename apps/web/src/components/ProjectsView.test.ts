@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { projectBlurb, projectCounts, projectSummary } from "./ProjectsView";
+import { projectBlurb, projectCounts, projectSummary, sameName } from "./ProjectsView";
 
 const base = { id: "p", name: "Viagem para o Chile", created_at: "2026-11-17T12:00:00Z", conversations: 1, pages: 0, files: 0 };
 
@@ -20,5 +20,13 @@ describe("project cards", () => {
 
   it("counts conversations, pages and files", () => {
     expect(projectCounts({ conversations: 14, pages: 1, files: 0 })).toEqual(["14 conversas", "1 página", "0 arquivos"]);
+  });
+});
+
+describe("one name, one project", () => {
+  it("finds the project already called that, ignoring case, accents and spaces", () => {
+    const list = [{ id: "1", name: "Viagem à Lisboa" }, { id: "2", name: "Estudos de Go" }];
+    expect(sameName(list, "  viagem a   LISBOA ")?.id).toBe("1");
+    expect(sameName(list, "Viagem")).toBeNull();
   });
 });

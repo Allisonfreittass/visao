@@ -262,6 +262,17 @@ def execute(
                 name = projects.clean_name(str(item.get("name") or ""))
                 if not name:
                     continue
+                clash = projects.same_name(owned, name, other_than=project.id)
+                if clash is not None:
+                    deeds.append(
+                        Deed(
+                            kind,
+                            f"não renomeei «{project.name}»: já existe o projeto «{clash.name}»",
+                            False,
+                            project_id=clash.id,
+                        )
+                    )
+                    continue
                 old, project.name = project.name, name
                 _audit(session, owner, "project.rename", project_id=str(project.id), via="chat")
                 deeds.append(

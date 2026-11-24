@@ -7,6 +7,11 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 24/11/2026
 
+- **Um nome, um projeto.** Criar um projeto com o nome de outro que já existe, pela tela ou pela
+  conversa, não cria um segundo: a tela oferece abrir o que já existe, e ele usa o mesmo. Renomear
+  também não pega o nome de outro projeto; ele avisa que não renomeou. A comparação ignora
+  maiúsculas, acentos e espaços a mais.
+
 - **Cara nova no app web: o corvo no eclipse e três temas**
   ([DESIGN.md](../DESIGN.md), [telas-visao](design/telas-visao/README.md)).
   - O ícone do app e o favicon passam a ser o corvo na frente de um sol âmbar.
