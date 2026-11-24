@@ -141,6 +141,13 @@ class Capabilities:
                 "veem; você só olha, não mexe no mouse nem no teclado, e não pede uma captura por "
                 "conta própria"
             )
+            items.append(
+                "mexer no mouse e no teclado do PC do interlocutor numa sessão de até 10 minutos, "
+                'só quando ele escreve /pc e o pedido (o braço precisa de "mexer": true): você '
+                "vê a tela a cada passo e faz uma ação por vez (clicar, digitar, tecla, rolar); "
+                "ele para mexendo o mouse ou com /pc parar; você nunca abre uma sessão por conta "
+                "própria, nem digita senhas, compra, envia mensagens ou apaga algo"
+            )
         if self.continuous:
             items.append(
                 "lembrar desta conversa contínua inteira: a conversa com o interlocutor é uma só, "

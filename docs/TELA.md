@@ -1,7 +1,7 @@
 # A tela: o Visão olha o que você está vendo, quando você pede
 
 > Primeira versão em 24/11/2026 (braço versão 5). É o nível 1: ele só olha. Mexer no mouse e no
-> teclado é outra peça, com regras próprias.
+> teclado é o nível 3, com regras próprias: [MEXER.md](MEXER.md).
 
 ## Como usar
 

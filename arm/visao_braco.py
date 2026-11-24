@@ -38,10 +38,11 @@ from pathlib import Path
 # and can answer with a local model.
 # 3: Bash inside Claude Code's sandbox, the whole process group ends with the task, a photo of
 # the project before and after (changed files, undo), and "until the tests pass".
+# 6: the mouse and keyboard, a session of up to 10 min from the owner's /pc ("mexer": true).
 # 5: looks at the screen when the owner asks ("tela": true), on a line of its own.
 # 4: the arm's own executor (ADR-0023): tools implemented here, the model asked step by step
 # through the server, tests and git in a sandbox of the arm's own (bubblewrap on Linux too).
-VERSION = "5"
+VERSION = "6"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -118,6 +119,8 @@ class Config:
     local_model: str | None = None
     # docs/TELA.md: this computer lets the Visão look at its screen when the owner asks.
     screen: bool = False
+    # docs/MEXER.md: this computer lets the Visão use its mouse and keyboard, a session at a time.
+    desktop: bool = False
     ollama: str = "http://127.0.0.1:11434"
     local_context: int = 16384
     # Where results wait until the server takes them, next to braco.json.
@@ -172,6 +175,7 @@ class Config:
             ollama=_local_address(str(local.get("endereco") or "http://127.0.0.1:11434")),
             local_context=int(local.get("contexto", 16384)),
             screen=data.get("tela") is True,
+            desktop=data.get("mexer") is True,
             state_dir=path.expanduser().resolve().parent,
             tests=tests,
             test_attempts=max(1, int(data.get("test_attempts", 3))),
@@ -1248,6 +1252,8 @@ def run_visao(config: Config, task: dict, folder: Path) -> dict:
 
 
 def handle(config: Config, task: dict) -> dict:
+    if task.get("kind") == "desktop":  # no project: the whole desktop, docs/MEXER.md
+        return run_desktop(config, task)
     project = str(task.get("project", ""))
     folder = config.projects.get(project)
     if folder is None:
@@ -1530,8 +1536,11 @@ def monitor_under_mouse() -> tuple[int, int, int, int] | None:
     return None
 
 
-def capture_command(target: Path) -> list[list[str]] | None:
-    """The commands that leave a JPEG of at most 1568 px at `target`, for this system."""
+def capture_command(
+    target: Path, box: tuple[int, int, int, int] | None = None
+) -> list[list[str]] | None:
+    """The commands that leave a JPEG of at most 1568 px at `target`, for this system. `box`:
+    the monitor to capture (width, height, x, y); by default the one under the mouse."""
     if sys.platform == "darwin":
         return [
             ["/usr/sbin/screencapture", "-x", "-m", "-t", "jpg", str(target)],
@@ -1539,7 +1548,7 @@ def capture_command(target: Path) -> list[list[str]] | None:
         ]
     if sys.platform.startswith("linux") and os.environ.get("DISPLAY") and shutil.which("import"):
         crop = []
-        monitor = monitor_under_mouse()
+        monitor = box or monitor_under_mouse()
         if monitor is not None:
             w, h, x, y = monitor
             crop = ["-crop", f"{w}x{h}+{x}+{y}", "+repage"]
@@ -1557,13 +1566,13 @@ def _tell_screen(text: str) -> None:
         _output(["notify-send", "-a", "Visão", "Visão", text])
 
 
-def capture_screen() -> dict:
+def capture_screen(box: tuple[int, int, int, int] | None = None, tell: bool = True) -> dict:
     """Never raises: {"ok", "media_type", "data"} with the JPEG in base64, or {"ok": False}."""
     import base64
 
     with tempfile.TemporaryDirectory() as folder:
         target = Path(folder) / "tela.jpg"
-        steps = capture_command(target)
+        steps = capture_command(target, box) if box is not None else capture_command(target)
         if steps is None:
             return {"ok": False, "error": NO_SCREEN}
         for argv in steps:
@@ -1582,7 +1591,8 @@ def capture_screen() -> dict:
             return {"ok": False, "error": SCREEN_DENIED}
     if not raw.startswith(b"\xff\xd8") or len(raw) > SCREEN_MAX_BYTES:
         return {"ok": False, "error": SCREEN_DENIED}
-    _tell_screen("Olhei sua tela agora, como você pediu.")
+    if tell:
+        _tell_screen("Olhei sua tela agora, como você pediu.")
     return {"ok": True, "media_type": "image/jpeg", "data": base64.b64encode(raw).decode()}
 
 
@@ -1618,6 +1628,239 @@ def screen_loop(config: Config, once: bool = False) -> None:
             backoff = min(backoff * 2, 300)
         if once:
             return
+
+
+# --- the mouse and keyboard (docs/MEXER.md) -------------------------------------------------
+# Only with "mexer": true in braco.json, only on Linux with X11 and xdotool, a session at a time,
+# from the owner's own /pc. The owner chose the real desktop (24/11/2026): what bounds it is the
+# time (10 min), the steps, the cost, the stop (moving the mouse, /pc parar, Parar) and the
+# bumpers below. The bumpers catch the obvious; they are not a sandbox, and the docs say so.
+
+DESKTOP_MINUTES = 10
+DESKTOP_SETTLE = 0.8  # seconds for the screen to show what an action did
+MOUSE_MOVED = 8  # pixels the owner's hand moves the mouse before the session stops
+MAX_TYPED = 1000
+DESKTOP_TOOLS = ("clicar", "digitar", "tecla", "rolar", "esperar", "terminar")
+_KEY = re.compile(r"[A-Za-z0-9_]+(?:\+[A-Za-z0-9_]+){0,3}")
+# A terminal, the run dialog, the session itself, the console: not from a session at the mouse.
+DENIED_KEYS = {
+    "ctrl+alt+t",
+    "alt+f2",
+    "ctrl+alt+delete",
+    "ctrl+alt+backspace",
+    "ctrl+alt+l",
+    *(f"ctrl+alt+f{n}" for n in range(1, 13)),
+}
+DENIED_TEXT = re.compile(
+    r"(?i)\bsudo\b|\bsu\s+-|\|\s*(?:sh|bash|zsh|fish|python3?|perl)\b|\brm\s+-[a-z]*[rf]"
+    r"|\bmkfs|\bdd\s+if=|:\(\)\s*\{|\bchmod\s+[0-7]*\s+/|\bcurl\b[^\n]*\|"
+    r"|\bwget\b[^\n]*\|"
+)
+
+
+def mouse_position() -> tuple[int, int] | None:
+    mouse = dict(
+        line.split("=", 1)
+        for line in _output(["xdotool", "getmouselocation", "--shell"]).split()
+        if "=" in line
+    )
+    try:
+        return int(mouse["X"]), int(mouse["Y"])
+    except (KeyError, ValueError):
+        return None
+
+
+def desktop_ready() -> str | None:
+    """Why this computer cannot run a session, or None."""
+    if not sys.platform.startswith("linux"):
+        return "Mexer no mouse e no teclado, por enquanto, só no Linux (X11)."
+    if not os.environ.get("DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
+        return "Preciso de uma sessão X11 (no Wayland o xdotool não alcança as janelas)."
+    if not shutil.which("xdotool") or not shutil.which("import"):
+        return "Preciso do xdotool e do ImageMagick: sudo apt install xdotool imagemagick."
+    return None
+
+
+def _scale(box: tuple[int, int, int, int]) -> float:
+    """Pixels of the monitor per pixel of the picture the model sees."""
+    w, h, _, _ = box
+    side = max(w, h)
+    return side / SCREEN_SIDE if side > SCREEN_SIDE else 1.0
+
+
+def picture_size(box: tuple[int, int, int, int]) -> tuple[int, int]:
+    w, h, _, _ = box
+    factor = _scale(box)
+    return max(1, round(w / factor)), max(1, round(h / factor))
+
+
+def do_action(tool: object, args: object, box: tuple[int, int, int, int]) -> tuple[bool, str]:
+    """One action at the mouse or keyboard. Never raises: a refusal is the observation."""
+    if not isinstance(tool, str) or tool not in DESKTOP_TOOLS or not isinstance(args, dict):
+        return False, f"Recusado: {tool!r} não é uma ação liberada ({', '.join(DESKTOP_TOOLS)})."
+    w, h, left, top = box
+    factor = _scale(box)
+    if tool == "clicar":
+        x, y = args.get("x"), args.get("y")
+        if not isinstance(x, int) or not isinstance(y, int) or isinstance(x, bool):
+            return False, "Recusado: x e y precisam ser números inteiros."
+        rx, ry = left + round(x * factor), top + round(y * factor)
+        if not (left <= rx < left + w and top <= ry < top + h):
+            return False, "Recusado: o ponto fica fora da tela."
+        button = "3" if args.get("botao") == "direito" else "1"
+        repeat = ["--repeat", "2"] if args.get("duplo") is True else []
+        argv = ["xdotool", "mousemove", "--sync", str(rx), str(ry), "click", *repeat, button]
+        done = f"Cliquei em ({x}, {y})."
+    elif tool == "digitar":
+        text = args.get("texto")
+        if not isinstance(text, str) or not text:
+            return False, "Recusado: texto vazio."
+        if len(text) > MAX_TYPED:
+            return False, f"Recusado: mais de {MAX_TYPED} caracteres de uma vez."
+        if DENIED_TEXT.search(text):
+            return False, "Recusado: isso parece um comando de terminal, e eu não digito isso."
+        argv = ["xdotool", "type", "--clearmodifiers", "--delay", "25", "--", text]
+        done = f"Digitei {len(text)} caractere(s)."
+    elif tool == "tecla":
+        key = args.get("tecla")
+        if not isinstance(key, str) or not _KEY.fullmatch(key):
+            return False, "Recusado: tecla em formato que não conheço (ex.: Return, ctrl+s)."
+        low = key.lower()
+        if low in DENIED_KEYS or "super" in low or "meta" in low:
+            return False, f"Recusado: {key} abre o terminal, o sistema ou a sessão."
+        argv = ["xdotool", "key", "--clearmodifiers", key]
+        done = f"Apertei {key}."
+    elif tool == "rolar":
+        times = args.get("vezes", 3)
+        if not isinstance(times, int) or isinstance(times, bool):
+            times = 3
+        times = max(1, min(10, times))
+        button = "4" if args.get("direcao") == "cima" else "5"
+        argv = ["xdotool", "click", "--repeat", str(times), button]
+        done = f"Rolei {times}× para {'cima' if button == '4' else 'baixo'}."
+    elif tool == "esperar":
+        seconds = args.get("segundos", 2)
+        seconds = seconds if isinstance(seconds, int) and not isinstance(seconds, bool) else 2
+        time.sleep(max(1, min(5, seconds)))
+        return True, "Esperei."
+    else:
+        return False, "Recusado: terminar não se executa."
+    try:
+        result = subprocess.run(  # noqa: S603 (xdotool with fixed arguments, the text after --)
+            argv, capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"Erro: {exc}"
+    if result.returncode != 0:
+        return False, f"Erro do xdotool: {(result.stderr or result.stdout).strip()[-200:]}"
+    return True, done
+
+
+def _moved(a: tuple[int, int] | None, b: tuple[int, int] | None) -> bool:
+    return a is not None and b is not None and max(abs(a[0] - b[0]), abs(a[1] - b[1])) > MOUSE_MOVED
+
+
+def run_desktop(config: Config, task: dict) -> dict:
+    """A session at the mouse and keyboard. Ends at terminar, at the limits (10 min, steps,
+    cost), when the server says stop, or when the owner moves the mouse."""
+    task_id = str(task["id"])
+    if not config.desktop:
+        return {"ok": False, "error": NO_DESKTOP}
+    problem = desktop_ready()
+    if problem:
+        return {"ok": False, "error": problem}
+    box = monitor_under_mouse()
+    if box is None:
+        w, h = _screen_size()
+        box = (w, h, 0, 0)
+    width, height = picture_size(box)
+    limit = min(config.timeout_minutes, DESKTOP_MINUTES) * 60
+    started, steps, cost = time.monotonic(), [], 0.0
+    _tell_screen("Vou mexer no seu PC por até 10 min. Mexa o mouse para eu parar.")
+
+    def end(ok: bool, result: str = "", error: str = "") -> dict:
+        _tell_screen("Parei de mexer no seu PC.")
+        body: dict = {"ok": ok, "result": result[:MAX_RESULT], "cost_usd": round(cost, 6)}
+        body["executor"] = "visao"
+        if error:
+            body["error"] = error[:500]
+        return body
+
+    left_at = mouse_position()
+    while True:
+        if time.monotonic() - started > limit:
+            return end(False, error=f"Passaram {limit // 60} min e eu parei.")
+        if len(steps) >= config.max_turns:
+            return end(False, error=f"Cheguei ao limite de {config.max_turns} passos e parei.")
+        now = mouse_position()
+        if steps and _moved(left_at, now):
+            return end(False, error="Você mexeu no mouse, então parei.")
+        shot = capture_screen(box, tell=False)
+        if not shot.get("ok"):
+            return end(False, error=str(shot.get("error")))
+        body = {
+            "picture": shot["data"],
+            "width": width,
+            "height": height,
+            "steps": steps[-200:],
+            "max_steps": config.max_turns,
+            "max_usd": round(config.max_budget_usd, 2),
+        }
+        try:
+            reply = _desktop_step(config, task_id, body)
+        except StepFailed as exc:
+            return end(False, error=str(exc))
+        try:
+            cost = float(reply.get("cost_usd") or cost)
+        except (TypeError, ValueError):
+            pass
+        if reply.get("stop"):
+            return end(False, error=str(reply["stop"]))
+        action = reply.get("action")
+        note = str(reply.get("note") or "")[:2000]
+        if not isinstance(action, dict):
+            reason = str(reply.get("invalid") or "a resposta não trouxe uma ação")
+            steps.append({"tool": None, "args": {}, "note": note, "result": reason, "ok": False})
+            continue
+        tool, args = action.get("tool"), action.get("args") or {}
+        if tool == "terminar":
+            summary = str(args.get("resumo") or "").strip() or "Terminei."
+            return end(True, summary)
+        if _moved(left_at, mouse_position()):  # the owner's hand, while the model was thinking
+            return end(False, error="Você mexeu no mouse, então parei.")
+        ok, result = do_action(tool, args, box)
+        time.sleep(DESKTOP_SETTLE)
+        left_at = mouse_position()
+        entry = {"tool": str(tool), "args": args if isinstance(args, dict) else {}}
+        steps.append({**entry, "note": note, "result": result[:2000], "ok": ok})
+
+
+def _screen_size() -> tuple[int, int]:
+    found = re.search(r"(\d+)x(\d+)", _output(["xdotool", "getdisplaygeometry"]).replace(" ", "x"))
+    return (int(found.group(1)), int(found.group(2))) if found else (1920, 1080)
+
+
+def _desktop_step(config: Config, task_id: str, body: dict) -> dict:
+    for attempt in range(STEP_RETRIES):
+        try:
+            reply = call(config, "POST", f"/device/tasks/{task_id}/desktop", body, STEP_TIMEOUT)
+            return reply if isinstance(reply, dict) else {}
+        except urllib.error.HTTPError as exc:
+            if exc.code in (404, 409, 401):
+                raise StepFailed("O servidor não está mais com essa sessão.") from exc
+            if exc.code < 500 or attempt == STEP_RETRIES - 1:
+                raise StepFailed(f"O servidor recusou o passo ({exc.code}).") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt == STEP_RETRIES - 1:
+                raise StepFailed(f"Perdi a conexão com o servidor no meio ({exc}).") from exc
+        time.sleep(5 * (attempt + 1))
+    raise StepFailed("O servidor não respondeu.")
+
+
+NO_DESKTOP = (
+    'Este computador não deixa eu mexer no mouse e no teclado. Para deixar, escreva "mexer": true '
+    "no braco.json e religue o braço."
+)
 
 
 def genesis() -> None:

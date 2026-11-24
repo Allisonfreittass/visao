@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     arm_code_max_usd: Decimal = Field(default=Decimal("0.50"), ge=0)
     # The prompt of each step, in characters (bytes are what the budget guard measures).
     arm_code_context_chars: int = Field(default=48_000, ge=8000)
+    # The Visão at the mouse and keyboard (docs/MEXER.md): a session lasts at most 10 minutes (the
+    # owner's choice), with a limit of steps and of cost counted here.
+    arm_desktop_minutes: int = Field(default=10, ge=1, le=10)
+    arm_desktop_max_steps: int = Field(default=40, ge=1, le=200)
+    arm_desktop_max_usd: Decimal = Field(default=Decimal("0.50"), ge=0)
 
     # Optional fallback provider, tried when the primary is out of quota, rate-limited or down.
     llm_fallback_provider_name: str | None = None

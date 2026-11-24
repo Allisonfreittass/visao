@@ -7,6 +7,17 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 24/11/2026
 
+- **Ele mexe no mouse e no teclado do seu PC, quando você pede com `/pc`** ([MEXER.md](MEXER.md),
+  [ADR-0024](decisions/0024-mouse-e-teclado.md), braço versão 6).
+  - `/pc abre o YouTube e procura jazz`: uma sessão de até 10 minutos no seu desktop de verdade,
+    escolha sua. Você vê o cursor se mexer.
+  - A cada passo ele olha a tela e faz uma ação: clicar, digitar, tecla ou rolar.
+  - Para parar: mexer o mouse, `/pc parar` ou Parar na página Mac.
+  - Só com `"mexer": true` no `braco.json`, só no Linux com X11, e só Claude ou OpenAI veem a
+    tela.
+  - Ele não abre o terminal e não digita comandos. Fica o risco de uma página com instrução
+    escondida dentro das suas contas logadas, durante a sessão.
+
 - **Ele olha a sua tela quando você pede** ([TELA.md](TELA.md), braço versão 5).
   - "Olha minha tela", "o que é esse erro na tela?" ou `/tela`, no chat ou na ligação. O braço
     captura o monitor onde está o mouse, avisa no computador, e a captura aparece na sua

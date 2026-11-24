@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ArmTask } from "./api";
-import { parseMacCommand, taskDetail, undoQuestion } from "./arm";
+import { parseMacCommand, parsePcCommand, taskDetail, undoQuestion } from "./arm";
 
 describe("parseMacCommand", () => {
   it("splits the project from a multi-line request", () => {
@@ -16,6 +16,17 @@ describe("parseMacCommand", () => {
     expect(parseMacCommand("/mac visao")).toBe("usage");
     expect(parseMacCommand("me ajuda no mac")).toBeNull();
     expect(parseMacCommand("/macarrão é bom")).toBeNull();
+  });
+});
+
+describe("parsePcCommand", () => {
+  it("opens a session, stops one, or asks how", () => {
+    expect(parsePcCommand("/pc abre o YouTube e procura jazz")).toEqual({ prompt: "abre o YouTube e procura jazz" });
+    expect(parsePcCommand("/pc parar")).toBe("stop");
+    expect(parsePcCommand("/PC Pare!")).toBe("stop");
+    expect(parsePcCommand("/pc")).toBe("usage");
+    expect(parsePcCommand("liga o pc")).toBeNull();
+    expect(parsePcCommand("/pcx algo")).toBeNull();
   });
 });
 

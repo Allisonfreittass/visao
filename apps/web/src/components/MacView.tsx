@@ -43,6 +43,11 @@ export function MacView({ api, pending, onError }: MacViewProps) {
     pending.refresh();
   }
 
+  async function stopDesktop() {
+    await api.stopDesktop().catch(onError);
+    pending.refresh();
+  }
+
   async function copy(token: string) {
     try {
       await navigator.clipboard.writeText(token);
@@ -105,8 +110,11 @@ export function MacView({ api, pending, onError }: MacViewProps) {
                   <span className="task-what"><b>{t.project}</b> {t.prompt}</span>
                   <time className="panel-time">{dayLabel(utcDate(t.finished_at ?? t.created_at))}</time>
                   {detail && <span className="task-detail">{detail}</span>}
-                  {t.status === "approved" && (
+                  {t.status === "approved" && t.kind !== "desktop" && (
                     <button type="button" className="link-button" onClick={() => void pending.decideArm(t, "reject")}>cancelar</button>
+                  )}
+                  {t.kind === "desktop" && (t.status === "approved" || t.status === "running") && (
+                    <button type="button" className="link-button" onClick={() => void stopDesktop()}>parar</button>
                   )}
                   {t.can_undo && (
                     <button type="button" className="link-button" onClick={() => void undo(t)}>desfazer</button>
