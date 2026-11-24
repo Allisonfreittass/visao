@@ -43,6 +43,7 @@ import { StatusBar } from "./components/StatusBar";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { NotYetView } from "./components/NotYetView";
 import { RoutinesView } from "./components/RoutinesView";
+import { PanelView } from "./components/PanelView";
 import { ShareDialog, Toast } from "./components/ShareDialog";
 import type { ToolsMode } from "./components/ChatView";
 import { useRoutines } from "./hooks/useRoutines";
@@ -1056,6 +1057,8 @@ export function App() {
                     macOnline={macOnline}
                     project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
                     onOpenProject={(id) => void openProjectChat(id)}
+                    onOpenPanel={() => go("panel")}
+                    working={sending || macWorking}
                     pending={pending}
                     current={current}
                     onReplied={(conversationId) => {
@@ -1073,7 +1076,7 @@ export function App() {
                   <section className="page page--caderno" aria-labelledby="study-title">
                     <header className="page-head">
                       <span className="rotulo">Caderno</span>
-                      <h1 id="study-title">O que eu fiz <em>enquanto você não estava.</em></h1>
+                      <h1 id="study-title" className="page-voice">O que eu fiz <em>enquanto você não estava.</em></h1>
                       <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
                     </header>
                     <MindPanel api={api} onError={handleError} />
@@ -1082,6 +1085,7 @@ export function App() {
                 )}
                 {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
             {view === "routines" && <RoutinesView routines={routines} />}
+            {view === "panel" && <PanelView api={api} onBack={() => go("inbox")} onDraft={draftInChat} onError={handleError} />}
             {(view === "agents" || view === "channels" || view === "skills") && <NotYetView place={view} />}
                 {view === "settings" && (
                   <SettingsView

@@ -24,9 +24,9 @@ export function usageLine(metrics: CognitionMetrics | null): string | null {
 export function modelLabel(brain: BrainState | null, routing: RoutingState | null): string {
   if (!brain) return "…";
   if (brain.mode === "local") return `${brain.local_model ?? "modelo do Mac"} · no Mac`;
-  const cloud = routing?.personal[0] ?? routing?.configured[0] ?? "nuvem";
-  if (brain.mode === "auto") return `${cloud} · automático`;
-  return `${cloud} · nuvem`;
+  const cloud = routing?.personal[0] ?? routing?.configured[0];
+  if (brain.mode === "auto") return cloud ? `${cloud} · automático` : "automático";
+  return cloud ? `${cloud} · nuvem` : "nuvem";
 }
 
 /** "Braço: 1 tarefa rodando", or why it is idle. */
