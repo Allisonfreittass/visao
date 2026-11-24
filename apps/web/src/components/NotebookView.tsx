@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
 
-import { type Api, ApiError, type MemoryItem, type Mind, type NameRecord, utcDate } from "../api";
+import { type Api, ApiError, type MemoryItem, type Mind, type NameRecord, type OwnerGoal, type OwnerGoals, utcDate } from "../api";
 import { dayLabel } from "../labels";
 import { StudyPanel } from "./StudyPanel";
 
@@ -31,6 +31,84 @@ export function warmth(strength: number): string {
 }
 
 const EVENT: Record<string, string> = { chosen: "Escolheu", deferred: "Adiou", declined: "Recusou", renamed: "Trocou", kept: "Manteve" };
+
+const day = (iso: string) => utcDate(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+/** "desde 24/11 · quer algo dele" for an active goal; what happened to an older one. */
+export function goalLine(goal: Pick<OwnerGoal, "status" | "reason" | "created_at" | "ended_at">): string {
+  if (goal.status === "undone") return `desfeito${goal.ended_at ? ` em ${day(goal.ended_at)}` : ""}`;
+  if (goal.status === "ended") return `de ${day(goal.created_at)} a ${goal.ended_at ? day(goal.ended_at) : "?"}`;
+  return [`desde ${day(goal.created_at)}`, goal.reason].filter(Boolean).join(" · ");
+}
+
+/** His record of what the owner is after: written only with the owner's yes (ADR-0025), shown
+ * with where each came from, and the last change can be undone. Hidden where the server does not
+ * have it yet. */
+function GoalsSection({ api, memoryEnabled, onError }: { api: Api; memoryEnabled: boolean; onError: (e: unknown) => void }) {
+  const [goals, setGoals] = useState<OwnerGoals | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const load = useCallback(() => {
+    api.ownerGoals().then(setGoals, (e) => {
+      if (e instanceof ApiError && e.status === 404) setMissing(true);
+      else onError(e);
+    });
+  }, [api, onError]);
+  useEffect(load, [load]);
+
+  async function undo() {
+    try {
+      const { undone } = await api.undoOwnerGoal();
+      setDone(undone ? `Pronto: ${undone}.` : "Não havia mudança para desfazer.");
+      load();
+    } catch (e) {
+      onError(e);
+    }
+  }
+
+  if (missing) return null;
+  const past = goals?.history.filter((g) => g.status !== "active") ?? [];
+  return (
+    <section className="goals" aria-labelledby="goals-title">
+      <h2 id="goals-title">Seus objetivos</h2>
+      <p className="note">
+        {memoryEnabled
+          ? "Só entram com o seu sim. Ele pergunta quando ouve uma mudança de rumo; você também pode pedir: “registra como objetivo meu…”."
+          : "Com a memória desligada, ele não registra objetivos."}
+      </p>
+      {goals === null ? <p className="note">Carregando…</p> : goals.active.length === 0 ? (
+        <p className="note">Nenhum objetivo registrado.</p>
+      ) : (
+        <ul className="goal-list">
+          {goals.active.map((g) => (
+            <li key={g.id}>
+              <span className="goal-content">{g.content}</span>
+              <span className="memory-origin">{goalLine(g)}</span>
+              {g.source_text && <span className="goal-source">Você disse: “{g.source_text}”</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {past.length > 0 && (
+        <details className="goal-past">
+          <summary>Mudanças anteriores ({past.length})</summary>
+          <ul className="goal-list">
+            {past.map((g) => (
+              <li key={g.id}>
+                <span className="goal-content goal-content--past">{g.content}</span>
+                <span className="memory-origin">{goalLine(g)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {goals && (goals.active.length > 0 || past.some((g) => g.status === "ended")) && (
+        <button type="button" className="btn-secondary btn-small" onClick={() => void undo()}>Desfazer a última mudança</button>
+      )}
+      {done && <p className="note" role="status">{done}</p>}
+    </section>
+  );
+}
 
 function useMind(api: Api, onError: (e: unknown) => void) {
   const [mind, setMind] = useState<Mind | null>(null);
@@ -81,6 +159,7 @@ function MemoryTab({ api, mind, reloadMind, memoryEnabled, onToggleMemory, onErr
   }
   return (
     <div className="notebook-tab">
+      <GoalsSection api={api} memoryEnabled={memoryEnabled} onError={onError} />
       <p className="lede">Só o que você deixou guardar. Cada item diz de onde veio.</p>
       {items === null ? <p className="note">Carregando…</p> : items.length === 0 ? (
         <p className="note">Nada guardado ainda.{memoryEnabled ? "" : " A memória está desligada."}</p>

@@ -187,6 +187,25 @@ export interface NameRecord {
   }[];
 }
 
+/** One of the owner's goals, written only with the owner's yes (docs/decisions/0025). */
+export interface OwnerGoal {
+  id: string;
+  content: string;
+  reason: string;
+  /** The owner's own words it came from. */
+  source_text: string;
+  source_message_id: string | null;
+  status: "active" | "ended" | "undone";
+  replaces_id: string | null;
+  created_at: string;
+  ended_at: string | null;
+}
+
+export interface OwnerGoals {
+  active: OwnerGoal[];
+  history: OwnerGoal[];
+}
+
 export interface Conversation {
   id: string;
   created_at: string;
@@ -1060,6 +1079,15 @@ export class Api {
 
   nameRecord(): Promise<NameRecord> {
     return this.request("/identity/name");
+  }
+
+  ownerGoals(): Promise<OwnerGoals> {
+    return this.request("/owner-goals");
+  }
+
+  /** Undoes the newest change to the goals; `undone` says what, or null when there was none. */
+  undoOwnerGoal(): Promise<{ undone: string | null }> {
+    return this.request("/owner-goals/undo", { method: "POST" });
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {

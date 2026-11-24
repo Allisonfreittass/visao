@@ -749,3 +749,15 @@ button.project-tile:hover { border-color: var(--border-strong); }
 @media (max-width: 1100px) { .project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .project-grid { grid-template-columns: 1fr; } }
 .project-tile-clash { margin: 0; font: 400 13px/1.4 var(--font-sans); color: var(--text); }
+
+/* ---------- Caderno: seus objetivos (ADR-0025) ---------- */
+.goals { display: grid; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.goals h2 { margin: 0; font: 400 20px/1.2 var(--font-display); color: var(--text); }
+.goals .note { margin: 0; }
+.goal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.goal-list li { display: grid; gap: 3px; padding: 10px 0 10px 14px; border-left: 2px solid var(--border-strong); }
+.goal-content { font: 400 16px/1.4 var(--font-sans); color: var(--text); }
+.goal-content--past { color: var(--text-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.goal-source { font: italic 300 15px/1.45 var(--font-display); color: var(--text-muted); }
+.goal-past summary { cursor: pointer; font: 400 13px/1.4 var(--font-sans); color: var(--text-muted); }
+.goals > .btn-secondary { justify-self: start; }
