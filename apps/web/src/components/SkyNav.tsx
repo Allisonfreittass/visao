@@ -1,40 +1,52 @@
-import { Lockup } from "../brand/Lockup";
-import { OWNER_NAME } from "../brand/copy";
-import type { AnelEstado } from "../anel/state";
-import { Icon } from "./Icon";
+import { Corvo } from "../brand/Corvo";
+import { Icon, type IconName } from "./Icon";
 import type { WorkspaceView } from "./Rail";
 
 interface MobileBarProps {
-  view: WorkspaceView;
+  title: string;
+  online: boolean;
   pendingCount: number;
-  anel: AnelEstado;
   menuOpen: boolean;
   onMenu: () => void;
-  onView: (view: WorkspaceView) => void;
+  onHome: () => void;
 }
 
-/** Below 900 px: the drawer button, the logo, and the avatar that opens Ajustes. */
-export function MobileBar({ view, pendingCount, anel, menuOpen, onMenu, onView }: MobileBarProps) {
+/** Below 900 px: the crow and where you are, whether the server answers, and the menu with the
+ * other places. */
+export function MobileBar({ title, online, pendingCount, menuOpen, onMenu, onHome }: MobileBarProps) {
   return (
     <header className="mobile-bar">
+      <button type="button" className="mobile-bar-brand" onClick={onHome} aria-label="VISAO, Início">
+        <Corvo size={26} />
+      </button>
+      <span className="mobile-bar-title">{title}</span>
+      <span className={`mobile-bar-status${online ? " on" : ""}`}>{online ? "ok" : "sem conexão"}</span>
       <button type="button" className="mobile-bar-button" onClick={onMenu} aria-expanded={menuOpen} aria-label="Abrir o menu">
         <Icon name="menu" size={22} />
         {pendingCount > 0 && <span className="mobile-bar-badge" aria-label={`${pendingCount} esperando você`}>{pendingCount}</span>}
       </button>
-      <button type="button" className="mobile-bar-brand" onClick={() => onView("inbox")} aria-label="V.I.S.A.O., Início">
-        <Lockup estado={anel} size={26} animated />
-      </button>
-      <button
-        type="button"
-        className="mobile-bar-avatar"
-        aria-current={view === "settings" ? "page" : undefined}
-        onClick={() => onView("settings")}
-        aria-label="Ajustes"
-        title="Ajustes"
-      >
-        {OWNER_NAME.charAt(0)}
-      </button>
     </header>
+  );
+}
+
+const TABS: { view: WorkspaceView; label: string; icon: IconName }[] = [
+  { view: "inbox", label: "Início", icon: "home" },
+  { view: "conversation", label: "Chat", icon: "chat" },
+  { view: "study", label: "Caderno", icon: "notebook" },
+  { view: "routines", label: "Rotinas", icon: "clock" },
+];
+
+/** Below 900 px: the four places at the bottom of the screen. */
+export function MobileTabs({ view, onView }: { view: WorkspaceView; onView: (view: WorkspaceView) => void }) {
+  return (
+    <nav className="mobile-tabs" aria-label="Lugares principais">
+      {TABS.map((t) => (
+        <button key={t.view} type="button" aria-current={view === t.view ? "page" : undefined} onClick={() => onView(t.view)}>
+          <Icon name={t.icon} size={20} />
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
   );
 }
 

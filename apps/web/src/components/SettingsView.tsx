@@ -8,13 +8,59 @@ import { RoutingSettings } from "./RoutingSettings";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
-import { FORCED_THEME, loadThemePreference, saveThemePreference, type ThemePreference } from "../brand/theme";
+import { loadTheme, saveTheme, THEMES, type Theme } from "../brand/theme";
+import type { QuietHours } from "../api";
+import type { ToolsMode } from "./ChatView";
+import { fold } from "./CommandPalette";
+import { Icon, type IconName } from "./Icon";
 
-const THEMES: { value: ThemePreference; label: string }[] = [
-  { value: "light", label: "Claro" },
-  { value: "dark", label: "Escuro" },
-  { value: "system", label: "Sistema" },
+type SectionId = "aparencia" | "autonomia" | "memoria" | "modelo" | "voz" | "integracoes" | "conta";
+
+/** The sections on the left, with the words the search also finds them by. */
+export const SECTIONS: { id: SectionId; title: string; icon: IconName; keywords: string }[] = [
+  { id: "aparencia", title: "Aparência", icon: "sparkle", keywords: "tema papel tinta rótulo cor escuro claro ferramentas resumido técnico passos" },
+  { id: "autonomia", title: "Autonomia", icon: "clock", keywords: "pausa agir sozinho pesquisar resumo da manhã" },
+  { id: "memoria", title: "Memória", icon: "notebook", keywords: "lembrar perguntas iniciais apresentação" },
+  { id: "modelo", title: "Modelo", icon: "laptop", keywords: "nuvem local mac automático provedor ordem" },
+  { id: "voz", title: "Voz e avisos", icon: "speaker", keywords: "falar ouvir ligação aprovar notificação silêncio horário" },
+  { id: "integracoes", title: "Integrações", icon: "plug", keywords: "google e-mail agenda gmail localização" },
+  { id: "conta", title: "Conta", icon: "gear", keywords: "senha e-mail sair" },
 ];
+
+export function matchSections(query: string): SectionId[] {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  return SECTIONS.filter((sec) => words.every((w) => fold(`${sec.title} ${sec.keywords}`).includes(w))).map((sec) => sec.id);
+}
+
+/** Quiet hours: nothing he starts on his own arrives in this window. */
+function QuietHoursSetting({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
+  const [hours, setHours] = useState<QuietHours | null>(null);
+  const [note, setNote] = useState("");
+  useEffect(() => { api.quietHours().then(setHours).catch(onError); }, [api, onError]);
+  async function save(next: QuietHours) {
+    setHours(next);
+    try {
+      setHours(await api.setQuietHours(next));
+      setNote("Salvo.");
+    } catch (e) {
+      onError(e);
+    }
+  }
+  return (
+    <div className="setting">
+      <div className="setting-text">
+        <span className="setting-title" id="quiet-title">Horário de silêncio</span>
+        <p className="note">Nada que ele faz sozinho chega nesse intervalo. O resumo da manhã sai quando ele acaba.{note && ` ${note}`}</p>
+      </div>
+      {hours && (
+        <div className="quiet-hours" role="group" aria-labelledby="quiet-title">
+          <label>De <input type="time" value={hours.quiet_start} onChange={(e) => e.target.value && void save({ ...hours, quiet_start: e.target.value })} /></label>
+          <label>até <input type="time" value={hours.quiet_end} onChange={(e) => e.target.value && void save({ ...hours, quiet_end: e.target.value })} /></label>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SettingsViewProps {
   api: Api;
@@ -35,6 +81,8 @@ interface SettingsViewProps {
   onError: (e: unknown) => void;
   voiceApproval: boolean;
   onToggleVoiceApproval: () => void;
+  toolsMode: ToolsMode;
+  onToolsMode: (mode: ToolsMode) => void;
 }
 
 /** All the switches in one place, grouped by what they touch. */
@@ -46,7 +94,11 @@ export function SettingsView(props: SettingsViewProps) {
   const [morningNote, setMorningNote] = useState("");
   const [here, setHere] = useState(locationOn());
   const [hereNote, setHereNote] = useState("");
-  const [theme, setTheme] = useState<ThemePreference>(loadThemePreference);
+  const [theme, setTheme] = useState<Theme>(loadTheme);
+  const [section, setSection] = useState<SectionId>("aparencia");
+  const [query, setQuery] = useState("");
+  const shown = query.trim() ? matchSections(query) : [section];
+  const show = (id: SectionId) => shown.includes(id);
 
   useEffect(() => {
     Promise.all([api.autonomy(), api.permissions()])
@@ -121,40 +173,74 @@ export function SettingsView(props: SettingsViewProps) {
 
   return (
     <section className="page" aria-labelledby="settings-title">
-      <header className="page-head">
-        <h1 id="settings-title">Ajustes</h1>
-        <p className="lede">Modelo, voz, avisos, permissões e conta.</p>
-      </header>
+      <h1 id="settings-title" className="visually-hidden">Ajustes</h1>
+      <div className="settings-layout">
+      <nav className="settings-nav" aria-label="Seções dos ajustes">
+        <label htmlFor="settings-search" className="visually-hidden">Buscar nos ajustes</label>
+        <input id="settings-search" className="settings-search" type="search" placeholder="Buscar nos ajustes…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        {SECTIONS.map((sec) => (
+          <button
+            key={sec.id}
+            type="button"
+            aria-current={!query.trim() && section === sec.id ? "page" : undefined}
+            onClick={() => { setQuery(""); setSection(sec.id); }}
+          >
+            <Icon name={sec.icon} size={16} />
+            {sec.title}
+          </button>
+        ))}
+      </nav>
       <div className="page-body settings">
-        {!FORCED_THEME && (
+        {shown.length === 0 && <p className="note">Nenhum ajuste com esse nome.</p>}
+        {show("aparencia") && (
         <section className="settings-group" aria-labelledby="g-aparencia">
           <h2 id="g-aparencia" className="rotulo">Aparência</h2>
           <div className="setting">
             <div className="setting-text">
               <span id="theme-title" className="setting-title">Tema</span>
-              <p className="note">Claro é o padrão. “Sistema” segue o claro ou escuro do aparelho.</p>
+              <p className="note">Troca na hora: experimente.</p>
             </div>
-            <div className="segmented" role="radiogroup" aria-labelledby="theme-title">
-              {THEMES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === t.value}
-                  onClick={() => { setTheme(t.value); saveThemePreference(t.value); }}
-                >
-                  {t.label}
-                </button>
-              ))}
+          </div>
+          <div className="choice-cards" role="radiogroup" aria-labelledby="theme-title">
+            {THEMES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                role="radio"
+                aria-checked={theme === t.value}
+                className="choice-card"
+                data-swatch={t.value}
+                onClick={() => { setTheme(t.value); saveTheme(t.value); }}
+              >
+                <span className="choice-card-title">{t.label}</span>
+                <span className="choice-card-note">{t.value === "papel" ? "Claro, para o dia" : t.value === "tinta" ? "Escuro, para a noite" : "Creme e azul, anos 50"}</span>
+              </button>
+            ))}
+          </div>
+          <div className="setting">
+            <div className="setting-text">
+              <span id="tools-title" className="setting-title">Como as ferramentas aparecem</span>
+              <p className="note">No chat, cada passo que ele dá vira um cartão.</p>
             </div>
+          </div>
+          <div className="choice-cards" role="radiogroup" aria-labelledby="tools-title">
+            {([["resumo", "Resumido", "Frases curtas: “Procurou no seu Gmail”"], ["tecnico", "Técnico", "Também o que foi enviado e recebido"]] as const).map(([value, label, note]) => (
+              <button key={value} type="button" role="radio" aria-checked={props.toolsMode === value} className="choice-card" onClick={() => props.onToolsMode(value)}>
+                <span className="choice-card-title">{label}</span>
+                <span className="choice-card-note">{note}</span>
+              </button>
+            ))}
           </div>
         </section>
         )}
+        {show("modelo") && (
         <section className="settings-group" aria-labelledby="g-modelo">
           <h2 id="g-modelo" className="rotulo">Modelo</h2>
           <BrainSettings api={api} onError={onError} />
           <RoutingSettings api={api} onError={onError} />
         </section>
+        )}
+        {show("voz") && (
         <section className="settings-group" aria-labelledby="g-voz">
           <h2 id="g-voz" className="rotulo">Voz e avisos</h2>
           <Setting
@@ -179,8 +265,11 @@ export function SettingsView(props: SettingsViewProps) {
             />
           )}
           <PushToggle api={api} onError={onError} />
+          <QuietHoursSetting api={api} onError={onError} />
         </section>
+        )}
 
+        {show("autonomia") && (
         <section className="settings-group" aria-labelledby="g-autonomia">
           <h2 id="g-autonomia" className="rotulo">Autonomia</h2>
           <Setting
@@ -210,7 +299,9 @@ export function SettingsView(props: SettingsViewProps) {
             {morningNote && <p className="note">{morningNote}</p>}
           </Setting>
         </section>
+        )}
 
+        {show("integracoes") && (
         <section className="settings-group" aria-labelledby="g-local">
           <h2 id="g-local" className="rotulo">Localização</h2>
           <Setting
@@ -222,12 +313,16 @@ export function SettingsView(props: SettingsViewProps) {
             {hereNote && <p className="note">{hereNote}</p>}
           </Setting>
         </section>
+        )}
 
+        {show("integracoes") && (
         <section className="settings-group" aria-labelledby="g-google">
           <h2 id="g-google" className="rotulo">Google</h2>
           <GoogleSettings api={api} onError={onError} />
         </section>
+        )}
 
+        {show("memoria") && (
         <section className="settings-group" aria-labelledby="g-memoria">
           <h2 id="g-memoria" className="rotulo">Memória</h2>
           <Setting
@@ -244,7 +339,9 @@ export function SettingsView(props: SettingsViewProps) {
             <button type="button" className="ghost" onClick={props.onRestartOnboarding}>Refazer</button>
           </div>
         </section>
+        )}
 
+        {show("conta") && (
         <section className="settings-group" aria-labelledby="g-conta">
           <h2 id="g-conta" className="rotulo">Conta</h2>
           <AccountPanel api={api} />
@@ -256,6 +353,8 @@ export function SettingsView(props: SettingsViewProps) {
             <button type="button" className="ghost" onClick={props.onLogout}>Sair</button>
           </div>
         </section>
+        )}
+      </div>
       </div>
     </section>
   );

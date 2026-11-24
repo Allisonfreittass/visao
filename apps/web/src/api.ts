@@ -151,6 +151,61 @@ export interface Mind {
   rules: MindNote;
 }
 
+/** A remembered fact (GET /memory). `source_message_ids`: the messages it came from. */
+export interface MemoryItem {
+  id: string;
+  type: string;
+  content: string;
+  confidence: number;
+  created_at: string;
+  source_message_ids: string[];
+}
+
+/** Quiet hours, "HH:MM" in the owner's timezone (GET /notifications/settings). */
+export interface QuietHours {
+  quiet_start: string;
+  quiet_end: string;
+  timezone: string;
+}
+
+/** Model use in the last `window_days` (GET /cognition/metrics), per purpose. cost_usd is a decimal string. */
+export interface CognitionMetrics {
+  window_days: number;
+  llm_usage: Record<string, { calls: number; tokens: number; cost_usd: string; autonomous?: boolean }>;
+}
+
+/** How he chose his name (GET /identity/name). By design the owner cannot set it. */
+export interface NameRecord {
+  chosen_name: string | null;
+  history: {
+    event_type: string;
+    previous_name: string | null;
+    new_name: string | null;
+    alternatives_considered: string[] | null;
+    rationale: string | null;
+    created_at: string;
+  }[];
+}
+
+/** One of the owner's goals, written only with the owner's yes (docs/decisions/0025). */
+export interface OwnerGoal {
+  id: string;
+  content: string;
+  reason: string;
+  /** The owner's own words it came from. */
+  source_text: string;
+  source_message_id: string | null;
+  status: "active" | "ended" | "undone";
+  replaces_id: string | null;
+  created_at: string;
+  ended_at: string | null;
+}
+
+export interface OwnerGoals {
+  active: OwnerGoal[];
+  history: OwnerGoal[];
+}
+
 export interface Conversation {
   id: string;
   created_at: string;
@@ -991,6 +1046,48 @@ export class Api {
       method: "PUT", body: JSON.stringify({ enabled }),
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  memories(): Promise<MemoryItem[]> {
+    return this.request("/memory");
+  }
+
+  forgetMemory(id: string): Promise<void> {
+    return this.request(`/memory/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  /** Everything remembered, as the server exports it (JSON). */
+  memoryExport(): Promise<unknown> {
+    return this.request("/memory/export");
+  }
+
+  quietHours(): Promise<QuietHours> {
+    return this.request("/notifications/settings");
+  }
+
+  setQuietHours(hours: QuietHours): Promise<QuietHours> {
+    return this.request("/notifications/settings", {
+      method: "PUT", body: JSON.stringify(hours),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /** Model use in the last `days` days (1 = the last 24 h, not the calendar day). */
+  metrics(days = 1): Promise<CognitionMetrics> {
+    return this.request(`/cognition/metrics?days=${days}`);
+  }
+
+  nameRecord(): Promise<NameRecord> {
+    return this.request("/identity/name");
+  }
+
+  ownerGoals(): Promise<OwnerGoals> {
+    return this.request("/owner-goals");
+  }
+
+  /** Undoes the newest change to the goals; `undone` says what, or null when there was none. */
+  undoOwnerGoal(): Promise<{ undone: string | null }> {
+    return this.request("/owner-goals/undo", { method: "POST" });
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {

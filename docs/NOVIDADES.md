@@ -14,10 +14,32 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
     objetivo meu…").
   - Os objetivos ativos vão em toda resposta, com a data e o porquê, para ele lembrar o rumo que
     você escolheu.
-  - Mudar um objetivo encerra o antigo e abre o novo, guardando a sua fala de origem. A última
-    mudança se desfaz em `POST /owner-goals/undo`, e `GET /owner-goals` mostra tudo.
+  - Mudar um objetivo encerra o antigo e abre o novo, guardando a sua fala de origem. No Caderno,
+    aba Memória, você vê cada objetivo com a fala de onde veio e desfaz a última mudança.
   - Só com a memória ligada. "Esquecer tudo" apaga os objetivos junto.
   - Ele nunca diz "registrei" sem ter registrado: a frase sai, em código.
+
+- **Um nome, um projeto.** Criar um projeto com o nome de outro que já existe, pela tela ou pela
+  conversa, não cria um segundo: a tela oferece abrir o que já existe, e ele usa o mesmo. Renomear
+  também não pega o nome de outro projeto; ele avisa que não renomeou. A comparação ignora
+  maiúsculas, acentos e espaços a mais.
+
+- **Cara nova no app web: o corvo no eclipse e três temas**
+  ([DESIGN.md](../DESIGN.md), [telas-visao](design/telas-visao/README.md)).
+  - O ícone do app e o favicon passam a ser o corvo na frente de um sol âmbar.
+  - Em Ajustes › Aparência o dono escolhe entre Papel (claro, o padrão), Tinta (escuro) e Rótulo
+    (creme com azul). Muda na hora e fica guardado no aparelho.
+  - No computador, a janela virou um app: barra lateral com nove lugares (Início, Chat, Projetos,
+    Caderno, Rotinas, Mac, Agentes, Canais, Habilidades) e um rodapé com o servidor, o Braço, as
+    rotinas, o silêncio, o uso de modelos das últimas 24 h e o modelo, que se troca dali.
+  - Ctrl/⌘+K abre uma paleta para buscar conversas, projetos e comandos.
+  - No chat, cada passo vira um cartão (resumido ou técnico), e a conversa pode ser exportada em
+    Markdown ou PDF. O link privado ainda não existe.
+  - O Caderno tem abas: Memória (com de onde veio e Esquecer), Pensamentos, Interesses, O nome e
+    Autorretrato. Rotinas reúne o resumo da manhã, o estudo, a pesquisa sozinho e cada painel.
+  - Agentes em paralelo, Canais e Habilidades têm lugar no menu, mas dizem "ainda não disponível":
+    ele não faz essas coisas ainda e não deve dizer que faz.
+  - É só a aparência: ele não troca o tema sozinho e nada mudou na memória ou no que ele faz.
 
 - **Na ligação, o Muninn vira a ferramenta que ele está usando** ([DESIGN.md](../DESIGN.md),
   seção 6, "Nanorrobôs").

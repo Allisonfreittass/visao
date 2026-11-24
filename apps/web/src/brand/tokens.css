@@ -1,7 +1,8 @@
-/* V.I.S.A.O.: tokens da identidade "Muninn" (DESIGN.md §2 e §3). Uma luz só: âmbar é presença e
-   iniciativa dele; o resto é tinta, grafite, linha, cinza e papel. O botão principal é papel com
-   texto tinta. Vermelho só em erro, e como texto. Escuro é o único tema exposto (brand/theme.ts
-   força data-theme="dark"). Espelhado em apps/ios/Visao/Theme.swift (ainda na marca anterior). */
+/* V.I.S.A.O.: tokens da identidade "corvo no eclipse" (DESIGN.md §2 e §3). Uma luz só: âmbar
+   (#E39A2E) é dele; o resto é tinta, linha, cinza e papel. O botão principal é a cor do texto com
+   o fundo por cima. Vermelho só em erro, e como texto. Três temas, trocados em Ajustes › Aparência
+   (brand/theme.ts põe data-theme no <html>): Papel (claro, o padrão), Tinta (escuro) e Rótulo
+   (creme e azul). Os valores vêm do mockup em docs/design/telas-visao. */
 @import "./fonts.css";
 
 :root {
@@ -11,12 +12,13 @@
   --linha: #2C3136;
   --cinza: #9AA1A8;
   --papel: #F3F1EC;
-  --ambar: #F0A23B;
+  --ambar: #E39A2E;
   --ambar-fundo: #8A5A12;
   /* Erro: o único vermelho, só em texto e em borda de campo. 6,7:1 sobre --tinta, 6:1 sobre --grafite. */
   --vermelho-erro: #FF6B5E;
 
-  /* Tipografia (DESIGN.md §3): voz dele, interface, rastros. */
+  /* Tipografia (DESIGN.md §3): voz dele, interface, rastros e o nome VISAO. */
+  --font-marca: "Six Caps", "Geist", sans-serif;
   --font-display: "Newsreader", Georgia, "Times New Roman", serif;
   --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -57,77 +59,83 @@
   /* Camadas */
   --layer-content: 1;
   --layer-overlay: 60;
-
-  /* Verde só no ponto de 6 px de "conectado" (DESIGN.md §2). */
-  --conectado: #4ADE80;
 }
 
-/* Escuro: o tema da marca. Sem sombras: a separação vem da borda de 1px. */
-:root, [data-theme="dark"] {
+/* Os três temas. Cada um dá só as cores de base (os valores do mockup); o resto deriva delas no
+   bloco seguinte. Sem sombras: a separação vem da borda de 1 px.
+   A ligação (.call) é sempre Tinta; a abertura (.intro) e a gênese antiga também. */
+:root, [data-theme="papel"] {
+  color-scheme: light;
+  --bg: #F6F4EF;
+  --surface: #FFFFFF;
+  --surface-2: #EEEAE1;
+  --border: #E3DFD6;
+  --text: #101214;
+  --text-muted: #5B6066;
+  --code: #101214;
+  --code-text: #F3F1EC;
+  --danger: #B3261E;
+  --scrim: rgb(16 18 20 / .32);
+}
+
+[data-theme="tinta"], .muninn-entrada, .intro, .call {
   color-scheme: dark;
-  --bg: var(--tinta);
-  --surface: var(--grafite);
-  --surface-2: color-mix(in srgb, var(--grafite), var(--linha) 45%);
-  --surface-sidebar: color-mix(in srgb, var(--tinta) 88%, transparent);
-  --bubble-user: var(--grafite);
-  --bubble-user-border: var(--linha);
-  --border: var(--linha);
-  --border-strong: color-mix(in srgb, var(--linha), var(--cinza) 22%);
-  --text: var(--papel);
-  --text-2: color-mix(in srgb, var(--papel), var(--cinza) 45%);
-  --text-muted: var(--cinza);
-  --success: var(--text-2);
+  --bg: #101214;
+  --surface: #1A1D20;
+  --surface-2: #24282C;
+  --border: #2C3136;
+  --text: #F3F1EC;
+  --text-muted: #9AA1A8;
+  --code: #0B0C0E;
+  --code-text: #F3F1EC;
   --danger: var(--vermelho-erro);
+  --scrim: rgb(0 0 0 / .6);
+}
+
+/* Rótulo: creme e azul. O cinza é um tom mais escuro que o do mockup (#5A6480) para passar de
+   4,5:1 também sobre --surface-2. */
+[data-theme="rotulo"] {
+  color-scheme: light;
+  --bg: #F3E9D2;
+  --surface: #FBF5E6;
+  --surface-2: #EADCBB;
+  --border: #D9C9A3;
+  --text: #1D2B4F;
+  --text-muted: #56607C;
+  --code: #1D2B4F;
+  --code-text: #F3E9D2;
+  --danger: #A3241C;
+  --scrim: rgb(29 43 79 / .32);
+}
+
+/* Derivados: repetidos em cada lugar que muda de tema, para o color-mix usar as cores dali. */
+:root, [data-theme], .muninn-entrada, .intro, .call {
+  --chip: var(--surface-2);
+  --surface-sidebar: var(--surface);
+  --bubble-user: var(--surface);
+  --bubble-user-border: var(--border);
+  --border-strong: color-mix(in srgb, var(--border), var(--text-muted) 70%);  /* 3:1 em campos (WCAG 1.4.11) */
+  --text-2: color-mix(in srgb, var(--text), var(--text-muted) 45%);
+  --success: var(--text-2);
   /* Avisos falam em texto, na cor do texto: âmbar é só dele (DESIGN.md §2). */
   --warning: var(--text);
   --shadow-card: none;
   --shadow-float: none;
-  --scrim: rgb(0 0 0 / .6);
-  --card-ink: var(--grafite);
-  --card-ink-2: color-mix(in srgb, var(--grafite), var(--linha) 45%);
-  --card-ink-text: var(--papel);
-  --card-ink-muted: var(--cinza);
-  /* Ação principal: papel com texto tinta (DESIGN.md §2). */
-  --accent: var(--papel);
-  --accent-hover: #FFFFFF;
-  --on-accent: var(--tinta);
+  /* O cartão escuro (páginas, código) é o bloco de código do tema. */
+  --card-ink: var(--code);
+  --card-ink-2: color-mix(in srgb, var(--code), var(--code-text) 10%);
+  --card-ink-text: var(--code-text);
+  --card-ink-muted: color-mix(in srgb, var(--code-text) 70%, var(--code));
+  /* Ação principal: a cor do texto, com o fundo por cima (tinta sobre papel no claro). */
+  --accent: var(--text);
+  --accent-hover: color-mix(in srgb, var(--text) 85%, var(--bg));
+  --on-accent: var(--bg);
   --accent-text: var(--text-2);
   --accent-strong: var(--text);
-  --accent-soft: color-mix(in srgb, var(--papel) 12%, transparent);
-}
-
-/* Tema claro (o "dia": papel com texto tinta). Guardado, não exposto. */
-[data-theme="light"] {
-  color-scheme: light;
-  --bg: var(--papel);
-  --surface: #FFFFFF;
-  --surface-2: color-mix(in srgb, var(--papel), var(--tinta) 5%);
-  --border: color-mix(in srgb, var(--papel), var(--tinta) 12%);
-  --border-strong: color-mix(in srgb, var(--papel), var(--tinta) 22%);
-  --text: var(--tinta);
-  --text-2: color-mix(in srgb, var(--tinta), var(--papel) 25%);
-  --text-muted: #5C6268;
-  --accent: var(--tinta);
-  --accent-hover: #000000;
-  --on-accent: var(--papel);
-  --accent-text: var(--text-2);
-  --accent-strong: var(--tinta);
-  --accent-soft: color-mix(in srgb, var(--tinta) 8%, transparent);
-  --success: var(--text-2);
-  --danger: #B3261E;
-  --warning: var(--text);
-  --shadow-card: none;
-  --shadow-float: none;
-  --scrim: rgb(16 18 20 / .32);
-  /* O cartão escuro (páginas, pedidos de sim/não) fica escuro nos dois temas, como uma tela. */
-  --card-ink: var(--tinta);
-  --card-ink-2: var(--grafite);
-  --card-ink-text: var(--papel);
-  --card-ink-muted: var(--cinza);
-}
-
-/* Foco: anel papel de 2px, com uma folga da cor do fundo. */
-:root {
+  --accent-soft: color-mix(in srgb, var(--text) 10%, transparent);
+  /* Verde só no ponto de "conectado" e de "servidor ok" (DESIGN.md §2). Passa de 3:1 nos três temas. */
+  --conectado: #2E9E5B;
+  /* Foco: anel da cor do texto, com uma folga da cor do fundo. */
   --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
 }
 

@@ -21,8 +21,6 @@ import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
 import { Intro, introAfterLogin, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
-import { MuninnEntrance } from "./muninn/MuninnEntrance";
-import { MindPanel } from "./components/MindPanel";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
 import { ProjectsView } from "./components/ProjectsView";
@@ -34,11 +32,23 @@ import { useWide } from "./hooks/useWide";
 import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls } from "./components/InboxView";
-import { Lockup } from "./brand/Lockup";
+import { Corvo } from "./brand/Corvo";
+import { Icon } from "./components/Icon";
+import { PageBar, pageTitle } from "./components/PageBar";
 import { Rail, type WorkspaceView } from "./components/Rail";
 import { SettingsView } from "./components/SettingsView";
-import { MicButton, MobileBar } from "./components/SkyNav";
-import { StudyPanel } from "./components/StudyPanel";
+import { StatusBar } from "./components/StatusBar";
+import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
+import { NotYetView } from "./components/NotYetView";
+import { RoutinesView } from "./components/RoutinesView";
+import { Entrance } from "./components/Entrance";
+import { PanelView } from "./components/PanelView";
+import { NotebookView } from "./components/NotebookView";
+import { ShareDialog, Toast } from "./components/ShareDialog";
+import type { ToolsMode } from "./components/ChatView";
+import { useRoutines } from "./hooks/useRoutines";
+import { saveTheme, THEMES } from "./brand/theme";
+import { MicButton, MobileBar, MobileTabs } from "./components/SkyNav";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Anel } from "./anel/Anel";
@@ -138,6 +148,23 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The command palette (Ctrl/⌘+K). */
+  const [palette, setPalette] = useState(false);
+  /** The share dialog of the conversation in front. */
+  const [share, setShare] = useState(false);
+  /** The short confirmation at the bottom (an export, a copied link). */
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [toast]);
+  /** How the tool steps show in the chat (Ajustes › Aparência). */
+  const [toolsMode, setToolsMode] = useState<ToolsMode>(() => (loadPreference("tools") === "tecnico" ? "tecnico" : "resumo"));
+  /** The "Agora / O que fiz de verdade" column beside the chat. */
+  /** "Novo projeto" in the page bar: Projetos opens its form each time this goes up. */
+  const [newProject, setNewProject] = useState(0);
+  const [benchOpen, setBenchOpen] = useState(() => loadPreference("bench") !== "0");
   // The opening animation, once a day (components/Intro.tsx).
   // `?intro` in the address plays it again on demand (to see it).
   const [intro, setIntro] = useState(() => introDue() || new URLSearchParams(window.location.search).has("intro"));
@@ -153,7 +180,7 @@ export function App() {
   const [, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<AnelEstado>("ocioso");
   // The login is checking the credentials: the ring on the entrance shows "pensando".
-  const [loginBusy, setLoginBusy] = useState(false);
+  const [, setLoginBusy] = useState(false);
   const demoLevel = useDemoLevel(demo && demoState === "ouvindo");
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
@@ -183,7 +210,6 @@ export function App() {
   // Project names for the bar on top of a project's chat.
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
   const [projectsKey, setProjectsKey] = useState(0);
-  const [lastProject, setLastProject] = useState<string | null>(null);
   conversationsRef.current = conversations;
 
   // The continuous conversation loads only its last page (and as many as are already shown);
@@ -221,6 +247,20 @@ export function App() {
   const firstRun = loggedIn && !demo && onboarding !== "done";
   const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
   const pending = usePending(api, ready, handleError, ready && view === "conversation");
+  const routines = useRoutines(api, ready, handleError);
+
+  // Ctrl/⌘+K opens the palette anywhere in the app.
+  useEffect(() => {
+    if (!ready) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ready]);
 
   useEffect(() => {
     void registerWorker();
@@ -789,7 +829,8 @@ export function App() {
       const chat = await api.projectChat(projectId);
       setConversations((list) => (list.some((c) => c.id === chat.id) ? list : [chat, ...list]));
       setCurrent(chat.id);
-      setLastProject(projectId);
+      // A project made a moment ago is not in the names yet: the bar would say "Chat".
+      if (!projectNames[projectId]) setProjectsKey((k) => k + 1);
       showView("conversation");
     } catch (e) {
       handleError(e);
@@ -866,7 +907,6 @@ export function App() {
       onBack={() => showView("projects")}
       onDeleted={() => {
         setConversations((list) => list.map((c) => (c.project_id === inProject ? { ...c, project_id: null } : c)));
-        setLastProject(null);
         setProjectsKey((k) => k + 1);
         openChat();
       }}
@@ -877,13 +917,41 @@ export function App() {
       onError={handleError}
     />
   ) : null;
-  /** The pill and the menu: "Chat" is the main conversation; "Projetos" on a computer goes back
-   * to the last project's chat (the list is beside it), on a phone to the list. */
+  /** The pill and the menu: "Chat" is the main conversation; "Projetos" is the grid of projects. */
   function go(next: WorkspaceView) {
     if (next === "conversation") return openChat();
-    if (next === "projects" && desk && lastProject) return void openProjectChat(lastProject);
     showView(next);
   }
+
+  const paletteItems: PaletteItem[] = [
+    { id: "go-inbox", group: "Ações", icon: "home", label: "Ir para o Início", run: () => go("inbox") },
+    { id: "new-chat", group: "Ações", icon: "plus", label: "Nova conversa", keywords: "chat", run: openChat },
+    ...(call.canCall ? [{ id: "call", group: "Ações" as const, icon: "phone" as const, label: "Ligar para ele", keywords: "voz", run: call.onCall }] : []),
+    { id: "mac", group: "Ações", icon: "laptop", label: "Pedir ao Mac…", keywords: "braço", run: () => go("mac") },
+    { id: "study", group: "Ações", icon: "notebook", label: "Caderno", keywords: "memória pensamentos interesses nome autorretrato", run: () => go("study") },
+    { id: "routines", group: "Ações", icon: "clock", label: "Rotinas", run: () => go("routines") },
+    { id: "panel", group: "Ações", icon: "coin", label: "Painel", keywords: "preço meta gráfico", run: () => go("panel") },
+    { id: "agents", group: "Ações", icon: "agents", label: "Ver agentes em paralelo", run: () => go("agents") },
+    { id: "channels", group: "Ações", icon: "plug", label: "Canais: Telegram, e-mail…", keywords: "whatsapp discord", run: () => go("channels") },
+    { id: "skills", group: "Ações", icon: "sparkle", label: "Habilidades", run: () => go("skills") },
+    ...(view === "conversation" && current ? [{ id: "share", group: "Ações" as const, icon: "share" as const, label: "Compartilhar esta conversa", keywords: "exportar markdown pdf", run: () => setShare(true) }] : []),
+    ...THEMES.map((t) => ({ id: `theme-${t.value}`, group: "Ações" as const, icon: "sliders" as const, label: `Tema ${t.label}`, keywords: "aparência cor", run: () => { saveTheme(t.value); } })),
+    {
+      id: "pause", group: "Ações", icon: "gear",
+      label: pending.paused ? "Retomar o que ele faz sozinho" : "Pausar tudo que ele faz sozinho",
+      keywords: "autonomia",
+      run: () => {
+        const next = !pending.paused;
+        pending.setPaused(next);
+        api.setAutonomyPaused(next).catch((e) => { pending.setPaused(!next); handleError(e); });
+      },
+    },
+    { id: "settings", group: "Ações", icon: "gear", label: "Ajustes", run: () => go("settings") },
+    ...conversations
+      .filter((c) => !c.continuous && c.title)
+      .map((c) => ({ id: `c-${c.id}`, group: "Conversas" as const, icon: "chat" as const, label: c.title ?? "", run: () => { setCurrent(c.id); showView("conversation"); } })),
+    ...Object.entries(projectNames).map(([id, name]) => ({ id: `p-${id}`, group: "Projetos" as const, icon: "folder" as const, label: name, run: () => void openProjectChat(id) })),
+  ];
 
   const reload = () => { if (current) loadMessages(current).then(setMessages).catch(handleError); };
   reloadRef.current = reload;
@@ -895,17 +963,17 @@ export function App() {
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {ready && !firstRun && (
         <MobileBar
+          title={pageTitle(inProject ? "projects" : view, currentConversation?.title)}
+          online={online}
           pendingCount={pending.count}
-          anel={anel}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
-          view={inProject ? "projects" : view}
-          onView={go}
+          onHome={() => go("inbox")}
         />
       )}
       {(firstRun || (loggedIn && !demo && !ready)) && (
         <header className="topbar">
-          <Lockup />
+          <span className="rail-brand"><Corvo size={30} /><span className="rail-wordmark" aria-hidden="true">VISAO</span><span className="visually-hidden">VISAO</span></span>
           {loggedIn && !demo && !ready && (
             <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
           )}
@@ -932,161 +1000,233 @@ export function App() {
       {!firstRun && ready && (
         <div className="layout">
           <Rail
-            api={api}
-            anel={anel}
             open={menuOpen}
             view={inProject ? "projects" : view}
             preparing={preparing}
             online={online}
             pendingCount={pending.count}
-            macOnline={macOnline}
+            conversations={conversations}
+            currentConversation={current}
             onView={go}
+            onNewChat={openChat}
+            onSearch={() => setPalette(true)}
+            onOpenConversation={(c) => {
+              setCurrent(c.id);
+              showView("conversation");
+            }}
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
-          {desk && inProject && (
-            <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
-          )}
-
-          <main className="main">
-            {notice && (
-              <p className="note first-run-notice" role="status">
-                {notice}{" "}
-                <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
-              </p>
-            )}
-            {view === "inbox" && (
-              <InboxView
-                api={api}
-                call={call}
-                onDraft={draftInChat}
-                onSend={(text) => {
-                  // To the conversation in front (as the suggestions do), shown at once.
-                  setView("conversation");
-                  void send(text);
-                }}
-                online={online}
-                macOnline={macOnline}
-                project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
-                onOpenProject={(id) => void openProjectChat(id)}
-                pending={pending}
-                current={current}
-                onReplied={(conversationId) => {
-                  setView("conversation");
-                  setCurrent(conversationId);
-                  loadMessages(conversationId).then(setMessages).catch(handleError);
-                  setComposerFocus((value) => value + 1);
-                }}
-              />
-            )}
-            {view === "projects" && (
-              <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
-            )}
-            {view === "study" && (
-              <section className="page page--caderno" aria-labelledby="study-title">
-                <header className="page-head">
-                  <span className="rotulo">Caderno</span>
-                  <h1 id="study-title">O que eu fiz <em>enquanto você não estava.</em></h1>
-                  <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
-                </header>
-                <MindPanel api={api} onError={handleError} />
-                <StudyPanel api={api} onError={handleError} />
-              </section>
-            )}
-            {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
-            {view === "settings" && (
-              <SettingsView
-                api={api}
-                onPausedChange={pending.setPaused}
-                memoryEnabled={memoryEnabled}
-                onToggleMemory={() => void toggleMemory()}
-                speakReplies={speakReplies}
-                canSpeak={voice.speakerKind !== null}
-                speakerKind={voice.speakerKind}
-                onToggleSpeak={toggleSpeak}
-                deviceListening={deviceListening}
-                deviceCouldListen={voice.deviceCouldListen}
-                serverListening={voice.listenerKind === "server"}
-                onToggleDeviceListening={toggleDeviceListening}
-                onRestartOnboarding={() => {
-                  api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
-                }}
-                onLogout={logout}
-                onError={handleError}
-                voiceApproval={voiceApproval}
-                onToggleVoiceApproval={() => {
-                  const next = !voiceApproval;
-                  setVoiceApproval(next);
-                  savePreference("voice-approval", next ? "1" : "0");
-                }}
-              />
-            )}
-            <ChatView
-              hidden={view !== "conversation"}
-              onOpenProject={(id) => void openProjectChat(id)}
-              projectName={(id) => projectNames[id]}
-              segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
-              olderLeft={olderLeft}
-              onLoadOlder={() => void loadOlder()}
-              placeholder="Fala comigo…"
-              composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
-              anel={anel}
-              macWorking={macWorking}
-              voiceLevel={voice.level}
-              steps={liveSteps}
-              header={
+          <div className="principal">
+            <PageBar
+              title={pageTitle(view, conversations.find((c) => c.id === current)?.title ?? (inProject ? projectNames[inProject] : null))}
+            >
+              {view === "conversation" && (
                 <>
-                  {projectBar}
-                  {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
+                  <button
+                    type="button"
+                    className="page-bar-button"
+                    aria-label="Ler respostas em voz alta"
+                    title={voice.speakerKind ? "Ler respostas em voz alta" : "Este navegador não consegue ler em voz alta"}
+                    aria-pressed={speakReplies}
+                    disabled={voice.speakerKind === null}
+                    onClick={toggleSpeak}
+                  >
+                    <Icon name="speaker" size={18} />
+                  </button>
+                  <button type="button" className="page-bar-button" aria-label="Compartilhar ou exportar" title="Compartilhar ou exportar" onClick={() => setShare(true)} disabled={!current}>
+                    <Icon name="share" size={18} />
+                  </button>
+                  {desk && (
+                    <button
+                      type="button"
+                      className="page-bar-button"
+                      aria-label="Mostrar o que ele está fazendo"
+                      title="Mostrar o que ele está fazendo"
+                      aria-pressed={benchOpen}
+                      onClick={() => setBenchOpen((o) => { savePreference("bench", o ? "0" : "1"); return !o; })}
+                    >
+                      <Icon name="panel" size={18} />
+                    </button>
+                  )}
                 </>
-              }
-              focusRequest={composerFocus}
-              agentName={agentName}
-              messages={messages}
-              asks={liveAsks}
-              sending={sending || preparing}
-              status={liveStep}
-              draftRequest={draftRequest}
-              liveText={liveText}
-              settlingId={settling}
-              onSettled={() => {
-                setSettling(null);
-                setLiveText(null);
-                if (!document.hidden) navigator.vibrate?.(4);
-              }}
-              onStop={stopTurn}
-              error={voice.inCall ? null : error}
-              onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}
-              onUpload={(file, name) => api.uploadAttachment(file, name)}
-              loadAttachment={loadAttachment}
-              pageUrl={(path) => api.pageUrl(path)}
-              onOpenPage={desk ? setSidePage : undefined}
-              onDeleteArtifact={(a) => void deleteArtifact(a)}
-              onFeedback={sendFeedback}
-            />
-            {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
-          </main>
+              )}
+              {view === "projects" && (
+                <button type="button" className="page-bar-text" onClick={() => setNewProject((n) => n + 1)}>Novo projeto</button>
+              )}
+              <button type="button" className="page-bar-button" aria-label="Comandos (Ctrl K)" title="Comandos (Ctrl K)" onClick={() => setPalette(true)}>
+                <Icon name="command" size={18} />
+              </button>
+            </PageBar>
+            <div className="principal-corpo">
+              {desk && inProject && (
+                <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
+              )}
 
-          {desk ? (
-            sidePage?.path ? (
-              <ArtifactViewer
-                docked
-                artifact={sidePage}
-                url={api.pageUrl(sidePage.path)}
-                onClose={() => setSidePage(null)}
-                onDelete={() => {
-                  if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
-                }}
-              />
-            ) : (
-              <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
-            )
-          ) : null}
+              <main className="main">
+                {notice && (
+                  <p className="note first-run-notice" role="status">
+                    {notice}{" "}
+                    <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
+                  </p>
+                )}
+                {view === "inbox" && (
+                  <InboxView
+                    api={api}
+                    call={call}
+                    onDraft={draftInChat}
+                    onSend={(text) => {
+                      // To the conversation in front (as the suggestions do), shown at once.
+                      setView("conversation");
+                      void send(text);
+                    }}
+                    online={online}
+                    macOnline={macOnline}
+                    project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
+                    onOpenProject={(id) => void openProjectChat(id)}
+                    onOpenPanel={() => go("panel")}
+                    working={sending || macWorking}
+                    pending={pending}
+                    current={current}
+                    onReplied={(conversationId) => {
+                      setView("conversation");
+                      setCurrent(conversationId);
+                      loadMessages(conversationId).then(setMessages).catch(handleError);
+                      setComposerFocus((value) => value + 1);
+                    }}
+                  />
+                )}
+                {view === "projects" && (
+                  <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} newRequest={newProject} />
+                )}
+                {view === "study" && (
+                  <NotebookView api={api} memoryEnabled={memoryEnabled} onToggleMemory={() => void toggleMemory()} onError={handleError} />
+                )}
+                {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
+            {view === "routines" && <RoutinesView routines={routines} />}
+            {view === "panel" && <PanelView api={api} onBack={() => go("inbox")} onDraft={draftInChat} onError={handleError} />}
+            {(view === "agents" || view === "channels" || view === "skills") && <NotYetView place={view} />}
+                {view === "settings" && (
+                  <SettingsView
+                    api={api}
+                    onPausedChange={pending.setPaused}
+                    memoryEnabled={memoryEnabled}
+                    onToggleMemory={() => void toggleMemory()}
+                    speakReplies={speakReplies}
+                    canSpeak={voice.speakerKind !== null}
+                    speakerKind={voice.speakerKind}
+                    onToggleSpeak={toggleSpeak}
+                    deviceListening={deviceListening}
+                    deviceCouldListen={voice.deviceCouldListen}
+                    serverListening={voice.listenerKind === "server"}
+                    onToggleDeviceListening={toggleDeviceListening}
+                    onRestartOnboarding={() => {
+                      api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
+                    }}
+                    onLogout={logout}
+                    onError={handleError}
+                    voiceApproval={voiceApproval}
+                    toolsMode={toolsMode}
+                onToolsMode={(mode) => { setToolsMode(mode); savePreference("tools", mode); }}
+                onToggleVoiceApproval={() => {
+                      const next = !voiceApproval;
+                      setVoiceApproval(next);
+                      savePreference("voice-approval", next ? "1" : "0");
+                    }}
+                  />
+                )}
+                <ChatView
+                  hidden={view !== "conversation"}
+                  onOpenProject={(id) => void openProjectChat(id)}
+                  projectName={(id) => projectNames[id]}
+                  segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
+                  olderLeft={olderLeft}
+                  onLoadOlder={() => void loadOlder()}
+                  placeholder="Fala comigo…"
+                  composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
+                  anel={anel}
+                  macWorking={macWorking}
+                  voiceLevel={voice.level}
+                  steps={liveSteps}
+              toolsMode={toolsMode}
+                  header={
+                    <>
+                      {projectBar}
+                      {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
+                    </>
+                  }
+                  focusRequest={composerFocus}
+                  agentName={agentName}
+                  messages={messages}
+                  asks={liveAsks}
+                  sending={sending || preparing}
+                  status={liveStep}
+                  draftRequest={draftRequest}
+                  liveText={liveText}
+                  settlingId={settling}
+                  onSettled={() => {
+                    setSettling(null);
+                    setLiveText(null);
+                    if (!document.hidden) navigator.vibrate?.(4);
+                  }}
+                  onStop={stopTurn}
+                  error={voice.inCall ? null : error}
+                  onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}
+                  onUpload={(file, name) => api.uploadAttachment(file, name)}
+                  loadAttachment={loadAttachment}
+                  pageUrl={(path) => api.pageUrl(path)}
+                  onOpenPage={desk ? setSidePage : undefined}
+                  onDeleteArtifact={(a) => void deleteArtifact(a)}
+                  onFeedback={sendFeedback}
+                />
+                {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
+              </main>
+
+              {desk && view === "conversation" ? (
+                sidePage?.path ? (
+                  <ArtifactViewer
+                    docked
+                    artifact={sidePage}
+                    url={api.pageUrl(sidePage.path)}
+                    onClose={() => setSidePage(null)}
+                    onDelete={() => {
+                      if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
+                    }}
+                  />
+                ) : benchOpen ? (
+                  <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
+                ) : null
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
+      {!firstRun && ready && <MobileTabs view={inProject ? "projects" : view} onView={go} />}
+      {!firstRun && ready && (
+        <StatusBar
+          api={api}
+          online={online}
+          running={pending.tasks.filter((t) => t.status === "running").length}
+          macOnline={macOnline}
+          routines={routines.active}
+          quiet={routines.quiet}
+          onError={handleError}
+        />
+      )}
+      {palette && ready && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
+      {share && ready && (
+        <ShareDialog
+          title={pageTitle("conversation", currentConversation?.title)}
+          messages={messages}
+          agentName={agentName}
+          onClose={() => setShare(false)}
+          onDone={setToast}
+        />
+      )}
+      <Toast message={toast} />
 
       {!firstRun && !ready && !loggedIn && !demo && (
-        <MuninnEntrance thinking={loginBusy}>
+        <Entrance>
           <Login
             api={api}
             online={online}
@@ -1097,7 +1237,7 @@ export function App() {
               if (introAfterLogin()) setIntro(true);
             }}
           />
-        </MuninnEntrance>
+        </Entrance>
       )}
       {!firstRun && !ready && (loggedIn || demo) && (
         <div className="layout">

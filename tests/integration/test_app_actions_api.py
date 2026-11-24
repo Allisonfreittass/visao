@@ -388,3 +388,29 @@ def test_a_project_made_by_the_button_opens_its_chat_with_a_hello(client, db):
     chat = client.get(f"/conversations/project/{project['id']}", headers=headers).json()
     said = client.get(f"/conversations/{chat['id']}/messages", headers=headers).json()
     assert said[0]["content"].startswith("Aqui fica tudo de «Casa nova». Pode me pedir")
+
+
+def test_from_the_chat_a_project_is_never_made_twice_nor_renamed_onto_another(client, db):
+    llm = world(
+        client,
+        db,
+        actions_answer=[
+            [{"do": "create_project", "name": "viagem para o chile"}],
+            [{"do": "rename_project", "project": "Estudos", "name": "Viagem para o Chile"}],
+        ],
+    )
+    headers = _login(client, db)
+    client.post("/projects", headers=headers, json={"name": CHILE})
+    client.post("/projects", headers=headers, json={"name": "Estudos"})
+    conversation = _continuous(client, headers)
+
+    _send(client, headers, conversation, "cria o projeto viagem para o chile")
+    assert [p.name for p in db.query(Project).order_by(Project.created_at)] == [CHILE, "Estudos"]
+    assert "o projeto «viagem para o chile» já existia" in _chat_prompt(llm)[0].content
+
+    _send(client, headers, conversation, "renomeia o projeto Estudos para Viagem para o Chile")
+    db.expire_all()
+    assert sorted(p.name for p in db.query(Project)) == ["Estudos", CHILE]
+    assert "não renomeei «Estudos»: já existe o projeto «Viagem para o Chile»" in (
+        _chat_prompt(llm)[0].content
+    )

@@ -135,10 +135,13 @@ def create_project(body: ProjectIn, db: DbSession, user: CurrentUser) -> Project
     name = projects.clean_name(body.name)
     if not name:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dê um nome ao projeto")
-    count = db.scalar(
-        select(func.count()).select_from(Project).where(Project.owner_user_id == user.id)
-    )
-    if (count or 0) >= MAX_PROJECTS:
+    owned = projects.owned(db, user.id)
+    existing = projects.same_name(owned, name)
+    if existing is not None:
+        # Two projects with one name would split one subject in two (and the chat could not
+        # tell them apart): open the one there is.
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Já existe o projeto «{existing.name}»")
+    if len(owned) >= MAX_PROJECTS:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Projetos demais; apague algum")
     project = Project(owner_user_id=user.id, name=name)
     db.add(project)
@@ -196,6 +199,9 @@ def rename_project(
         name = projects.clean_name(body.name)
         if not name:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Dê um nome ao projeto")
+        clash = projects.same_name(projects.owned(db, user.id), name, other_than=project.id)
+        if clash is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Já existe o projeto «{clash.name}»")
         project.name = name
     if body.notes is not None:
         project.notes = body.notes.strip()

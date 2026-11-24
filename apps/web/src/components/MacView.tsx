@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type Api, type ArmDevice, type ArmTask, utcDate } from "../api";
 import { taskDetail, undoQuestion } from "../arm";
@@ -16,7 +16,19 @@ export function MacView({ api, pending, onError }: MacViewProps) {
   const [pairing, setPairing] = useState<ArmDevice | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
-  const { devices, tasks } = pending;
+  const { devices } = pending;
+  const [fresh, setFresh] = useState<ArmTask[] | null>(null);
+  const tasks = fresh ?? pending.tasks;
+  const [selected, setSelected] = useState<string | null>(null);
+  const running = tasks.some((t) => t.status === "running" || t.status === "approved");
+  // While something runs, read the tasks every 3 s: the log on the right follows.
+  useEffect(() => {
+    if (!running) return;
+    let alive = true;
+    const timer = setInterval(() => { api.armTasks().then((list) => alive && setFresh(list), () => undefined); }, 3000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [api, running]);
+  useEffect(() => setFresh(null), [pending.tasks]);
 
   async function pair() {
     setBusy(true);
@@ -58,13 +70,38 @@ export function MacView({ api, pending, onError }: MacViewProps) {
   }
 
   const history = tasks.filter((t) => t.status !== "proposed").slice(0, 12);
+  const current = history.find((t) => t.id === selected) ?? history.find((t) => t.status === "running") ?? history[0] ?? null;
+  const online = devices.find((d) => d.online);
   return (
     <section className="page" aria-labelledby="mac-title">
       <header className="page-head">
-        <span className="rotulo">Mac</span>
-        <h1 id="mac-title">{devices.length ? <>Trabalho no seu <em>Mac.</em></> : <>Conecte o seu <em>Mac.</em></>}</h1>
-        <p className="lede">Eu peço ao Claude Code nos projetos que você liberou. Escreva <code>/mac projeto o que fazer</code> na conversa.</p>
+        <h1 id="mac-title">Mac</h1>
+        <p className="lede">
+          {online ? `${online.name} · conectado. ` : devices.length ? "Mac desligado. " : ""}
+          Ele só trabalha nos projetos que você liberou, e cada tarefa espera o seu sim. Escreva <code>/mac projeto o que fazer</code> na conversa.
+        </p>
       </header>
+      {history.length > 0 && (
+        <div className="mac-split">
+          <div className="mac-tasks" role="listbox" aria-label="Tarefas no Mac">
+            <p className="mac-col-title">Tarefas</p>
+            {history.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="option"
+                aria-selected={current?.id === t.id}
+                className="mac-task"
+                onClick={() => setSelected(t.id)}
+              >
+                <span className="mac-task-what">{t.prompt}</span>
+                <span className="mac-task-meta"><span>{TASK_STATUS[t.status] ?? t.status}{t.changed_files?.length ? ` · ${t.changed_files.length} ${t.changed_files.length === 1 ? "arquivo" : "arquivos"}` : ""}</span><span>{dayLabel(utcDate(t.finished_at ?? t.created_at))}</span></span>
+              </button>
+            ))}
+          </div>
+          {current && <TaskLog task={current} onCancel={() => void pending.decideArm(current, "reject")} onStop={() => void stopDesktop()} onUndo={() => void undo(current)} />}
+        </div>
+      )}
       <div className="page-body">
         <section className="list-group">
           <h2 className="rotulo">Aparelhos</h2>
@@ -98,33 +135,37 @@ export function MacView({ api, pending, onError }: MacViewProps) {
             </div>
           )}
         </section>
-        <section className="list-group">
-          <h2 className="rotulo">O que eu fiz lá</h2>
-          {history.length === 0 && <p className="note">Nada ainda.</p>}
-          <ul className="task-list">
-            {history.map((t) => {
-              const detail = taskDetail(t);
-              return (
-                <li key={t.id} className={`task task--${t.status}`}>
-                  <span className="task-status">{TASK_STATUS[t.status] ?? t.status}</span>
-                  <span className="task-what"><b>{t.project}</b> {t.prompt}</span>
-                  <time className="panel-time">{dayLabel(utcDate(t.finished_at ?? t.created_at))}</time>
-                  {detail && <span className="task-detail">{detail}</span>}
-                  {t.status === "approved" && t.kind !== "desktop" && (
-                    <button type="button" className="link-button" onClick={() => void pending.decideArm(t, "reject")}>cancelar</button>
-                  )}
-                  {t.kind === "desktop" && (t.status === "approved" || t.status === "running") && (
-                    <button type="button" className="link-button" onClick={() => void stopDesktop()}>parar</button>
-                  )}
-                  {t.can_undo && (
-                    <button type="button" className="link-button" onClick={() => void undo(t)}>desfazer</button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
       </div>
+    </section>
+  );
+}
+
+/** The selected task as a terminal: what was asked, what came back, the files and tests the arm
+ * measured, the cost. The server sends the result when the task ends, not each line as it runs. */
+function TaskLog({ task, onCancel, onStop, onUndo }: { task: ArmTask; onCancel: () => void; onStop: () => void; onUndo: () => void }) {
+  const detail = taskDetail(task);
+  const live = task.status === "running" || task.status === "approved";
+  return (
+    <section className="mac-log" aria-label={`Registro: ${task.prompt}`} aria-live={live ? "polite" : "off"}>
+      <div className="mac-log-head"><span>{task.prompt}</span><span className="mac-log-project">{task.project}</span></div>
+      <pre className="mac-log-body">
+        <span className="mac-log-dim">{task.project} $</span> {task.prompt}{"\n"}
+        {live && <><span className="mac-log-dim">›</span> {task.status === "approved" ? "na fila do Mac" : "rodando"}…<span className="mac-log-cursor" aria-hidden="true">▍</span>{"\n"}</>}
+        {task.result && <>{task.result}{"\n"}</>}
+        {task.error && <><span className="mac-log-fail">ERRO</span> {task.error}{"\n"}</>}
+        {task.changed_files?.map((f) => <span key={f.path}><span className="mac-log-dim">{f.status}</span> {f.path}{"\n"}</span>)}
+        {detail && <span className="mac-log-dim">{detail}</span>}
+      </pre>
+      <div className="mac-log-foot">
+        {task.status === "approved" && task.kind !== "desktop" && <button type="button" className="btn-secondary btn-small" onClick={onCancel}>Cancelar</button>}
+        {task.kind === "desktop" && (task.status === "approved" || task.status === "running") && (
+          <button type="button" className="btn-secondary btn-small" onClick={onStop}>Parar</button>
+        )}
+        {task.can_undo && <button type="button" className="btn-secondary btn-small" onClick={onUndo}>Desfazer</button>}
+        <span>{task.requested_by === "agent" ? "pedido por ele · aprovado por você" : "pedido por você"}</span>
+        {task.cost_usd && <span className="mac-log-cost">custo: US$ {Number(task.cost_usd).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+      </div>
+      {live && <p className="note">O passo a passo ao vivo ainda não vem do servidor: o resultado aparece quando a tarefa termina.</p>}
     </section>
   );
 }

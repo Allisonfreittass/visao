@@ -101,3 +101,31 @@ def test_projects_are_private_and_deleting_one_keeps_its_conversations(client, d
     assert client.delete(f"/projects/{project['id']}", headers=owner).status_code == 204
     listed = {c["id"]: c for c in client.get("/conversations", headers=owner).json()}
     assert listed[conversation]["project_id"] is None
+
+
+def test_one_name_is_one_project(client, db):
+    """Creating or renaming onto a name the owner already uses would split one subject in two."""
+    world(client, db)
+    owner = _login(client, db)
+    other = _login(client, db, "b@exemplo.com")
+    lisboa = client.post("/projects", headers=owner, json={"name": "Viagem a Lisboa"}).json()
+
+    for again in ("Viagem a Lisboa", "viagem à  LISBOA "):
+        response = client.post("/projects", headers=owner, json={"name": again})
+        assert response.status_code == 409
+        assert "Viagem a Lisboa" in response.json()["detail"]
+    assert len(client.get("/projects", headers=owner).json()) == 1
+    # Another owner may use the same name.
+    theirs = client.post("/projects", headers=other, json={"name": "Viagem a Lisboa"})
+    assert theirs.status_code == 201
+
+    go = client.post("/projects", headers=owner, json={"name": "Estudos de Go"}).json()
+    clash = client.patch(f"/projects/{go['id']}", headers=owner, json={"name": "VIAGEM A LISBOA"})
+    assert clash.status_code == 409
+    assert client.get(f"/projects/{go['id']}", headers=owner).json()["name"] == "Estudos de Go"
+    # Changing only the case of its own name is not a clash.
+    recased = client.patch(
+        f"/projects/{lisboa['id']}", headers=owner, json={"name": "viagem a lisboa"}
+    )
+    assert recased.status_code == 200
+    assert recased.json()["name"] == "viagem a lisboa"

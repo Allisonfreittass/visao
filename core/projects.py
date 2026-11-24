@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from core.memory.text import tokens
+from core.memory.text import fold, tokens
 from infrastructure.database.models import (
     Artifact,
     Attachment,
@@ -31,6 +31,23 @@ MAX_NAMES = 20
 
 def clean_name(name: str) -> str:
     return " ".join(name.split())[:NAME_CHARS]
+
+
+def same_name(
+    owned: list[Project], name: str, *, other_than: uuid.UUID | None = None
+) -> Project | None:
+    """The owner's project already called this, ignoring case, accents and extra spaces. When
+    renaming, `other_than` is the project itself, so a change of case is not a clash."""
+    wanted = fold(clean_name(name))
+    return next((p for p in owned if p.id != other_than and fold(p.name) == wanted), None)
+
+
+def owned(session: Session, owner_id: uuid.UUID) -> list[Project]:
+    return list(
+        session.scalars(
+            select(Project).where(Project.owner_user_id == owner_id).order_by(Project.created_at)
+        )
+    )
 
 
 def titles(session: Session, conversation_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:

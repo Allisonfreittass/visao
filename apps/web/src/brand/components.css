@@ -41,3 +41,4 @@
 .rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .rs-campo[data-estado="erro"] input { border-color: var(--danger); }
 .rs-campo[data-estado="erro"] small { color: var(--danger); }
+.corvo { display: block; flex: none; }

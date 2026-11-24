@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PanelItem } from "../api";
 import { stepSensor } from "./ChatView";
-import { homeSuggestions, statusLine, watchCount } from "./InboxView";
+import { ago, homeSuggestions, statusLine, thoughtWhen, watchCount } from "./InboxView";
 import { panelKnown } from "./PanelsBoard";
 
 const item = (kind: "flight" | "hotel", cost: string | null) => ({ kind, cost }) as PanelItem;
@@ -17,9 +17,9 @@ describe("Início", () => {
 
   it("builds the status line from real data", () => {
     expect(statusLine({ online: false, macOnline: true, pendingCount: 0, panels: [] })).toBe("Sem conexão com o servidor.");
-    expect(statusLine({ online: true, macOnline: true, pendingCount: 0, panels: [{ items: [item("flight", null), item("hotel", "164")] }] }))
-      .toBe("Mac conectado · 1 voo aguardando preço");
-    expect(statusLine({ online: true, macOnline: false, pendingCount: 2, panels: null })).toBe("Sem conexão com o Mac · 2 pedidos esperando você");
+    expect(statusLine({ online: true, macOnline: true, pendingCount: 0, panels: [{ status: "active", items: [item("flight", null), item("hotel", "164")] }] }))
+      .toBe("Acompanhando 1\u00a0painel · Mac conectado · 1 voo aguardando preço");
+    expect(statusLine({ online: true, macOnline: false, pendingCount: 2, panels: null })).toBe("2 pedidos esperando você · Sem conexão com o Mac");
     expect(statusLine({ online: true, macOnline: null, pendingCount: 0, panels: null })).toBe("");
   });
 
@@ -43,5 +43,15 @@ describe("Início", () => {
     expect(stepSensor("Procurando no seu Gmail")).toBe("email");
     expect(stepSensor("Olhando sua agenda")).toBe("caderno");
     expect(stepSensor("Pesquisando “voos”")).toBe("projeto");
+  });
+
+  it("dates his thought and the requests", () => {
+    const now = new Date(2026, 10, 24, 10, 0);
+    expect(thoughtWhen(new Date(2026, 10, 24, 8, 45), now)).toBe("Pensado hoje, 08:45");
+    expect(thoughtWhen(new Date(2026, 10, 23, 22, 10), now)).toBe("Pensado ontem, 22:10");
+    expect(thoughtWhen(new Date(2026, 10, 12, 9, 0), now)).toBe("Pensado em 12/11, 09:00");
+    expect(ago(new Date(2026, 10, 24, 9, 35), now)).toBe("há 25 min");
+    expect(ago(new Date(2026, 10, 24, 7, 0), now)).toBe("há 3 h");
+    expect(ago(new Date(2026, 10, 22, 10, 0), now)).toBe("há 2 dias");
   });
 });

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Message, ProgressStep } from "../api";
 import { type CallCamera, cameraSupported } from "../call/camera";
 import { Icon } from "./Icon";
+import { Corvo } from "../brand/Corvo";
 import { type AssistantState, STATE_LABELS, anelEstado } from "../anel/state";
 import { MuninnDaLigacao } from "../muninn/MuninnDaLigacao";
 import { speakableText } from "../speech/speakable";
@@ -23,7 +24,8 @@ interface CallViewProps {
   voiceApproval?: boolean;
   /** The camera: while on, what it shows goes with each sentence you say. */
   camera?: CallCamera;
-  /** What the turn is doing now (null between turns): Muninn takes the shape of its tool. */
+  /** What the turn is doing now (null between turns): the caption says it, and Muninn's
+   * particles take the shape of its tool (DESIGN.md §6, "Nanorrobôs"). */
   step?: ProgressStep | null;
 }
 
@@ -65,28 +67,28 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
-  // Muninn inside the ring (above 120 px, DESIGN.md §5), with the listening wave round him; his
-  // particles take the shape of the tool the turn uses (§6, "Nanorrobôs").
-  const size = Math.min(220, Math.max(140, Math.round(window.innerWidth * 0.5)));
+  // Between turns, the crow before the sun, big (DESIGN.md §5). During a step, Muninn's particles
+  // take the shape of the tool and come back to the crow (§6, "Nanorrobôs").
+  const size = Math.min(380, Math.max(180, Math.round(Math.min(window.innerWidth * 0.6, window.innerHeight * 0.42))));
+  const caption = step?.label ?? STATE_LABELS[state];
 
   return (
     <div className="call" role="dialog" aria-modal="true" aria-label="Ligação">
       <header className="call-top">
-        <span className="rs-status"><span className="rs-ponto" aria-hidden="true" />Em ligação · {clock(now - started)}</span>
-        <span className="call-engine">{engine === "device" ? "Voz do aparelho" : "Voz própria"}</span>
+        <span className="call-live"><span className="call-live-dot" aria-hidden="true" />Em ligação · {clock(now - started)}</span>
+        <span className="call-engine">{engine === "device" ? "voz do aparelho" : "voz própria"}</span>
       </header>
       <div className="call-center">
-        <MuninnDaLigacao estado={anelEstado({ state })} size={size} level={level} passo={step} />
-        <h1 className="call-name">{agentName ?? "V.I.S.A.O."}</h1>
-        <p className="call-state" aria-live="polite">{STATE_LABELS[state]}</p>
         {step ? (
-          <p className="call-hint call-step" aria-live="polite">{step.detail ? `${step.label} · ${step.detail}` : step.label}</p>
+          <MuninnDaLigacao estado={anelEstado({ state })} size={size} level={level} passo={step} />
         ) : (
-          <p className="call-hint">{HINTS[state] ?? "Estou aqui."}</p>
+          <Corvo size={size} label={`O corvo diante do sol: ${caption.toLowerCase()}`} className="call-corvo" />
         )}
+        <h1 className="visually-hidden">Ligação com {agentName ?? "VISAO"}</h1>
+        <p className="call-state" aria-live="polite">{caption}…</p>
+        <p className="call-hint">{step?.detail ?? (lastUser ? `Você: “${lastUser.content.slice(0, 140)}”` : HINTS[state] ?? "Estou aqui.")}</p>
       </div>
       <div className="call-transcript" aria-live="polite">
-        {lastUser && <p><span>Você</span>{lastUser.content}</p>}
         {lastReply && <p><span>{agentName ?? "Ele"}</span>{speakableText(lastReply.content).slice(0, 280)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {camera?.error && <p className="error" role="alert">{camera.error}</p>}

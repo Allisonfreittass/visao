@@ -64,29 +64,6 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 .identity em { font-style: normal; }
 .layout { display: flex; flex: 1; min-height: 0; }
 
-/* Rail: sections, conversations, connection. */
-.rail { display: none; width: 232px; flex: 0 0 232px; flex-direction: column; gap: var(--espaco-5); padding: var(--espaco-5) var(--espaco-4) var(--espaco-4); border-right: 1px solid var(--border); overflow-y: auto; }
-.rail > * { flex-shrink: 0; }
-.rail-brand { margin: 0 0 0 10px; }
-.rail-nav { display: grid; gap: 2px; }
-.rail-nav button, .conversation-list button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 9px 10px; border: 0; border-radius: var(--raio-1); background: transparent; color: var(--text-muted); font: 500 14px/1.2 var(--font-sans); }
-.rail-nav button:hover, .conversation-list button:hover { background: var(--surface-2); color: var(--text); }
-.rail-nav button[aria-current], .conversation-list button[aria-current] { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 var(--accent-text); }
-.rail-nav .icon { flex-shrink: 0; color: var(--text-muted); }
-.rail-nav button[aria-current] .icon { color: var(--accent-text); }
-.rail-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: var(--raio-pilula); font: 400 11px/1 var(--font-mono); color: var(--text); }
-.menu-button .rail-badge { margin-left: 8px; }
-.rail-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
-.rail-dot.on { background: var(--success); }
-.rail-history { display: grid; gap: var(--espaco-2); padding-top: var(--espaco-4); border-top: 1px solid var(--border); }
-.rail-history-head { display: flex; align-items: center; justify-content: space-between; padding-left: 10px; }
-.rail-new { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--raio-pilula); background: transparent; color: var(--text-muted); }
-.rail-new:hover { color: var(--text); border-color: var(--text-muted); }
-.rail-preparing { padding-left: 10px; font-size: 13px; }
-.conversation-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.conversation-list button { padding: 7px 10px; font: 400 13px/1.2 var(--font-sans); }
-.conversation-list .note { padding: 0 10px; font-size: 13px; }
-.rail-bottom { margin-top: auto; padding: var(--espaco-3) 0 0 10px; }
 .connection { font: 400 12px/1.5 var(--font-mono); }
 .connection.on { color: var(--success); }
 .connection.off { color: var(--danger); }
