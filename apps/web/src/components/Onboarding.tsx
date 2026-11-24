@@ -3,18 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ApiError,
   type Api,
+  type ArmDevice,
+  type BrainMode,
+  type BrainState,
   type OnboardingAnswers,
   type OnboardingResult,
   type OnboardingStatus,
+  type QuietHours,
 } from "../api";
-
-const POINTS = [
-  ["Lembra de você", "Se você ligar a memória, guarda entre conversas o que for útil sobre você."],
-  ["Pensa e estuda entre conversas", "Um processo roda em segundo plano, chama o modelo e parte do que vocês conversaram. Estudar sozinho só com a sua permissão."],
-  ["Puxa conversa", "Pode mandar mensagem sem você pedir. Fica quieto no horário silencioso e para se você não responder."],
-  ["Aprende com correções", "Quando você corrige o jeito dele, isso vira uma regra curta para as próximas conversas."],
-  ["Você vê e desfaz", "Em Estudos ficam as anotações, os pensamentos e os estudos. Anotações e autodescrição dá para desfazer; anotações, também apagar."],
-];
+import { Corvo } from "../brand/Corvo";
 
 const QUESTIONS: Array<{ key: keyof OnboardingAnswers; label: string; hint: string }> = [
   { key: "who", label: "Quem é você?", hint: "Nome, como prefere ser chamado, o que quiser contar." },
@@ -23,21 +20,11 @@ const QUESTIONS: Array<{ key: keyof OnboardingAnswers; label: string; hint: stri
   { key: "tone", label: "Como prefere que ele fale com você?", hint: "Direto, curto, com exemplos, sem formalidade." },
 ];
 
-type Permission = "memory" | "study" | "research";
-type Permissions = Record<Permission, boolean>;
-
-const TOGGLES: Array<{ key: Permission; label: string; detail: string }> = [
-  { key: "memory", label: "Memória entre conversas", detail: "Guarda informações selecionadas e as suas respostas daqui. Desligada, nada disso fica." },
-  { key: "study", label: "Estudo autônomo", detail: "Estuda temas ligados a você entre as conversas, dentro do orçamento. Cada rodada fica em Estudos." },
-  { key: "research", label: "Pesquisa autônoma", detail: "Dúvidas de fatos públicos que ficaram sem resposta são pesquisadas de novo, sem pedir aprovação a cada vez." },
-];
-
 const NO_ANSWERS: OnboardingAnswers = { who: "", work: "", goal: "", tone: "" };
+const STEPS = 4;
 
 function closingNotice(result: OnboardingResult): string | null {
-  if (result.saved.length > 0) {
-    return "Suas respostas foram para as anotações dele. Em Estudos você vê, desfaz ou apaga.";
-  }
+  if (result.saved.length > 0) return "Suas respostas foram para as anotações dele. No Caderno você vê, desfaz ou apaga.";
   if (result.discarded) return "Nada do que você escreveu foi guardado: a memória estava desligada.";
   return null;
 }
@@ -54,17 +41,31 @@ interface Props {
   onDone: (notice: string | null) => void;
 }
 
-/** The first run: how he works, a few questions and the permissions. Shown once, always skippable. */
+/** One choice of a step: a card with a title and a line under it. */
+function Choice({ checked, title, note, disabled, onPick }: { checked: boolean; title: string; note: string; disabled?: boolean; onPick: () => void }) {
+  return (
+    <button type="button" role="radio" aria-checked={checked} className="choice-card" disabled={disabled} onClick={onPick}>
+      <span className="choice-card-title">{title}</span>
+      <span className="choice-card-note">{note}</span>
+    </button>
+  );
+}
+
+/** The first run, in four steps (who answers, memory, the Mac, when he may talk). Each choice
+ * applies at once; every step can be skipped, and so can the whole thing. */
 export function Onboarding({ api, status, onMemoryChange, onError, onDone }: Props) {
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<OnboardingAnswers>(NO_ANSWERS);
-  const [permissions, setPermissions] = useState<Permissions | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-  const [saving, setSaving] = useState<Permission | "finish" | null>(null);
+  const [brain, setBrain] = useState<BrainState | null>(null);
+  const [memory, setMemory] = useState<boolean | null>(null);
+  const [study, setStudy] = useState<boolean | null>(null);
+  const [research, setResearch] = useState<boolean | null>(null);
+  const [quiet, setQuiet] = useState<QuietHours | null>(null);
+  const [pairing, setPairing] = useState<ArmDevice | null>(null);
+  const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const wrote = Object.values(answers).some((value) => value.trim());
-  const busy = saving !== null;
 
   useEffect(() => heading.current?.focus(), [step]);
 
@@ -73,50 +74,28 @@ export function Onboarding({ api, status, onMemoryChange, onError, onDone }: Pro
     else setFailure(`${prefix}${message(e)}`);
   }, [onError]);
 
-  const loadPermissions = useCallback(async () => {
-    setLoadFailed(false);
-    try {
-      const [memory, study, autonomy] = await Promise.all([
-        api.memorySettings(), api.study(), api.permissions(),
-      ]);
-      setPermissions({ memory: memory.enabled, study: study.enabled, research: autonomy.auto_research });
-    } catch (e) {
-      setLoadFailed(true);
-      fail(e, "Não deu para ler as permissões: ");
-    }
-  }, [api, fail]);
-
   useEffect(() => {
-    if (step === 3 && !permissions) void loadPermissions();
-  }, [step, permissions, loadPermissions]);
+    api.brain().then(setBrain, () => undefined);
+    api.memorySettings().then((m) => setMemory(m.enabled), () => undefined);
+    api.study().then((s) => setStudy(s.enabled), () => undefined);
+    api.permissions().then((p) => setResearch(p.auto_research), () => undefined);
+    api.quietHours().then(setQuiet, () => undefined);
+  }, [api]);
 
-  function go(next: number) {
-    setFailure(null);
-    setStep(next);
-  }
-
-  async function toggle(key: Permission) {
-    if (!permissions) return;
-    const next = !permissions[key];
-    setSaving(key);
+  async function apply<T>(action: () => Promise<T>, then: (value: T) => void) {
     setFailure(null);
     try {
-      const applied = key === "memory"
-        ? (await api.setMemoryEnabled(next)).enabled
-        : key === "study"
-          ? (await api.setStudyEnabled(next)).enabled
-          : (await api.setAutoResearch(next)).auto_research;
-      setPermissions({ ...permissions, [key]: applied });
-      if (key === "memory") onMemoryChange(applied);
+      then(await action());
     } catch (e) {
       fail(e, "Não deu para mudar, continua como estava: ");
-    } finally {
-      setSaving(null);
     }
   }
 
+  const chooseBrain = (mode: BrainMode) => apply(() => api.setBrain(mode), setBrain);
+  const chooseMemory = (on: boolean) => apply(() => api.setMemoryEnabled(on), (r) => { setMemory(r.enabled); onMemoryChange(r.enabled); });
+
   async function finish() {
-    setSaving("finish");
+    setSaving(true);
     setFailure(null);
     try {
       onDone(closingNotice(await api.finishOnboarding(answers)));
@@ -125,108 +104,129 @@ export function Onboarding({ api, status, onMemoryChange, onError, onDone }: Pro
       if (e instanceof ApiError && e.status === 422) setStep(2);
       fail(e, "");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   }
 
   async function skipAll() {
-    setSaving("finish");
+    setSaving(true);
     setFailure(null);
     try {
       onDone(closingNotice(await api.skipOnboarding()));
     } catch (e) {
       fail(e, "Não deu para pular: ");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   }
 
-  function skipStep() {
-    if (step === 3) void finish();
-    else {
-      if (step === 2) setAnswers(NO_ANSWERS);
-      go(step + 1);
-    }
+  function go(next: number) {
+    setFailure(null);
+    setStep(next);
   }
 
   return (
-    <section className="onboarding" aria-labelledby="onboarding-title">
-      <div className="onboarding-top">
-        <span className="rotulo">Passo {step} de 3</span>
-        <button type="button" className="ghost" onClick={() => void skipAll()} disabled={busy}>
-          {wrote ? "Descartar e pular tudo" : "Pular tudo"}
-        </button>
+    <section className="onboarding-novo" aria-labelledby="onboarding-title">
+      <div className="onboarding-marca">
+        <Corvo size={260} className="onboarding-corvo" />
+        <ol className="onboarding-progress" aria-label={`Passo ${step} de ${STEPS}`}>
+          {Array.from({ length: STEPS }, (_, i) => <li key={i} data-done={i < step || undefined} />)}
+        </ol>
       </div>
+      <div className="onboarding-corpo">
+        <div className="onboarding-top">
+          <span className="onboarding-step">Passo {step} de {STEPS}</span>
+          <button type="button" className="link-button" onClick={() => void skipAll()} disabled={saving}>
+            {wrote ? "Descartar e pular tudo" : "Pular tudo"}
+          </button>
+        </div>
+        {failure && <p className="error" role="alert">{failure}</p>}
 
-      {failure && <p className="error" role="alert">{failure}</p>}
-
-      {step === 1 && <>
-        <h1 id="onboarding-title" ref={heading} tabIndex={-1}>Como ele funciona</h1>
-        <p className="onboarding-lead">Isto é software: um modelo de linguagem com memória, estudo e iniciativa em volta. Em resumo:</p>
-        <ul className="onboarding-points">
-          {POINTS.map(([title, text]) => <li key={title}><strong>{title}</strong><span>{text}</span></li>)}
-        </ul>
-        {!status.mind_enabled && <p className="note onboarding-status">Nesta instalação a mente está desligada: pensar entre conversas, puxar conversa e usar as anotações nas respostas só funcionam quando ela for ligada.</p>}
-      </>}
-
-      {step === 2 && <>
-        <h1 id="onboarding-title" ref={heading} tabIndex={-1}>Algumas perguntas</h1>
-        <p className="onboarding-lead">Todas opcionais. Só ficam guardadas se a memória estiver ligada no próximo passo. Não escreva senhas nem documentos.</p>
-        {QUESTIONS.map((question) => (
-          <label className="onboarding-field" key={question.key}>
-            <span>{question.label}</span>
-            <textarea
-              rows={2}
-              value={answers[question.key]}
-              placeholder={question.hint}
-              onChange={(event) => setAnswers({ ...answers, [question.key]: event.target.value })}
+        {step === 1 && <>
+          <h1 id="onboarding-title" ref={heading} tabIndex={-1}>Quem responde?</h1>
+          <p className="onboarding-lead">Escolha quem pensa as respostas. Dá para trocar depois, no rodapé da janela ou pedindo no chat.</p>
+          <div className="onboarding-choices" role="radiogroup" aria-labelledby="onboarding-title">
+            <Choice checked={brain?.mode === "nuvem"} title="Nuvem" note="Melhor qualidade · paga por uso" onPick={() => void chooseBrain("nuvem")} />
+            <Choice
+              checked={brain?.mode === "local"}
+              title={brain?.local_model ? `${brain.local_model} · no seu Mac` : "No seu Mac"}
+              note={brain?.mac_online ? "Grátis e privado · mais lento" : "Precisa do Mac conectado (passo 3)"}
+              disabled={!brain?.mac_online}
+              onPick={() => void chooseBrain("local")}
             />
-          </label>
-        ))}
-        <p className="note">Espaço livre nas anotações: {status.room.profile} caracteres para quem você é, {status.room.rules} para o jeito de falar. Se já houver algo anotado, as respostas entram depois, sem apagar nada.</p>
-      </>}
+            <Choice checked={brain?.mode === "auto"} title="Automático" note="Nuvem, e o Mac se ela falhar" onPick={() => void chooseBrain("auto")} />
+          </div>
+          {!status.mind_enabled && <p className="note">Nesta instalação a mente está desligada: pensar entre conversas e puxar conversa só funcionam quando ela for ligada.</p>}
+        </>}
 
-      {step === 3 && <>
-        <h1 id="onboarding-title" ref={heading} tabIndex={-1}>O que ele pode fazer</h1>
-        <p className="onboarding-lead">Cada chave vale assim que você muda e aparece como está agora. Depois você muda tudo em Preferências e em Estudos.</p>
-        {permissions === null && !loadFailed && <p className="note" role="status">Lendo as permissões…</p>}
-        {permissions && TOGGLES.map((item) => (
-          <label className="onboarding-toggle" key={item.key}>
-            <span>
-              <input
-                type="checkbox"
-                checked={permissions[item.key]}
-                disabled={busy}
-                onChange={() => void toggle(item.key)}
-              />
-              {item.label}
-            </span>
-            <span className="note">{item.detail}</span>
-          </label>
-        ))}
-        {loadFailed && <button type="button" className="ghost" onClick={() => void loadPermissions()}>Tentar ler de novo</button>}
-        {permissions && wrote && (
-          <p className="note onboarding-status" role="status">
-            {permissions.memory
-              ? "Memória ligada: suas respostas vão para as anotações dele, e você pode desfazer ou apagar em Estudos."
-              : "Memória desligada: nada do que você escreveu será guardado."}
-          </p>
-        )}
-      </>}
+        {step === 2 && <>
+          <h1 id="onboarding-title" ref={heading} tabIndex={-1}>O que ele pode lembrar?</h1>
+          <p className="onboarding-lead">Ele só guarda o que você deixar, e sempre mostra de onde veio cada lembrança.</p>
+          <div className="onboarding-choices" role="radiogroup" aria-labelledby="onboarding-title">
+            <Choice checked={memory === true} title="Lembrar entre conversas" note="Recomendado · tudo aparece no Caderno" onPick={() => void chooseMemory(true)} />
+            <Choice checked={memory === false} title="Não guardar nada" note="Cada conversa começa do zero" onPick={() => void chooseMemory(false)} />
+          </div>
+          {memory && (
+            <details className="onboarding-questions">
+              <summary>Contar um pouco de você (opcional)</summary>
+              <p className="note">Não escreva senhas nem documentos.</p>
+              {QUESTIONS.map((question) => (
+                <label className="onboarding-field" key={question.key}>
+                  <span>{question.label}</span>
+                  <textarea rows={2} value={answers[question.key]} placeholder={question.hint} onChange={(event) => setAnswers({ ...answers, [question.key]: event.target.value })} />
+                </label>
+              ))}
+            </details>
+          )}
+        </>}
 
-      <div className="onboarding-actions">
-        {step > 1 && <button type="button" className="ghost" onClick={() => go(step - 1)} disabled={busy}>Voltar</button>}
-        <button type="button" className="ghost" onClick={skipStep} disabled={busy}>
-          {step === 2 ? "Pular sem responder" : "Pular esta etapa"}
-        </button>
-        <button
-          type="button"
-          className="onboarding-next"
-          onClick={() => (step === 3 ? void finish() : go(step + 1))}
-          disabled={busy}
-        >
-          {saving === "finish" ? "Salvando…" : step === 3 ? "Concluir" : "Continuar"}
-        </button>
+        {step === 3 && <>
+          <h1 id="onboarding-title" ref={heading} tabIndex={-1}>Conectar o seu Mac?</h1>
+          <p className="onboarding-lead">Com o Braço, ele roda testes e mexe em arquivos dos projetos que você liberar, sempre pedindo aprovação antes.</p>
+          {pairing?.token ? (
+            <div className="onboarding-pair">
+              <p className="note">Cole este token em <code>~/.config/visao/braco.json</code> e rode no Mac:</p>
+              <pre>bash arm/instalar-mac.sh</pre>
+              <code className="mac-token">{pairing.token}</code>
+              <p className="note">O token não aparece de novo.</p>
+            </div>
+          ) : (
+            <button type="button" className="btn-secondary" onClick={() => void apply(() => api.pairArm("Mac"), setPairing)}>Gerar o token do Mac</button>
+          )}
+          <p className="note">Pode pular: dá para conectar depois em Mac.</p>
+        </>}
+
+        {step === 4 && <>
+          <h1 id="onboarding-title" ref={heading} tabIndex={-1}>Quando ele pode falar com você?</h1>
+          <p className="onboarding-lead">Fora do silêncio, ele pode puxar conversa quando tiver algo útil. Dentro dele, nada chega.</p>
+          {quiet && (
+            <div className="quiet-hours" role="group" aria-label="Horário de silêncio">
+              <label>Silêncio das <input type="time" value={quiet.quiet_start} onChange={(e) => e.target.value && void apply(() => api.setQuietHours({ ...quiet, quiet_start: e.target.value }), setQuiet)} /></label>
+              <label>às <input type="time" value={quiet.quiet_end} onChange={(e) => e.target.value && void apply(() => api.setQuietHours({ ...quiet, quiet_end: e.target.value }), setQuiet)} /></label>
+            </div>
+          )}
+          <div className="onboarding-switches">
+            {study !== null && (
+              <label className="onboarding-toggle">
+                <input type="checkbox" checked={study} onChange={() => void apply(() => api.setStudyEnabled(!study), (r) => setStudy(r.enabled))} />
+                <span>Estudar entre conversas<span className="note"> · temas ligados a você, dentro do orçamento</span></span>
+              </label>
+            )}
+            {research !== null && (
+              <label className="onboarding-toggle">
+                <input type="checkbox" checked={research} onChange={() => void apply(() => api.setAutoResearch(!research), (r) => setResearch(r.auto_research))} />
+                <span>Pesquisar sozinho<span className="note"> · dúvidas de fatos públicos, sempre com fonte</span></span>
+              </label>
+            )}
+          </div>
+        </>}
+
+        <div className="onboarding-actions-novo">
+          {step > 1 && <button type="button" className="btn-secondary" onClick={() => go(step - 1)} disabled={saving}>Voltar</button>}
+          <button type="button" className="btn-primary" onClick={() => (step === STEPS ? void finish() : go(step + 1))} disabled={saving}>
+            {saving ? "Salvando…" : step === STEPS ? "Começar" : "Continuar"}
+          </button>
+        </div>
       </div>
     </section>
   );

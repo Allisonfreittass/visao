@@ -137,8 +137,8 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginPro
           {error.text}
         </p>
       )}
-      <button type="submit" className="rs-botao rs-botao--principal" disabled={busy}>
-        {busy ? "Verificando…" : "Acessar"}
+      <button type="submit" className="btn-primary login-entrar" disabled={busy}>
+        {busy ? "Verificando…" : "Entrar"}
       </button>
     </form>
   );

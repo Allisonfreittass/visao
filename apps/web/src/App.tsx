@@ -21,7 +21,6 @@ import { CallView } from "./components/CallView";
 import { type Ask, ChatView } from "./components/ChatView";
 import { Intro, introAfterLogin, introDue } from "./components/Intro";
 import { Login } from "./components/Login";
-import { MuninnEntrance } from "./muninn/MuninnEntrance";
 import { InboxView } from "./components/InboxView";
 import { MacView } from "./components/MacView";
 import { ProjectsView } from "./components/ProjectsView";
@@ -33,7 +32,7 @@ import { useWide } from "./hooks/useWide";
 import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls } from "./components/InboxView";
-import { Lockup } from "./brand/Lockup";
+import { Corvo } from "./brand/Corvo";
 import { Icon } from "./components/Icon";
 import { PageBar, pageTitle } from "./components/PageBar";
 import { Rail, type WorkspaceView } from "./components/Rail";
@@ -42,6 +41,7 @@ import { StatusBar } from "./components/StatusBar";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { NotYetView } from "./components/NotYetView";
 import { RoutinesView } from "./components/RoutinesView";
+import { Entrance } from "./components/Entrance";
 import { PanelView } from "./components/PanelView";
 import { NotebookView } from "./components/NotebookView";
 import { ShareDialog, Toast } from "./components/ShareDialog";
@@ -178,7 +178,7 @@ export function App() {
   const [, setLatency] = useState<TurnLatency | null>(null);
   const [demoState, setDemoState] = useState<AnelEstado>("ocioso");
   // The login is checking the credentials: the ring on the entrance shows "pensando".
-  const [loginBusy, setLoginBusy] = useState(false);
+  const [, setLoginBusy] = useState(false);
   const demoLevel = useDemoLevel(demo && demoState === "ouvindo");
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
@@ -947,7 +947,7 @@ export function App() {
       )}
       {(firstRun || (loggedIn && !demo && !ready)) && (
         <header className="topbar">
-          <Lockup />
+          <span className="rail-brand"><Corvo size={30} /><span className="rail-wordmark" aria-hidden="true">VISAO</span><span className="visually-hidden">VISAO</span></span>
           {loggedIn && !demo && !ready && (
             <button type="button" className="rs-botao rs-botao--compacto" onClick={logout}>Sair</button>
           )}
@@ -1197,7 +1197,7 @@ export function App() {
       <Toast message={toast} />
 
       {!firstRun && !ready && !loggedIn && !demo && (
-        <MuninnEntrance thinking={loginBusy}>
+        <Entrance>
           <Login
             api={api}
             online={online}
@@ -1208,7 +1208,7 @@ export function App() {
               if (introAfterLogin()) setIntro(true);
             }}
           />
-        </MuninnEntrance>
+        </Entrance>
       )}
       {!firstRun && !ready && (loggedIn || demo) && (
         <div className="layout">
