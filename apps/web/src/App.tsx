@@ -35,8 +35,10 @@ import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls } from "./components/InboxView";
 import { Lockup } from "./brand/Lockup";
+import { PageBar, pageTitle } from "./components/PageBar";
 import { Rail, type WorkspaceView } from "./components/Rail";
 import { SettingsView } from "./components/SettingsView";
+import { StatusBar } from "./components/StatusBar";
 import { MicButton, MobileBar } from "./components/SkyNav";
 import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
@@ -917,146 +919,154 @@ export function App() {
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
-          {desk && inProject && (
-            <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
-          )}
-
-          <main className="main">
-            {notice && (
-              <p className="note first-run-notice" role="status">
-                {notice}{" "}
-                <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
-              </p>
-            )}
-            {view === "inbox" && (
-              <InboxView
-                api={api}
-                call={call}
-                onDraft={draftInChat}
-                onSend={(text) => {
-                  // To the conversation in front (as the suggestions do), shown at once.
-                  setView("conversation");
-                  void send(text);
-                }}
-                online={online}
-                macOnline={macOnline}
-                project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
-                onOpenProject={(id) => void openProjectChat(id)}
-                pending={pending}
-                current={current}
-                onReplied={(conversationId) => {
-                  setView("conversation");
-                  setCurrent(conversationId);
-                  loadMessages(conversationId).then(setMessages).catch(handleError);
-                  setComposerFocus((value) => value + 1);
-                }}
-              />
-            )}
-            {view === "projects" && (
-              <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
-            )}
-            {view === "study" && (
-              <section className="page page--caderno" aria-labelledby="study-title">
-                <header className="page-head">
-                  <span className="rotulo">Caderno</span>
-                  <h1 id="study-title">O que eu fiz <em>enquanto você não estava.</em></h1>
-                  <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
-                </header>
-                <MindPanel api={api} onError={handleError} />
-                <StudyPanel api={api} onError={handleError} />
-              </section>
-            )}
-            {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
-            {view === "settings" && (
-              <SettingsView
-                api={api}
-                onPausedChange={pending.setPaused}
-                memoryEnabled={memoryEnabled}
-                onToggleMemory={() => void toggleMemory()}
-                speakReplies={speakReplies}
-                canSpeak={voice.speakerKind !== null}
-                speakerKind={voice.speakerKind}
-                onToggleSpeak={toggleSpeak}
-                deviceListening={deviceListening}
-                deviceCouldListen={voice.deviceCouldListen}
-                serverListening={voice.listenerKind === "server"}
-                onToggleDeviceListening={toggleDeviceListening}
-                onRestartOnboarding={() => {
-                  api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
-                }}
-                onLogout={logout}
-                onError={handleError}
-                voiceApproval={voiceApproval}
-                onToggleVoiceApproval={() => {
-                  const next = !voiceApproval;
-                  setVoiceApproval(next);
-                  savePreference("voice-approval", next ? "1" : "0");
-                }}
-              />
-            )}
-            <ChatView
-              hidden={view !== "conversation"}
-              onOpenProject={(id) => void openProjectChat(id)}
-              projectName={(id) => projectNames[id]}
-              segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
-              olderLeft={olderLeft}
-              onLoadOlder={() => void loadOlder()}
-              placeholder="Fala comigo…"
-              composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
-              anel={anel}
-              macWorking={macWorking}
-              voiceLevel={voice.level}
-              steps={liveSteps}
-              header={
-                <>
-                  {projectBar}
-                  {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
-                </>
-              }
-              focusRequest={composerFocus}
-              agentName={agentName}
-              messages={messages}
-              asks={liveAsks}
-              sending={sending || preparing}
-              status={liveStep}
-              draftRequest={draftRequest}
-              liveText={liveText}
-              settlingId={settling}
-              onSettled={() => {
-                setSettling(null);
-                setLiveText(null);
-                if (!document.hidden) navigator.vibrate?.(4);
-              }}
-              onStop={stopTurn}
-              error={voice.inCall ? null : error}
-              onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}
-              onUpload={(file, name) => api.uploadAttachment(file, name)}
-              loadAttachment={loadAttachment}
-              pageUrl={(path) => api.pageUrl(path)}
-              onOpenPage={desk ? setSidePage : undefined}
-              onDeleteArtifact={(a) => void deleteArtifact(a)}
-              onFeedback={sendFeedback}
+          <div className="principal">
+            <PageBar
+              title={pageTitle(view, conversations.find((c) => c.id === current)?.title ?? (inProject ? projectNames[inProject] : null))}
             />
-            {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
-          </main>
+            <div className="principal-corpo">
+              {desk && inProject && (
+                <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
+              )}
 
-          {desk ? (
-            sidePage?.path ? (
-              <ArtifactViewer
-                docked
-                artifact={sidePage}
-                url={api.pageUrl(sidePage.path)}
-                onClose={() => setSidePage(null)}
-                onDelete={() => {
-                  if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
-                }}
-              />
-            ) : (
-              <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
-            )
-          ) : null}
+              <main className="main">
+                {notice && (
+                  <p className="note first-run-notice" role="status">
+                    {notice}{" "}
+                    <button type="button" className="link-button" onClick={() => setNotice(null)}>ok</button>
+                  </p>
+                )}
+                {view === "inbox" && (
+                  <InboxView
+                    api={api}
+                    call={call}
+                    onDraft={draftInChat}
+                    onSend={(text) => {
+                      // To the conversation in front (as the suggestions do), shown at once.
+                      setView("conversation");
+                      void send(text);
+                    }}
+                    online={online}
+                    macOnline={macOnline}
+                    project={Object.entries(projectNames).map(([id, name]) => ({ id, name }))[0] ?? null}
+                    onOpenProject={(id) => void openProjectChat(id)}
+                    pending={pending}
+                    current={current}
+                    onReplied={(conversationId) => {
+                      setView("conversation");
+                      setCurrent(conversationId);
+                      loadMessages(conversationId).then(setMessages).catch(handleError);
+                      setComposerFocus((value) => value + 1);
+                    }}
+                  />
+                )}
+                {view === "projects" && (
+                  <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
+                )}
+                {view === "study" && (
+                  <section className="page page--caderno" aria-labelledby="study-title">
+                    <header className="page-head">
+                      <span className="rotulo">Caderno</span>
+                      <h1 id="study-title">O que eu fiz <em>enquanto você não estava.</em></h1>
+                      <p className="lede">O que pensei, estudei e o que sei de você. Tudo pode ser desfeito.</p>
+                    </header>
+                    <MindPanel api={api} onError={handleError} />
+                    <StudyPanel api={api} onError={handleError} />
+                  </section>
+                )}
+                {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
+                {view === "settings" && (
+                  <SettingsView
+                    api={api}
+                    onPausedChange={pending.setPaused}
+                    memoryEnabled={memoryEnabled}
+                    onToggleMemory={() => void toggleMemory()}
+                    speakReplies={speakReplies}
+                    canSpeak={voice.speakerKind !== null}
+                    speakerKind={voice.speakerKind}
+                    onToggleSpeak={toggleSpeak}
+                    deviceListening={deviceListening}
+                    deviceCouldListen={voice.deviceCouldListen}
+                    serverListening={voice.listenerKind === "server"}
+                    onToggleDeviceListening={toggleDeviceListening}
+                    onRestartOnboarding={() => {
+                      api.restartOnboarding().then(() => api.onboarding()).then(setOnboarding).catch(handleError);
+                    }}
+                    onLogout={logout}
+                    onError={handleError}
+                    voiceApproval={voiceApproval}
+                    onToggleVoiceApproval={() => {
+                      const next = !voiceApproval;
+                      setVoiceApproval(next);
+                      savePreference("voice-approval", next ? "1" : "0");
+                    }}
+                  />
+                )}
+                <ChatView
+                  hidden={view !== "conversation"}
+                  onOpenProject={(id) => void openProjectChat(id)}
+                  projectName={(id) => projectNames[id]}
+                  segments={conversations.find((c) => c.id === current)?.continuous ? segments : undefined}
+                  olderLeft={olderLeft}
+                  onLoadOlder={() => void loadOlder()}
+                  placeholder="Fala comigo…"
+                  composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
+                  anel={anel}
+                  macWorking={macWorking}
+                  voiceLevel={voice.level}
+                  steps={liveSteps}
+                  header={
+                    <>
+                      {projectBar}
+                      {memoryWarning ? <p className="note sky-warning" role="status">{memoryWarning}</p> : undefined}
+                    </>
+                  }
+                  focusRequest={composerFocus}
+                  agentName={agentName}
+                  messages={messages}
+                  asks={liveAsks}
+                  sending={sending || preparing}
+                  status={liveStep}
+                  draftRequest={draftRequest}
+                  liveText={liveText}
+                  settlingId={settling}
+                  onSettled={() => {
+                    setSettling(null);
+                    setLiveText(null);
+                    if (!document.hidden) navigator.vibrate?.(4);
+                  }}
+                  onStop={stopTurn}
+                  error={voice.inCall ? null : error}
+                  onSend={(text, files, replyTo) => void send(text, undefined, files, replyTo)}
+                  onUpload={(file, name) => api.uploadAttachment(file, name)}
+                  loadAttachment={loadAttachment}
+                  pageUrl={(path) => api.pageUrl(path)}
+                  onOpenPage={desk ? setSidePage : undefined}
+                  onDeleteArtifact={(a) => void deleteArtifact(a)}
+                  onFeedback={sendFeedback}
+                />
+                {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
+              </main>
+
+              {desk ? (
+                sidePage?.path ? (
+                  <ArtifactViewer
+                    docked
+                    artifact={sidePage}
+                    url={api.pageUrl(sidePage.path)}
+                    onClose={() => setSidePage(null)}
+                    onDelete={() => {
+                      if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
+                    }}
+                  />
+                ) : (
+                  <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
+                )
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
+      {!firstRun && ready && <StatusBar online={online} />}
 
       {!firstRun && !ready && !loggedIn && !demo && (
         <MuninnEntrance thinking={loginBusy}>

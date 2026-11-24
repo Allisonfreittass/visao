@@ -26,6 +26,18 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .app > :not(.ambient) { position: relative; z-index: 1; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 64px; padding: 0 var(--space-5); border: 0; flex-shrink: 0; }
 .layout { display: flex; flex: 1; min-height: 0; }
+/* Janela (computador): barra lateral | área principal (barra da página em cima, conteúdo embaixo)
+   e a barra de status no rodapé, de ponta a ponta. */
+.principal { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+.principal-corpo { display: flex; flex: 1; min-height: 0; }
+.page-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 52px; padding: 0 16px 0 28px; border-bottom: 1px solid var(--border); }
+.page-bar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 15px/1 var(--font-sans); color: var(--text); }
+.page-bar-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.status-bar { flex: none; display: flex; align-items: center; gap: 18px; height: 28px; padding: 0 14px; border-top: 1px solid var(--border); background: var(--surface);
+  font: 400 11px/1 var(--font-mono); letter-spacing: .04em; color: var(--text-muted); }
+.status-bar-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.status-bar-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+.status-bar-dot.on { background: var(--conectado); }
 .main { padding: var(--space-5) var(--space-6) var(--space-3); }
 .main > * { max-width: 760px; }
 
@@ -36,7 +48,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .lockup-word b { color: var(--text-muted); font-weight: 500; }
 
 /* ---------- Barra lateral ---------- */
-.rail { display: flex; flex: 0 0 248px; width: 248px; flex-direction: column; gap: var(--space-5); padding: var(--space-5) var(--space-3) var(--space-4);
+.rail { display: flex; flex: 0 0 248px; width: 248px; flex-direction: column; gap: var(--space-5); padding: 16px 12px 12px;
   border-right: 1px solid var(--border); background: var(--surface-sidebar); overflow-y: auto; }
 .rail-brand { display: block; padding: 4px 10px 8px; margin: 0; text-decoration: none; border-radius: var(--radius-chip); }
 .rail-nav { display: grid; gap: 2px; }
@@ -81,6 +93,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 
 @media (max-width: 899px) {
   .mobile-bar { display: flex; }
+  .page-bar, .status-bar { display: none; }
   .rail { display: none; }
   .rail.open { display: flex; position: fixed; z-index: var(--layer-overlay); top: calc(12px + env(safe-area-inset-top)); bottom: 12px; left: 12px; width: min(300px, 86vw);
     border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float); transition: transform .22s var(--ease); }
