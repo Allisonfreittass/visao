@@ -1,38 +1,36 @@
-// The look. The brand ("Muninn") shows only the dark theme: FORCED_THEME wins over
-// any saved choice. The light theme and the Claro/Escuro/Sistema choice stay in the code,
-// hidden, in case they come back. Only appearance lives here.
+// The look: three themes, switched at once in Ajustes › Aparência (DESIGN.md §2). Papel is the
+// default. Only appearance lives here; the colors are in tokens.css, keyed by data-theme on <html>.
 import { loadPreference, savePreference } from "../session";
 
-export type ThemePreference = "light" | "dark" | "system";
-export type Theme = "light" | "dark";
+export type Theme = "papel" | "tinta" | "rotulo";
+
+export const THEMES: { value: Theme; label: string }[] = [
+  { value: "papel", label: "Papel" },
+  { value: "tinta", label: "Tinta" },
+  { value: "rotulo", label: "Rótulo" },
+];
 
 const KEY = "theme";
+export const DEFAULT_THEME: Theme = "papel";
 /** The browser bar and the home-screen splash follow the page's floor (--bg). */
-export const THEME_COLOR: Record<Theme, string> = { light: "#F3F1EC", dark: "#101214" };
-/** The theme the brand shows, whatever is saved. null would bring the choice back. */
-export const FORCED_THEME: Theme | null = "dark";
+export const THEME_COLOR: Record<Theme, string> = { papel: "#F6F4EF", tinta: "#101214", rotulo: "#F3E9D2" };
 
-export function loadThemePreference(): ThemePreference {
-  const saved = loadPreference(KEY);
-  return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
+/** The saved theme. Choices saved before the three themes ("light", "dark") carry over. */
+export function parseTheme(saved: string | null): Theme {
+  if (saved === "papel" || saved === "tinta" || saved === "rotulo") return saved;
+  if (saved === "dark") return "tinta";
+  return DEFAULT_THEME;
 }
 
-export function resolveTheme(preference: ThemePreference, systemDark: boolean): Theme {
-  if (FORCED_THEME) return FORCED_THEME;
-  if (preference === "system") return systemDark ? "dark" : "light";
-  return preference;
-}
-
-function systemPrefersDark(): boolean {
-  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+export function loadTheme(): Theme {
+  return parseTheme(loadPreference(KEY));
 }
 
 /** Sets the theme on <html> (the CSS tokens switch on it) and the browser's bar color. */
-export function applyTheme(preference: ThemePreference = loadThemePreference()): Theme {
-  const theme = resolveTheme(preference, systemPrefersDark());
+export function applyTheme(theme: Theme = loadTheme()): Theme {
   const root = document.documentElement;
   root.dataset.theme = theme;
-  root.style.colorScheme = theme;
+  root.style.colorScheme = theme === "tinta" ? "dark" : "light";
   document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
     meta.content = THEME_COLOR[theme];
     meta.removeAttribute("media");
@@ -40,18 +38,7 @@ export function applyTheme(preference: ThemePreference = loadThemePreference()):
   return theme;
 }
 
-export function saveThemePreference(preference: ThemePreference): Theme {
-  savePreference(KEY, preference);
-  return applyTheme(preference);
-}
-
-/** With "Sistema", the page follows the system when it changes (sunset on a phone, say). */
-export function followSystemTheme(): () => void {
-  const query = window.matchMedia?.("(prefers-color-scheme: dark)");
-  if (!query) return () => undefined;
-  const onChange = () => {
-    if (loadThemePreference() === "system") applyTheme("system");
-  };
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
+export function saveTheme(theme: Theme): Theme {
+  savePreference(KEY, theme);
+  return applyTheme(theme);
 }

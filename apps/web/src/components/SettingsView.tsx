@@ -8,13 +8,7 @@ import { RoutingSettings } from "./RoutingSettings";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
-import { FORCED_THEME, loadThemePreference, saveThemePreference, type ThemePreference } from "../brand/theme";
-
-const THEMES: { value: ThemePreference; label: string }[] = [
-  { value: "light", label: "Claro" },
-  { value: "dark", label: "Escuro" },
-  { value: "system", label: "Sistema" },
-];
+import { loadTheme, saveTheme, THEMES, type Theme } from "../brand/theme";
 
 interface SettingsViewProps {
   api: Api;
@@ -46,7 +40,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [morningNote, setMorningNote] = useState("");
   const [here, setHere] = useState(locationOn());
   const [hereNote, setHereNote] = useState("");
-  const [theme, setTheme] = useState<ThemePreference>(loadThemePreference);
+  const [theme, setTheme] = useState<Theme>(loadTheme);
 
   useEffect(() => {
     Promise.all([api.autonomy(), api.permissions()])
@@ -126,13 +120,12 @@ export function SettingsView(props: SettingsViewProps) {
         <p className="lede">Modelo, voz, avisos, permissões e conta.</p>
       </header>
       <div className="page-body settings">
-        {!FORCED_THEME && (
         <section className="settings-group" aria-labelledby="g-aparencia">
           <h2 id="g-aparencia" className="rotulo">Aparência</h2>
           <div className="setting">
             <div className="setting-text">
               <span id="theme-title" className="setting-title">Tema</span>
-              <p className="note">Claro é o padrão. “Sistema” segue o claro ou escuro do aparelho.</p>
+              <p className="note">Papel é o claro, Tinta é o escuro e Rótulo é creme com azul. Muda na hora.</p>
             </div>
             <div className="segmented" role="radiogroup" aria-labelledby="theme-title">
               {THEMES.map((t) => (
@@ -141,7 +134,7 @@ export function SettingsView(props: SettingsViewProps) {
                   type="button"
                   role="radio"
                   aria-checked={theme === t.value}
-                  onClick={() => { setTheme(t.value); saveThemePreference(t.value); }}
+                  onClick={() => { setTheme(t.value); saveTheme(t.value); }}
                 >
                   {t.label}
                 </button>
@@ -149,7 +142,6 @@ export function SettingsView(props: SettingsViewProps) {
             </div>
           </div>
         </section>
-        )}
         <section className="settings-group" aria-labelledby="g-modelo">
           <h2 id="g-modelo" className="rotulo">Modelo</h2>
           <BrainSettings api={api} onError={onError} />

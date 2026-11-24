@@ -71,7 +71,7 @@ function readPalette(el: Element): Palette {
     papel: v("--papel", "#F3F1EC"),
     cinza: v("--cinza", "#9AA1A8"),
     linha: v("--linha", "#2C3136"),
-    ambar: v("--ambar", "#F0A23B"),
+    ambar: v("--ambar", "#E39A2E"),
   };
 }
 

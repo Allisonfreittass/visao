@@ -7,6 +7,13 @@
   overflow: visible;
   color: var(--papel);
 }
+/* Nos temas claros o anel e os sensores desenham na cor do texto. O anel sai com a identidade nova
+   (DESIGN.md §5); isto só o mantém visível até cada tela trocar para o corvo. */
+[data-theme="papel"] :is(.anel, .sensor), [data-theme="rotulo"] :is(.anel, .sensor) {
+  --papel: var(--text);
+  --cinza: var(--text-muted);
+  --linha: var(--border);
+}
 .anel-marca { stroke: var(--cinza); stroke-width: 1.5; stroke-linecap: round; opacity: var(--apagada); }
 .anel-marca--hora { stroke: var(--papel); stroke-width: 2; opacity: 1; }
 .anel--mini .anel-marca:not(.anel-marca--hora) { opacity: 0; }
