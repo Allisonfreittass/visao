@@ -727,3 +727,5 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .app > .toast-region { z-index: calc(var(--layer-overlay) + 20); }
 .palette-search input:focus-visible { outline: none; box-shadow: none; }
 .mobile-tabs button, .mobile-tabs button[aria-current] { border-radius: 0; background: transparent; box-shadow: none; }
+/* Ajustes: as seções não são cartões (DESIGN.md §4: nada de cartão dentro de cartão). */
+.settings-layout .settings-group { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

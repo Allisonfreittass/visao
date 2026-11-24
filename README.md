@@ -8,7 +8,7 @@ English · [Português](README.pt-BR.md)
 
 <p align="center"><img src="brand/muninn/muninn-ascii.gif" width="620" alt="The Muninn being drawn in ASCII: characters settle from the chest to the wing tips, the ring of 24 marks closes and the empty gap at the top blinks"></p>
 
-![Início: Muninn inside the ring of traces, the greeting, what it is thinking in its own voice and a live price panel](docs/assets/inicio.webp)
+![Início in the Papel theme: the crow before the sun, the greeting, the side bar with the nine places and the status bar at the bottom](docs/assets/inicio.webp)
 
 I built Visão to be the friend I can call. It helps me with code and ideas, it remembers only what
 I let it remember, and it starts the conversation on its own when it has something worth saying.
@@ -30,9 +30,9 @@ rewrite.
 | **Reads my email and calendar.** It reads Gmail and Google Calendar when I ask, and prepares replies and events that only go out after I tap Approve. The connection is stored encrypted; an email that tries to give it orders can at most produce a proposal I read ([docs/GOOGLE.md](docs/GOOGLE.md)). | built |
 | **Opens what I send.** Links in a message are read before the reply: GitHub repositories through the API, other pages through a reader that only reaches public HTTPS addresses. | built |
 | **Sees photos, reads files.** Attach with +, paste a screenshot or drop a file: photos go to the model as pictures (shrunk in the browser first), PDFs and text or code files as the text read out of them, marked as data, never orders. What you send shows at once, before the reply ([docs/ANEXOS.md](docs/ANEXOS.md)). | built; needs a vision model for photos |
-| **A face that is a trace.** No mascot and no eye watching you: Muninn, Odin's raven of memory, inside a ring of 24 marks, one per hour, with the local hour lit. The gap at the top is where its name will go. The ring shows what it is doing (listening, thinking, speaking first, waiting for your yes, paused) and a single amber light belongs to it alone. Logging in plays its genesis: the drawing grows stroke by stroke from one amber dot ([DESIGN.md](DESIGN.md)). Keep writing while it answers: those messages wait, dimmed, and go together as one next message. | built |
+| **A crow before the sun.** No mascot and no eye watching you: the icon is Muninn, Odin's raven of memory, in woodcut before an amber eclipse, and the amber belongs to it alone (its thoughts, its approval requests, the dot that pulses while it works). Three themes switched at once in Ajustes: Papel, Tinta and Rótulo. On a computer it is a desktop-style window: a side bar with nine places, a bar with the page, and a status bar with the server, the Mac, routines, quiet hours, the last 24 h of model use and the model, which you switch from there. Ctrl/⌘+K opens a command palette. The login shows the seal: VISAO in Six Caps behind the bust ([DESIGN.md](DESIGN.md)). Keep writing while it answers: those messages wait, dimmed, and go together as one next message. | built |
 | **Pages it writes.** Ask for a plan, a comparison or an itinerary to keep: the reply says what it will hold, and a card under it turns from "Criando…" into a page you open, share by a secret link or delete. Written from the conversation and its research, with dates and sources, "a confirmar" where something is missing; served with no scripts and an opaque origin, so it cannot touch your session ([docs/ARTEFATOS.md](docs/ARTEFATOS.md)). | built |
-| **Live status.** While it works, the chat shows the current step ("Pesquisando…", "Abrindo github.com", "Lendo roteiro.pdf"); if you leave the app mid-turn, the reply also arrives as a notification ([docs/STATUS.md](docs/STATUS.md)). | built |
+| **Live status.** While it works, each step becomes a card in the chat ("Procurou no seu Gmail", "Abrindo github.com"), short or technical as you choose, and a column beside it shows what it is doing now and what it really did, taken from the system log. If you leave the app mid-turn, the reply also arrives as a notification ([docs/STATUS.md](docs/STATUS.md)). | built |
 | **Live pages.** For fares, rooms, prices or schedules it opens the sites in a real Chromium (Google Flights and Hotels work; sites that block robots are reported, never worked around), reads what they show now and answers with the site and the time. Read only: no logins, forms or purchases. The browser runs in its own container with no secrets and no database ([docs/NAVEGADOR.md](docs/NAVEGADOR.md)). | built |
 | **Answer a specific message, stop, approve in place.** ↩ on any message quotes it in your answer and tells the model which one you mean; × stops the turn in flight (a reply being written is not kept); approvals (Mac, email, calendar) are cards inside the conversation. | built |
 | **Projects.** A subject with its conversations, pages and files; a conversation in a project knows what was said in the others. | built |
@@ -42,9 +42,9 @@ rewrite.
 | **Versioned, reversible adaptation.** The way it answers moves with feedback; every change is a version I can revert. | built (−69% words after feedback; revert returns to baseline) |
 | **Budget per call.** A fail-closed ledger reserves tokens before every model call, on every path. | built |
 
-![The chat: a code answer with a copy button, the small ring beside each reply](docs/assets/conversa.webp)
+![The chat in the Tinta theme: the message box with the microphone, and the column with what it is doing now and what it really did](docs/assets/conversa.webp)
 
-<p align="center"><img src="docs/assets/entrar.webp" width="68%" alt="The login: Muninn inside the ring on the left, Bem-vindo de volta and the form on the right"> <img src="docs/assets/celular.webp" width="26%" alt="Início on a phone: Muninn in the ring, the greeting and its thought with the amber rule"></p>
+<p align="center"><img src="docs/assets/entrar.webp" width="68%" alt="The login: the amber seal with VISAO behind the woodcut crow on the left, Bem-vindo de volta and the form on the right"> <img src="docs/assets/celular.webp" width="26%" alt="Início on a phone: the crow and the page on top, the greeting, the message box and the four tabs at the bottom"></p>
 
 ## Architecture
 
@@ -135,10 +135,10 @@ The design docs, ADRs and research log in [docs/](docs/) are written in Portugue
 
 ## License
 
-Code under the [MIT License](LICENSE). The brand (the ring of traces, Muninn, the marks and the
-visual identity in [DESIGN.md](DESIGN.md) and [brand/](brand/)) is not covered by it: forks keep
-the code and drop the brand. The fonts (Newsreader, Geist, Geist Mono) ship with the app under the
-SIL Open Font License.
+Code under the [MIT License](LICENSE). The brand (the crow before the sun, the VISAO seal, Muninn,
+the ring of traces and the visual identity in [DESIGN.md](DESIGN.md) and [brand/](brand/)) is not
+covered by it: forks keep the code and drop the brand. The fonts (Newsreader, Geist, Geist Mono,
+Six Caps) ship with the app under the SIL Open Font License.
 
 Visão is the project's codename, not the agent's name. The agent's name is still `null`: it is
 deciding.

@@ -12,8 +12,16 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
   - O ícone do app e o favicon passam a ser o corvo na frente de um sol âmbar.
   - Em Ajustes › Aparência o dono escolhe entre Papel (claro, o padrão), Tinta (escuro) e Rótulo
     (creme com azul). Muda na hora e fica guardado no aparelho.
-  - No computador, a janela ganhou uma barra com o título do lugar e um rodapé que mostra se o
-    servidor responde.
+  - No computador, a janela virou um app: barra lateral com nove lugares (Início, Chat, Projetos,
+    Caderno, Rotinas, Mac, Agentes, Canais, Habilidades) e um rodapé com o servidor, o Braço, as
+    rotinas, o silêncio, o uso de modelos das últimas 24 h e o modelo, que se troca dali.
+  - Ctrl/⌘+K abre uma paleta para buscar conversas, projetos e comandos.
+  - No chat, cada passo vira um cartão (resumido ou técnico), e a conversa pode ser exportada em
+    Markdown ou PDF. O link privado ainda não existe.
+  - O Caderno tem abas: Memória (com de onde veio e Esquecer), Pensamentos, Interesses, O nome e
+    Autorretrato. Rotinas reúne o resumo da manhã, o estudo, a pesquisa sozinho e cada painel.
+  - Agentes em paralelo, Canais e Habilidades têm lugar no menu, mas dizem "ainda não disponível":
+    ele não faz essas coisas ainda e não deve dizer que faz.
   - É só a aparência: ele não troca o tema sozinho e nada mudou na memória ou no que ele faz.
 
 ## 23/11/2026

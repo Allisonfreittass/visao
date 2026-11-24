@@ -220,11 +220,26 @@ Referência visual da direção "Muninn": canvas "Visão — identidade" no Clau
 Prompt e ordem em [`docs/design/telas-visao/PROMPT_CLAUDE_CODE.md`](docs/design/telas-visao/PROMPT_CLAUDE_CODE.md),
 na branch `design/telas-visao`:
 
+Todas as etapas estão **feitas** no web (24/11/2026):
+
 1. Base: três temas, fontes novas, ícones a partir do corvo, janela com barra da página e rodapé.
-   **Feito** no web.
-2. Barra lateral. 3. Barra de status com dados da API. 4. Login com o selo e primeira vez.
-5. Início. 6. Chat. 7. Paleta de comandos. 8. Caderno. 9. Rotinas, Mac, Painel, Projetos e Ajustes.
-10. Ligação. 11. Celular. 12. Telas sem backend ainda, com estado vazio honesto.
+2. Barra lateral: corvo e VISAO, Nova conversa e lupa, nove lugares, Recentes. **Fixadas não
+   aparece**: o servidor não guarda conversa fixada.
+3. Barra de status: servidor, Braço, rotinas, silêncio, uso das últimas 24 h (não o dia do
+   calendário: é o que `/cognition/metrics` mede) e o modelo, que abre a troca nuvem/Mac/automático.
+4. Login com o selo; primeira vez em quatro passos (quem responde, memória, Mac, silêncio).
+5. Início: corvo, saudação, pensamento, pedido de aprovação com o carimbo APROVADO, painel.
+6. Chat: passos em cartões (Resumido ou Técnico), ponto âmbar de atividade, coluna Agora / O que fiz
+   de verdade, ler em voz alta, compartilhar em Markdown e PDF. **O link privado espera o
+   servidor.**
+7. Paleta de comandos (Ctrl/⌘+K). 8. Caderno em cinco abas. 9. Rotinas, Mac, Painel e Ajustes.
+10. Ligação. 11. Celular com abas embaixo.
+12. Agentes, Canais e Habilidades com estado vazio honesto; o autorretrato é o texto dele (o
+    desenho não existe no servidor) e o aviso de versão não aparece (não há rota de novidades).
+
+**Saiu** do app web: o anel como avatar e logo, o `<Lockup>` na barra lateral, o `MindPanel` (virou
+as abas do Caderno) e a seção Integrações da barra lateral. A gênese do Muninn e o
+`MuninnEntrance` continuam no código, sem uso no login, até decidirmos o que fazer com eles.
 
 ## 9. Skills de design no repositório
 
