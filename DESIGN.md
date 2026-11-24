@@ -275,7 +275,9 @@ Todas as etapas estão **feitas** no web (24/11/2026):
 6. Chat: passos em cartões (Resumido ou Técnico), ponto âmbar de atividade, coluna Agora / O que fiz
    de verdade, ler em voz alta, compartilhar em Markdown e PDF. **O link privado espera o
    servidor.**
-7. Paleta de comandos (Ctrl/⌘+K). 8. Caderno em cinco abas. 9. Rotinas, Mac, Painel e Ajustes.
+7. Paleta de comandos (Ctrl/⌘+K). 8. Caderno em cinco abas. 9. Rotinas, Mac, Painel, Projetos
+   (grade de cartões; a linha sob o nome é a primeira anotação do projeto, porque o servidor não
+   tem descrição) e Ajustes.
 10. Ligação. 11. Celular com abas embaixo.
 12. Agentes, Canais e Habilidades com estado vazio honesto; o autorretrato é o texto dele (o
     desenho não existe no servidor) e o aviso de versão não aparece (não há rota de novidades).

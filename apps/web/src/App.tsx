@@ -162,6 +162,8 @@ export function App() {
   /** How the tool steps show in the chat (Ajustes › Aparência). */
   const [toolsMode, setToolsMode] = useState<ToolsMode>(() => (loadPreference("tools") === "tecnico" ? "tecnico" : "resumo"));
   /** The "Agora / O que fiz de verdade" column beside the chat. */
+  /** "Novo projeto" in the page bar: Projetos opens its form each time this goes up. */
+  const [newProject, setNewProject] = useState(0);
   const [benchOpen, setBenchOpen] = useState(() => loadPreference("bench") !== "0");
   // The opening animation, once a day (components/Intro.tsx).
   // `?intro` in the address plays it again on demand (to see it).
@@ -208,7 +210,6 @@ export function App() {
   // Project names for the bar on top of a project's chat.
   const [projectNames, setProjectNames] = useState<Record<string, string>>({});
   const [projectsKey, setProjectsKey] = useState(0);
-  const [lastProject, setLastProject] = useState<string | null>(null);
   conversationsRef.current = conversations;
 
   // The continuous conversation loads only its last page (and as many as are already shown);
@@ -828,7 +829,8 @@ export function App() {
       const chat = await api.projectChat(projectId);
       setConversations((list) => (list.some((c) => c.id === chat.id) ? list : [chat, ...list]));
       setCurrent(chat.id);
-      setLastProject(projectId);
+      // A project made a moment ago is not in the names yet: the bar would say "Chat".
+      if (!projectNames[projectId]) setProjectsKey((k) => k + 1);
       showView("conversation");
     } catch (e) {
       handleError(e);
@@ -905,7 +907,6 @@ export function App() {
       onBack={() => showView("projects")}
       onDeleted={() => {
         setConversations((list) => list.map((c) => (c.project_id === inProject ? { ...c, project_id: null } : c)));
-        setLastProject(null);
         setProjectsKey((k) => k + 1);
         openChat();
       }}
@@ -916,11 +917,9 @@ export function App() {
       onError={handleError}
     />
   ) : null;
-  /** The pill and the menu: "Chat" is the main conversation; "Projetos" on a computer goes back
-   * to the last project's chat (the list is beside it), on a phone to the list. */
+  /** The pill and the menu: "Chat" is the main conversation; "Projetos" is the grid of projects. */
   function go(next: WorkspaceView) {
     if (next === "conversation") return openChat();
-    if (next === "projects" && desk && lastProject) return void openProjectChat(lastProject);
     showView(next);
   }
 
@@ -1013,7 +1012,6 @@ export function App() {
             onSearch={() => setPalette(true)}
             onOpenConversation={(c) => {
               setCurrent(c.id);
-              if (c.project_id) setLastProject(c.project_id);
               showView("conversation");
             }}
             onClose={() => setMenuOpen(false)}
@@ -1052,6 +1050,9 @@ export function App() {
                     </button>
                   )}
                 </>
+              )}
+              {view === "projects" && (
+                <button type="button" className="page-bar-text" onClick={() => setNewProject((n) => n + 1)}>Novo projeto</button>
               )}
               <button type="button" className="page-bar-button" aria-label="Comandos (Ctrl K)" title="Comandos (Ctrl K)" onClick={() => setPalette(true)}>
                 <Icon name="command" size={18} />
@@ -1096,7 +1097,7 @@ export function App() {
                   />
                 )}
                 {view === "projects" && (
-                  <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} />
+                  <ProjectsView api={api} onOpenProject={(id) => void openProjectChat(id)} onError={handleError} newRequest={newProject} />
                 )}
                 {view === "study" && (
                   <NotebookView api={api} memoryEnabled={memoryEnabled} onToggleMemory={() => void toggleMemory()} onError={handleError} />
