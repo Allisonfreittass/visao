@@ -1,6 +1,7 @@
 """What it does in the app from the conversation (docs/ACOES.md, ADR-0021): create, rename and
 delete projects, write notes in a project, put a panel or a page in a project, pause, resume and
-delete panels.
+delete panels, and write down or end one of the owner's goals, only with the owner's yes
+(ADR-0025).
 
 A short model call reads what was asked and names the actions from a closed list, using the names
 of what exists; code finds each thing, checks it and does it. Deleting waits for the owner's yes
@@ -19,7 +20,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from core import projects
+from core import owner_goals, projects
 from core.memory.text import fold
 from core.panels import service as panels
 from core.panels.offers import affirmative
@@ -43,9 +44,10 @@ NOTES_CHARS = 6000
 MAX_PROJECTS = 100
 CONFIRM_WINDOW = timedelta(minutes=30)
 CONFIRMING = {"delete_project", "delete_panel"}
+GOALS = {"set_goal", "end_goal"}
 
 # Both a thing in the app and a verb that changes it: "terminei aquele projeto" is not a request.
-_THING = re.compile(r"\bprojeto|\bpainel|\bpaineis|\bpagina|\banot|\bnotas?\b")
+_THING = re.compile(r"\bprojeto|\bpainel|\bpaineis|\bpagina|\banot|\bnotas?\b|\bobjetiv")
 _VERB = re.compile(
     r"\banot|\bapag|\bexclu|\bdelet|\bremov|\brenome|\bpaus[ae]|\bretom|\bmov[ae]\b|"
     r"\bcoloc|\bpo[eê]\b|\bpoe\b|\bjunt[ae]\b|\bcri[ae]\b|\bcriar\b|\bguard|\bsalv|\btir[ae]\b|"
@@ -77,6 +79,11 @@ nunca invente nem arredonde. Se ela pediu para anotar num projeto que não exist
 create_project, com o nome que ela deu.
 - {"do": "move", "what": "panel" ou "page", "item": "título", "project": "nome"}
 - {"do": "pause_panel" ou "resume_panel" ou "delete_panel", "panel": "título"}
+- {"do": "set_goal", "goal": "o objetivo dela, curto, nas palavras dela", "reason": "por que \
+mudou, em uma frase", "replaces": "objetivo atual que este substitui, ou vazio"}: só quando ela \
+pede para registrar um objetivo dela, ou responde que sim à pergunta da última resposta sobre \
+registrar uma mudança nos objetivos dela. Use o que ela disse na conversa recente.
+- {"do": "end_goal", "goal": "objetivo atual"}: quando ela pede para tirar um objetivo dela.
 
 Nada aqui compra, reserva, manda mensagem ou mexe fora do app: isso não é ação daqui.
 Se a mensagem não pede nada disso (uma cotação, uma opinião, uma página nova, uma pergunta), \
@@ -223,9 +230,13 @@ def execute(
     source: str,
     limits: panels.Limits,
     now: datetime | None = None,
+    consent: owner_goals.Consent | None = None,
+    said: str = "",
+    said_message_id: uuid.UUID | None = None,
 ) -> list[Deed]:
     """Each asked action, checked and done (or left waiting for a yes). Never raises on a bad
-    item: it becomes a deed that says what could not be done."""
+    item: it becomes a deed that says what could not be done. A goal is written only with the
+    owner's yes (`consent`, checked in code); `said` is the owner's words it comes from."""
     now = now or datetime.now(UTC)
     deeds: list[Deed] = []
     created: list[Project] = []
@@ -233,6 +244,20 @@ def execute(
     for item in [a for a in asked if isinstance(a, dict)][:MAX_ACTIONS]:
         kind = item.get("do")
         owned = _projects(session, owner)
+        if kind in GOALS:
+            deeds.append(
+                _goal(
+                    session,
+                    owner,
+                    conversation,
+                    item,
+                    consent or owner_goals.Consent(False),
+                    said,
+                    said_message_id,
+                    now,
+                )
+            )
+            continue
         if kind == "create_project":
             name = projects.clean_name(str(item.get("name") or ""))
             if not name:
@@ -352,6 +377,101 @@ def execute(
     return deeds
 
 
+def _goal(
+    session: Session,
+    owner: User,
+    conversation: Conversation,
+    item: dict,
+    consent: owner_goals.Consent,
+    said: str,
+    said_message_id: uuid.UUID | None,
+    now: datetime,
+) -> Deed:
+    """Writes down or ends one of the owner's goals with the yes, or asks for the yes."""
+    kind = str(item.get("do"))
+    if not owner.memory_consent:
+        return Deed(kind, "não registrei nada nos objetivos: a memória dela está desligada", False)
+    current = owner_goals.active(session, owner.id)
+    if kind == "end_goal":
+        goal = owner_goals.find(current, item.get("goal"))
+        if goal is None:
+            return Deed(kind, f"não achei o objetivo «{item.get('goal')}»", False)
+        if not consent.given:
+            return _wait_goal(
+                session,
+                owner,
+                conversation,
+                kind,
+                {"id": str(goal.id)},
+                f"encerrar o objetivo «{goal.content}»",
+            )
+        owner_goals.end_goal(goal, now)
+        _audit(session, owner, "goal.end", goal_id=str(goal.id), via="chat")
+        return Deed(kind, f"encerrei o objetivo «{goal.content}»", True)
+    content = owner_goals.clean(item.get("goal"))
+    why = owner_goals.refusal(content)
+    if why:
+        return Deed(kind, f"não registrei o objetivo: {why}", False)
+    replaces = owner_goals.find(current, item.get("replaces"))
+    if replaces is None and len(current) >= owner_goals.MAX_ACTIVE:
+        return Deed(kind, "não registrei: objetivos demais; peça para tirar algum", False)
+    summary = f"registrar o objetivo «{content}»" + (
+        f" no lugar de «{replaces.content}»" if replaces else ""
+    )
+    payload = {
+        "goal": content,
+        "reason": owner_goals.clean(item.get("reason"), owner_goals.REASON_CHARS),
+        "replaces": str(replaces.id) if replaces else None,
+        "source_text": said,
+        "source_message_id": str(said_message_id) if said_message_id else None,
+    }
+    if not consent.given:
+        return _wait_goal(session, owner, conversation, kind, payload, summary)
+    return _write_goal(session, owner, payload, now)
+
+
+def _wait_goal(
+    session: Session,
+    owner: User,
+    conversation: Conversation,
+    kind: str,
+    payload: dict,
+    summary: str,
+) -> Deed:
+    session.add(
+        PendingAction(
+            owner_user_id=owner.id,
+            conversation_id=conversation.id,
+            kind=kind,
+            payload=payload,
+            summary=summary[:300],
+        )
+    )
+    return Deed(kind, f"{summary}: espera o sim dela", done=False, waiting=True)
+
+
+def _write_goal(session: Session, owner: User, payload: dict, now: datetime) -> Deed:
+    replaces = None
+    if payload.get("replaces"):
+        replaces = session.get(owner_goals.OwnerGoal, uuid.UUID(payload["replaces"]))
+        if replaces is not None and replaces.owner_user_id != owner.id:
+            replaces = None
+    source_id = payload.get("source_message_id")
+    goal = owner_goals.set_goal(
+        session,
+        owner.id,
+        content=payload["goal"],
+        reason=payload.get("reason") or "",
+        source_text=payload.get("source_text") or "",
+        source_message_id=uuid.UUID(source_id) if source_id else None,
+        replaces=replaces,
+        now=now,
+    )
+    _audit(session, owner, "goal.set", goal_id=str(goal.id), via="chat")
+    instead = f" no lugar de «{replaces.content}»" if replaces is not None else ""
+    return Deed("set_goal", f"registrei o objetivo «{goal.content}»{instead}", True)
+
+
 def plan(
     session: Session,
     provider: LLMProvider,
@@ -368,6 +488,7 @@ def plan(
         ],
         "paineis": [{"titulo": p.title, "status": p.status} for p in _panels(session, owner)],
         "paginas": [{"titulo": a.title} for a in _pages(session, owner)],
+        "objetivos": [g.content for g in owner_goals.active(session, owner.id)],
         "conversa_recente": recent,
         "mensagem": text,
     }
@@ -449,8 +570,24 @@ def answered(
         return Deed(pending.kind, f"não fiz: {pending.summary}, como ela pediu", done=True)
     if not _YES.match(said):
         return None
-    target_id = uuid.UUID(pending.payload["id"])
     pending.status, pending.decided_at = "done", now
+    if pending.kind in GOALS:
+        if not owner.memory_consent:
+            session.commit()
+            return Deed(pending.kind, "não registrei: a memória dela está desligada", False)
+        if pending.kind == "set_goal":
+            deed = _write_goal(session, owner, pending.payload, now)
+        else:
+            goal = session.get(owner_goals.OwnerGoal, uuid.UUID(pending.payload["id"]))
+            if goal is None or goal.owner_user_id != owner.id or goal.status != "active":
+                session.commit()
+                return Deed(pending.kind, "o objetivo já não estava ativo", done=False)
+            owner_goals.end_goal(goal, now)
+            _audit(session, owner, "goal.end", goal_id=str(goal.id), via="chat")
+            deed = Deed(pending.kind, f"encerrei o objetivo «{goal.content}»", True)
+        session.commit()
+        return deed
+    target_id = uuid.UUID(pending.payload["id"])
     if pending.kind == "delete_project":
         project = session.get(Project, target_id)
         if project is None or project.owner_user_id != owner.id:
@@ -476,9 +613,9 @@ def block(deeds: list[Deed]) -> str:
     lines = [
         "O que o sistema fez agora no app por este pedido (fatos; é tudo o que foi feito):",
         *[f"- {d.said}" for d in deeds],
-        "Diga isso em poucas palavras. Só afirme ter criado, anotado, movido, pausado, retomado ou "
-        "apagado o que está nesta lista como feito. O que 'espera o sim dela' ainda não foi feito: "
-        "pergunte em uma frase se pode (ela responde 'sim, apaga'). O que não deu, diga que não "
-        "deu.",
+        "Diga isso em poucas palavras. Só afirme ter criado, anotado, registrado, encerrado, "
+        "movido, pausado, retomado ou apagado o que está nesta lista como feito. O que 'espera o "
+        "sim dela' ainda não foi feito: pergunte em uma frase se pode (ela responde 'sim'). O que "
+        "não deu, diga que não deu.",
     ]
     return "\n".join(lines)

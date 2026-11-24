@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from core import owner_goals
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
 from core.conversation import attachments, browser_guard, deeds_guard, progress
@@ -259,6 +260,8 @@ def reply(
         )
     session.commit()
 
+    # The owner's goals, written only with their yes (ADR-0025): always in front, like the profile.
+    goals = owner_goals.active(session, owner.id) if owner.memory_consent else None
     version, params = behavior_state.current_params(session, owner.id)
     adjustments = behavior_state.prompt_lines(params)
     arm_record = work_record(session, owner.id, owner.timezone or "UTC")
@@ -294,6 +297,8 @@ def reply(
             owner_rules=owner_rules,
             arm_record="" if lean else arm_record,
         )
+        if goals is not None:
+            system_prompt += "\n".join(owner_goals.prompt_block(goals))
         if adjustments and not lean:
             system_prompt += (
                 f"\n\nAjustes de comunicação aprendidos com o retorno deste interlocutor "

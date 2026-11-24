@@ -171,6 +171,14 @@ class Capabilities:
             "Isso é feito pelo sistema antes da sua resposta: diga só o que a lista do que foi "
             "feito mostra, nunca 'anotado' ou 'criei' sem isso"
         )
+        if self.memory:
+            items.append(
+                "registrar os objetivos dela (o que ela quer alcançar), só com o sim dela: quando "
+                "ela disser algo que muda um objetivo, ligue ao que você já sabe e pergunte em "
+                "uma frase se pode registrar como mudança nos objetivos dela; o sistema registra "
+                "quando ela diz que sim, e ela vê e desfaz no Caderno. Nunca diga que registrou "
+                "sem isso aparecer na lista do que foi feito"
+            )
         if self.name_deliberation:
             items.append("deliberar sobre o próprio nome pessoal (decidir, adiar ou recusar)")
         if self.reflection:
