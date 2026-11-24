@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import type { Message } from "../api";
 import { type CallCamera, cameraSupported } from "../call/camera";
 import { Icon } from "./Icon";
-import { Anel } from "../anel/Anel";
-import { type AssistantState, STATE_LABELS, anelEstado } from "../anel/state";
+import { Corvo } from "../brand/Corvo";
+import { type AssistantState, STATE_LABELS } from "../anel/state";
 import { speakableText } from "../speech/speakable";
 
 interface CallViewProps {
@@ -23,6 +23,8 @@ interface CallViewProps {
   voiceApproval?: boolean;
   /** The camera: while on, what it shows goes with each sentence you say. */
   camera?: CallCamera;
+  /** What he is doing right now, from the turn in flight ("Procurando no seu Gmail"). */
+  doing?: string | null;
 }
 
 function clock(ms: number): string {
@@ -40,7 +42,7 @@ const HINTS: Partial<Record<AssistantState, string>> = {
 };
 
 /** A call: the whole screen is the conversation, hands free, the screen kept on. */
-export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval, camera }: CallViewProps) {
+export function CallView({ agentName, state, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval, camera, doing }: CallViewProps) {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(started);
   useEffect(() => {
@@ -63,23 +65,23 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
-  // Muninn inside the ring (above 120 px, DESIGN.md §5), with the listening wave round him.
-  const size = Math.min(220, Math.max(140, Math.round(window.innerWidth * 0.5)));
+  // The crow before the sun, big (DESIGN.md §5).
+  const size = Math.min(380, Math.max(180, Math.round(Math.min(window.innerWidth * 0.6, window.innerHeight * 0.42))));
+  const caption = doing ?? STATE_LABELS[state];
 
   return (
     <div className="call" role="dialog" aria-modal="true" aria-label="Ligação">
       <header className="call-top">
-        <span className="rs-status"><span className="rs-ponto" aria-hidden="true" />Em ligação · {clock(now - started)}</span>
-        <span className="call-engine">{engine === "device" ? "Voz do aparelho" : "Voz própria"}</span>
+        <span className="call-live"><span className="call-live-dot" aria-hidden="true" />Em ligação · {clock(now - started)}</span>
+        <span className="call-engine">{engine === "device" ? "voz do aparelho" : "voz própria"}</span>
       </header>
       <div className="call-center">
-        <Anel estado={anelEstado({ state })} size={size} level={level} decorative />
-        <h1 className="call-name">{agentName ?? "V.I.S.A.O."}</h1>
-        <p className="call-state" aria-live="polite">{STATE_LABELS[state]}</p>
-        <p className="call-hint">{HINTS[state] ?? "Estou aqui."}</p>
+        <Corvo size={size} label={`O corvo diante do sol: ${caption.toLowerCase()}`} className="call-corvo" />
+        <h1 className="visually-hidden">Ligação com {agentName ?? "VISAO"}</h1>
+        <p className="call-state" aria-live="polite">{caption}…</p>
+        <p className="call-hint">{lastUser ? `Você: “${lastUser.content.slice(0, 140)}”` : HINTS[state] ?? "Estou aqui."}</p>
       </div>
       <div className="call-transcript" aria-live="polite">
-        {lastUser && <p><span>Você</span>{lastUser.content}</p>}
         {lastReply && <p><span>{agentName ?? "Ele"}</span>{speakableText(lastReply.content).slice(0, 280)}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {camera?.error && <p className="error" role="alert">{camera.error}</p>}

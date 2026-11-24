@@ -48,7 +48,7 @@ import { ShareDialog, Toast } from "./components/ShareDialog";
 import type { ToolsMode } from "./components/ChatView";
 import { useRoutines } from "./hooks/useRoutines";
 import { saveTheme, THEMES } from "./brand/theme";
-import { MicButton, MobileBar } from "./components/SkyNav";
+import { MicButton, MobileBar, MobileTabs } from "./components/SkyNav";
 import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Anel } from "./anel/Anel";
@@ -937,12 +937,12 @@ export function App() {
       {intro && ready && !firstRun && !demo && <Intro onDone={endIntro} />}
       {ready && !firstRun && (
         <MobileBar
+          title={pageTitle(inProject ? "projects" : view, currentConversation?.title)}
+          online={online}
           pendingCount={pending.count}
-          anel={anel}
           menuOpen={menuOpen}
           onMenu={() => setMenuOpen((o) => !o)}
-          view={inProject ? "projects" : view}
-          onView={go}
+          onHome={() => go("inbox")}
         />
       )}
       {(firstRun || (loggedIn && !demo && !ready)) && (
@@ -1173,6 +1173,7 @@ export function App() {
           </div>
         </div>
       )}
+      {!firstRun && ready && <MobileTabs view={inProject ? "projects" : view} onView={go} />}
       {!firstRun && ready && (
         <StatusBar
           api={api}
@@ -1251,6 +1252,7 @@ export function App() {
           ask={liveAsks[0] ?? null}
           voiceApproval={voiceApproval}
           camera={camera}
+          doing={liveStep?.label ?? null}
         />
       )}
     </div>

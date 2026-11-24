@@ -686,3 +686,36 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .onboarding-corvo { width: 120px; height: 120px; border-radius: 28px; }
   .onboarding-corpo h1 { font-size: 32px; }
 }
+
+/* ---------- Ligação: fundo tinta, o corvo grande, o que ele está fazendo, Desligar ---------- */
+.call .call-top { justify-content: center; gap: 16px; }
+.call-live { display: inline-flex; align-items: center; gap: 8px; font: 400 12px/1.4 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.call-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ambar); }
+.call .call-engine { font: 400 11px/1.4 var(--font-mono); letter-spacing: .04em; color: var(--text-muted); }
+.call .call-center { gap: 16px; }
+.call-corvo { border-radius: 0; }
+.call .call-state { font: italic 300 26px/1.3 var(--font-display); color: var(--text); }
+.call .call-hint { max-width: 560px; font: 400 15px/1.5 var(--font-sans); color: var(--text-muted); }
+.call .call-actions { justify-content: center; }
+.call .call-hangup { height: 56px; padding: 0 34px; border: 0; border-radius: 28px; background: var(--text); color: var(--bg); font: 500 15px/1 var(--font-sans); }
+.call .call-camera-toggle { width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 28px; background: transparent; color: var(--text); }
+
+/* ---------- Celular: barra de cima e abas embaixo ---------- */
+.mobile-tabs { display: none; }
+@media (max-width: 899px) {
+  .mobile-bar { gap: 10px; padding: 10px 12px 6px; }
+  .mobile-bar-brand { padding: 0; min-height: 44px; display: inline-flex; align-items: center; }
+  .mobile-bar-brand .corvo { border-radius: 7px; }
+  .mobile-bar-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 15px/1.2 var(--font-sans); color: var(--text); }
+  .mobile-bar-status { display: inline-flex; align-items: center; gap: 6px; font: 400 11px/1 var(--font-mono); letter-spacing: .04em; color: var(--text-muted); }
+  .mobile-bar-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+  .mobile-bar-status.on { color: var(--conectado); }
+  .mobile-bar-status.on::before { background: var(--conectado); }
+  .mobile-bar-button { border: 0; background: transparent; color: var(--text); }
+  .mobile-tabs { display: flex; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--surface); padding-bottom: env(safe-area-inset-bottom); }
+  .mobile-tabs button { flex: 1; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0; border: 0; background: transparent;
+    color: var(--text-muted); font: 400 11px/1 var(--font-sans); }
+  .mobile-tabs button[aria-current] { color: var(--text); }
+  .main > .home { max-width: none; }
+  .home-hero .home-corvo { display: none; }
+}

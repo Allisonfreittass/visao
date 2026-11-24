@@ -63,7 +63,7 @@
 
 /* Os três temas. Cada um dá só as cores de base (os valores do mockup); o resto deriva delas no
    bloco seguinte. Sem sombras: a separação vem da borda de 1 px.
-   O login (.muninn-entrada) e a abertura (.intro) ficam em Tinta até ganharem a tela nova. */
+   A ligação (.call) é sempre Tinta; a abertura (.intro) e a gênese antiga também. */
 :root, [data-theme="papel"] {
   color-scheme: light;
   --bg: #F6F4EF;
@@ -78,7 +78,7 @@
   --scrim: rgb(16 18 20 / .32);
 }
 
-[data-theme="tinta"], .muninn-entrada, .intro {
+[data-theme="tinta"], .muninn-entrada, .intro, .call {
   color-scheme: dark;
   --bg: #101214;
   --surface: #1A1D20;
@@ -109,7 +109,7 @@
 }
 
 /* Derivados: repetidos em cada lugar que muda de tema, para o color-mix usar as cores dali. */
-:root, [data-theme], .muninn-entrada, .intro {
+:root, [data-theme], .muninn-entrada, .intro, .call {
   --chip: var(--surface-2);
   --surface-sidebar: var(--surface);
   --bubble-user: var(--surface);
