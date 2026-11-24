@@ -7,6 +7,18 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 24/11/2026
 
+- **Seus objetivos, só com o seu sim** ([ADR-0025](decisions/0025-objetivos-do-dono.md)).
+  - Quando você diz algo que muda um objetivo seu ("acho que quero construir algo meu, não mais
+    prestar serviços"), ele liga isso ao que já sabe e pergunta se pode registrar como mudança nos
+    seus objetivos. Só registra se você disser que sim, ou se você mesmo pedir ("registra como
+    objetivo meu…").
+  - Os objetivos ativos vão em toda resposta, com a data e o porquê, para ele lembrar o rumo que
+    você escolheu.
+  - Mudar um objetivo encerra o antigo e abre o novo, guardando a sua fala de origem. No Caderno,
+    aba Memória, você vê cada objetivo com a fala de onde veio e desfaz a última mudança.
+  - Só com a memória ligada. "Esquecer tudo" apaga os objetivos junto.
+  - Ele nunca diz "registrei" sem ter registrado: a frase sai, em código.
+
 - **Um nome, um projeto.** Criar um projeto com o nome de outro que já existe, pela tela ou pela
   conversa, não cria um segundo: a tela oferece abrir o que já existe, e ele usa o mesmo. Renomear
   também não pega o nome de outro projeto; ele avisa que não renomeou. A comparação ignora

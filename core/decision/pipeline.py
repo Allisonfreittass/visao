@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from sqlalchemy.orm import Session
 
 from core import actions as app_actions
-from core import browse, location, projects
+from core import browse, location, owner_goals, projects
 from core.arm import intent as mac_intent
 from core.arm import screen
 from core.autonomy import continuity
@@ -317,6 +317,15 @@ def run_turn(
             recent=said_before[-8000:],
         )
         if asked:
+            # A goal is written only with the owner's yes, checked here in code (ADR-0025): the
+            # message asks for it, or it is a short yes to the last reply's question. On a plain
+            # yes the goal comes from the owner's message before that question.
+            consent = owner_goals.consent(text, last_reply)
+            said, said_id = text, None
+            if consent.by_yes:
+                earlier = next((m for m in reversed(history) if m.role == "user"), None)
+                if earlier is not None:
+                    said, said_id = earlier.content, earlier.id
             deeds = app_actions.execute(
                 session,
                 owner=owner,
@@ -324,6 +333,9 @@ def run_turn(
                 asked=asked,
                 source=f"{said_before}\n{text}",
                 limits=config.panel_limits,
+                consent=consent,
+                said=said,
+                said_message_id=said_id,
             )
     if deeds:
         blocks.append(app_actions.block(deeds))

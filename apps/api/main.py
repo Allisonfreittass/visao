@@ -18,6 +18,7 @@ from apps.api.routes import (
     memory,
     mind,
     onboarding,
+    owner_goals,
     panels,
     projects,
     push,
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(voice.router)
     app.include_router(curiosity.router)
     app.include_router(goals.router)
+    app.include_router(owner_goals.router)
     app.include_router(behavior.router)
     app.include_router(cognition.router)
     app.include_router(mind.router)

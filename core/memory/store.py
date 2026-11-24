@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from core import owner_goals
 from core.mind import notes, questions
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import (
@@ -71,6 +72,7 @@ def delete_all(session: Session, owner: User) -> int:
         _scrub(candidate, now)
     notes.erase(session, owner.id)
     questions.erase(session, owner.id)
+    owner_goals.erase(session, owner.id)
     record_audit(
         session,
         "memory.delete_all",
