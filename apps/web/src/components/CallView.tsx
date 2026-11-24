@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import type { Message } from "../api";
+import type { Message, ProgressStep } from "../api";
 import { type CallCamera, cameraSupported } from "../call/camera";
 import { Icon } from "./Icon";
-import { Anel } from "../anel/Anel";
 import { type AssistantState, STATE_LABELS, anelEstado } from "../anel/state";
+import { MuninnDaLigacao } from "../muninn/MuninnDaLigacao";
 import { speakableText } from "../speech/speakable";
 
 interface CallViewProps {
@@ -23,6 +23,8 @@ interface CallViewProps {
   voiceApproval?: boolean;
   /** The camera: while on, what it shows goes with each sentence you say. */
   camera?: CallCamera;
+  /** What the turn is doing now (null between turns): Muninn takes the shape of its tool. */
+  step?: ProgressStep | null;
 }
 
 function clock(ms: number): string {
@@ -40,7 +42,7 @@ const HINTS: Partial<Record<AssistantState, string>> = {
 };
 
 /** A call: the whole screen is the conversation, hands free, the screen kept on. */
-export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval, camera }: CallViewProps) {
+export function CallView({ agentName, state, level, messages, engine, speaking, error, onInterrupt, onHangUp, ask, voiceApproval, camera, step = null }: CallViewProps) {
   const [started] = useState(() => Date.now());
   const [now, setNow] = useState(started);
   useEffect(() => {
@@ -63,7 +65,8 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
-  // Muninn inside the ring (above 120 px, DESIGN.md §5), with the listening wave round him.
+  // Muninn inside the ring (above 120 px, DESIGN.md §5), with the listening wave round him; his
+  // particles take the shape of the tool the turn uses (§6, "Nanorrobôs").
   const size = Math.min(220, Math.max(140, Math.round(window.innerWidth * 0.5)));
 
   return (
@@ -73,10 +76,14 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         <span className="call-engine">{engine === "device" ? "Voz do aparelho" : "Voz própria"}</span>
       </header>
       <div className="call-center">
-        <Anel estado={anelEstado({ state })} size={size} level={level} decorative />
+        <MuninnDaLigacao estado={anelEstado({ state })} size={size} level={level} passo={step} />
         <h1 className="call-name">{agentName ?? "V.I.S.A.O."}</h1>
         <p className="call-state" aria-live="polite">{STATE_LABELS[state]}</p>
-        <p className="call-hint">{HINTS[state] ?? "Estou aqui."}</p>
+        {step ? (
+          <p className="call-hint call-step" aria-live="polite">{step.detail ? `${step.label} · ${step.detail}` : step.label}</p>
+        ) : (
+          <p className="call-hint">{HINTS[state] ?? "Estou aqui."}</p>
+        )}
       </div>
       <div className="call-transcript" aria-live="polite">
         {lastUser && <p><span>Você</span>{lastUser.content}</p>}

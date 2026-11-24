@@ -148,7 +148,7 @@ def run_turn(
     # returns shows it), and the reply that sees it goes only to Claude or OpenAI.
     reply_provider = provider
     if not shared and screen.wants_screen(text):
-        progress.step("Olhando sua tela")
+        progress.step("Olhando sua tela", kind="mac")
         files = files if files is not None else []
         if screen_provider is None:
             looked = screen.Look(None, screen.NO_PROVIDER)
@@ -173,9 +173,12 @@ def run_turn(
             progress.step(
                 "Lendo " + (documents[0].filename if len(documents) == 1 else "os arquivos"),
                 ", ".join(f.filename for f in documents) if len(documents) > 1 else None,
+                kind="arquivo",
             )
         elif photos:
-            progress.step("Olhando a foto" if len(photos) == 1 else "Olhando as fotos")
+            progress.step(
+                "Olhando a foto" if len(photos) == 1 else "Olhando as fotos", kind="arquivo"
+            )
         plan.add(
             "read_attachments",
             executed=True,
@@ -186,7 +189,7 @@ def run_turn(
     urls = conversation_links.find(text) if links is not None else []
     if urls:
         hosts = list(dict.fromkeys(urlsplit(u).hostname or u for u in urls))
-        progress.step("Abrindo " + hosts[0], ", ".join(hosts[1:]) or None)
+        progress.step("Abrindo " + hosts[0], ", ".join(hosts[1:]) or None, kind="site")
     read = tuple(links.read(text)) if links is not None else ()
     if read:
         opened = [r.url for r in read if r.ok]
@@ -223,6 +226,8 @@ def run_turn(
             provider=provider,
             budgets=config.budgets,
         )
+        if wanted:
+            progress.step("Montando o pedido ao Mac", wanted.project, kind="mac")
         task = mac_intent.propose(session, owner.id, wanted, conversation.id) if wanted else None
         if task is not None:
             plan.add(
@@ -373,7 +378,7 @@ def run_turn(
             if changed:
                 rechecked = False
                 if set(changed) & panels.SEARCH_FIELDS and browser is not None:
-                    progress.step("Conferindo os preços de novo")
+                    progress.step("Conferindo os preços de novo", kind="site")
                     outcome_of_check = panels.recheck(
                         session,
                         target,
@@ -623,7 +628,7 @@ def run_turn(
             )
         optional.append(mind_temperament.compute(session, owner, now).chat_block())
     if self_knowledge.about_self(text):
-        progress.step("Lendo o próprio código")
+        progress.step("Lendo o próprio código", kind="arquivo")
     own_code = self_knowledge.context_block(text)
     if own_code:
         optional.append(own_code)

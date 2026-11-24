@@ -7,6 +7,14 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 24/11/2026
 
+- **Na ligação, o Muninn vira a ferramenta que ele está usando** ([DESIGN.md](../DESIGN.md),
+  seção 6, "Nanorrobôs").
+  - As partículas do corvo viram um envelope no Gmail, um calendário na agenda, uma lupa na
+    pesquisa, uma janela de navegador num site ou cotação, um notebook no Mac e uma página num
+    arquivo. Quando ele termina, voltam a ser o corvo.
+  - Cada passo do turno diz agora que ferramenta usa (`kind`, no `/progress` e no stream).
+  - Com "reduzir movimento" ligado no aparelho, o corvo só troca por um ícone de traço.
+
 - **Ele mexe no mouse e no teclado do seu PC, quando você pede com `/pc`** ([MEXER.md](MEXER.md),
   [ADR-0024](decisions/0024-mouse-e-teclado.md), braço versão 6).
   - `/pc abre o YouTube e procura jazz`: uma sessão de até 10 minutos no seu desktop de verdade,

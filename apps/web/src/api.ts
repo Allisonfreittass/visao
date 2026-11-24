@@ -19,6 +19,8 @@ export interface Source {
 export interface ProgressStep {
   label: string;
   detail?: string | null;
+  /** The tool the step uses (core/conversation/progress.py KINDS); null for his own steps. */
+  kind?: string | null;
 }
 
 export interface TurnProgress {

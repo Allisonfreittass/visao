@@ -66,6 +66,24 @@ def test_the_steps_that_ran_are_shown_while_it_works(client, db):
     assert steps[-1] == "Escrevendo a resposta"
     after = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
     assert after["active"] is False and after["steps"][-1]["label"] == "Escrevendo a resposta"
+    kinds = {s["label"]: s["kind"] for s in after["steps"]}
+    # The tool's shape for the call's nanorrobôs; thinking and writing are the crow.
+    assert kinds["Lendo notas.md"] == "arquivo"
+    assert kinds["Pensando"] is None and kinds["Escrevendo a resposta"] is None
+
+
+def test_reading_its_own_code_is_a_file_step(client, db):
+    seen = world(client, db)
+    headers = _login(client, db)
+    conversation = client.post("/conversations", headers=headers).json()["id"]
+    client.post(
+        f"/conversations/{conversation}/messages",
+        headers=headers,
+        json={"content": "o que faz o core/conversation/progress.py?"},
+    )
+    assert "Lendo o próprio código" in seen[-1]
+    after = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
+    assert {s["label"]: s["kind"] for s in after["steps"]}["Lendo o próprio código"] == "arquivo"
 
 
 def test_with_nothing_running_there_is_nothing_to_show(client, db):
@@ -74,6 +92,20 @@ def test_with_nothing_running_there_is_nothing_to_show(client, db):
     conversation = client.post("/conversations", headers=headers).json()["id"]
     live = client.get(f"/conversations/{conversation}/progress", headers=headers).json()
     assert live == {"active": False, "elapsed_ms": 0, "steps": [], "draft": None}
+
+
+def test_a_step_says_its_kind_and_an_unknown_kind_is_a_bug():
+    with progress.tracking(CONVERSATION):
+        progress.step("Procurando no seu Gmail", "from:joao", kind="gmail")
+        progress.step("Pensando")
+        with pytest.raises(ValueError):
+            progress.step("Fazendo café", kind="cafeteira")
+        assert [s["kind"] for s in progress.snapshot(CONVERSATION)["steps"]] == ["gmail", None]
+    sent = [e.data for e in progress._turns[CONVERSATION].events if e.kind == "step"]
+    assert sent == [
+        {"label": "Procurando no seu Gmail", "detail": "from:joao", "kind": "gmail"},
+        {"label": "Pensando", "detail": None, "kind": None},
+    ]
 
 
 def test_someone_elses_progress_is_not_found(client, db):

@@ -42,3 +42,19 @@ def client(engine: Engine) -> Iterator[TestClient]:
     app.dependency_overrides[get_session_factory] = lambda: factory
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def steps(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str | None]]:
+    """Every progress step said, as (label, kind), tracked turn or not."""
+    from core.conversation import progress
+
+    said: list[tuple[str, str | None]] = []
+    real = progress.step
+
+    def record(label: str, detail: str | None = None, kind: str | None = None) -> None:
+        said.append((label, kind))
+        real(label, detail, kind)
+
+    monkeypatch.setattr(progress, "step", record)
+    return said

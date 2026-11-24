@@ -167,7 +167,7 @@ def run(
     try:
         days = wanted.get("calendar_days")
         if isinstance(days, int | float) and 0 <= days <= 14:
-            progress.step("Olhando sua agenda")
+            progress.step("Olhando sua agenda", kind="agenda")
             start = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
             events = google.events(
                 start - timedelta(hours=1), start + timedelta(days=int(days) + 1)
@@ -177,7 +177,7 @@ def run(
             result.calendar_days = int(days) or 1
         query = wanted.get("email_query")
         if isinstance(query, str) and query.strip():
-            progress.step("Procurando no seu Gmail", query.strip())
+            progress.step("Procurando no seu Gmail", query.strip(), kind="gmail")
             found = google.search(query.strip(), limit=8)
             parts.append(f'Emails para a busca "{query.strip()}":\n{_mails_text(found)}')
             result.read.append("gmail")

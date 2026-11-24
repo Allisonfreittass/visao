@@ -284,7 +284,7 @@ def turn(db, owner, text, extraction):
     return outcome, provider.prompts[-1][0].content
 
 
-def test_a_question_reads_the_calendar_and_mail_as_data(db, google):
+def test_a_question_reads_the_calendar_and_mail_as_data(db, google, steps):
     owner = setup(db)
     connected(db, owner)
     outcome, system = turn(
@@ -298,6 +298,8 @@ def test_a_question_reads_the_calendar_and_mail_as_data(db, google):
     assert "google_read" in outcome.plan.executed()
     assert "ler o Gmail e a Google Agenda" in system
     assert db.scalar(select(GoogleAction)) is None
+    assert ("Olhando sua agenda", "agenda") in steps
+    assert ("Procurando no seu Gmail", "gmail") in steps
 
 
 def test_a_reply_is_prepared_and_waits_for_approval(db, google):

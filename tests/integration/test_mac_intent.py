@@ -36,7 +36,7 @@ def test_a_slash_mac_in_the_middle_of_a_sentence_is_a_request_too():
     assert not candidate("comprei um imac/macbook novo", PROJECTS)
 
 
-def test_a_slash_mac_without_a_project_goes_to_the_only_one_and_waits_for_a_tap(db):
+def test_a_slash_mac_without_a_project_goes_to_the_only_one_and_waits_for_a_tap(db, steps):
     owner = setup(db)
     mac(db, owner, ["visao"])
     outcome, _ = turn(
@@ -48,6 +48,7 @@ def test_a_slash_mac_without_a_project_goes_to_the_only_one_and_waits_for_a_tap(
     task = db.scalar(select(ArmTask))
     assert (task.project, task.status) == ("visao", "proposed")
     assert "mac_proposed" in outcome.plan.executed()
+    assert ("Montando o pedido ao Mac", "mac") in steps
 
 
 def test_talk_about_the_mac_never_gets_a_no_connection_answer(db):

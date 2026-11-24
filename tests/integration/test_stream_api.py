@@ -107,6 +107,7 @@ def test_the_text_chat_streams_steps_text_and_a_done_with_the_reply(client, db):
         "Pensando",
         "Escrevendo a resposta",
     ]
+    assert all("kind" in d for _, k, d in events if k == "step")
     reply = turn.json()["assistant_message"]
     assert text_of(events) == reply["content"] == "Camberra é a capital.\n\nFica no sudeste."
     assert "[[" not in "".join(d.get("text", "") for _, _, d in events)

@@ -22,7 +22,7 @@ import {
 import "./genesis.css";
 
 // Colours of DESIGN.md §2, read from the scoped tokens so the canvas follows the CSS.
-interface Palette {
+export interface Palette {
   tinta: string;
   papel: string;
   cinza: string;
@@ -47,9 +47,9 @@ interface Stroke {
   total: number;
 }
 
-const STROKES_URL = "/muninn/strokes.json";
+export const STROKES_URL = "/muninn/strokes.json";
 /** The plate at the resolution the screen needs: 720 px up to that, 1024 px for retina desktops. */
-const artUrl = (devicePixels: number) => (devicePixels > 720 ? "/muninn/muninn-1024.webp" : "/muninn/muninn-720.webp");
+export const artUrl = (devicePixels: number) => (devicePixels > 720 ? "/muninn/muninn-1024.webp" : "/muninn/muninn-720.webp");
 /** If the assets are slow, the ring still closes and the form never waits on them. */
 const ASSET_WAIT_MS = 2500;
 
@@ -63,7 +63,7 @@ function prepare(raw: number[][]): Stroke[] {
   });
 }
 
-function readPalette(el: Element): Palette {
+export function readPalette(el: Element): Palette {
   const s = getComputedStyle(el);
   const v = (name: string, fallback: string) => s.getPropertyValue(name).trim() || fallback;
   return {

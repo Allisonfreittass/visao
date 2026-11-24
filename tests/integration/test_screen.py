@@ -83,7 +83,9 @@ def send(client, world, text):
     )
 
 
-def test_the_owner_asks_and_only_the_private_chain_sees_the_screen(client, db, world, monkeypatch):
+def test_the_owner_asks_and_only_the_private_chain_sees_the_screen(
+    client, db, world, monkeypatch, steps
+):
     offer_screen(client, world)
     the_arm_answers(db, monkeypatch)
 
@@ -91,6 +93,7 @@ def test_the_owner_asks_and_only_the_private_chain_sees_the_screen(client, db, w
 
     assert turn.status_code == 200, turn.text
     assert turn.json()["assistant_message"]["content"] == "É um erro de import."
+    assert ("Olhando sua tela", "mac") in steps and ("Olhando a foto", "arquivo") in steps
     [shown] = turn.json()["user_message"]["attachments"]  # in the answer, no reload needed
     assert shown["kind"] == "image" and shown["filename"].startswith("tela-")
     prompt = world["private"].prompts[-1]
