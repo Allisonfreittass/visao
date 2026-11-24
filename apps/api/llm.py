@@ -74,6 +74,13 @@ def get_code_provider() -> LLMProvider | None:
     return build_llm_provider(get_settings(), only=llm_routing.CODE_KINDS)
 
 
+@lru_cache
+def get_screen_provider() -> LLMProvider | None:
+    """A reply that sees the owner's screen (docs/TELA.md): the conversation's chain, only with
+    the providers allowed to see it. None when none of them is configured."""
+    return build_llm_provider(get_settings(), fast=True, only=llm_routing.SCREEN_KINDS)
+
+
 def with_brain(
     settings: Settings,
     cloud: LLMProvider | None,

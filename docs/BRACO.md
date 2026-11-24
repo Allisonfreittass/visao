@@ -160,6 +160,11 @@ guarda suas chaves. Por isso:
       passarem" funcionam igual. No resultado aparece "Feito pelo executor do Visão, em N passos".
     - Ainda não visto rodando no Mac: os testes passaram no Linux, com o `bubblewrap` de verdade.
 
+12. **A tela** (versão 5, [TELA.md](TELA.md)). Com `"tela": true` no `braco.json`, o braço abre
+    uma terceira linha, separada das tarefas e do modelo local. Quando a sua mensagem pede para
+    ver a tela, ele captura o monitor onde está o mouse e avisa no próprio computador. Só olha:
+    não mexe em nada.
+
    **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
    `braco.json` é mantido.
 

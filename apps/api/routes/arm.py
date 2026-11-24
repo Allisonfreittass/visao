@@ -16,7 +16,7 @@ from apps.api.deps import CurrentUser, DbSession
 from apps.api.llm import get_code_provider
 from apps.api.settings import Settings, get_settings
 from core import brain
-from core.arm import coder, local_llm, service
+from core.arm import coder, local_llm, screen, service
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Message
 from integrations.llm.base import LLMProvider
@@ -154,6 +154,18 @@ class LlmResultIn(BaseModel):
     error: str = Field(default="", max_length=5000)
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
+
+
+class ScreenNextOut(BaseModel):
+    id: uuid.UUID
+
+
+class ScreenResultIn(BaseModel):
+    ok: bool
+    media_type: str = Field(default="", max_length=64)
+    # Base64 of at most 5 MB of picture.
+    data: str = Field(default="", max_length=7_000_000)
+    error: str = Field(default="", max_length=2000)
 
 
 class BrainOut(BaseModel):
@@ -512,4 +524,41 @@ def device_llm_result(call_id: uuid.UUID, body: LlmResultIn, device: Device, db:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, "Pergunta não está com este aparelho"
         ) from exc
+    db.commit()
+
+
+@router.get("/device/screen/next", response_model=ScreenNextOut | None)
+def device_screen_next(
+    device: Device, db: DbSession, wait: Annotated[int, Query(ge=0, le=LONG_POLL_MAX)] = 0
+) -> ScreenNextOut | None:
+    """Long poll of a computer that offers its screen ("tela": true, docs/TELA.md): answers as
+    soon as the owner asked for a look, or null after `wait` seconds."""
+    deadline = time.monotonic() + wait
+    while True:
+        screen.seen(db, device)
+        request = screen.claim(db, device)
+        db.commit()
+        if request is not None:
+            return ScreenNextOut(id=request.id)
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(0.3)
+
+
+@router.post("/device/screen/{request_id}/result", status_code=status.HTTP_204_NO_CONTENT)
+def device_screen_result(
+    request_id: uuid.UUID, body: ScreenResultIn, device: Device, db: DbSession
+) -> None:
+    try:
+        screen.finish(
+            db,
+            device,
+            request_id,
+            ok=body.ok,
+            media_type=body.media_type,
+            data=body.data,
+            error=body.error,
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pedido não está com este aparelho") from exc
     db.commit()

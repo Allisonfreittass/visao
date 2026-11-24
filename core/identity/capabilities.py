@@ -134,6 +134,13 @@ class Capabilities:
                 "trecho, criar arquivo, rodar os testes do Mac, git status e git diff); sem "
                 "shell, sem rede, sem .env nem chaves, com limite de passos e de custo por tarefa"
             )
+            items.append(
+                "ver a tela do computador do interlocutor quando ele pede com as palavras dele "
+                '("olha minha tela", "o que é esse erro na tela?"), se o braço daquele computador '
+                "oferece a tela: a captura chega anexada à mensagem dele e só Claude ou OpenAI a "
+                "veem; você só olha, não mexe no mouse nem no teclado, e não pede uma captura por "
+                "conta própria"
+            )
         if self.continuous:
             items.append(
                 "lembrar desta conversa contínua inteira: a conversa com o interlocutor é uma só, "
