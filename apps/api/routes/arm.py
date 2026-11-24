@@ -13,10 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
-from apps.api.llm import get_code_provider
+from apps.api.llm import get_code_provider, get_screen_provider
 from apps.api.settings import Settings, get_settings
 from core import brain
-from core.arm import coder, local_llm, screen, service
+from core.arm import coder, desktop, local_llm, screen, service
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Message
 from integrations.llm.base import LLMProvider
@@ -154,6 +154,33 @@ class LlmResultIn(BaseModel):
     error: str = Field(default="", max_length=5000)
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
+
+
+class DesktopIn(BaseModel):
+    prompt: str = Field(max_length=service.MAX_PROMPT)
+    conversation_id: uuid.UUID | None = None
+
+
+class StopOut(BaseModel):
+    stopped: int
+
+
+class PastActionIn(BaseModel):
+    tool: str | None = Field(default=None, max_length=40)
+    args: dict = Field(default_factory=dict)
+    note: str = Field(default="", max_length=2000)
+    result: str = Field(default="", max_length=2000)
+    ok: bool = True
+
+
+class DesktopStepIn(BaseModel):
+    # The screen as it is now: base64 of at most 5 MB of JPEG or PNG.
+    picture: str = Field(max_length=7_000_000)
+    width: int = Field(ge=1, le=10_000)
+    height: int = Field(ge=1, le=10_000)
+    steps: list[PastActionIn] = Field(default_factory=list, max_length=200)
+    max_steps: int = Field(ge=1, le=200)
+    max_usd: Decimal = Field(ge=0, le=100)
 
 
 class ScreenNextOut(BaseModel):
@@ -342,6 +369,59 @@ def undo(task_id: uuid.UUID, user: CurrentUser, db: DbSession) -> TaskOut:
     return _task_out(task)
 
 
+@router.post("/desktop", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
+def ask_desktop(body: DesktopIn, user: CurrentUser, db: DbSession) -> TaskOut:
+    """`/pc <pedido>` (docs/MEXER.md): the command is the approval of one session of up to 10
+    minutes at the mouse and keyboard of the owner's computer."""
+    if body.conversation_id is not None:
+        conversation = db.get(Conversation, body.conversation_id)
+        if conversation is None or conversation.user_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversa não encontrada")
+    try:
+        task = service.request_desktop(
+            db, user.id, body.prompt, conversation_id=body.conversation_id
+        )
+    except service.ArmError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    record_audit(db, "arm.desktop", "success", actor_user_id=user.id)
+    if body.conversation_id is not None:
+        now = service._now()
+        db.add_all(
+            [
+                Message(
+                    conversation_id=body.conversation_id,
+                    role="user",
+                    content=f"/pc {task.prompt}",
+                    origin="arm",
+                    created_at=now,
+                ),
+                Message(
+                    conversation_id=body.conversation_id,
+                    role="assistant",
+                    content=DESKTOP_RECEIPT,
+                    origin="arm",
+                    created_at=now + timedelta(milliseconds=1),
+                ),
+            ]
+        )
+    db.commit()
+    return _task_out(task)
+
+
+DESKTOP_RECEIPT = (
+    "Vou mexer no seu PC por até 10 minutos. Para eu parar: mexa o mouse, escreva /pc parar ou "
+    "toque em Parar na página Mac."
+)
+
+
+@router.post("/desktop/stop", response_model=StopOut)
+def stop_desktop(user: CurrentUser, db: DbSession) -> StopOut:
+    stopped = service.stop_desktop(db, user.id)
+    record_audit(db, "arm.desktop_stop", "success", actor_user_id=user.id)
+    db.commit()
+    return StopOut(stopped=stopped)
+
+
 @router.get("/brain", response_model=BrainOut)
 def brain_status(user: CurrentUser, db: DbSession) -> BrainOut:
     """Which model the Visão thinks with, and whether the Mac offers a local one now."""
@@ -460,6 +540,39 @@ def device_step(
         db.rollback()
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Essa tarefa não está rodando neste aparelho"
+        ) from exc
+
+
+@router.post("/device/tasks/{task_id}/desktop", response_model=StepOut)
+def device_desktop_step(
+    task_id: uuid.UUID,
+    body: DesktopStepIn,
+    device: Device,
+    db: DbSession,
+    provider: Annotated[LLMProvider | None, Depends(get_screen_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    """The next action of a desktop session (docs/MEXER.md), asked of a model that may see the
+    screen (Claude or OpenAI). The keys stay here; limits of time, steps and cost too."""
+    device.last_seen_at = service._now()
+    try:
+        return desktop.step(
+            db,
+            device,
+            task_id,
+            provider=provider,
+            picture_b64=body.picture,
+            width=body.width,
+            height=body.height,
+            steps=[desktop.PastAction(**s.model_dump()) for s in body.steps],
+            max_steps=coder.limit_steps(settings.arm_desktop_max_steps, body.max_steps),
+            max_usd=coder.limit_usd(settings.arm_desktop_max_usd, body.max_usd),
+            minutes=settings.arm_desktop_minutes,
+        )
+    except desktop.StepError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Essa sessão não está rodando neste aparelho"
         ) from exc
 
 

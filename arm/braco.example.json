@@ -9,6 +9,7 @@
   },
   "executor": "claude_code",
   "tela": false,
+  "mexer": false,
   "claude": "claude",
   "max_turns": 30,
   "max_budget_usd": 2.0,

@@ -235,8 +235,9 @@ export interface ArmTask {
   conversation_id: string | null;
   created_at: string;
   finished_at: string | null;
-  /** work: Claude Code did it; undo: the arm put back what `undo_of` changed. */
-  kind: "work" | "undo";
+  /** work: Claude Code did it; undo: the arm put back what `undo_of` changed; desktop: a
+   * session at the mouse and keyboard (docs/MEXER.md). */
+  kind: "work" | "undo" | "desktop";
   undo_of: string | null;
   until_tests: boolean;
   /** Measured by the arm's photos before and after, not told by Claude. */
@@ -803,6 +804,20 @@ export class Api {
       body: JSON.stringify({ project, prompt, conversation_id: conversationId }),
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  /** `/pc <pedido>`: the command is the approval of one session at the mouse and keyboard. */
+  askDesktop(prompt: string, conversationId: string | null): Promise<ArmTask> {
+    return this.request("/arm/desktop", {
+      method: "POST",
+      body: JSON.stringify({ prompt, conversation_id: conversationId }),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /** `/pc parar` or Parar: the session stops before its next action. */
+  stopDesktop(): Promise<{ stopped: number }> {
+    return this.request("/arm/desktop/stop", { method: "POST" });
   }
 
   /** `via: "voz"`: said in a call after it read the task aloud; the server records it. */

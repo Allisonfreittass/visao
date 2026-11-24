@@ -45,6 +45,10 @@ OPEN = ("proposed", "approved", "running")
 # Undo and "until the tests pass" need an arm of version 3; an older one would take the first as
 # a prompt for Claude and run the second only once.
 NEW_KINDS_VERSION = 3
+# The desktop session (docs/MEXER.md) needs an arm of version 6; an older one would hand the
+# request to Claude Code as a prompt.
+DESKTOP_VERSION = 6
+DESKTOP = "desktop"
 TESTS_GOAL = re.compile(
     r"(?i)\bat[eé]\s+(?:que\s+)?(?:(?:todos\s+)?os?\s+)?testes?\s+pass\w*"
     r"|\bat[eé]\s+passar(?:em)?\s+(?:n[oa]s?\s+|em\s+)?(?:(?:todos\s+)?os?\s+)?testes?\b"
@@ -111,6 +115,10 @@ def _version(device: ArmDevice) -> int:
 
 def can_do_new_kinds(device: ArmDevice) -> bool:
     return _version(device) >= NEW_KINDS_VERSION
+
+
+def can_use_desktop(device: ArmDevice) -> bool:
+    return _version(device) >= DESKTOP_VERSION
 
 
 def beats_while_working(device: ArmDevice) -> bool:
@@ -226,6 +234,70 @@ def propose(
     return task
 
 
+def request_desktop(
+    session: Session,
+    owner_id: uuid.UUID,
+    prompt: str,
+    *,
+    conversation_id: uuid.UUID | None = None,
+) -> ArmTask:
+    """The owner's `/pc <pedido>`: that command is the approval of one session at the mouse and
+    keyboard (docs/MEXER.md). Never proposed by the agent: there is no propose for it."""
+    _, prompt = _validated(DESKTOP, prompt)
+    devices = session.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == owner_id)).all()
+    if not any(can_use_desktop(d) for d in devices):
+        raise ArmError(
+            'Para eu mexer no seu PC, atualize o braço (versão 6) e escreva "mexer": true '
+            "no braco.json desse computador."
+        )
+    running = session.scalar(
+        select(ArmTask.id).where(
+            ArmTask.owner_user_id == owner_id,
+            ArmTask.kind == DESKTOP,
+            ArmTask.status.in_(("approved", "running")),
+        )
+    )
+    if running is not None:
+        raise ArmError("Já tem uma sessão no seu PC. Para parar, escreva /pc parar.")
+    now = _now()
+    task = ArmTask(
+        owner_user_id=owner_id,
+        conversation_id=conversation_id,
+        project="pc",
+        prompt=prompt,
+        status="approved",
+        requested_by="owner",
+        kind=DESKTOP,
+        result="",
+        error="",
+        created_at=now,
+        approved_at=now,
+    )
+    session.add(task)
+    session.flush()
+    return task
+
+
+def stop_desktop(session: Session, owner_id: uuid.UUID) -> int:
+    """`/pc parar` or Parar: a session waiting is cancelled, a running one stops at its next
+    step (the arm asks before every action). Returns how many sessions it reached."""
+    count = 0
+    for task in session.scalars(
+        select(ArmTask).where(
+            ArmTask.owner_user_id == owner_id,
+            ArmTask.kind == DESKTOP,
+            ArmTask.status.in_(("approved", "running")),
+        )
+    ):
+        if task.status == "approved":
+            task.status, task.finished_at = "cancelled", _now()
+        else:
+            task.stop_requested = True
+        count += 1
+    session.flush()
+    return count
+
+
 def _needs_new_arm(session: Session, owner_id: uuid.UUID, what: str) -> None:
     devices = session.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == owner_id)).all()
     if devices and not any(can_do_new_kinds(d) for d in devices):
@@ -329,6 +401,8 @@ def claim(session: Session, device: ArmDevice) -> ArmTask | None:
     )
     if not can_do_new_kinds(device):
         query = query.where(ArmTask.kind == "work", ArmTask.until_tests.is_(False))
+    elif not can_use_desktop(device):
+        query = query.where(ArmTask.kind != DESKTOP)
     candidate = session.scalar(query.order_by(ArmTask.approved_at).limit(1))
     if candidate is None:
         return None
@@ -396,6 +470,12 @@ def _executor_line(task: ArmTask) -> str:
 
 
 def _summary(task: ArmTask) -> str:
+    if task.kind == DESKTOP:
+        head = "Mexi no seu PC." if task.status == "done" else "Parei de mexer no seu PC."
+        body = (task.result.strip() if task.status == "done" else task.error) or "Sem detalhe."
+        if task.status != "done" and task.result.strip():
+            body += "\n\n" + task.result.strip()
+        return "\n\n".join(p for p in (head, body, _executor_line(task)) if p)[:MAX_RESULT]
     undo = task.kind == "undo"
     if task.status == "done":
         head = f"{'Desfiz' if undo else 'Terminei'} no Mac, em **{task.project}**."
@@ -470,14 +550,20 @@ def finish(
     push.send_to_owner(
         session,
         task.owner_user_id,
-        title=("Desfiz no Mac" if task.kind == "undo" else "Terminei no Mac")
-        if ok
-        else "Não deu certo no Mac",
+        title=_push_title(task, ok),
         body=text,
         url=f"/?c={task.conversation_id}" if task.conversation_id else "/?mac=1",
         tag=f"visao-arm-{task.id}",
     )
     return task
+
+
+def _push_title(task: ArmTask, ok: bool) -> str:
+    if task.kind == DESKTOP:
+        return "Terminei no seu PC" if ok else "Parei no seu PC"
+    if not ok:
+        return "Não deu certo no Mac"
+    return "Desfiz no Mac" if task.kind == "undo" else "Terminei no Mac"
 
 
 def open_count(session: Session, owner_id: uuid.UUID) -> int:

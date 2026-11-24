@@ -43,7 +43,7 @@ import { usePending } from "./hooks/usePending";
 import { type SpokenTiming, useVoice } from "./hooks/useVoice";
 import { Anel } from "./anel/Anel";
 import { ANEL_ESTADOS, ANEL_LABELS, type AnelEstado, type AssistantState, anelEstado } from "./anel/state";
-import { parseMacCommand } from "./arm";
+import { parseMacCommand, parsePcCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { AmbientBackground } from "./brand/AmbientBackground";
@@ -514,6 +514,24 @@ export function App() {
     }
   }
 
+  async function askPc(command: { prompt: string } | "stop"): Promise<void> {
+    setSending(true);
+    try {
+      if (command === "stop") {
+        const { stopped } = await api.stopDesktop();
+        setError(stopped ? null : "Não tem nenhuma sessão no seu PC agora.");
+        return;
+      }
+      const conversationId = current ?? (await openConversation());
+      await api.askDesktop(command.prompt, conversationId);
+      setMessages(await loadMessages(conversationId));
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function send(text: string, spoken?: SpokenTiming, files: Attachment[] = [], replyTo: Message | null = null): Promise<void> {
     setError(null);
     const quote = replyTo ? { id: replyTo.id, role: replyTo.role, excerpt: replyTo.content.replace(/\s+/g, " ").slice(0, 160) } : null;
@@ -525,6 +543,15 @@ export function App() {
         ...list,
         { id: queuedId, role: "user", content: text, created_at: new Date().toISOString(), attachments: files, reply_to: quote, local: "queued" },
       ]);
+      return;
+    }
+    const pc = spoken || files.length ? null : parsePcCommand(text);
+    if (pc === "usage") {
+      setError("Use assim: /pc o que fazer (ex.: /pc abre o YouTube e procura jazz). Para parar: /pc parar.");
+      return;
+    }
+    if (pc) {
+      await askPc(pc);
       return;
     }
     const mac = spoken || files.length ? null : parseMacCommand(text);

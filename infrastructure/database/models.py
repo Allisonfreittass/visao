@@ -994,7 +994,8 @@ class ArmTask(Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # work: Claude Code does it | undo: the arm puts back what `undo_of` changed, no Claude.
+    # work: Claude Code does it | undo: the arm puts back what `undo_of` changed, no Claude |
+    # desktop: the Visão at the mouse and keyboard, a session of up to 10 min (docs/MEXER.md).
     kind: Mapped[str] = mapped_column(String(16), default="work", server_default="work")
     undo_of: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("arm_tasks.id", ondelete="SET NULL"), nullable=True
@@ -1014,6 +1015,8 @@ class ArmTask(Base):
     model_cost_usd: Mapped[Decimal] = mapped_column(
         Numeric(12, 6), default=Decimal(0), server_default="0"
     )
+    # The owner asked a running desktop session to stop (docs/MEXER.md): the next step says so.
+    stop_requested: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class OwnerQuestion(Base):

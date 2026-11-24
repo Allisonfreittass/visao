@@ -165,6 +165,11 @@ guarda suas chaves. Por isso:
     ver a tela, ele captura o monitor onde está o mouse e avisa no próprio computador. Só olha:
     não mexe em nada.
 
+13. **Mouse e teclado** (versão 6, [MEXER.md](MEXER.md), [ADR-0024](decisions/0024-mouse-e-teclado.md)).
+    Com `"mexer": true` no `braco.json`, o `/pc <pedido>` abre uma sessão de até 10 minutos no
+    desktop de verdade. Ela para quando você mexe o mouse, escreve `/pc parar` ou toca em Parar.
+    O braço recusa terminal, a tecla Super e texto com cara de comando.
+
    **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
    `braco.json` é mantido.
 
