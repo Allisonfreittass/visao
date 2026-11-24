@@ -3,7 +3,8 @@
 On 17/11/2026 it answered "Anotado: a viagem ao Chile fica no projeto «Viagem para o Chile»"
 with no project and no note anywhere, and then said it could not create projects. When no action
 in the app ran this turn, a sentence that says it noted, created, moved, paused or deleted a
-project, a note, a panel or a page goes, in code; removing never adds a claim.
+project, a note, a panel, a page or one of the owner's goals (ADR-0025) goes, in code; removing
+never adds a claim.
 """
 
 import re
@@ -16,7 +17,7 @@ _CLAIM = re.compile(
     r"exclui|excluid[oa]|removi|removid[oa]|renomeei|salvei|salv[oa]|guardei|guardad[oa]|movi|"
     r"coloquei|pausei|retomei)\b"
 )
-_THING = re.compile(r"\b(projeto|projetos|anotac\w*|notas?|painel|paineis|pagina)\b")
+_THING = re.compile(r"\b(projeto|projetos|anotac\w*|notas?|painel|paineis|pagina|objetivos?)\b")
 # "Não consigo acrescentar isso agora" right after offering to (17/11/2026): it can.
 _DENIES = re.compile(
     r"\b(nao (consigo|posso|tenho como|da para|da pra)|sem como)\b.{0,40}"
