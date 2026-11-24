@@ -719,3 +719,11 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .main > .home { max-width: none; }
   .home-hero .home-corvo { display: none; }
 }
+.app > main.entrada { position: fixed; inset: 0; z-index: 2; }
+.notebook-tabs button { border-radius: 0; box-shadow: none; min-height: 0; }
+/* Camadas por cima de tudo: o seletor .app > :not(.ambient) não pode puxá-las para o fluxo. */
+.app > .palette-scrim, .app > .toast-region { position: fixed; }
+.app > .palette-scrim { z-index: calc(var(--layer-overlay) + 10); }
+.app > .toast-region { z-index: calc(var(--layer-overlay) + 20); }
+.palette-search input:focus-visible { outline: none; box-shadow: none; }
+.mobile-tabs button, .mobile-tabs button[aria-current] { border-radius: 0; background: transparent; box-shadow: none; }
