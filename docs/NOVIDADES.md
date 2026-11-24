@@ -7,6 +7,30 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 23/11/2026
 
+- **Braço versão 4: ele coda sem o Claude Code, com qualquer modelo da corrente**
+  ([ADR-0023](decisions/0023-executor-de-codigo-proprio.md), [BRACO.md](BRACO.md), item 11).
+  - Com `"executor": "visao"` no `braco.json`, o braço usa um executor próprio, como o Goose e
+    o OpenClaw. O Claude Code continua o padrão.
+  - O ciclo roda no Mac e a cabeça no servidor: a cada passo, o servidor pede a próxima ação ao
+    modelo pela corrente de sempre, e cada passo aparece no uso de modelos. As chaves não saem do
+    servidor.
+  - Só Claude e OpenAI leem o código do dono. O Gemini grátis fica fora, porque pode treinar com
+    o que recebe.
+  - As ferramentas são fechadas: ler, listar, buscar, editar um trecho, criar arquivo, rodar os
+    testes do Mac, git status e git diff. Não há shell nem rede, e `.env`, chaves, `.git`,
+    `.claude` e `CLAUDE.md` ficam fora de alcance.
+  - Os testes e o git rodam num sandbox do próprio braço: no Mac o de sempre, que agora também
+    não deixa gravar em `.git`, e no Linux o `bubblewrap`.
+  - Limites por tarefa: 20 passos e US$ 0,50, contados no servidor, além dos do Mac.
+  - Para modelos baratos errarem menos, vieram do estudo do Goose, OpenClaw, Hermes e Grok Build:
+    - edição que tolera espaço, aspas e recuo, e devolve o diff;
+    - erro que mostra as linhas mais parecidas;
+    - conserto das chamadas mal formadas;
+    - trava de repetição;
+    - "rode os testes antes de dizer que terminou";
+    - cache de prompt.
+  - Antes de virar o padrão, ele vai ser medido com tarefas reais contra o Claude Code.
+
 - **Provedor por tarefa, escolhido por regra no código**
   ([ADR-0022](decisions/0022-provedor-por-tarefa.md)).
   - Em Ajustes > Modelo, "Escolha do provedor" tem duas opções. **Ordem fixa** é a de antes:

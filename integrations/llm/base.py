@@ -31,6 +31,24 @@ class ChatMessage:
 
 
 @dataclass(frozen=True)
+class ToolSpec:
+    """A tool the model may ask for. `parameters` is a JSON Schema object. Offering it never runs
+    anything: whoever offered it validates the call and decides (ADR-0023)."""
+
+    name: str
+    description: str
+    parameters: dict
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """What the model asked for, as it said it. Not validated here."""
+
+    name: str
+    arguments: dict
+
+
+@dataclass(frozen=True)
 class LLMResponse:
     text: str
     provider: str
@@ -41,6 +59,8 @@ class LLMResponse:
     finish_reason: str | None
     # Priced by whichever provider actually answered (matters when a fallback took over).
     cost_usd: Decimal
+    # Native tool calls, when tools were offered and the provider speaks them (ADR-0023).
+    tool_calls: tuple[ToolCall, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -168,3 +188,42 @@ def for_purpose(purpose: str) -> Iterator[None]:
 
 def current_purpose() -> str | None:
     return _purpose.get()
+
+
+# The tools offered to this call (ADR-0023). A provider with native tool calling (Anthropic,
+# OpenAI) sends them with the request and returns the calls in LLMResponse.tool_calls; any other
+# ignores them, and the caller's prompt carries the same catalog as a JSON action protocol.
+_tools: ContextVar[tuple[ToolSpec, ...]] = ContextVar("llm_tools", default=())
+
+
+@contextmanager
+def offering_tools(tools: list[ToolSpec]) -> Iterator[None]:
+    token = _tools.set(tuple(tools))
+    try:
+        yield
+    finally:
+        _tools.reset(token)
+
+
+def offered_tools() -> tuple[ToolSpec, ...]:
+    return _tools.get()
+
+
+# Prompt caching for a run of calls that share a growing prefix (the arm's executor, ADR-0023).
+# Anthropic marks the system prompt and the last turn with cache_control; OpenAI groups the calls
+# by prompt_cache_key. Others ignore it (Gemini caches on its own). The key names the run, never
+# the owner.
+_cache_key: ContextVar[str | None] = ContextVar("llm_cache_key", default=None)
+
+
+@contextmanager
+def caching(key: str) -> Iterator[None]:
+    token = _cache_key.set(key)
+    try:
+        yield
+    finally:
+        _cache_key.reset(token)
+
+
+def cache_key() -> str | None:
+    return _cache_key.get()

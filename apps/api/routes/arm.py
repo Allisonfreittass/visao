@@ -13,10 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from apps.api.deps import CurrentUser, DbSession
+from apps.api.llm import get_code_provider
+from apps.api.settings import Settings, get_settings
 from core import brain
-from core.arm import local_llm, service
+from core.arm import coder, local_llm, service
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Message
+from integrations.llm.base import LLMProvider
 
 router = APIRouter(prefix="/arm", tags=["arm"])
 
@@ -68,6 +71,8 @@ class TaskOut(BaseModel):
     tests: dict | None
     undone_at: datetime | None
     can_undo: bool
+    executor: str | None
+    steps: int
 
 
 class HeartbeatIn(BaseModel):
@@ -104,6 +109,36 @@ class ResultIn(BaseModel):
     changed: list[ChangedIn] = Field(default_factory=list, max_length=2000)
     snapshot: bool = False
     tests: dict | None = None
+    # Version 4: who coded it (ADR-0023).
+    executor: Literal["claude_code", "visao"] | None = None
+
+
+class PastStepIn(BaseModel):
+    """One step of the arm's own executor, as the Mac reports it."""
+
+    tool: str | None = Field(default=None, max_length=40)
+    args: dict = Field(default_factory=dict)
+    note: str = Field(default="", max_length=4000)
+    result: str = Field(default="", max_length=20_000)
+    ok: bool = True
+
+
+class StepIn(BaseModel):
+    tools: list[str] = Field(default_factory=list, max_length=20)
+    steps: list[PastStepIn] = Field(default_factory=list, max_length=200)
+    # What braco.json allows; the server applies the smaller of these and its own.
+    max_steps: int = Field(ge=1, le=200)
+    max_usd: Decimal = Field(ge=0, le=100)
+
+
+class StepOut(BaseModel):
+    action: dict | None = None
+    invalid: str | None = None
+    note: str = ""
+    stop: str | None = None
+    step: int | None = None
+    cost_usd: Decimal | None = None
+    model: str | None = None
 
 
 class LlmNextOut(BaseModel):
@@ -375,10 +410,45 @@ def device_result(task_id: uuid.UUID, body: ResultIn, device: Device, db: DbSess
             changed=[c.model_dump() for c in body.changed],
             snapshot=body.snapshot,
             tests=_tests(body.tests),
+            executor=body.executor,
         )
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Tarefa não está com este aparelho") from exc
     db.commit()
+
+
+@router.post("/device/tasks/{task_id}/step", response_model=StepOut)
+def device_step(
+    task_id: uuid.UUID,
+    body: StepIn,
+    device: Device,
+    db: DbSession,
+    provider: Annotated[LLMProvider | None, Depends(get_code_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    """The arm's own executor (ADR-0023): the next action of a running task, asked of the model
+    through the chain of providers allowed to read code. The keys stay here."""
+    device.last_seen_at = service._now()
+    try:
+        return coder.step(
+            db,
+            device,
+            task_id,
+            provider=provider,
+            tools=body.tools,
+            steps=[coder.PastStep(**s.model_dump()) for s in body.steps],
+            max_steps=coder.limit_steps(settings.arm_code_max_steps, body.max_steps),
+            max_usd=coder.limit_usd(settings.arm_code_max_usd, body.max_usd),
+            budget_chars=settings.arm_code_context_chars,
+            max_output_tokens=min(
+                coder.MAX_OUTPUT_TOKENS, settings.llm_budget_output_tokens_per_call
+            ),
+        )
+    except coder.StepError as exc:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Essa tarefa não está rodando neste aparelho"
+        ) from exc
 
 
 def _tests(report: dict | None) -> dict | None:

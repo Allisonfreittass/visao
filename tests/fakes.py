@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from integrations.llm.base import ChatMessage, LLMError, LLMResponse, Pricing
+from integrations.llm.base import ChatMessage, LLMError, LLMResponse, Pricing, ToolCall
 
 
 @dataclass
@@ -20,6 +20,8 @@ class FakeLLMProvider:
     fail_with: str | None = None
     finish_reason: str = "stop"
     prompts: list[list[ChatMessage]] = field(default_factory=list)
+    # Optional: native tool calls for the prompt, as a provider that speaks them returns.
+    tool_caller: Callable[[list[ChatMessage]], tuple[ToolCall, ...]] | None = None
 
     def complete(self, messages: list[ChatMessage], *, max_output_tokens: int) -> LLMResponse:
         self.prompts.append(list(messages))
@@ -34,4 +36,5 @@ class FakeLLMProvider:
             latency_ms=5,
             finish_reason=self.finish_reason,
             cost_usd=self.pricing.cost(1000, 500),
+            tool_calls=self.tool_caller(messages) if self.tool_caller else (),
         )

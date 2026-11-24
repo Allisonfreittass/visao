@@ -11,6 +11,10 @@ Two modes, switched by the owner in Ajustes ("Escolha do provedor"):
   - "pessoal", everything else, and every call that does not say what it is for: Claude, OpenAI,
     Gemini.
 
+The owner's code (the arm's own executor, ADR-0023, purpose "arm_code") is stricter: its chain is
+built only with the providers in CODE_KINDS, in either mode. Gemini's free tier and unknown hosts
+are never in it, not even as a last resort.
+
 Not to be confused with core/brain.py, whose "auto" puts the local model on the Mac behind the
 cloud; this one only orders the cloud providers. Fallback on failure, the budget guard (paid
 caps), the fitting of the prompt and the pause of a provider out of quota apply as before, to
@@ -38,6 +42,10 @@ CACHE_SECONDS = 3.0
 
 # Purposes whose prompt carries nothing of the owner. Adding one here is a privacy decision.
 PUBLIC_PURPOSES = frozenset({"study_review"})
+# Who may read the owner's code, a choice of the owner (23/11/2026). Widening it is a privacy
+# decision: docs/decisions/0023-executor-de-codigo-proprio.md.
+CODE_PURPOSE = "arm_code"
+CODE_KINDS: tuple[Kind, ...] = ("claude", "openai")
 ORDERS: dict[TaskClass, tuple[Kind, ...]] = {
     "pessoal": ("claude", "openai", "gemini"),
     "publico": ("gemini", "claude", "openai"),

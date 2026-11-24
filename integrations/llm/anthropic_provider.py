@@ -16,6 +16,9 @@ from integrations.llm.base import (
     LLMError,
     LLMResponse,
     Pricing,
+    ToolCall,
+    cache_key,
+    offered_tools,
     should_stop,
     tell_draft,
     wants_draft,
@@ -56,6 +59,28 @@ def to_messages_api(messages: list[ChatMessage]) -> tuple[str, list[dict[str, An
     if not turns:
         turns = [{"role": "user", "content": _OPENING}]
     return system, turns
+
+
+_EPHEMERAL = {"type": "ephemeral"}
+
+
+def _mark_cache(request: dict[str, Any]) -> None:
+    """Two of the four marks: the system prompt (the tools come before it, so they are cached
+    too) and the last turn, which the next call of the same run reads back."""
+    if request.get("system"):
+        request["system"] = [
+            {"type": "text", "text": request["system"], "cache_control": _EPHEMERAL}
+        ]
+    turns = request.get("messages") or []
+    if not turns:
+        return
+    last = dict(turns[-1])
+    content = last["content"]
+    blocks = [{"type": "text", "text": content}] if isinstance(content, str) else list(content)
+    if blocks:
+        blocks[-1] = {**blocks[-1], "cache_control": _EPHEMERAL}
+    last["content"] = blocks
+    request["messages"] = [*turns[:-1], last]
 
 
 # Real case (2026-11-18): every call came back 400 for days and the log only said "provider error
@@ -107,6 +132,15 @@ class AnthropicProvider:
         }
         if system:
             request["system"] = system
+        if cache_key():
+            _mark_cache(request)
+        tools = offered_tools()
+        if tools:
+            # tool_choice stays "auto": forcing a tool is refused together with thinking.
+            request["tools"] = [
+                {"name": t.name, "description": t.description, "input_schema": t.parameters}
+                for t in tools
+            ]
         started = time.monotonic()
         try:
             response = (
@@ -129,6 +163,11 @@ class AnthropicProvider:
             raise LLMError("refusal", "the model declined this request")
         try:
             text = "".join(block.text for block in response.content if block.type == "text")
+            calls = tuple(
+                ToolCall(str(block.name), dict(block.input or {}))
+                for block in response.content
+                if block.type == "tool_use"
+            )
             usage = response.usage
             input_tokens = (
                 int(usage.input_tokens)
@@ -149,6 +188,7 @@ class AnthropicProvider:
             if response.stop_reason == "max_tokens"
             else response.stop_reason,
             cost_usd=self.pricing.cost(input_tokens, output_tokens),
+            tool_calls=calls,
         )
 
     def _stream(self, request: dict[str, Any]) -> Any:
