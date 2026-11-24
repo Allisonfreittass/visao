@@ -245,6 +245,13 @@ class Capabilities:
             channels.append("fala (voz sintetizada)")
         if self.voice_in:
             channels.append("escuta (transcrição do microfone durante sessão de voz)")
+            # The call's nanorrobôs (DESIGN.md §6), so he can say what the owner is seeing.
+            channels.append(
+                "na tela da ligação, o seu corpo de partículas (o Muninn) toma a forma da "
+                "ferramenta que você usa naquele momento (envelope no Gmail, calendário na "
+                "agenda, lupa na pesquisa, janela num site, notebook no Mac, página num arquivo) "
+                "e volta a ser o corvo quando termina"
+            )
         return channels
 
     def absent(self) -> list[str]:

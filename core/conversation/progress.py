@@ -50,11 +50,18 @@ class Event:
     data: dict[str, Any]
 
 
+# What kind of tool a step uses, for the call's nanorrobôs (DESIGN.md §6): the Muninn's particles
+# take its shape while it runs. A step without a kind ("Pensando", "Escrevendo a resposta") is the
+# crow.
+KINDS = frozenset({"gmail", "agenda", "pesquisa", "site", "mac", "arquivo"})
+
+
 @dataclass
 class Step:
     label: str
     detail: str | None
     at: float
+    kind: str | None = None
 
 
 @dataclass
@@ -167,9 +174,11 @@ def checkpoint() -> None:
         raise TurnCancelled()
 
 
-def step(label: str, detail: str | None = None) -> None:
+def step(label: str, detail: str | None = None, kind: str | None = None) -> None:
     """Says what the turn starts doing now (and stops it there if the owner tapped Parar).
-    Outside a tracked turn it does nothing."""
+    `kind` is one of KINDS when the step uses a tool. Outside a tracked turn it does nothing."""
+    if kind is not None and kind not in KINDS:
+        raise ValueError(f"unknown step kind: {kind}")
     conversation_id = _current.get()
     if conversation_id is None:
         return
@@ -182,10 +191,11 @@ def step(label: str, detail: str | None = None) -> None:
             label=_clean(label, LABEL_CHARS),
             detail=_clean(detail, DETAIL_CHARS) if detail else None,
             at=time.monotonic(),
+            kind=kind,
         )
         turn.steps.append(said)
         del turn.steps[:-MAX_STEPS]
-        _emit(turn, "step", {"label": said.label, "detail": said.detail})
+        _emit(turn, "step", {"label": said.label, "detail": said.detail, "kind": said.kind})
 
 
 def draft(text: str) -> None:
@@ -271,7 +281,7 @@ def snapshot(conversation_id: uuid.UUID) -> dict | None:
         return {
             "active": turn.finished is None,
             "elapsed_ms": round(((turn.finished or now) - turn.started) * 1000),
-            "steps": [{"label": s.label, "detail": s.detail} for s in turn.steps],
+            "steps": [{"label": s.label, "detail": s.detail, "kind": s.kind} for s in turn.steps],
             # In the text chat the stream shows the text; here only a voice call's draft, which
             # the phone speaks sentence by sentence.
             "draft": turn.draft if turn.modality == "voice" else None,

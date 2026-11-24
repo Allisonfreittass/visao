@@ -342,7 +342,7 @@ def _addresses(
     query = plan.get("search")
     found: list[str] = []
     if isinstance(query, str) and query.strip() and search is not None:
-        progress.step(f"Procurando “{query.strip()[:60]}”")
+        progress.step(f"Procurando “{query.strip()[:60]}”", kind="pesquisa")
         try:
             found = [r.url for r in search.search(query.strip(), max_pages * 2)]
         except SearchError:
@@ -539,13 +539,17 @@ def run(
         return Browsed(skipped="no_addresses")
 
     def opening(url: str) -> None:
-        progress.step(*step_for(url))
+        progress.step(*step_for(url), kind="site")
 
     visits = browser.visit(urls, on_visit=opening)
     turned_away = {_host(v.final_url or v.url) for v in visits if not v.ok and refused(v.failure)}
     retry_skipped = ""
     if turned_away:
-        progress.step(f"{', '.join(sorted(turned_away))[:60]} recusou robôs", "tentando outro site")
+        progress.step(
+            f"{', '.join(sorted(turned_away))[:60]} recusou robôs",
+            "tentando outro site",
+            kind="site",
+        )
         others, retry_skipped = _instead(
             session,
             owner=owner,

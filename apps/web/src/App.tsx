@@ -612,9 +612,9 @@ export function App() {
       followTurn(
         (last, signal) => api.openStream(watching, last, signal),
         (event) => {
-          const data = (event.data ?? {}) as { label?: string; detail?: string | null; text?: string };
+          const data = (event.data ?? {}) as { label?: string; detail?: string | null; kind?: string | null; text?: string };
           if (event.kind === "step" && data.label) {
-            const step = { label: data.label, detail: data.detail ?? null };
+            const step = { label: data.label, detail: data.detail ?? null, kind: data.kind ?? null };
             steps.push(step);
             setLiveStep(step);
             setLiveSteps([...steps]);
@@ -1140,6 +1140,7 @@ export function App() {
           ask={liveAsks[0] ?? null}
           voiceApproval={voiceApproval}
           camera={camera}
+          step={liveStep}
         />
       )}
     </div>

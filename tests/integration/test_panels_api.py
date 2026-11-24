@@ -387,7 +387,7 @@ def test_a_panel_expires_after_the_trip(client, db):
     assert client.get("/panels", headers=headers).json() == []
 
 
-def test_the_owner_edits_the_same_panel_and_the_old_version_stays(client, db):
+def test_the_owner_edits_the_same_panel_and_the_old_version_stays(client, db, steps):
     llm, _, browser = world(client, db)
     headers = _login(client, db)
     conversation, panel, _ = make_panel(client, db, headers)
@@ -403,6 +403,7 @@ def test_the_owner_edits_the_same_panel_and_the_old_version_stays(client, db):
     assert old.spec["hotel_area"] != "Lastarria" and old.version == 1
     assert "troquei" in turn["assistant_message"]["content"]
     assert any("Lastarria" in u for u in browser.opened)  # checked again with the change
+    assert ("Conferindo os preços de novo", "site") in steps
 
 
 def test_pause_resume_and_delete_belong_to_the_owner(client, db):

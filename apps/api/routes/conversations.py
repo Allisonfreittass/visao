@@ -580,6 +580,9 @@ def move_to_project(
 class ProgressStepOut(BaseModel):
     label: str
     detail: str | None = None
+    # The tool the step uses (core/conversation/progress.py KINDS): the call's Muninn takes its
+    # shape. None is the crow.
+    kind: str | None = None
 
 
 class ProgressOut(BaseModel):
