@@ -35,10 +35,18 @@ import { useBackClose } from "./hooks/useBackClose";
 import { Onboarding } from "./components/Onboarding";
 import { type CallControls } from "./components/InboxView";
 import { Lockup } from "./brand/Lockup";
+import { Icon } from "./components/Icon";
 import { PageBar, pageTitle } from "./components/PageBar";
 import { Rail, type WorkspaceView } from "./components/Rail";
 import { SettingsView } from "./components/SettingsView";
 import { StatusBar } from "./components/StatusBar";
+import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
+import { NotYetView } from "./components/NotYetView";
+import { RoutinesView } from "./components/RoutinesView";
+import { ShareDialog, Toast } from "./components/ShareDialog";
+import type { ToolsMode } from "./components/ChatView";
+import { useRoutines } from "./hooks/useRoutines";
+import { saveTheme, THEMES } from "./brand/theme";
 import { MicButton, MobileBar } from "./components/SkyNav";
 import { StudyPanel } from "./components/StudyPanel";
 import { usePending } from "./hooks/usePending";
@@ -140,6 +148,21 @@ export function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  /** The command palette (Ctrl/⌘+K). */
+  const [palette, setPalette] = useState(false);
+  /** The share dialog of the conversation in front. */
+  const [share, setShare] = useState(false);
+  /** The short confirmation at the bottom (an export, a copied link). */
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [toast]);
+  /** How the tool steps show in the chat (Ajustes › Aparência). */
+  const [toolsMode, setToolsMode] = useState<ToolsMode>(() => (loadPreference("tools") === "tecnico" ? "tecnico" : "resumo"));
+  /** The "Agora / O que fiz de verdade" column beside the chat. */
+  const [benchOpen, setBenchOpen] = useState(() => loadPreference("bench") !== "0");
   // The opening animation, once a day (components/Intro.tsx).
   // `?intro` in the address plays it again on demand (to see it).
   const [intro, setIntro] = useState(() => introDue() || new URLSearchParams(window.location.search).has("intro"));
@@ -223,6 +246,20 @@ export function App() {
   const firstRun = loggedIn && !demo && onboarding !== "done";
   const ready = loggedIn && !demo && !firstRun && status?.genesis_completed !== false;
   const pending = usePending(api, ready, handleError, ready && view === "conversation");
+  const routines = useRoutines(api, ready, handleError);
+
+  // Ctrl/⌘+K opens the palette anywhere in the app.
+  useEffect(() => {
+    if (!ready) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalette((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [ready]);
 
   useEffect(() => {
     void registerWorker();
@@ -860,6 +897,36 @@ export function App() {
     showView(next);
   }
 
+  const paletteItems: PaletteItem[] = [
+    { id: "go-inbox", group: "Ações", icon: "home", label: "Ir para o Início", run: () => go("inbox") },
+    { id: "new-chat", group: "Ações", icon: "plus", label: "Nova conversa", keywords: "chat", run: openChat },
+    ...(call.canCall ? [{ id: "call", group: "Ações" as const, icon: "phone" as const, label: "Ligar para ele", keywords: "voz", run: call.onCall }] : []),
+    { id: "mac", group: "Ações", icon: "laptop", label: "Pedir ao Mac…", keywords: "braço", run: () => go("mac") },
+    { id: "study", group: "Ações", icon: "notebook", label: "Caderno", keywords: "memória pensamentos interesses nome autorretrato", run: () => go("study") },
+    { id: "routines", group: "Ações", icon: "clock", label: "Rotinas", run: () => go("routines") },
+    { id: "panel", group: "Ações", icon: "coin", label: "Painel", keywords: "preço meta gráfico", run: () => go("panel") },
+    { id: "agents", group: "Ações", icon: "agents", label: "Ver agentes em paralelo", run: () => go("agents") },
+    { id: "channels", group: "Ações", icon: "plug", label: "Canais: Telegram, e-mail…", keywords: "whatsapp discord", run: () => go("channels") },
+    { id: "skills", group: "Ações", icon: "sparkle", label: "Habilidades", run: () => go("skills") },
+    ...(view === "conversation" && current ? [{ id: "share", group: "Ações" as const, icon: "share" as const, label: "Compartilhar esta conversa", keywords: "exportar markdown pdf", run: () => setShare(true) }] : []),
+    ...THEMES.map((t) => ({ id: `theme-${t.value}`, group: "Ações" as const, icon: "sliders" as const, label: `Tema ${t.label}`, keywords: "aparência cor", run: () => { saveTheme(t.value); } })),
+    {
+      id: "pause", group: "Ações", icon: "gear",
+      label: pending.paused ? "Retomar o que ele faz sozinho" : "Pausar tudo que ele faz sozinho",
+      keywords: "autonomia",
+      run: () => {
+        const next = !pending.paused;
+        pending.setPaused(next);
+        api.setAutonomyPaused(next).catch((e) => { pending.setPaused(!next); handleError(e); });
+      },
+    },
+    { id: "settings", group: "Ações", icon: "gear", label: "Ajustes", run: () => go("settings") },
+    ...conversations
+      .filter((c) => !c.continuous && c.title)
+      .map((c) => ({ id: `c-${c.id}`, group: "Conversas" as const, icon: "chat" as const, label: c.title ?? "", run: () => { setCurrent(c.id); showView("conversation"); } })),
+    ...Object.entries(projectNames).map(([id, name]) => ({ id: `p-${id}`, group: "Projetos" as const, icon: "folder" as const, label: name, run: () => void openProjectChat(id) })),
+  ];
+
   const reload = () => { if (current) loadMessages(current).then(setMessages).catch(handleError); };
   reloadRef.current = reload;
   const macOnline = pending.devices.length ? pending.devices.some((d) => d.online) : null;
@@ -907,22 +974,62 @@ export function App() {
       {!firstRun && ready && (
         <div className="layout">
           <Rail
-            api={api}
-            anel={anel}
             open={menuOpen}
             view={inProject ? "projects" : view}
             preparing={preparing}
             online={online}
             pendingCount={pending.count}
-            macOnline={macOnline}
+            conversations={conversations}
+            currentConversation={current}
             onView={go}
+            onNewChat={openChat}
+            onSearch={() => setPalette(true)}
+            onOpenConversation={(c) => {
+              setCurrent(c.id);
+              if (c.project_id) setLastProject(c.project_id);
+              showView("conversation");
+            }}
             onClose={() => setMenuOpen(false)}
           />
           {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
           <div className="principal">
             <PageBar
               title={pageTitle(view, conversations.find((c) => c.id === current)?.title ?? (inProject ? projectNames[inProject] : null))}
-            />
+            >
+              {view === "conversation" && (
+                <>
+                  <button
+                    type="button"
+                    className="page-bar-button"
+                    aria-label="Ler respostas em voz alta"
+                    title={voice.speakerKind ? "Ler respostas em voz alta" : "Este navegador não consegue ler em voz alta"}
+                    aria-pressed={speakReplies}
+                    disabled={voice.speakerKind === null}
+                    onClick={toggleSpeak}
+                  >
+                    <Icon name="speaker" size={18} />
+                  </button>
+                  <button type="button" className="page-bar-button" aria-label="Compartilhar ou exportar" title="Compartilhar ou exportar" onClick={() => setShare(true)} disabled={!current}>
+                    <Icon name="share" size={18} />
+                  </button>
+                  {desk && (
+                    <button
+                      type="button"
+                      className="page-bar-button"
+                      aria-label="Mostrar o que ele está fazendo"
+                      title="Mostrar o que ele está fazendo"
+                      aria-pressed={benchOpen}
+                      onClick={() => setBenchOpen((o) => { savePreference("bench", o ? "0" : "1"); return !o; })}
+                    >
+                      <Icon name="panel" size={18} />
+                    </button>
+                  )}
+                </>
+              )}
+              <button type="button" className="page-bar-button" aria-label="Comandos (Ctrl K)" title="Comandos (Ctrl K)" onClick={() => setPalette(true)}>
+                <Icon name="command" size={18} />
+              </button>
+            </PageBar>
             <div className="principal-corpo">
               {desk && inProject && (
                 <ProjectColumn api={api} current={inProject} refreshKey={projectsKey} onOpen={(id) => void openProjectChat(id)} onError={handleError} />
@@ -974,6 +1081,8 @@ export function App() {
                   </section>
                 )}
                 {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
+            {view === "routines" && <RoutinesView routines={routines} />}
+            {(view === "agents" || view === "channels" || view === "skills") && <NotYetView place={view} />}
                 {view === "settings" && (
                   <SettingsView
                     api={api}
@@ -994,7 +1103,9 @@ export function App() {
                     onLogout={logout}
                     onError={handleError}
                     voiceApproval={voiceApproval}
-                    onToggleVoiceApproval={() => {
+                    toolsMode={toolsMode}
+                onToolsMode={(mode) => { setToolsMode(mode); savePreference("tools", mode); }}
+                onToggleVoiceApproval={() => {
                       const next = !voiceApproval;
                       setVoiceApproval(next);
                       savePreference("voice-approval", next ? "1" : "0");
@@ -1014,6 +1125,7 @@ export function App() {
                   macWorking={macWorking}
                   voiceLevel={voice.level}
                   steps={liveSteps}
+              toolsMode={toolsMode}
                   header={
                     <>
                       {projectBar}
@@ -1047,7 +1159,7 @@ export function App() {
                 {view !== "conversation" && error && !voice.inCall && <p className="error page-error" role="alert">× {error}</p>}
               </main>
 
-              {desk ? (
+              {desk && view === "conversation" ? (
                 sidePage?.path ? (
                   <ArtifactViewer
                     docked
@@ -1058,15 +1170,36 @@ export function App() {
                       if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
                     }}
                   />
-                ) : (
+                ) : benchOpen ? (
                   <Bench bench={bench} steps={liveSteps} working={sending} onOpenPage={(page) => setSidePage(page)} />
-                )
+                ) : null
               ) : null}
             </div>
           </div>
         </div>
       )}
-      {!firstRun && ready && <StatusBar online={online} />}
+      {!firstRun && ready && (
+        <StatusBar
+          api={api}
+          online={online}
+          running={pending.tasks.filter((t) => t.status === "running").length}
+          macOnline={macOnline}
+          routines={routines.active}
+          quiet={routines.quiet}
+          onError={handleError}
+        />
+      )}
+      {palette && ready && <CommandPalette items={paletteItems} onClose={() => setPalette(false)} />}
+      {share && ready && (
+        <ShareDialog
+          title={pageTitle("conversation", currentConversation?.title)}
+          messages={messages}
+          agentName={agentName}
+          onClose={() => setShare(false)}
+          onDone={setToast}
+        />
+      )}
+      <Toast message={toast} />
 
       {!firstRun && !ready && !loggedIn && !demo && (
         <MuninnEntrance thinking={loginBusy}>

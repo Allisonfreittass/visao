@@ -1,4 +1,4 @@
-import { type ClipboardEvent, type DragEvent, type FormEvent, Fragment, type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ClipboardEvent, type DragEvent, type FormEvent, Fragment, type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { type ArtifactSummary, type Attachment, type ProgressStep, type Segment, utcDate, type Message } from "../api";
 import { dividers } from "../labels";
@@ -13,7 +13,7 @@ export interface Ask {
   onApprove: () => void;
   onReject: () => void;
 }
-import { Anel } from "../anel/Anel";
+import { Corvo } from "../brand/Corvo";
 import { Sensor, type SensorKind } from "../anel/Sensor";
 import type { AnelEstado } from "../anel/state";
 import { ArtifactCard, ArtifactViewer } from "./ArtifactCard";
@@ -75,6 +75,8 @@ interface ChatViewProps {
   anel?: AnelEstado;
   /** A task runs on the Mac: the newest reply says so. */
   macWorking?: boolean;
+  /** How the tool steps show (Ajustes › Aparência). */
+  toolsMode?: ToolsMode;
   /** Voice level 0..1 while it speaks. */
   voiceLevel?: () => number;
   /** The turn in flight, step by step (shown as step cards before the reply's text). */
@@ -89,29 +91,49 @@ export function stepSensor(label: string): SensorKind {
   return "projeto";
 }
 
-function StepCards({ steps }: { steps: ProgressStep[] }) {
+/** "Resumido" shows each step as a short sentence; "Técnico" also what was sent and received. */
+export type ToolsMode = "resumo" | "tecnico";
+
+/** "3 passos · procurou no Gmail, abriu 2 sites" from the labels the server sent. */
+export function stepsSummary(steps: ProgressStep[]): string {
+  const n = steps.length;
+  const labels = steps.slice(-3).map((s) => s.label.charAt(0).toLowerCase() + s.label.slice(1));
+  return `${n} ${n === 1 ? "passo" : "passos"} · ${labels.join(", ")}`;
+}
+
+function StepCards({ steps, mode = "resumo" }: { steps: ProgressStep[]; mode?: ToolsMode }) {
+  const [open, setOpen] = useState(true);
+  const listId = useId();
   if (steps.length === 0) return null;
   return (
-    <ol className="step-cards" aria-label="Passos">
-      {steps.map((step, i) => {
-        const now = i === steps.length - 1;
-        const kind = stepSensor(step.label);
-        return (
-          <li key={`${i}-${step.label}`} className="step-card">
-            <Sensor kind={kind} size={20} />
-            <span className="step-card-text">
-              {step.label}
-              {step.detail && <small>{step.detail}</small>}
-            </span>
-            {now ? (
-              <span className="step-card-status step-card-status--now"><span className="step-spinner" aria-hidden="true" />agora</span>
-            ) : (
-              <span className="step-card-status">✓ feito</span>
-            )}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="steps">
+      <button type="button" className="steps-toggle" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)}>
+        <span className="steps-chevron" aria-hidden="true">›</span>
+        {stepsSummary(steps)}
+      </button>
+      {open && (
+        <ol id={listId} className="step-cards" aria-label="Passos">
+          {steps.map((step, i) => {
+            const now = i === steps.length - 1;
+            const kind = stepSensor(step.label);
+            return (
+              <li key={`${i}-${step.label}`} className="step-card">
+                <div className="step-card-row">
+                  <Sensor kind={kind} size={16} />
+                  <span className="step-card-text">{step.label}</span>
+                  {now ? (
+                    <span className="step-card-status step-card-status--now"><span className="step-spinner" aria-hidden="true" />agora</span>
+                  ) : (
+                    <span className="step-card-status">feito</span>
+                  )}
+                </div>
+                {mode === "tecnico" && step.detail && <pre className="step-card-detail">{step.detail}</pre>}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -169,7 +191,7 @@ function useReveal(target: string) {
 /** The assistant's bubble while it works: it breathes with the current step, then the text comes
  * in where the dots were, and when the reply has arrived and finished showing it hands over to
  * the message itself (the same bubble, no jump). */
-function LiveBubble({ text, status, onStop, settling, onSettled, anel = "pensando", steps = [] }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void; anel?: AnelEstado; steps?: ProgressStep[] }) {
+function LiveBubble({ text, status, onStop, settling, onSettled, steps = [], toolsMode = "resumo" }: { text: string; status?: ProgressStep | null; onStop?: () => void; settling: boolean; onSettled?: () => void; steps?: ProgressStep[]; toolsMode?: ToolsMode }) {
   const reveal = useReveal(text);
   useEffect(() => {
     if (settling && reveal.done) onSettled?.();
@@ -178,7 +200,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled, anel = "pensand
     return (
       <div className="live-status" role="status" aria-live="polite">
         <div className="bubble assistant pending">
-          <Anel estado={anel} size={36} decorative className="message-avatar" />
+          <Corvo size={30} className="message-avatar" />
           <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Processando"}</span>
           {onStop && (
             <button type="button" className="live-status-stop" onClick={onStop} aria-label="Parar" title="Parar">
@@ -186,14 +208,14 @@ function LiveBubble({ text, status, onStop, settling, onSettled, anel = "pensand
             </button>
           )}
         </div>
-        {steps.length > 1 ? <StepCards steps={steps} /> : status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
+        {steps.length > 1 ? <StepCards steps={steps} mode={toolsMode} /> : status?.detail && <span key={status.detail} className="live-status-detail">{status.detail}</span>}
       </div>
     );
   }
   return (
     <div className="bubble assistant bubble--live" aria-live="off">
-      <div className="message-meta message-meta--live"><Anel estado={anel} size={36} decorative className="message-avatar" /><span className="message-label">Visão · {settling ? "concluído" : "respondendo"}</span></div>
-      {!settling && <StepCards steps={steps} />}
+      <div className="message-meta message-meta--live"><Corvo size={30} className="message-avatar" /><span className="message-label">Visão · {settling ? "concluído" : "respondendo"}</span></div>
+      {!settling && <StepCards steps={steps} mode={toolsMode} />}
       {!settling && status && <span key={status.label} className="live-status-label live-status-label--inline">{status.label}</span>}
       <MessageContent text={reveal.text} chunks={reveal.chunks} />
       {!settling && onStop && (
@@ -205,7 +227,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled, anel = "pensand
   );
 }
 
-export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage, anel = "ocioso", macWorking = false, voiceLevel, steps = [] }: ChatViewProps) {
+export function ChatView({ header, onOpenProject, projectName, messages, segments, olderLeft, onLoadOlder, asks = [], agentName, hidden, focusRequest, draftRequest, sending, status, onStop, liveText = null, settlingId = null, onSettled, error, onSend, onUpload, loadAttachment, onFeedback, composerStart, placeholder, pageUrl, onDeleteArtifact, onOpenPage, macWorking = false, steps = [], toolsMode = "resumo" }: ChatViewProps) {
   const [draft, setDraft] = useState("");
   // In the continuous conversation: a divider at each new day and at each stretch's start.
   const divided = useMemo(() => (segments ? dividers(messages, segments, utcDate) : new Map<string, string>()), [messages, segments]);
@@ -391,13 +413,11 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
               </button>
             )}
             <div className="message-meta">{m.role === "assistant" && (
-              i === shown.length - 1 && !sending
-                ? <Anel estado={anel} size={36} level={anel === "ouvindo" ? voiceLevel : undefined} decorative className="message-avatar" />
-                : <Anel estado="ocioso" size={36} animated={false} decorative className="message-avatar" />
+              <Corvo size={30} className="message-avatar" />
             )}{m.role === "assistant" ? (
               i === shown.length - 1 && !sending && macWorking
-                ? <span className="message-label message-label--working">Visão · executando no Mac</span>
-                : <span className="message-label">{m.local_model ? "Visão · local" : "Visão · concluído"}</span>
+                ? <span className="message-label message-label--working">{agentName ?? "Visão"} · executando no Mac</span>
+                : <span className="message-label">{agentName ?? "Visão"}{m.local_model ? " · local" : ""}</span>
             ) : <span>Você</span>}{m.origin === "arm" && <Sensor kind="mac" size={16} />}{m.origin === "initiative" && <span className="initiative-tag">puxou conversa</span>}{m.origin === "arm" && <span className="initiative-tag">no Mac</span>}{m.origin === "google" && <span className="initiative-tag">no Google</span>}{m.origin === "share" && <span className="initiative-tag">compartilhado do iPhone</span>}{m.local === "failed" ? <span className="failed-tag">não foi enviada</span> : m.local === "stopped" ? <span className="failed-tag">parada</span> : <time>{utcDate(m.created_at).toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}</time>}</div>
             {m.attachments && m.attachments.length > 0 && <MessageAttachments attachments={m.attachments} load={loadAttachment} />}
             {m.parts && m.parts.length > 1
@@ -442,7 +462,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           </Fragment>
         ))}
         {(sending || settlingId) && (
-          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} anel={sending ? "pensando" : anel} steps={steps} />
+          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} steps={steps} toolsMode={toolsMode} />
         )}
         {asks.map((ask) => (
           <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
@@ -472,27 +492,6 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
         )}
         <DraftAttachments files={files} onRemove={removeFile} />
         <div className="composer-row">
-          <button
-            type="button"
-            className="composer-attach"
-            onClick={() => pickerRef.current?.click()}
-            disabled={files.length >= MAX_FILES}
-            aria-label="Anexar foto ou arquivo"
-            title="Foto ou arquivo"
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-          <input
-            ref={pickerRef}
-            type="file"
-            accept={ACCEPT}
-            multiple
-            hidden
-            onChange={(e) => {
-              addFiles(Array.from(e.target.files ?? []));
-              e.target.value = "";
-            }}
-          />
           <textarea
             ref={textareaRef}
             value={draft}
@@ -507,6 +506,28 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             rows={1}
             maxLength={8000}
             aria-label="Mensagem"
+          />
+          {(sending || macWorking) && <span className="atividade" role="img" aria-label="Ele está trabalhando" title="Ele está trabalhando" />}
+          <button
+            type="button"
+            className="composer-attach"
+            onClick={() => pickerRef.current?.click()}
+            disabled={files.length >= MAX_FILES}
+            aria-label="Anexar foto ou arquivo"
+            title="Foto ou arquivo"
+          >
+            <Icon name="plus" size={18} />
+          </button>
+          <input
+            ref={pickerRef}
+            type="file"
+            accept={ACCEPT}
+            multiple
+            hidden
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
           />
           <button type="submit" className="composer-send" aria-label="Enviar mensagem" disabled={!canSend}>
             <Icon name="send" size={20} />

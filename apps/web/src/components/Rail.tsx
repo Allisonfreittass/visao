@@ -1,60 +1,70 @@
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 
-import type { Api } from "../api";
-import { Lockup } from "../brand/Lockup";
+import type { Conversation } from "../api";
+import { Corvo } from "../brand/Corvo";
 import { OWNER_NAME } from "../brand/copy";
-import type { AnelEstado } from "../anel/state";
-import { Sensor, type SensorKind } from "../anel/Sensor";
 import { useDragToClose } from "../hooks/useDragToClose";
 import { Icon, type IconName } from "./Icon";
 
-export type WorkspaceView = "conversation" | "inbox" | "projects" | "study" | "mac" | "settings";
+export type WorkspaceView =
+  | "inbox"
+  | "conversation"
+  | "projects"
+  | "study"
+  | "routines"
+  | "mac"
+  | "agents"
+  | "channels"
+  | "skills"
+  | "settings"
+  | "panel";
 
-// The Mac is not here: it lives under Integrações.
-const NAV: { view: WorkspaceView; label: string; icon: IconName }[] = [
+/** The places, in the mockup's order (docs/design/telas-visao). */
+export const NAV: { view: WorkspaceView; label: string; icon: IconName }[] = [
   { view: "inbox", label: "Início", icon: "home" },
   { view: "conversation", label: "Chat", icon: "chat" },
   { view: "projects", label: "Projetos", icon: "folder" },
   { view: "study", label: "Caderno", icon: "notebook" },
+  { view: "routines", label: "Rotinas", icon: "clock" },
+  { view: "mac", label: "Mac", icon: "laptop" },
+  { view: "agents", label: "Agentes", icon: "agents" },
+  { view: "channels", label: "Canais", icon: "plug" },
+  { view: "skills", label: "Habilidades", icon: "sparkle" },
 ];
 
+/** The conversations listed under "Recentes": the ones with a title, newest first. The continuous
+ * conversation is "Chat" itself, so it is not repeated here. */
+export function recentConversations(list: Conversation[], max = 6): Conversation[] {
+  return list
+    .filter((c) => !c.continuous && c.title?.trim())
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, max);
+}
+
 interface RailProps {
-  api: Api;
   open: boolean;
   view: WorkspaceView;
-  preparing: boolean;
   online: boolean;
   pendingCount: number;
-  /** null: no Mac paired yet. */
-  macOnline: boolean | null;
-  /** The mascot's live state, for the logo. */
-  anel?: AnelEstado;
+  conversations: Conversation[];
+  currentConversation: string | null;
+  preparing: boolean;
   onView: (view: WorkspaceView) => void;
+  onNewChat: () => void;
+  onSearch: () => void;
+  onOpenConversation: (conversation: Conversation) => void;
+  /** The "new version" card, when there is one. */
+  update?: ReactNode;
   /** Closes the drawer (dragging it left, on a phone). */
   onClose?: () => void;
 }
 
-/** Whether Google (e-mail and calendar) is connected; null until known. Read only. */
-function useGoogleConnected(api: Api): boolean | null {
-  const [connected, setConnected] = useState<boolean | null>(null);
-  useEffect(() => {
-    let alive = true;
-    api.google().then((g) => alive && setConnected(g.connected), () => alive && setConnected(null));
-    return () => { alive = false; };
-  }, [api]);
-  return connected;
-}
-
-/** The side bar: the logo, the places, the integrations with their real status, and you with
- * Ajustes at the bottom. Fixed on a computer; a drawer below 900 px. */
+/** The side bar: the crow and VISAO, a new chat and the search, the places, the recent
+ * conversations, the update card and you with Ajustes. Fixed on a computer; a drawer below 900 px. */
 export function Rail(props: RailProps) {
   const { view, onView } = props;
   const drag = useDragToClose("left", () => props.onClose?.(), 70);
-  const google = useGoogleConnected(props.api);
-  const integrations: { kind: SensorKind; label: string; on: boolean | null; open: WorkspaceView; idle: string }[] = [
-    { kind: "mac", label: "Mac", on: props.online ? props.macOnline : false, open: "mac", idle: "Não pareado" },
-    { kind: "email", label: "E-mail", on: props.online ? google : false, open: "settings", idle: "Não conectado" },
-  ];
+  const recent = recentConversations(props.conversations);
   return (
     <aside
       className={`rail ${props.open ? "open" : ""}`}
@@ -62,13 +72,28 @@ export function Rail(props: RailProps) {
       style={drag.offset ? { transform: `translateX(${-drag.offset}px)`, transition: "none" } : undefined}
       {...(props.open ? drag.handlers : {})}
     >
-      <a className="rail-brand" href="/" aria-label="V.I.S.A.O., início">
-        <Lockup estado={props.anel} />
+      <a className="rail-brand" href="/" aria-label="VISAO, início">
+        <Corvo size={30} />
+        <span className="rail-wordmark" aria-hidden="true">VISAO</span>
       </a>
-      <nav className="rail-nav" aria-label="Seções">
+      <div className="rail-actions">
+        <button type="button" className="rail-new" onClick={props.onNewChat}>
+          <Icon name="plus" size={16} />
+          Nova conversa
+        </button>
+        <button type="button" className="rail-search" onClick={props.onSearch} aria-label="Buscar e comandos (Ctrl K)" title="Buscar e comandos (Ctrl K)">
+          <Icon name="search" size={16} />
+        </button>
+      </div>
+      <nav className="rail-nav" aria-label="Lugares">
         {NAV.map((item) => (
-          <button key={item.view} type="button" aria-current={view === item.view ? "page" : undefined} onClick={() => onView(item.view)}>
-            <Icon name={item.icon} size={20} />
+          <button
+            key={item.view}
+            type="button"
+            aria-current={view === item.view || (item.view === "inbox" && view === "panel") ? "page" : undefined}
+            onClick={() => onView(item.view)}
+          >
+            <Icon name={item.icon} size={18} />
             <span>{item.label}</span>
             {item.view === "inbox" && props.pendingCount > 0 && (
               <span className="rail-badge" aria-label={`${props.pendingCount} esperando você`}>{props.pendingCount}</span>
@@ -76,27 +101,29 @@ export function Rail(props: RailProps) {
           </button>
         ))}
       </nav>
-      <section className="rail-section" aria-labelledby="rail-integrations">
-        <h2 id="rail-integrations" className="rail-heading">Integrações</h2>
-        <ul className="rail-integrations">
-          {integrations.map((i) => (
-            <li key={i.kind}>
-              <button type="button" aria-current={view === i.open && i.kind === "mac" ? "page" : undefined} onClick={() => onView(i.open)}>
-                <Sensor kind={i.kind} size={22} asleep={i.on !== true} />
-                <span className="rail-integration-text">
-                  <span>{i.label}</span>
-                  <small className={i.on ? "on" : ""}>
-                    {i.on ? <><span className="ponto-conectado" aria-hidden="true" />Conectado</> : !props.online ? "Sem conexão" : i.on === false ? "Desconectado" : i.idle}
-                  </small>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {recent.length > 0 && (
+        <section className="rail-section" aria-labelledby="rail-recent">
+          <h2 id="rail-recent" className="rail-heading">Recentes</h2>
+          <ul className="rail-chats">
+            {recent.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  aria-current={view === "conversation" && props.currentConversation === c.id ? "page" : undefined}
+                  onClick={() => props.onOpenConversation(c)}
+                >
+                  <span className="rail-chat-dot" aria-hidden="true" />
+                  <span className="rail-chat-title">{c.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {props.preparing && <p className="note rail-preparing">Lembrando do que importa…</p>}
       <div className="rail-bottom">
         {!props.online && <p className="rail-offline" role="status">Sem conexão com o servidor.</p>}
+        {props.update}
         <div className="rail-me">
           <span className="rail-avatar" aria-hidden="true">{OWNER_NAME.charAt(0)}</span>
           <span className="rail-name">{OWNER_NAME}</span>
@@ -108,7 +135,7 @@ export function Rail(props: RailProps) {
             aria-current={view === "settings" ? "page" : undefined}
             onClick={() => onView("settings")}
           >
-            <Icon name="gear" size={20} />
+            <Icon name="gear" size={18} />
           </button>
         </div>
       </div>

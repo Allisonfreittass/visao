@@ -7,8 +7,13 @@ const TITLES: Record<WorkspaceView, string> = {
   conversation: "Chat",
   projects: "Projetos",
   study: "Caderno",
+  routines: "Rotinas",
   mac: "Mac",
+  agents: "Agentes",
+  channels: "Canais",
+  skills: "Habilidades",
   settings: "Ajustes",
+  panel: "Painel",
 };
 
 /** The bar's title: the place, or the conversation's own title in the chat. */
