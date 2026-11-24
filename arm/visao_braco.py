@@ -38,9 +38,10 @@ from pathlib import Path
 # and can answer with a local model.
 # 3: Bash inside Claude Code's sandbox, the whole process group ends with the task, a photo of
 # the project before and after (changed files, undo), and "until the tests pass".
+# 5: looks at the screen when the owner asks ("tela": true), on a line of its own.
 # 4: the arm's own executor (ADR-0023): tools implemented here, the model asked step by step
 # through the server, tests and git in a sandbox of the arm's own (bubblewrap on Linux too).
-VERSION = "4"
+VERSION = "5"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -115,6 +116,8 @@ class Config:
     # The local model (docs/MODELO_LOCAL.md): {"modelo": "qwen3:4b", "endereco": Ollama's
     # address on this Mac}. Unset: this Mac offers no local model.
     local_model: str | None = None
+    # docs/TELA.md: this computer lets the Visão look at its screen when the owner asks.
+    screen: bool = False
     ollama: str = "http://127.0.0.1:11434"
     local_context: int = 16384
     # Where results wait until the server takes them, next to braco.json.
@@ -168,6 +171,7 @@ class Config:
             local_model=(str(local["modelo"]).strip() or None) if local.get("modelo") else None,
             ollama=_local_address(str(local.get("endereco") or "http://127.0.0.1:11434")),
             local_context=int(local.get("contexto", 16384)),
+            screen=data.get("tela") is True,
             state_dir=path.expanduser().resolve().parent,
             tests=tests,
             test_attempts=max(1, int(data.get("test_attempts", 3))),
@@ -1487,6 +1491,135 @@ def local_loop(config: Config, once: bool = False) -> None:
             return
 
 
+# --- the screen (docs/TELA.md) --------------------------------------------------------------
+# Only with "tela": true in braco.json. The server asks only when the owner's own message asked
+# to see the screen; the arm captures the monitor under the mouse (the one being looked at),
+# shrinks it to what a model reads (1568 px) and says so on the screen itself.
+
+SCREEN_SIDE = 1568
+SCREEN_MAX_BYTES = 4_500_000
+_MONITOR = re.compile(r"(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)")
+
+
+def _output(argv: list[str], seconds: float = 10) -> str:
+    try:
+        done = subprocess.run(  # noqa: S603 (fixed argv)
+            argv, capture_output=True, text=True, timeout=seconds
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return done.stdout if done.returncode == 0 else ""
+
+
+def monitor_under_mouse() -> tuple[int, int, int, int] | None:
+    """(width, height, x, y) of the X11 monitor the mouse is on, or None (one monitor, or no
+    xrandr/xdotool): then the whole screen."""
+    mouse = dict(
+        line.split("=", 1)
+        for line in _output(["xdotool", "getmouselocation", "--shell"]).split()
+        if "=" in line
+    )
+    try:
+        mx, my = int(mouse["X"]), int(mouse["Y"])
+    except (KeyError, ValueError):
+        return None
+    for match in _MONITOR.finditer(_output(["xrandr", "--listactivemonitors"])):
+        w, h, x, y = (int(v) for v in match.groups())
+        if x <= mx < x + w and y <= my < y + h:
+            return w, h, x, y
+    return None
+
+
+def capture_command(target: Path) -> list[list[str]] | None:
+    """The commands that leave a JPEG of at most 1568 px at `target`, for this system."""
+    if sys.platform == "darwin":
+        return [
+            ["/usr/sbin/screencapture", "-x", "-m", "-t", "jpg", str(target)],
+            ["/usr/bin/sips", "-Z", str(SCREEN_SIDE), str(target)],
+        ]
+    if sys.platform.startswith("linux") and os.environ.get("DISPLAY") and shutil.which("import"):
+        crop = []
+        monitor = monitor_under_mouse()
+        if monitor is not None:
+            w, h, x, y = monitor
+            crop = ["-crop", f"{w}x{h}+{x}+{y}", "+repage"]
+        resize = ["-resize", f"{SCREEN_SIDE}x{SCREEN_SIDE}>", "-quality", "80"]
+        return [["import", "-silent", "-window", "root", *crop, *resize, f"jpg:{target}"]]
+    return None
+
+
+def _tell_screen(text: str) -> None:
+    """A notice on this computer: the owner always knows when the screen was taken."""
+    if sys.platform == "darwin":
+        script = f'display notification "{text}" with title "Visão"'
+        _output(["/usr/bin/osascript", "-e", script])
+    elif shutil.which("notify-send"):
+        _output(["notify-send", "-a", "Visão", "Visão", text])
+
+
+def capture_screen() -> dict:
+    """Never raises: {"ok", "media_type", "data"} with the JPEG in base64, or {"ok": False}."""
+    import base64
+
+    with tempfile.TemporaryDirectory() as folder:
+        target = Path(folder) / "tela.jpg"
+        steps = capture_command(target)
+        if steps is None:
+            return {"ok": False, "error": NO_SCREEN}
+        for argv in steps:
+            try:
+                done = subprocess.run(  # noqa: S603 (fixed argv)
+                    argv, capture_output=True, text=True, timeout=30
+                )
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                return {"ok": False, "error": f"A captura falhou ({exc})."}
+            if done.returncode != 0:
+                detail = (done.stderr or done.stdout).strip()[-200:]
+                return {"ok": False, "error": f"A captura falhou: {detail or done.returncode}"}
+        try:
+            raw = target.read_bytes()
+        except OSError:
+            return {"ok": False, "error": SCREEN_DENIED}
+    if not raw.startswith(b"\xff\xd8") or len(raw) > SCREEN_MAX_BYTES:
+        return {"ok": False, "error": SCREEN_DENIED}
+    _tell_screen("Olhei sua tela agora, como você pediu.")
+    return {"ok": True, "media_type": "image/jpeg", "data": base64.b64encode(raw).decode()}
+
+
+NO_SCREEN = (
+    "Este computador não tem como capturar a tela (no Linux preciso do ImageMagick e de uma "
+    "sessão X11; no Mac, do screencapture)."
+)
+SCREEN_DENIED = (
+    "A captura não saiu. No Mac, libere Gravação de Tela para o Python em Ajustes do Sistema > "
+    "Privacidade e Segurança."
+)
+
+
+def screen_loop(config: Config, once: bool = False) -> None:
+    """The third line: requests to look at the screen, apart from the tasks, so a long task
+    never makes the owner wait for a look."""
+    backoff = 5
+    while True:
+        try:
+            request = call(config, "GET", f"/device/screen/next?wait={LONG_POLL_SECONDS}")
+            backoff = 5
+            if request:
+                answer = capture_screen()
+                call(config, "POST", f"/device/screen/{request['id']}/result", answer, timeout=60)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                return
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            print(f"Tela sem conexão ({exc}); tento de novo em {backoff}s", file=sys.stderr)
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
+        if once:
+            return
+
+
 def genesis() -> None:
     """The Muninn in ASCII when the arm is started by hand in a terminal (under launchd there is
     no terminal, so the log stays clean). Missing player files just skip it."""
@@ -1523,6 +1656,9 @@ def main(argv: list[str] | None = None) -> int:
     if config.local_model and not args.once:
         print(f"Modelo local: {config.local_model} em {config.ollama}")
         threading.Thread(target=local_loop, args=(config,), daemon=True).start()
+    if config.screen and not args.once:
+        print('Tela: olho quando você pede ("tela": true)')
+        threading.Thread(target=screen_loop, args=(config,), daemon=True).start()
     loop(config, once=args.once)
     return 0
 

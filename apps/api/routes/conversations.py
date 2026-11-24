@@ -26,7 +26,7 @@ from apps.api.browser import get_browser
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.limits import panel_limits
 from apps.api.links import get_link_reader
-from apps.api.llm import get_llm_provider, missing_llm_settings
+from apps.api.llm import get_llm_provider, get_screen_provider, missing_llm_settings
 from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
 from apps.api.routes.attachments import AttachmentOut, attachment_out
 from apps.api.routes.projects import own_project
@@ -775,6 +775,7 @@ def send_message(
     background: BackgroundTasks,
     factory: SessionFactory,
     browser: Annotated[Browser | None, Depends(get_browser)],
+    screen_provider: Annotated[LLMProvider | None, Depends(get_screen_provider)],
 ) -> TurnOut:
     conversation = _own_conversation(db, user, conversation_id)
     command = None if body.attachment_ids else brain.parse_command(body.content)
@@ -821,6 +822,7 @@ def send_message(
                     reply_to_id=body.reply_to_id,
                     position=body.location.here() if body.location else None,
                     client_message_id=body.client_message_id,
+                    screen_provider=screen_provider,
                 )
             result, outcome = turn.result, turn.curiosity
     except turn_lock.Busy as exc:

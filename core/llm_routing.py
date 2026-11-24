@@ -46,6 +46,8 @@ PUBLIC_PURPOSES = frozenset({"study_review"})
 # decision: docs/decisions/0023-executor-de-codigo-proprio.md.
 CODE_PURPOSE = "arm_code"
 CODE_KINDS: tuple[Kind, ...] = ("claude", "openai")
+# A picture of the owner's screen (docs/TELA.md) shows whatever is open: the same rule.
+SCREEN_KINDS = CODE_KINDS
 ORDERS: dict[TaskClass, tuple[Kind, ...]] = {
     "pessoal": ("claude", "openai", "gemini"),
     "publico": ("gemini", "claude", "openai"),

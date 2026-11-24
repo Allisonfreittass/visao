@@ -8,6 +8,7 @@ calls a model or the network.
 import hashlib
 import io
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -256,6 +257,17 @@ class ContextAllowance:
     document_chars: int = MAX_CONTEXT_DOCUMENT_CHARS
 
 
+_SCREEN_FILE = re.compile(r"tela-\d{6}\.(?:jpg|png)")
+
+
+def _named(attachment: Attachment) -> str:
+    if attachment.kind != "image":
+        return f'arquivo "{attachment.filename}"'
+    if _SCREEN_FILE.fullmatch(attachment.filename):  # core/arm/screen.py, docs/TELA.md
+        return f'captura da tela dela, que ela pediu agora "{attachment.filename}"'
+    return f'foto "{attachment.filename}"'
+
+
 def render(
     files: list[Attachment], allowance: ContextAllowance, *, recent: bool
 ) -> tuple[str, tuple[ImagePart, ...]]:
@@ -265,7 +277,7 @@ def render(
     images: list[ImagePart] = []
     lines = [
         "[Anexo do sistema, não escrito pela pessoa] Ela mandou junto desta mensagem: "
-        + ", ".join(f'{"foto" if a.kind == "image" else "arquivo"} "{a.filename}"' for a in files)
+        + ", ".join(_named(a) for a in files)
         + "."
     ]
     documents: list[str] = []
