@@ -5,6 +5,17 @@ em você?" e "o que você consegue fazer agora?" com fatos. Cada item aponta par
 detalhes. O que está ligado **agora** vem do manifesto de capacidades
 (`core/identity/capabilities.py`), que entra em todo prompt; este arquivo conta a história.
 
+## 24/11/2026
+
+- **Cara nova no app web: o corvo no eclipse e três temas**
+  ([DESIGN.md](../DESIGN.md), [telas-visao](design/telas-visao/README.md)).
+  - O ícone do app e o favicon passam a ser o corvo na frente de um sol âmbar.
+  - Em Ajustes › Aparência o dono escolhe entre Papel (claro, o padrão), Tinta (escuro) e Rótulo
+    (creme com azul). Muda na hora e fica guardado no aparelho.
+  - No computador, a janela ganhou uma barra com o título do lugar e um rodapé que mostra se o
+    servidor responde.
+  - É só a aparência: ele não troca o tema sozinho e nada mudou na memória ou no que ele faz.
+
 ## 23/11/2026
 
 - **Braço versão 4: ele coda sem o Claude Code, com qualquer modelo da corrente**

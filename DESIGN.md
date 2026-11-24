@@ -4,7 +4,13 @@ Fonte única do visual do Visão. Todo agente (Claude Code, Codex, Cursor) e tod
 em interface lê este arquivo antes. Se uma tela nova não couber nestas regras, a regra muda aqui
 primeiro, depois o código.
 
-> **Estado:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 5 da
+> **Identidade nova (24/11/2026): o corvo no eclipse.** O mockup em
+> [`docs/design/telas-visao/`](docs/design/telas-visao/README.md) é a referência de pixel; o app web
+> está migrando por etapas (seção 8, "Telas do VISAO"). Onde este arquivo e o mockup discordarem, vale
+> o mockup e este arquivo é corrigido. O que está marcado **sai** continua no código até a etapa
+> que o substitui.
+>
+> **Estado anterior:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 5 da
 > [Migração](#migração) estão feitos: tokens e fontes em todo o app, o `<Anel>` no lugar do
 > Ciclope, os sensores como ícones de traço, o login no Muninn e os textos na voz da seção 7.
 > Os ícones e imagens (passo 6) saem do anel por `brand/generate_assets.py`. Falta o iPhone
@@ -17,46 +23,62 @@ continuar mora em volta: memória que a pessoa autoriza, interesses, versões re
 
 - **Muninn** é a forma que ele usa agora: o corvo da memória de Odin, que voa pelo mundo e volta
   para contar o que viu. É o que o Visão faz: pensa entre conversas, estuda e abre o papo.
-- **O anel de rastros** é a marca: 24 marcas radiais, uma por hora. A falha no topo é o lugar do
-  nome e fica vazia enquanto ele não escolher. O ponto âmbar é a chamada ao modelo.
+- **O corvo no eclipse** é o ícone: o busto do Muninn em xilogravura na frente de um sol âmbar,
+  sobre tinta. É o avatar das mensagens dele, o logo da barra lateral e o ícone do app.
+- **O selo** é o campo âmbar com "VISAO" em Six Caps preenchendo o quadrado atrás do busto. Só no
+  login e em material de marca.
+- **O anel de rastros** (**sai**): 24 marcas radiais, uma por hora, com a falha do nome no topo.
+  Era a marca da direção "Muninn"; o corvo no eclipse toma o lugar dele em cada tela.
 - **Não é vigia.** Nada de câmera, olho que encara, "vigilância", "dê uma ordem". Quem supervisiona
   é a pessoa.
 
 ## 2. Cor
 
-Uma luz só. Âmbar é presença e iniciativa dele; nada mais é colorido.
+Uma luz só. Âmbar `#E39A2E` é dele; nada mais é colorido.
 
-| Token | Hex | Uso |
-|---|---|---|
-| `--tinta` (fundo) | `#101214` | Fundo da noite e do app |
-| `--grafite` | `#1A1D20` | Superfícies (campos, composer) |
-| `--linha` | `#2C3136` | Bordas de 1 px, divisórias |
-| `--cinza` | `#9AA1A8` | Texto secundário (7:1 sobre `--tinta`) |
-| `--papel` | `#F3F1EC` | Texto principal; fundo do dia; botão primário |
-| `--ambar` | `#F0A23B` | Olho do Muninn, ponto do anel, pedidos dele, estado "pensando" |
-| `--ambar-fundo` | `#8A5A12` | Âmbar como texto sobre `--papel` |
+Três temas, trocados na hora em Ajustes › Aparência e guardados no aparelho. Papel é o padrão.
+Os valores vivem em `apps/web/src/brand/tokens.css` (`data-theme` no `<html>`):
+
+| Token | Papel (claro) | Tinta (escuro) | Rótulo (creme e azul) | Uso |
+|---|---|---|---|---|
+| `--bg` | `#F6F4EF` | `#101214` | `#F3E9D2` | Fundo da janela |
+| `--surface` | `#FFFFFF` | `#1A1D20` | `#FBF5E6` | Barra lateral, rodapé, cartões, compositor |
+| `--surface-2` (`--chip`) | `#EEEAE1` | `#24282C` | `#EADCBB` | Item ativo, chips, balão do código inline |
+| `--border` | `#E3DFD6` | `#2C3136` | `#D9C9A3` | Bordas de 1 px, divisórias |
+| `--text` | `#101214` | `#F3F1EC` | `#1D2B4F` | Texto; fundo do botão principal |
+| `--text-muted` | `#5B6066` | `#9AA1A8` | `#56607C` | Texto secundário, dados |
+| `--code` / `--code-text` | `#101214` / `#F3F1EC` | `#0B0C0E` / `#F3F1EC` | `#1D2B4F` / `#F3E9D2` | Bloco de código |
+
+O cinza do Rótulo é um tom mais escuro que o do mockup (`#5A6480`) para passar de 4,5:1 sobre
+`--surface-2`. Todo o texto passa de AA nos três temas; a borda de campo (`--border-strong`) passa
+de 3:1.
 
 Regras:
 
-- Botão primário é **papel com texto tinta**. Nunca vermelho, nunca âmbar sólido em "Aprovar":
-  aprovar é calmo.
-- Âmbar é dele: o anel e o olho (presença), o filete da fala dele e o cartão de pedido. Nunca de
-  fundo, nunca em texto da interface, nunca decorativo.
+- Botão principal é **a cor do texto com o fundo por cima** (tinta sobre papel no Papel). O
+  secundário é contorno. Nunca vermelho, nunca âmbar sólido em "Aprovar": aprovar é calmo.
+- Âmbar é dele: o eclipse, o filete dos pensamentos, o pedido de aprovação, o ponto de atividade
+  pulsando e o aviso de versão. Nunca em botões comuns, nunca de fundo (fora o selo), nunca em texto
+  da interface. Nos temas claros o âmbar tem pouco contraste (cerca de 2:1): é ponto, borda e
+  desenho, nunca a única pista de algo.
 - A gênese conta como presença: o ponto do peito, as faíscas e o lampejo da falha são dele.
 - Sem degradê em botão, cartão ou fundo. O único degradê permitido é o da revelação do Muninn
   (papel → cinza, de cima para baixo).
-- Verde só para "conectado" (ponto de 6 px). Erro usa texto, não cor de fundo.
+- Verde `#2E9E5B` só no ponto de "conectado" e de "servidor ok". Erro usa texto, não cor de fundo.
+- O login e a abertura ficam em Tinta até a tela nova do login (etapa 4); a ligação é sempre tinta.
 
 ## 3. Tipografia
 
 | Papel | Fonte | Onde |
 |---|---|---|
-| Voz dele | **Newsreader** 300, itálico para falas | Saudações, títulos, o que ele pensa, o nome quando existir |
-| Interface | **Geist** 400/500 | Texto corrido, botões, rótulos |
-| Rastros | **Geist Mono** 400/500, 11–13 px, caixa-alta com 0.06–0.08em | Datas, estados, metadados, código |
+| Voz dele | **Newsreader** 300, itálico para falas; 400 em números grandes | Saudações, títulos, o que ele pensa, o nome quando existir |
+| Interface | **Geist** 400/500/600 | Texto corrido, botões, rótulos |
+| Dados | **Geist Mono** 400/500, 11–13 px | Datas, horários, status, metadados, código, a barra de status |
+| Marca | **Six Caps** | Só o nome `VISAO` (logo da barra lateral e selo) |
 
-- O codinome `VISÃO` é Geist Mono caixa-alta (identificador técnico). O nome do agente, quando
-  vier, é Newsreader itálico.
+- Todas servidas pelo próprio app (`apps/web/public/fonts/`), sem Google Fonts.
+- O nome `VISAO` é Six Caps (token `--font-marca`). O antigo codinome `VISÃO` em Geist Mono
+  caixa-alta **sai**. O nome do agente, quando vier, é Newsreader itálico.
 - Fala dele em bloco: Newsreader itálico com filete âmbar de 2 px à esquerda.
 - Não usar Inter, Space Grotesk ou JetBrains Mono em telas novas.
 
@@ -66,11 +88,24 @@ Regras:
 - Toque mínimo de 44 px em tudo que é clicável.
 - **Não aninhar cartões.** Um bloco com borda nunca fica dentro de outro bloco com borda.
 - Sem ícone decorativo em cima de título. Ícones só em navegação e botões, traço 1.5 px.
-- Computador: menu lateral (Início, Chat, Projetos, Caderno, Integrações) + conteúdo com
-  `max-width: 1120px`. Abaixo de ~800 px o menu vira o botão de menu e as colunas empilham.
+- Computador, a janela: barra lateral de 248 px (`--surface`, borda à direita) | área principal com
+  a barra da página de 52 px em cima (título do lugar ou da conversa, ações à direita) e o conteúdo
+  embaixo | barra de status de 28 px no rodapé, de ponta a ponta, em Geist Mono 11 px.
+- Barra lateral: logo, Nova conversa e lupa, navegação (Início, Chat, Projetos, Caderno, Rotinas,
+  Mac, Agentes, Canais, Habilidades), conversas Fixadas e Recentes, cartão de versão nova, você e
+  Ajustes. Abaixo de 900 px ela vira gaveta, e a barra da página e o rodapé somem.
+- Ícones: os traços do mockup, grade de 20, em `apps/web/src/components/Icon.tsx`.
 - Composer: pílula `--grafite` com microfone, campo "Fala comigo…", anexar e enviar (papel).
 
-## 5. O Muninn
+## 5. O corvo no eclipse e o Muninn
+
+O ícone tem dois desenhos, em `brand/corvo/`: `icone-grande-512.png` acima de 72 px e
+`icone-pequeno-256.png` (traço mais grosso) em 72 px ou menos. No app ele é `<Corvo size>`
+(`apps/web/src/brand/Corvo.tsx`), que escolhe o desenho pelo tamanho. `brand/generate_assets.py`
+gera dele o favicon, o `apple-touch-icon` e os ícones do PWA. O ícone do iPhone e a `og-image`
+ainda são os do anel e mudam quando o iPhone e o selo migrarem.
+
+A gênese do Muninn (abaixo) continua sendo a animação do login até a etapa 4 decidir o que fica.
 
 Arquivos em `brand/muninn/`:
 
@@ -86,10 +121,10 @@ No app web, a ilustração sai de `apps/web/public/muninn/` em dois tamanhos, ge
 720 px de tela (tamanho × `devicePixelRatio` × 0,76), e a de 720 nos outros casos. Cada uma tem
 um `.json` ao lado dizendo de onde veio. `strokes.json` fica na mesma pasta.
 
-Tamanhos: acima de 120 px, Muninn + anel. Entre 32 e 120 px, só o anel. Abaixo de 32 px, anel
-sem as marcas apagadas.
+Tamanhos (direção anterior, **sai** com o anel): acima de 120 px, Muninn + anel. Entre 32 e 120 px,
+só o anel. Abaixo de 32 px, anel sem as marcas apagadas.
 
-Onde ele aparece no app web:
+Onde ele aparece no app web hoje (cada linha troca para o corvo na etapa indicada):
 
 | Tela | Forma | Tamanho |
 |---|---|---|
@@ -97,8 +132,8 @@ Onde ele aparece no app web:
 | Abertura depois do login e a do dia | Muninn + anel, gênese curta (1,8 s) | 180 px; 132 px no celular |
 | Início, no topo | Muninn + anel, com os estados da seção 6 | 200 px; 150 px no celular |
 | Ligação | Muninn + anel, com a onda do "ouvindo" | 140 a 220 px |
-| Avatar das respostas no chat | só o anel | 36 px |
-| Logo do menu lateral e da barra do celular | anel sem as marcas apagadas | 28 e 26 px |
+| Avatar das respostas no chat | só o anel (**sai**: corvo, etapa 6) | 36 px |
+| Logo do menu lateral e da barra do celular | anel sem as marcas apagadas (**sai**: corvo + VISAO, etapas 2 e 11) | 28 e 26 px |
 
 Sensores (Mac, e-mail, Caderno, projetos) são ícones de traço, nunca o corvo.
 
@@ -178,8 +213,18 @@ Sem exclamação, sem emoji.
    tingido), os do PWA, o favicon, o wordmark `VISÃO` em contornos, o `muninn-512.png` e a
    `og-image`. Ícones pequenos levam só o anel (seção 5); o Muninn entra a partir de 120 px.
 
-Referência visual completa (telas de computador e celular, estados, animação): canvas
-"Visão — identidade" no Claude.
+Referência visual da direção "Muninn": canvas "Visão — identidade" no Claude.
+
+### Telas do VISAO (identidade nova)
+
+Prompt e ordem em [`docs/design/telas-visao/PROMPT_CLAUDE_CODE.md`](docs/design/telas-visao/PROMPT_CLAUDE_CODE.md),
+na branch `design/telas-visao`:
+
+1. Base: três temas, fontes novas, ícones a partir do corvo, janela com barra da página e rodapé.
+   **Feito** no web.
+2. Barra lateral. 3. Barra de status com dados da API. 4. Login com o selo e primeira vez.
+5. Início. 6. Chat. 7. Paleta de comandos. 8. Caderno. 9. Rotinas, Mac, Painel, Projetos e Ajustes.
+10. Ligação. 11. Celular. 12. Telas sem backend ainda, com estado vazio honesto.
 
 ## 9. Skills de design no repositório
 
