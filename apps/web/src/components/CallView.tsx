@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Message, ProgressStep } from "../api";
 import { type CallCamera, cameraSupported } from "../call/camera";
 import { Icon } from "./Icon";
-import { Corvo } from "../brand/Corvo";
+import { CORVO_ALT, Corvo } from "../brand/Corvo";
 import { type AssistantState, STATE_LABELS, anelEstado } from "../anel/state";
 import { MuninnDaLigacao } from "../muninn/MuninnDaLigacao";
 import { speakableText } from "../speech/speakable";
@@ -67,7 +67,7 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
 
   const lastUser = [...messages].reverse().find((m) => m.role === "user");
   const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
-  // Between turns, the crow before the sun, big (DESIGN.md §5). During a step, Muninn's particles
+  // Between turns, the crow with the amber eye, big (DESIGN.md §5). During a step, Muninn's particles
   // take the shape of the tool and come back to the crow (§6, "Nanorrobôs").
   const size = Math.min(380, Math.max(180, Math.round(Math.min(window.innerWidth * 0.6, window.innerHeight * 0.42))));
   const caption = step?.label ?? STATE_LABELS[state];
@@ -82,7 +82,7 @@ export function CallView({ agentName, state, level, messages, engine, speaking, 
         {step ? (
           <MuninnDaLigacao estado={anelEstado({ state })} size={size} level={level} passo={step} />
         ) : (
-          <Corvo size={size} label={`O corvo diante do sol: ${caption.toLowerCase()}`} className="call-corvo" />
+          <Corvo size={size} label={CORVO_ALT} className="call-corvo" />
         )}
         <h1 className="visually-hidden">Ligação com {agentName ?? "VISAO"}</h1>
         <p className="call-state" aria-live="polite">{caption}…</p>

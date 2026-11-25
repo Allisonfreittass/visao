@@ -1,19 +1,20 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { Corvo, corvoSrc } from "./Corvo";
+import { CORVO_ALT, Corvo, corvoSrc } from "./Corvo";
 
 describe("Corvo", () => {
-  it("uses the small drawing up to 72 px and the large one above", () => {
-    expect(corvoSrc(30)).toBe("/marca/corvo-256.png");
-    expect(corvoSrc(72)).toBe("/marca/corvo-256.png");
-    expect(corvoSrc(73)).toBe("/marca/corvo-512.png");
+  it("uses the close crop up to 48 px and the whole icon above", () => {
+    expect(corvoSrc(16)).toBe("/marca/corvo-olho-pequeno.svg");
+    expect(corvoSrc(48)).toBe("/marca/corvo-olho-pequeno.svg");
+    expect(corvoSrc(49)).toBe("/marca/corvo-olho.svg");
+    expect(corvoSrc(380)).toBe("/marca/corvo-olho.svg");
   });
 
   it("is decorative unless it has a label", () => {
     expect(renderToStaticMarkup(<Corvo size={30} />)).toContain('aria-hidden="true"');
-    const named = renderToStaticMarkup(<Corvo size={92} label="VISAO" />);
-    expect(named).toContain('alt="VISAO"');
+    const named = renderToStaticMarkup(<Corvo size={92} label={CORVO_ALT} />);
+    expect(named).toContain('alt="O corvo do VISAO, de olho âmbar"');
     expect(named).not.toContain("aria-hidden");
   });
 });

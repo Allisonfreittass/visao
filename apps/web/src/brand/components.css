@@ -41,4 +41,7 @@
 .rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .rs-campo[data-estado="erro"] input { border-color: var(--danger); }
 .rs-campo[data-estado="erro"] small { color: var(--danger); }
-.corvo { display: block; flex: none; }
+/* The crow (DESIGN.md §5): the corners are the drawing's own (22.5 % of the side). On a light page
+   its paper ground meets the page, so a 1 px line in tinta at 12 % keeps the edge; on tinta, none. */
+.corvo { display: block; flex: none; border-radius: 22.5%; box-shadow: 0 0 0 1px rgba(16, 18, 20, 0.12); }
+[data-theme="tinta"] .corvo, .call .corvo, .muninn-entrada .corvo, .intro .corvo { box-shadow: none; }
