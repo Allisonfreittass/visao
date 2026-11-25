@@ -1,6 +1,41 @@
 {
  "items": [
   {
+   "slug": "composio",
+   "name": "Composio",
+   "app": "composio",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "GitHub"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "developer-tools",
+      "name": "Developer-Tools"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Composio enables AI Agents and LLMs to authenticate and integrate with various tools.",
+    "logo": "https://logos.composio.dev/api/github",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
    "slug": "github",
    "name": "GitHub",
    "app": "github",
@@ -276,7 +311,7 @@
   }
  ],
  "current_page": 1,
- "total_items": 8,
+ "total_items": 9,
  "total_pages": 1,
  "next_cursor": null
 }

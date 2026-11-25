@@ -131,7 +131,7 @@ def _catalog(apps: ComposioClient) -> dict[str, CatalogItemOut]:
             asks_key=t.asks_key,
         )
         for t in found
-        if t.slug not in account.EXCLUDED
+        if t.slug not in account.HIDDEN
     }
 
 
@@ -143,7 +143,7 @@ def read_apps(db: DbSession, user: CurrentUser, settings: AppSettings) -> AppsOu
     ref = account.user_ref(user.id, settings.secret_key)
     problem = ""
     try:
-        connections = [c for c in apps.connections(ref) if c.toolkit not in account.EXCLUDED]
+        connections = [c for c in apps.connections(ref) if c.toolkit not in account.HIDDEN]
     except ComposioError as exc:
         connections, problem = [], f"O Composio não respondeu: {exc}."
     try:

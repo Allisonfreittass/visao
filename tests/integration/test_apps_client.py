@@ -145,13 +145,14 @@ def test_the_catalog_leaves_nothing_out_but_marks_what_needs_own_credentials():
     assert catalog["github"].managed and not catalog["jira"].managed
 
 
-def test_gmail_and_calendar_never_count_as_connected_apps():
+def test_gmail_calendar_and_composio_itself_never_count_as_connected_apps():
     api = RecordedComposio()
     api.answers[("GET", f"{API}/connected_accounts")] = {
         "items": [
             {"id": "ca_1", "status": "ACTIVE", "toolkit": {"slug": "github"}},
             {"id": "ca_2", "status": "ACTIVE", "toolkit": {"slug": "gmail"}},
             {"id": "ca_3", "status": "ACTIVE", "toolkit": {"slug": "googlecalendar"}},
+            {"id": "ca_4", "status": "ACTIVE", "toolkit": {"slug": "composio"}},
         ]
     }
     ref = f"visao-{uuid.uuid4().hex}"
