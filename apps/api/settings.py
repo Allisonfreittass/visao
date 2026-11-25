@@ -232,6 +232,17 @@ class Settings(BaseSettings):
         # Docker Compose passes unset variables as "", which must mean "not configured".
         return None if isinstance(value, str) and not value.strip() else value
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _psycopg_driver(cls, value: object) -> object:
+        # Supabase hands out "postgresql://..." (and some tools "postgres://"), which SQLAlchemy
+        # reads as psycopg2, not installed here: the driver in the dependencies is psycopg 3.
+        if isinstance(value, str):
+            for prefix in ("postgresql://", "postgres://"):
+                if value.startswith(prefix):
+                    return "postgresql+psycopg://" + value[len(prefix) :]
+        return value
+
     @model_validator(mode="after")
     def _require_real_secret_in_production(self) -> "Settings":
         if self.environment == "production" and (

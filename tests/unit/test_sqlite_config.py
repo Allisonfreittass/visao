@@ -69,3 +69,13 @@ def test_foreign_keys_are_checked(tmp_path):
         with engine.begin() as connection:
             connection.execute(text("INSERT INTO children (parent_id) VALUES (42)"))
     engine.dispose()
+
+
+def test_a_supabase_url_gets_the_installed_driver():
+    from apps.api.settings import Settings
+
+    for raw in ("postgresql://u:p@db.example.supabase.co:5432/postgres", "postgres://u:p@h/db"):
+        assert Settings(database_url=raw).database_url.startswith("postgresql+psycopg://")
+    kept = "postgresql+psycopg://u:p@h/db"
+    assert Settings(database_url=kept).database_url == kept
+    assert Settings(database_url="sqlite:///./x.db").database_url == "sqlite:///./x.db"
