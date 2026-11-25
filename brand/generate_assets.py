@@ -1,63 +1,68 @@
-"""Gera os ícones do app web a partir do corvo no eclipse (DESIGN.md §5).
+"""Gera os ícones do app a partir do corvo de olho âmbar (DESIGN.md §5).
 
-    pip install pillow
+    pip install pillow cairosvg
     python brand/generate_assets.py
 
-As fontes são os dois desenhos em brand/corvo/: `icone-grande-512.png` para tudo acima de 72 px e
-`icone-pequeno-256.png` (traço mais grosso, lê melhor pequeno) para 72 px ou menos. Escreve em
-apps/web/public/ e o ícone do app de Mac em desktop/app/app-icon.png. O ícone do iPhone e a
-og-image ainda são os da marca anterior e não saem daqui: mudam quando o iPhone e o selo do login
-migrarem.
+As fontes são os dois desenhos em vetor de brand/simbolo/: `corvo-olho-pequeno.svg` (corte fechado
+na cabeça, só o olho e o bico) até 48 px, e `corvo-olho-icone.svg` de 64 px para cima. Cada tamanho
+sai direto do vetor, sem reduzir um PNG grande. Escreve em apps/web/public/ e o ícone do app de Mac
+em desktop/app/app-icon.png. O cairosvg precisa do libcairo do sistema.
 """
 
 from __future__ import annotations
 
 import io
+import re
 import struct
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+import cairosvg
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
-CORVO = ROOT / "brand/corvo"
+SIMBOLO = ROOT / "brand/simbolo"
 PUB = ROOT / "apps/web/public"
 DESKTOP = ROOT / "desktop/app"
 
-TINTA = (16, 18, 20)  # the ground of the drawing, under its rounded corners
-SMALL_MAX = 72  # px: up to here, the small drawing
+PAPEL = (243, 241, 236)  # #F3F1EC, the ground of the drawing
+SMALL_MAX = 48  # px: up to here, the close crop of the head
 
 
-def source(size: int) -> Image.Image:
-    name = "icone-pequeno-256.png" if size <= SMALL_MAX else "icone-grande-512.png"
-    return Image.open(CORVO / name).convert("RGBA")
+def svg(size: int) -> str:
+    name = "corvo-olho-pequeno.svg" if size <= SMALL_MAX else "corvo-olho-icone.svg"
+    return (SIMBOLO / name).read_text()
 
 
-def icon(size: int) -> Image.Image:
-    """The icon as drawn: rounded corners, transparent around them."""
-    return source(size).resize((size, size), Image.LANCZOS)
+def render(size: int, *, rounded: bool = True) -> Image.Image:
+    """The drawing at `size`, straight from the vector. Rounded: the corners it carries, transparent
+    around them. Not rounded: edge to edge, for whoever masks the icon (iOS, Android)."""
+    source = svg(size)
+    if not rounded:
+        source = re.sub(r'\s*clip-path="url\(#c\)"', "", source)
+    png = cairosvg.svg2png(bytestring=source.encode(), output_width=size, output_height=size)
+    return Image.open(io.BytesIO(png)).convert("RGBA")
 
 
-def full_bleed(size: int) -> Image.Image:
-    """Edge to edge, the corners filled with tinta: for whoever masks the icon (iOS, Android)."""
-    ground = Image.new("RGBA", (size, size), (*TINTA, 255))
-    return Image.alpha_composite(ground, icon(size)).convert("RGB")
+def maskable(size: int, scale: float = 0.84) -> Image.Image:
+    """Android's safe zone is the centered circle of 80 %. The crow runs off the bottom and the
+    left, so the drawing shrinks into that corner and paper fills the rest: the head, the eye and
+    the tip of the beak stay inside the circle, and no cut edge shows."""
+    inner = round(size * scale)
+    out = Image.new("RGBA", (size, size), (*PAPEL, 255))
+    out.alpha_composite(render(inner, rounded=False), (0, size - inner))
+    return out.convert("RGB")
 
 
 def mac_icon() -> Image.Image:
     """The Mac app's icon on Apple's grid: the macOS does not round or inset icons, so the
     drawing sits as an 824 px rounded square in 1024, with a soft shadow under it."""
-    canvas, body, radius = 1024, 824, 185
-    art = Image.open(CORVO / "icone-grande-512.png").convert("RGBA")
-    art = art.resize((body, body), Image.LANCZOS)
-    ground = Image.new("RGBA", (body, body), (*TINTA, 255))
-    art = Image.alpha_composite(ground, art)
-    mask = Image.new("L", (body, body), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, body - 1, body - 1), radius, fill=255)
-    art.putalpha(mask)
+    canvas, body = 1024, 824
+    art = render(body)
     at = (canvas - body) // 2
+    alpha = art.getchannel("A").point(lambda v: v * 90 // 255)
+    shape = Image.new("RGBA", (body, body), (0, 0, 0, 0))
+    shape.putalpha(alpha)
     shadow = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    shape = Image.new("RGBA", (body, body), (0, 0, 0, 90))
-    shape.putalpha(mask.point(lambda v: v * 90 // 255))
     shadow.paste(shape, (at, at + 12), shape)
     out = shadow.filter(ImageFilter.GaussianBlur(14))
     out.alpha_composite(art, (at, at))
@@ -88,18 +93,16 @@ def ico(images: list[Image.Image], path: Path) -> None:
 
 
 def main() -> None:
-    # PWA and browser.
-    save(full_bleed(180), PUB / "apple-touch-icon.png")
-    for size in (192, 512):
-        save(icon(size), PUB / f"icon-{size}.png")
-    # Maskable: edge to edge. The crow already runs off the bottom and the left; a round mask
-    # trims a little of the eclipse, the squircles keep it.
-    save(full_bleed(512), PUB / "maskable-512.png")
-    ico([icon(16), icon(32), icon(48)], PUB / "favicon.ico")
+    # Browser tab: the close crop of the head.
+    for size in (16, 32):
+        save(render(size), PUB / f"favicon-{size}.png")
+    ico([render(16), render(32), render(48)], PUB / "favicon.ico")
 
-    # In the app (<Corvo>): the two drawings, as they are.
-    save(source(512), PUB / "marca/corvo-512.png")
-    save(source(SMALL_MAX), PUB / "marca/corvo-256.png")
+    # PWA. The iPhone rounds the touch icon itself: edge to edge.
+    save(render(180, rounded=False).convert("RGB"), PUB / "apple-touch-icon.png")
+    for size in (192, 512):
+        save(render(size), PUB / f"icon-{size}.png")
+    save(maskable(512), PUB / "maskable-512.png")
 
     # The Mac app (docs/APP_MAC.md): `npx tauri icon app-icon.png` makes the sizes from it.
     save(mac_icon(), DESKTOP / "app-icon.png")
