@@ -1,13 +1,16 @@
 """Speech-to-text with faster-whisper (MIT, CTranslate2) on CPU.
 
 The library is imported when the engine is built, so the API runs without the `[stt]` extra.
+The model loads on the first transcription and leaves memory after VISION_VOICE_IDLE_MINUTES
+without one (integrations/idle_cache.py).
 """
 
 import io
 import time
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Protocol
+
+from integrations.idle_cache import VOICE_IDLE, IdleCache
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,7 @@ class WhisperSTT:
         )
 
 
-@lru_cache(maxsize=1)
-def load_stt(size: str, models_dir: str) -> STTProvider:
-    return WhisperSTT(size, models_dir)
+# The Whisper model for one size, loaded on first use and dropped when idle (~0.5 GB for base).
+load_stt: IdleCache[STTProvider] = IdleCache(
+    WhisperSTT, idle_seconds=VOICE_IDLE, maxsize=1, name="stt"
+)

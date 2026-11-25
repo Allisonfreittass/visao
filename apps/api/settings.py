@@ -133,6 +133,9 @@ class Settings(BaseSettings):
     stt_models_dir: str = "models/stt"
     # ~60 s of 16 kHz mono 16-bit WAV; longer turns are refused.
     stt_max_bytes: int = Field(default=2_000_000, ge=10_000)
+    # A voice model (speaking or listening) leaves memory after this long unused; 0 keeps it for
+    # the life of the process. Kokoro holds ~0.9 GB, Whisper base ~0.5 GB.
+    voice_idle_minutes: float = Field(default=10.0, ge=0)
 
     # Curiosity and research (docs/CURIOSITY.md). Off by default: one extra LLM call per
     # non-trivial turn, plus searches within the limits below.
