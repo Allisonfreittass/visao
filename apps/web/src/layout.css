@@ -707,23 +707,41 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .login-link:focus-visible { outline: 2px solid var(--e-tinta, #101214); outline-offset: 3px; }
 .entrada .login--fora { display: grid; gap: 22px; }
 
+/* Celular e tablet: o corvo vira uma faixa em cima e o formulário vem logo abaixo, inteiro na
+ * primeira tela num celular comum. A faixa mostra a cabeça (do alto da cabeça ao bico), sem o
+ * pescoço: o desenho tem a proporção natural, é centrado na cabeça (40% da altura do desenho) e a
+ * altura da faixa acompanha a largura, então o recorte é o mesmo em 320, 375 ou 414 px. Em tela
+ * baixa a faixa encolhe (30% da altura) para os campos aparecerem sem rolar. */
 @media (max-width: 899px) {
   .entrada { flex-direction: column; }
-  .entrada-corvo { flex: 0 0 auto; height: 380px; min-height: 0; }
-  /* Mais largo que a tela e preso à direita: o corvo fica em close e sangra pela esquerda. */
-  .entrada-corvo svg { width: 112%; margin-left: -12%; }
-  .entrada-acesso {
-    flex: 1 0 auto; justify-content: flex-start; gap: 20px; border-left: 0; border-top: 1px solid var(--e-linha);
-    padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  .entrada-corvo {
+    position: relative; flex: 0 0 auto; min-height: 0;
+    height: clamp(136px, min(56vw, 30vh), 300px);
+    height: clamp(136px, min(56vw, 30svh), 300px);
   }
-  .entrada-marca { font-size: 52px; }
-  .entrada-saudacao { margin-top: 8px; }
-  .entrada-acesso h1 { font-size: 38px; }
-  .entrada-lede { font-size: 15px; }
-  .entrada .login { gap: 18px; }
+  /* Um pouco mais largo que a tela e puxado para a esquerda: o corvo sangra pela borda. */
+  .entrada-corvo svg {
+    position: absolute; left: -10%; top: 50%; width: min(110%, 600px); height: auto; aspect-ratio: 470 / 557;
+    transform: translateY(-40.4%);
+  }
+  .entrada-acesso {
+    flex: 1 0 auto; justify-content: flex-start; gap: 18px; border-left: 0; border-top: 1px solid var(--e-linha);
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  .entrada-marca { font-size: 42px; }
+  .entrada-saudacao { gap: 8px; margin-top: 4px; }
+  .entrada-acesso h1 { font-size: clamp(31px, 9.6vw, 38px); }
+  .entrada-lede { font-size: 15px; line-height: 1.5; }
+  .entrada .login { gap: 16px; }
 }
-@media (max-width: 899px) and (max-height: 700px) {
-  .entrada-corvo { height: 300px; }
+
+/* Dedo, não mouse: "Manter conectado" e os dois links ganham 44 px de altura para tocar (PRODUCT.md),
+ * com margem negativa para o espaço entre as linhas continuar o mesmo. */
+@media (pointer: coarse) {
+  .entrada .memory-toggle { min-height: 44px; margin: -12px 0 -10px; }
+  .entrada .memory-toggle input { width: 20px; height: 20px; }
+  .login-links { align-items: center; margin: -10px 0; }
+  .login-link { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* ---------- Primeira vez (4 passos) ---------- */
