@@ -88,7 +88,16 @@ O desenho completo, com o contrato de cada módulo, está em [docs/ARCHITECTURE.
 
 ## Como rodar
 
-Requer Python 3.12, Node 22 e, para o caminho com Docker, Docker Compose 2.24+.
+Para instalar no seu Mac ou Linux, um script, sem Docker e sem sudo, instala o `uv`, o código em
+`~/.visao` e um serviço que sobe o Visão com o login e de novo se ele cair (launchd no Mac, systemd
+do usuário no Linux); detalhes em [docs/INSTALAR.md](docs/INSTALAR.md):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Allisonfreittass/visao/main/scripts/instalar.sh | bash
+visao conta criar --email voce@exemplo.com   # usuário inicial (a senha é pedida) e gênese
+```
+
+Para mexer no código, requer Python 3.12, Node 22 e, para o caminho com Docker, Docker Compose 2.24+.
 
 ```bash
 make setup                 # .venv e dependências de Python e do web
