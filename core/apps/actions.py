@@ -83,6 +83,8 @@ def propose(
 ) -> ToolAction:
     if tool.toolkit in account.EXCLUDED:
         raise ActionError("email e agenda são pela integração do Google")
+    if tool.toolkit in account.NOT_APPS:
+        raise ActionError("isso não é um app seu")
     if tool.kind == "destructive":
         raise ActionError("apagar pelos apps está desligado")
     if not tool.version or tool.version == "latest":

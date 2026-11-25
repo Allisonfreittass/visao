@@ -222,3 +222,17 @@ def test_disconnecting_an_app_turns_down_only_its_own_proposals(db, apps):
     assert actions.reject_app(db, owner.id, "github") == 1
     assert github.status == "rejected" and notion.status == "proposed"
     assert db.scalar(select(ToolAction).where(ToolAction.toolkit == "notion")) is notion
+
+
+def test_composios_own_toolkit_cannot_be_proposed(db, apps):
+    from dataclasses import replace
+
+    owner = setup(db)
+    with pytest.raises(actions.ActionError, match="não é um app seu"):
+        actions.propose(
+            db,
+            owner.id,
+            tool=replace(tool(apps), toolkit="composio", slug="COMPOSIO_MANAGE_CONNECTIONS"),
+            app_name="Composio",
+            arguments={},
+        )
