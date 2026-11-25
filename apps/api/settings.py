@@ -148,6 +148,9 @@ class Settings(BaseSettings):
     # machine. Off on the server, where the worker is its own service. Never with more than one
     # uvicorn worker: each would start its own.
     worker_in_api: bool = False
+    # The Vite build served by the API itself, with /api for the API (apps/api/web.py): one
+    # address on the owner's machine, no Caddy. Unset on the server, where Caddy serves it.
+    web_dir: str | None = None
     # Inner life (docs/MIND.md): thinking between turns, interest-led study, starting conversations.
     mind_enabled: bool = False
     mind_think_minutes: int = Field(default=20, ge=5)

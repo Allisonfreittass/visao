@@ -30,6 +30,10 @@ dependencies = [
     "playwright==1.62.0",
 ]
 
+[project.scripts]
+# The Visão on the owner's machine: visao iniciar | parar | estado (apps/visao_cli.py).
+visao = "apps.visao_cli:main"
+
 [project.optional-dependencies]
 # Self-hosted speech synthesis (docs/VOICE.md). Heavy; not needed by the API core or the tests.
 tts = [

@@ -141,7 +141,7 @@ usados e saírem da memória depois**.
 |---|---|---|
 | 1 | Configurar o SQLite (item 3 acima). **Feito** (#15) | pequeno; vale já |
 | 2 | Worker como thread da API, com uma opção para continuar separado no servidor. **Feito** (`VISION_WORKER_IN_API`): 149 MB num processo, contra 269 MB em dois, medido aqui | médio |
-| 3 | API servindo o site e um comando `visao` (iniciar, parar, estado) | médio |
+| 3 | API servindo o site e um comando `visao` (iniciar, parar, estado). **Feito** (`VISION_WEB_DIR`, `apps/visao_cli.py`) | médio |
 | 4 | Navegador e voz carregados sob demanda e descarregados depois de parados | médio |
 | 5 | Instalador nos moldes do Hermes e do braço: um script que instala o `uv`, o Visão em `~/.visao` e um serviço do launchd (Mac) ou do systemd do usuário (Linux) | médio |
 | 6 | Isolar o navegador sem Docker: o Chromium como processo separado, sem as chaves no ambiente, dentro do `sandbox-exec` no Mac e do `bubblewrap` no Linux, que o braço já usa | médio, pede ADR |

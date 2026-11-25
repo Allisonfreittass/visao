@@ -33,6 +33,7 @@ from apps.api.routes import (
     voice,
 )
 from apps.api.settings import get_settings
+from apps.api.web import mount_web
 from infrastructure.observability.logging import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,9 @@ def create_app() -> FastAPI:
     app.include_router(google.router)
     app.include_router(panels.router)
     app.include_router(share.router)
+    if settings.web_dir:
+        # Last: the site's catch-all must come after every API route.
+        mount_web(app, settings.web_dir)
     return app
 
 
