@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core import actions as app_actions
@@ -63,12 +64,14 @@ from core.panels import quote as panel_quote
 from core.panels import service as panels
 from core.panels.extract import extract as extract_prices
 from core.policies.autonomy import is_paused
+from core.skills import catalog as skills
 from core.study.service import related_context
 from infrastructure.database.models import (
     AgentIdentity,
     Attachment,
     Conversation,
     Decision,
+    Message,
     Panel,
     User,
 )
@@ -695,6 +698,12 @@ def run_turn(
     if own_code:
         optional.append(own_code)
         plan.add("read_own_code", executed=True, reason="question_about_itself")
+    skill = _skill_for(session, conversation, text)
+    if skill is not None:
+        # A way of working the owner switched on in Habilidades (core/skills/catalog.py).
+        progress.step(f"Seguindo a habilidade {skill.name}")
+        optional.append(skills.context_block(skill))
+        plan.add("skill_used", executed=True, reason="message_matched_skill", skill=skill.id)
     local_now = mind_intentions.local(owner, datetime.now(UTC))
     blocks.append(
         f"Agora, no relógio de quem fala com você: {local_now} ({owner.timezone}). Todo horário "
@@ -900,6 +909,30 @@ def run_turn(
         browsed=tuple(browsed.visits) if browsed else (),
         panel=created or edited,
     )
+
+
+# How far back a skill keeps going after the message that called it (a document written section
+# by section, a bug chased over several replies).
+SKILL_FOLLOW = timedelta(hours=2)
+SKILL_FOLLOW_MESSAGES = 3
+
+
+def _skill_for(session: Session, conversation: Conversation, text: str) -> skills.Skill | None:
+    switched_on = skills.enabled(session)
+    if not switched_on:
+        return None
+    since = datetime.now(UTC) - SKILL_FOLLOW
+    earlier = session.scalars(
+        select(Message.content)
+        .where(
+            Message.conversation_id == conversation.id,
+            Message.role == "user",
+            Message.created_at >= since,
+        )
+        .order_by(Message.created_at.desc())
+        .limit(SKILL_FOLLOW_MESSAGES)
+    ).all()
+    return skills.choose(switched_on, text, list(earlier))
 
 
 def _done_before_the_reply(

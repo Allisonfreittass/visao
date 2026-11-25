@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from core import llm_routing
 from core.initiatives import push
 from core.policies.autonomy import is_paused
+from core.skills import catalog as skill_catalog
 from infrastructure.database.models import ArmDevice, GoogleAccount, PushSubscription, User
 
 
@@ -52,6 +53,8 @@ class Capabilities:
     self_knowledge: bool = False
     # Ajustes > Escolha do provedor on "Por tarefa" (core/llm_routing.py, ADR-0022).
     provider_by_task: bool = False
+    # Skills the owner left on in Habilidades, by name (core/skills/catalog.py).
+    skills: tuple[str, ...] = ()
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -233,6 +236,12 @@ class Capabilities:
                 "estudo, com texto público, vai primeiro no Gemini grátis; o dono liga e desliga "
                 "em Ajustes"
             )
+        if self.skills:
+            items.append(
+                f"seguir as habilidades ligadas em Habilidades ({'; '.join(self.skills)}): quando "
+                "o pedido combina com uma, o sistema põe o jeito de trabalhar dela no contexto "
+                "desta resposta; o interlocutor liga e desliga cada uma nessa tela"
+            )
         if self.notifications:
             if not self.push_configured:
                 items.append(
@@ -354,6 +363,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         push_configured=push.configured(),
         self_knowledge=inputs.self_knowledge,
         provider_by_task=llm_routing.get_mode(session) == "por_tarefa",
+        skills=tuple(s.name for s in skill_catalog.enabled(session)),
         google=session.scalar(
             select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
         )

@@ -29,6 +29,7 @@ from apps.api.routes import (
     projects,
     push,
     share,
+    skills,
     study,
     system,
     voice,
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
     app.include_router(owner_apps.router)
     app.include_router(panels.router)
     app.include_router(share.router)
+    app.include_router(skills.router)
     if settings.web_dir:
         # Last: the site's catch-all must come after every API route.
         mount_web(app, settings.web_dir)
