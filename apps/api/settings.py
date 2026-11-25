@@ -3,7 +3,7 @@ from decimal import Decimal
 from functools import lru_cache
 from typing import Any, Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from integrations.llm.budget import FreeEndpointGrant
@@ -172,8 +172,11 @@ class Settings(BaseSettings):
     webpush_private_key: SecretStr | None = None
     webpush_subject: str | None = None  # https URL of the app or mailto: contact (VAPID "sub")
     # Optional read-only GitHub token: opens the owner's private repositories when a link to one
-    # is sent, and raises the API limit from 60 to 5000 reads an hour.
-    github_token: SecretStr | None = None
+    # is sent, lets the conversation read commits, PRs and issues on the server (core/github), and
+    # raises the API limit from 60 to 5000 reads an hour. GITHUB_TOKEN is accepted too.
+    github_token: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("VISION_GITHUB_TOKEN", "GITHUB_TOKEN")
+    )
     # Optional: web search in the conversation through Tavily (free plan: 1000 searches a month).
     # Without it, research in the conversation uses Wikipedia and arXiv.
     tavily_api_key: SecretStr | None = None

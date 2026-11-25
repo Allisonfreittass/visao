@@ -70,6 +70,11 @@ _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
         f"leu no {', '.join(a.get('apps') or ['app'])} da pessoa"
         + (f" ({', '.join(a['tools'][:3])})" if a.get("tools") else "")
     ),
+    "github_read": lambda a: (
+        f"leu o GitHub da pessoa pelo servidor ({a.get('repo') or 'repositório'}: "
+        + ", ".join(a.get("read") or [])
+        + ")"
+    ),
     "apps_proposed": lambda a: (
         f"preparou uma mudança no {', '.join(a.get('apps') or ['app'])}, que espera a aprovação "
         "da pessoa"
@@ -189,6 +194,7 @@ _TOPIC = {
         r"\bapps?\b|issues?|github|notion|slack|linear|trello|jira|p[áa]ginas?|canal|tarefas?",
         re.IGNORECASE,
     ),
+    "github_read": re.compile(r"github|commits?|\bprs?\b|pull|issues?|reposit", re.IGNORECASE),
     "read_links": re.compile(r"links?|site|p[áa]gina", re.IGNORECASE),
     "browsed": re.compile(r"site|p[áa]gina|pre[çc]o|voo|naveg", re.IGNORECASE),
     "read_attachments": re.compile(r"foto|arquivo|anexo|imagem|pdf", re.IGNORECASE),

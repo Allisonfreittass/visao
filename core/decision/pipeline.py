@@ -44,6 +44,7 @@ from core.curiosity.engine import (
 )
 from core.decision import record as deed_record
 from core.decision.turn import TurnPlan
+from core.github import assist as github_assist
 from core.google import actions as google_actions
 from core.google import assist as google_assist
 from core.identity import name_deliberation, self_knowledge
@@ -77,6 +78,7 @@ from infrastructure.database.models import (
 )
 from infrastructure.jobs import queue
 from integrations.browser.base import Browser, Visit
+from integrations.github.api import GitHubAPI
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
@@ -139,6 +141,7 @@ def run_turn(
     position: location.Here | None = None,
     client_message_id: uuid.UUID | None = None,
     screen_provider: LLMProvider | None = None,
+    github: GitHubAPI | None = None,
 ) -> TurnOutcome:
     """The caller holds core/conversation/turn_lock.py for the conversation: what runs here
     before the reply (projects, notes, proposals) must not run twice at once."""
@@ -231,7 +234,24 @@ def run_turn(
             ),
         ),
     )
-    if capabilities.mac_projects:
+    # The owner's GitHub, read on the server (a "cloud" tool): before the Mac, so a question about
+    # commits of a Mac project is answered now instead of waiting for a Mac that may be off.
+    from_github = (
+        github_assist.run(text, api=github, now=datetime.now(UTC), timezone=owner.timezone or "UTC")
+        if github is not None and not shared
+        else None
+    )
+    if from_github is not None:
+        blocks.append(from_github.block)
+        plan.add(
+            "github_read" if from_github.read else "github_failed",
+            executed=bool(from_github.read),
+            reason="owner_asked",
+            repo=from_github.repo,
+            read=from_github.read,
+            **({"failure": from_github.failure} if from_github.failure else {}),
+        )
+    if capabilities.mac_projects and from_github is None:
         wanted = mac_intent.detect(
             session,
             conversation=conversation,
@@ -307,7 +327,7 @@ def run_turn(
                     for a in helped.proposed
                 )
 
-    if config.apps_key and config.google_secret:
+    if config.apps_key and config.google_secret and from_github is None:
         recent = "\n".join(
             f"{m.role}: {m.content[:300]}" for m in context_history(session, conversation)[-6:]
         )
@@ -491,7 +511,13 @@ def run_turn(
     offering = False
     quote_table = None
     budget_goal = None
-    if browser is not None and not read and accepted is None and edited is None:
+    if (
+        browser is not None
+        and not read
+        and accepted is None
+        and edited is None
+        and from_github is None
+    ):
         browsed = browse.run(
             session,
             owner=owner,
@@ -592,6 +618,7 @@ def run_turn(
         config.curiosity_enabled
         and modality != "voice"
         and not read
+        and from_github is None
         and not (browsed and (browsed.opened or browsed.missing))
     ):
         outcome = consider(

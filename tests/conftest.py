@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from apps.api.deps import get_session_factory  # noqa: E402
+from apps.api.links import get_github  # noqa: E402
 from apps.api.main import create_app  # noqa: E402
 from infrastructure.database.base import Base  # noqa: E402
 from infrastructure.database.session import configure_sqlite  # noqa: E402
@@ -43,6 +44,8 @@ def client(engine: Engine) -> Iterator[TestClient]:
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     app = create_app()
     app.dependency_overrides[get_session_factory] = lambda: factory
+    # No test reaches api.github.com; tests that need GitHub pass their own.
+    app.dependency_overrides[get_github] = lambda: None
     with TestClient(app) as test_client:
         yield test_client
 

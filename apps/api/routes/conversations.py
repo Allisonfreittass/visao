@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from apps.api.browser import get_browser
 from apps.api.deps import AppSettings, CurrentUser, DbSession, SessionFactory
 from apps.api.limits import panel_limits
-from apps.api.links import get_link_reader
+from apps.api.links import get_github, get_link_reader
 from apps.api.llm import get_llm_provider, get_screen_provider, missing_llm_settings
 from apps.api.routes.artifacts import ArtifactOut, artifact_out, build_in_background
 from apps.api.routes.attachments import AttachmentOut, attachment_out
@@ -65,6 +65,7 @@ from infrastructure.database.models import (
     User,
 )
 from integrations.browser.base import Browser
+from integrations.github.api import GitHubAPI
 from integrations.llm.base import LLMError, LLMProvider
 from integrations.search.base import SearchProvider
 
@@ -779,6 +780,7 @@ def send_message(
     provider: OptionalProvider,
     search: Annotated[SearchProvider, Depends(get_search_provider)],
     links: Annotated[LinkReader, Depends(get_link_reader)],
+    github: Annotated[GitHubAPI | None, Depends(get_github)],
     background: BackgroundTasks,
     factory: SessionFactory,
     browser: Annotated[Browser | None, Depends(get_browser)],
@@ -824,6 +826,7 @@ def send_message(
                     config=turn_config(settings),
                     modality=body.modality,
                     links=links,
+                    github=github,
                     files=files,
                     browser=browser,
                     reply_to_id=body.reply_to_id,
