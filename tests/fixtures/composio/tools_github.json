@@ -1,0 +1,403 @@
+{
+ "items": [
+  {
+   "slug": "GITHUB_LIST_REPOSITORY_ISSUES",
+   "name": "List repository issues",
+   "description": "Lists issues in a repository.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "open",
+       "closed",
+       "all"
+      ]
+     }
+    },
+    "required": [
+     "owner",
+     "repo"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [
+    "readOnlyHint",
+    "openWorldHint",
+    "issues"
+   ],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "List repository issues",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  },
+  {
+   "slug": "GITHUB_GET_AN_ISSUE",
+   "name": "Get an issue",
+   "description": "Gets one issue with its body.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     },
+     "issue_number": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "owner",
+     "repo",
+     "issue_number"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [
+    "readOnlyHint",
+    "idempotentHint"
+   ],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "Get an issue",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  },
+  {
+   "slug": "GITHUB_CREATE_AN_ISSUE",
+   "name": "Create an issue",
+   "description": "Creates an issue.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     },
+     "title": {
+      "type": "string"
+     },
+     "body": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "owner",
+     "repo",
+     "title"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [
+    "createHint",
+    "openWorldHint"
+   ],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "Create an issue",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  },
+  {
+   "slug": "GITHUB_UPDATE_AN_ISSUE",
+   "name": "Update an issue",
+   "description": "Edits an issue.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     },
+     "issue_number": {
+      "type": "integer"
+     },
+     "state": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "owner",
+     "repo",
+     "issue_number"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [
+    "readOnlyHint",
+    "updateHint"
+   ],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "Update an issue",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  },
+  {
+   "slug": "GITHUB_STAR_A_REPOSITORY",
+   "name": "Star a repository",
+   "description": "Stars a repository for the user.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     }
+    },
+    "required": [
+     "owner",
+     "repo"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "Star a repository",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  },
+  {
+   "slug": "GITHUB_DELETE_A_REPOSITORY",
+   "name": "Delete a repository",
+   "description": "Deletes a repository.",
+   "human_description": null,
+   "input_parameters": {
+    "type": "object",
+    "properties": {
+     "owner": {
+      "type": "string",
+      "description": "Dono do repositório"
+     },
+     "repo": {
+      "type": "string",
+      "description": "Nome do repositório"
+     }
+    },
+    "required": [
+     "owner",
+     "repo"
+    ]
+   },
+   "output_parameters": {
+    "type": "object",
+    "properties": {
+     "data": {
+      "type": "object"
+     }
+    }
+   },
+   "tags": [
+    "destructiveHint"
+   ],
+   "toolkit": {
+    "slug": "github",
+    "name": "GitHub",
+    "logo": "https://logos.composio.dev/api/github"
+   },
+   "version": "20251111_00",
+   "available_versions": [
+    "20251111_00",
+    "20251020_01"
+   ],
+   "is_deprecated": false,
+   "deprecated": {
+    "available_versions": [
+     "20251111_00"
+    ],
+    "displayName": "Delete a repository",
+    "is_deprecated": false,
+    "toolkit": {
+     "logo": ""
+    },
+    "version": "20251111_00"
+   },
+   "no_auth": false,
+   "scopes": [
+    "repo"
+   ],
+   "scope_requirements": null
+  }
+ ],
+ "current_page": 1,
+ "total_items": 6,
+ "total_pages": 1,
+ "next_cursor": null
+}

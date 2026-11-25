@@ -1,0 +1,216 @@
+{
+ "items": [
+  {
+   "slug": "github",
+   "name": "GitHub",
+   "app": "github",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "GitHub"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "developer-tools",
+      "name": "Developer-Tools"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "GitHub description",
+    "logo": "https://logos.composio.dev/api/github",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "notion",
+   "name": "Notion",
+   "app": "notion",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Notion"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "productivity",
+      "name": "Productivity"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Notion description",
+    "logo": "https://logos.composio.dev/api/notion",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "slack",
+   "name": "Slack",
+   "app": "slack",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Slack"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "communication",
+      "name": "Communication"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Slack description",
+    "logo": "https://logos.composio.dev/api/slack",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "gmail",
+   "name": "Gmail",
+   "app": "gmail",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Gmail"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "communication",
+      "name": "Communication"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Gmail description",
+    "logo": "https://logos.composio.dev/api/gmail",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "googlecalendar",
+   "name": "Google Calendar",
+   "app": "googlecalendar",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [
+    "OAUTH2"
+   ],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Google Calendar"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "productivity",
+      "name": "Productivity"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Google Calendar description",
+    "logo": "https://logos.composio.dev/api/googlecalendar",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "jira",
+   "name": "Jira",
+   "app": "jira",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "OAUTH2"
+   ],
+   "composio_managed_auth_schemes": [],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Jira"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "developer-tools",
+      "name": "Developer-Tools"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Jira description",
+    "logo": "https://logos.composio.dev/api/jira",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  }
+ ],
+ "current_page": 1,
+ "total_items": 6,
+ "total_pages": 1,
+ "next_cursor": null
+}

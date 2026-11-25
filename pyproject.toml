@@ -28,6 +28,9 @@ dependencies = [
     # Client for the real browser that opens live pages (docs/NAVEGADOR.md); must match the
     # version of the `browser` container in deploy/docker-compose.yml.
     "playwright==1.62.0",
+    # The owner's other apps (Notion, GitHub, Slack...) through Composio (docs/APPS.md, ADR-0028).
+    # Imported only by integrations/composio/client.py, and unused without VISION_COMPOSIO_API_KEY.
+    "composio==0.35.0",
 ]
 
 [project.scripts]

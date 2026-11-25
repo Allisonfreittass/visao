@@ -1,0 +1,23 @@
+{
+ "items": [
+  {
+   "id": "ac_github",
+   "uuid": "u1",
+   "name": "github-managed",
+   "created_at": "2026-11-25T10:00:00Z",
+   "no_of_connections": 0,
+   "status": "ENABLED",
+   "type": "default",
+   "is_composio_managed": true,
+   "auth_scheme": "OAUTH2",
+   "tool_access_config": {},
+   "toolkit": {
+    "slug": "github",
+    "logo": ""
+   }
+  }
+ ],
+ "current_page": 1,
+ "total_items": 1,
+ "total_pages": 1
+}
