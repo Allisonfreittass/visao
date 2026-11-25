@@ -199,7 +199,11 @@ def title_handler(settings: Settings, provider: LLMProvider | None) -> Handler:
             return HandlerResult("done", {"skipped": "no_llm"})
         budgets = Budgets(settings.llm_daily_budget_usd, settings.llm_conversation_budget_usd)
         named = conversation_title.run_job(
-            session, uuid.UUID(job.payload["conversation_id"]), provider, budgets
+            session,
+            uuid.UUID(job.payload["conversation_id"]),
+            provider,
+            budgets,
+            again=bool(job.payload.get("retitle")),
         )
         return HandlerResult("done", {"titled": named is not None})
 

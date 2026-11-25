@@ -76,3 +76,36 @@ def test_titles_are_cleaned_and_kept_short():
         "Uma conversa sobre muitas coisas diferentes"
     )
     assert title.clean("Oi") is None
+
+
+def test_a_clear_change_of_subject_gets_a_new_title(client, db):
+    def respond(messages):
+        if messages[0].content == title.INSTRUCTIONS:
+            return "Cotação recorrente de voo"
+        if messages[0].content == title.RETITLE_INSTRUCTIONS:
+            return '{"mudou": true, "titulo": "Commits do Visão hoje"}'
+        return "Consigo ver ao vivo."
+
+    llm = FakeLLMProvider(responder=respond)
+    client.app.dependency_overrides[get_llm_provider] = lambda: llm
+    client.app.dependency_overrides[get_settings] = lambda: Settings(curiosity_enabled=False)
+    run_genesis(db)
+    db.commit()
+    headers = _login(client, db)
+    conversation = _talk(client, headers, "me avisa todo dia do preço do voo pra Santiago")
+    _run_title_jobs(db, llm)
+    # Same subject, a detail: no check at all.
+    _talk(client, headers, "e o preço do voo de volta?", conversation)
+    _run_title_jobs(db, llm)
+    assert not [p for p in llm.prompts if p[0].content == title.RETITLE_INSTRUCTIONS]
+    _talk(client, headers, "quantos commits teve hoje no visao?", conversation)
+    _run_title_jobs(db, llm)
+    listed = client.get("/conversations", headers=headers).json()
+    assert listed[0]["title"] == "Commits do Visão hoje"
+    assert db.query(ModelUsage).filter_by(purpose=title.PURPOSE_RETITLE).one().outcome == "changed"
+
+
+def test_a_detail_of_the_same_subject_keeps_the_title():
+    assert not title.drifted("Cotação recorrente de voo", "e o voo de volta?")
+    assert title.drifted("Cotação recorrente de voo", "quantos commits teve hoje no visao?")
+    assert not title.drifted("Cotação recorrente de voo", "ok")
