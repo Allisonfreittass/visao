@@ -20,9 +20,10 @@ describe("CallView", () => {
   beforeAll(() => vi.stubGlobal("window", { innerWidth: 1440, innerHeight: 900, matchMedia: () => ({ matches: false }) }));
   afterAll(() => vi.unstubAllGlobals());
 
-  it("shows the crow before the sun between turns, with your last sentence", () => {
+  it("shows the crow with the amber eye between turns, with your last sentence", () => {
     const html = renderToStaticMarkup(<CallView {...base} />);
-    expect(html).toContain("corvo-512.png");
+    expect(html).toContain("/marca/corvo-olho.svg");
+    expect(html).toContain('alt="O corvo do VISAO, de olho âmbar"');
     expect(html).not.toContain('class="nano');
     expect(html).toContain("Você: “vê se chegou a confirmação”");
     expect(html).toContain("Desligar");
@@ -31,7 +32,7 @@ describe("CallView", () => {
   it("turns into the tool during a step and says what he is doing", () => {
     const html = renderToStaticMarkup(<CallView {...base} step={{ label: "Procurando no seu Gmail", detail: "reserva Lisboa", kind: "email" } as never} />);
     expect(html).toContain('class="nano');
-    expect(html).not.toContain("corvo-512.png");
+    expect(html).not.toContain("corvo-olho");
     expect(html).toContain("Procurando no seu Gmail…");
     expect(html).toContain("reserva Lisboa");
   });

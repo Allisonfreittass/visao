@@ -5,8 +5,9 @@
 
 As fontes são os dois desenhos em vetor de brand/simbolo/: `corvo-olho-pequeno.svg` (corte fechado
 na cabeça, só o olho e o bico) até 48 px, e `corvo-olho-icone.svg` de 64 px para cima. Cada tamanho
-sai direto do vetor, sem reduzir um PNG grande. Escreve em apps/web/public/ e o ícone do app de Mac
-em desktop/app/app-icon.png. O cairosvg precisa do libcairo do sistema.
+sai direto do vetor, sem reduzir um PNG grande. Escreve em apps/web/public/ (os dois SVGs vão para
+marca/, de onde o <Corvo> os lê) e o ícone do app de Mac em desktop/app/app-icon.png. O cairosvg
+precisa do libcairo do sistema.
 """
 
 from __future__ import annotations
@@ -103,6 +104,14 @@ def main() -> None:
     for size in (192, 512):
         save(render(size), PUB / f"icon-{size}.png")
     save(maskable(512), PUB / "maskable-512.png")
+
+    # In the app (<Corvo>): the two drawings as vectors, sharp at any size.
+    for name, out in (
+        ("corvo-olho-icone.svg", "corvo-olho.svg"),
+        ("corvo-olho-pequeno.svg", "corvo-olho-pequeno.svg"),
+    ):
+        (PUB / "marca" / out).write_text((SIMBOLO / name).read_text())
+        print("ok", (PUB / "marca" / out).relative_to(ROOT))
 
     # The Mac app (docs/APP_MAC.md): `npx tauri icon app-icon.png` makes the sizes from it.
     save(mac_icon(), DESKTOP / "app-icon.png")

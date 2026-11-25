@@ -1,12 +1,16 @@
-/** Above this, the detailed drawing; at or below it, the small one, with thicker strokes. */
-export const CORVO_SMALL_MAX = 72;
+/** Up to this, the close crop of the head (only the eye and the beak); above it, the whole icon. */
+export const CORVO_SMALL_MAX = 48;
+
+/** What the icon says when it is not beside his name. */
+export const CORVO_ALT = "O corvo do VISAO, de olho âmbar";
 
 export function corvoSrc(size: number): string {
-  return size > CORVO_SMALL_MAX ? "/marca/corvo-512.png" : "/marca/corvo-256.png";
+  return size > CORVO_SMALL_MAX ? "/marca/corvo-olho.svg" : "/marca/corvo-olho-pequeno.svg";
 }
 
-/** The crow in the eclipse (DESIGN.md §5): his avatar, the sidebar logo and the app icon. The
- * picture carries its own rounded corners. Decorative unless `label` names it. */
+/** The crow with the amber eye (DESIGN.md §5): his avatar, the sidebar logo, the call and the app
+ * icon. The drawing carries its own rounded corners and paper ground; on a light page a 1 px line
+ * in tinta keeps its edge (layout `.corvo`). Decorative unless `label` names it. */
 export function Corvo({ size, label, className }: { size: number; label?: string; className?: string }) {
   return (
     <img
