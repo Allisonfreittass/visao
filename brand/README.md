@@ -29,18 +29,20 @@ desenho pequeno; `apple-touch-icon.png` (180, de ponta a ponta: o iPhone arredon
 `icon-512.png` (com os cantos arredondados do desenho) e `maskable-512.png` (o desenho a 84 %, no
 canto de baixo à esquerda, para a cabeça e o bico caberem no círculo seguro do Android). As URLs levam
 `?v=olho` no `index.html` e no manifest: o Chrome só troca o ícone de um app instalado quando a URL
-muda. No app de Mac, `desktop/app/app-icon.png` (1024, o quadrado arredondado de 824 com sombra, na
-grade da Apple), de onde `npx tauri icon` tira os tamanhos. A `og-image.png` ainda é a do anel.
+muda. No app de Mac, os ícones de `desktop/app/src-tauri/icons/` (o `icon.icns` e os PNGs que o
+Tauri lê) e o `desktop/app/app-icon.png` (1024): o quadrado arredondado de 824/1024 do lado, com
+sombra, na grade da Apple. Em 16 e 32 pt (listas do Finder, Spotlight, menus) vai o desenho pequeno,
+também nos pixels 2x da tela Retina; de 128 pt para cima, o inteiro. A `og-image.png` ainda é a do
+anel.
 
 ## Regenerar
 
 ```bash
 uv venv /tmp/marca && uv pip install --python /tmp/marca/bin/python pillow cairosvg
 /tmp/marca/bin/python brand/generate_assets.py
-cd desktop/app && npx tauri icon app-icon.png -o src-tauri/icons
 ```
 
-Cada tamanho sai direto do vetor (o cairosvg usa o libcairo do sistema). Do que o `tauri icon` gera,
-ficam só `32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns` e `icon.png`; o resto (Android,
-iOS, Windows) se apaga. O ícone do iPhone, o wordmark, o `muninn-512.png` e a `og-image` não saem
-daqui: são os da direção anterior e ficam como estão até o iPhone e o selo migrarem.
+Cada tamanho sai direto do vetor (o cairosvg usa o libcairo do sistema), o `.icns` inclusive: não
+precisa do `npx tauri icon`, que tiraria todos os tamanhos de uma imagem só. O ícone do iPhone, o
+wordmark, o `muninn-512.png` e a `og-image` não saem daqui: são os da direção anterior e ficam como
+estão até o iPhone e o selo migrarem.

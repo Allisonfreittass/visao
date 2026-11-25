@@ -78,4 +78,4 @@ comando `visao` e o serviço com os mesmos dados.
 | Build e teste | [`desktop/construir.sh`](../desktop/construir.sh), [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) |
 | O `visao` congelado | [`apps/visao_cli.py`](../apps/visao_cli.py) (`FROZEN`, `.env` em `~/.visao`) |
 | Primeira conta | `GET`/`POST /auth/first-run` em [`apps/api/routes/auth.py`](../apps/api/routes/auth.py), a tela em `apps/web/src/components/Login.tsx` |
-| O ícone | `desktop/app/app-icon.png`, gerado por [`brand/generate_assets.py`](../brand/generate_assets.py) na grade da Apple |
+| O ícone | `desktop/app/src-tauri/icons/` (o `icon.icns` e os PNGs), gerados por [`brand/generate_assets.py`](../brand/generate_assets.py) na grade da Apple, com o desenho pequeno em 16 e 32 pt |
