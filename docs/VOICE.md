@@ -7,6 +7,18 @@
 > Latência mediana medida: ~4,1 s do fim da fala ao primeiro áudio. Falta o teste humano com
 > microfone real e no iPhone (HTTPS).
 
+## Memória: só enquanto fala ou ouve (2026-11-25)
+
+Os modelos de voz carregam no primeiro uso e **saem da memória depois de 10 minutos sem uso**
+(`VISION_VOICE_IDLE_MINUTES`; `0` mantém para sempre, como antes). São cerca de 0,9 GB do Kokoro
+e 0,5 GB do Whisper `base`, que antes ficavam ocupados a vida toda do processo, mesmo horas
+depois da última fala.
+
+- O cache (`integrations/idle_cache.py`) só solta a referência dele: uma fala em andamento
+  termina com o modelo que já tem, e a memória volta depois.
+- Voltar a falar depois de descarregado custa a carga de novo (alguns segundos na primeira frase).
+- No máximo duas vozes ficam carregadas ao mesmo tempo, e um modelo de ouvir.
+
 ## Ligação (2026-11-12)
 
 O botão **Ligar** abre uma tela só de conversa: a bolha grande, o estado, a última troca e

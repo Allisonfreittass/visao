@@ -7,9 +7,9 @@ decided by the agent (core/identity/voice.py).
 """
 
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
+from integrations.idle_cache import VOICE_IDLE, IdleCache
 from integrations.tts.base import TTSProvider
 
 
@@ -94,9 +94,8 @@ def system_default(approved: list[VoiceSpec]) -> VoiceSpec | None:
     return min(approved, key=lambda s: s.first_audio_s, default=None)
 
 
-@lru_cache(maxsize=2)
-def load_provider(voice_id: str, models_dir: str) -> TTSProvider:
-    """Loads (and keeps) the engine for one voice. Heavy: Kokoro takes ~0.9 GB of RAM."""
+def _load_provider(voice_id: str, models_dir: str) -> TTSProvider:
+    """Builds the engine for one voice. Heavy: Kokoro takes ~0.9 GB of RAM."""
     from integrations.tts.engines import KokoroTTS, PiperTTS
 
     spec = CATALOG[voice_id]
@@ -108,3 +107,10 @@ def load_provider(voice_id: str, models_dir: str) -> TTSProvider:
             voice=spec.engine_voice or "",
         )
     return PiperTTS(root / "piper" / spec.model_file)
+
+
+# Up to two voices in memory, each loaded on first use and dropped after VISION_VOICE_IDLE_MINUTES
+# without speaking (integrations/idle_cache.py).
+load_provider: IdleCache[TTSProvider] = IdleCache(
+    _load_provider, idle_seconds=VOICE_IDLE, maxsize=2, name="tts"
+)

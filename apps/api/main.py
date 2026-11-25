@@ -35,6 +35,7 @@ from apps.api.routes import (
 from apps.api.settings import get_settings
 from apps.api.web import mount_web
 from infrastructure.observability.logging import configure_logging
+from integrations.idle_cache import VOICE_IDLE
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     configure_push(settings)
+    VOICE_IDLE.set(settings.voice_idle_minutes * 60)
     app = FastAPI(title="VISÃO API", version="0.0.1", lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(auth.router)
