@@ -7,6 +7,12 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 25/11/2026
 
+- **Sete habilidades novas, para o dia a dia** ([HABILIDADES.md](HABILIDADES.md)).
+  - Triagem do e-mail; Preparar uma reunião; Resumir uma reunião; Pesquisa a fundo; Ler um
+    contrato antes de assinar; Revisar código; Fechar e planejar a semana.
+  - Vieram da coleção `anthropics/knowledge-work-plugins` (Apache-2.0) e foram reescritas para o
+    que ele tem: o que sai em seu nome continua esperando o seu Aprovar, e nada é apagado.
+
 - **Habilidades** ([HABILIDADES.md](HABILIDADES.md)).
   - A tela Habilidades deixou de dizer "ainda não disponível": mostra cinco jeitos de trabalhar,
     cada um com um interruptor. Achar a causa de um bug; Comunicados e relatórios de status;

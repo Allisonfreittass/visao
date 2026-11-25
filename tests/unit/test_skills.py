@@ -8,26 +8,50 @@ import pytest
 from core.identity.capabilities import Capabilities
 from core.skills import catalog
 
-APPROVED = {"achar-bugs", "comunicados", "design-de-telas", "escrever-documentos", "ideias"}
+APPROVED = {
+    "achar-bugs",
+    "comunicados",
+    "design-de-telas",
+    "escrever-documentos",
+    "ideias",
+    # 25/11/2026, the owner's "Jarvis" set, from anthropics/knowledge-work-plugins.
+    "ler-contrato",
+    "pesquisa-a-fundo",
+    "preparar-reuniao",
+    "resumo-reuniao",
+    "revisao-semana",
+    "revisar-codigo",
+    "triagem-email",
+}
 
 
-def test_the_five_approved_skills_are_installed_with_origin_and_license():
+def test_the_approved_skills_are_installed_with_origin_and_license():
     skills = catalog.installed()
     assert {s.id for s in skills} == APPROVED
     for skill in skills:
         # Pinned to the commit that was read, never a branch that can change under it.
-        assert re.search(r"/tree/[0-9a-f]{40}/skills/", skill.source_url), skill.id
-        assert skill.source in {"anthropics/skills", "obra/superpowers"}
+        assert re.search(r"/tree/[0-9a-f]{40}/(?:[\w-]+/)?skills/", skill.source_url), skill.id
+        assert skill.source in {
+            "anthropics/skills",
+            "obra/superpowers",
+            "anthropics/knowledge-work-plugins",
+        }
         assert skill.license in {"Apache-2.0", "MIT"}
         assert skill.body.startswith("Adaptada da habilidade")
         assert len(skill.body) < catalog.BODY_CHARS
     assert (catalog.LIBRARY / "LICENSE-anthropic-skills.txt").is_file()
     assert (catalog.LIBRARY / "LICENSE-superpowers.txt").is_file()
+    assert (catalog.LIBRARY / "LICENSE-knowledge-work-plugins.txt").is_file()
 
 
 def test_a_skill_is_text_only():
     files = {p.name for p in catalog.LIBRARY.rglob("*") if p.is_file()}
-    assert files == {"SKILL.md", "LICENSE-anthropic-skills.txt", "LICENSE-superpowers.txt"}
+    assert files == {
+        "SKILL.md",
+        "LICENSE-anthropic-skills.txt",
+        "LICENSE-superpowers.txt",
+        "LICENSE-knowledge-work-plugins.txt",
+    }
 
 
 @pytest.mark.parametrize(
@@ -38,6 +62,13 @@ def test_a_skill_is_text_only():
         ("faz a atualização semanal do projeto pra diretoria", "comunicados"),
         ("tive uma ideia de app para a academia", "ideias"),
         ("quero mudar a tipografia e a paleta do site", "design-de-telas"),
+        ("o que precisa de mim no email hoje?", "triagem-email"),
+        ("me prepara pra reunião de amanhã com o Marcos", "preparar-reuniao"),
+        ("faz a ata da reunião com essas notas", "resumo-reuniao"),
+        ("faz uma pesquisa a fundo sobre baterias de sódio", "pesquisa-a-fundo"),
+        ("posso assinar esse contrato de aluguel?", "ler-contrato"),
+        ("revisa esse PR antes do merge", "revisar-codigo"),
+        ("como foi minha semana? e planeja a próxima", "revisao-semana"),
     ],
 )
 def test_the_message_calls_the_skill_it_asks_for(message, expected):
@@ -51,6 +82,10 @@ def test_the_message_calls_the_skill_it_asks_for(message, expected):
         "te mandei um documento, dá uma olhada",
         "quais as fontes dessa notícia?",
         "bom dia, tudo bem?",
+        "depois da reunião eu te falo",
+        "semana que vem a gente vê isso",
+        "mandei um email pro João ontem",
+        "quantos commits teve hoje no visao?",
     ],
 )
 def test_everyday_messages_call_no_skill(message):

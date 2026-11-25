@@ -49,8 +49,19 @@ para ele saber dizer o que sabe fazer.
 | Design de telas (`design-de-telas`) | `anthropics/skills`, frontend-design | Apache-2.0 |
 | Escrever documentos junto (`escrever-documentos`) | `anthropics/skills`, doc-coauthoring | Apache-2.0 |
 | Transformar ideia em plano (`ideias`) | `obra/superpowers`, brainstorming | MIT |
+| Triagem do e-mail (`triagem-email`) | `anthropics/knowledge-work-plugins`, inbox-manager | Apache-2.0 |
+| Preparar uma reunião (`preparar-reuniao`) | `anthropics/knowledge-work-plugins`, meeting-briefing | Apache-2.0 |
+| Resumir uma reunião (`resumo-reuniao`) | `anthropics/knowledge-work-plugins`, call-summary | Apache-2.0 |
+| Pesquisa a fundo (`pesquisa-a-fundo`) | `anthropics/knowledge-work-plugins`, knowledge-synthesis | Apache-2.0 |
+| Ler um contrato antes de assinar (`ler-contrato`) | `anthropics/knowledge-work-plugins`, contract-review | Apache-2.0 |
+| Revisar código (`revisar-codigo`) | `anthropics/knowledge-work-plugins`, code-review | Apache-2.0 |
+| Fechar e planejar a semana (`revisao-semana`) | `anthropics/knowledge-work-plugins`, weekly-wrap | Apache-2.0 |
 
-O dono escolheu essas cinco em 25/11/2026. Cada uma aponta, no `source_url`, para o commit exato
+O dono escolheu as cinco primeiras em 25/11/2026. As sete do `knowledge-work-plugins` vieram no
+mesmo dia, quando ele pediu as melhores para ter "um Jarvis": a coleção da Anthropic para trabalho
+do dia a dia (Apache-2.0, a maior e mais mantida que achamos). Foram tiradas do contexto de
+empresa, vendas e CRM e reescritas para o que o Visão tem: o Gmail e a Agenda que ele lê, os
+rascunhos que só saem com o Aprovar, o GitHub no servidor, o Mac, os painéis e as páginas. Cada uma aponta, no `source_url`, para o commit exato
 que foi lido. As licenças estão em `core/skills/library/LICENSE-*`.
 
 Ficaram de fora:
@@ -58,6 +69,12 @@ Ficaram de fora:
 - **pdf, xlsx, docx, pptx, webapp-testing, skill-creator:** dependem de rodar scripts.
 - **discernment-nudge:** termina as respostas com perguntas, contra a regra de voz.
 - **As de marca e arte da Anthropic e a claude-api:** não servem ao uso do dono.
+- **task-management e memory-management (knowledge-work-plugins):** dependem de arquivos
+  (`TASKS.md`, `CLAUDE.md`) que o Visão não tem; as anotações dos projetos e a memória já fazem
+  esse papel.
+- **As de vendas, CRM, finanças de empresa, RH e as do Zoom:** são de empresa, não de uma pessoa.
+- **ComposioHQ/awesome-claude-skills:** a lista mais popular, mas o repositório não declara
+  licença, então nada dele pode ser copiado nem adaptado.
 
 ## Instalar uma nova
 

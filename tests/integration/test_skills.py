@@ -11,6 +11,7 @@ from tests.fakes import FakeLLMProvider
 from tests.integration.test_mind import _owner_client, setup
 from tests.integration.test_mind_temperament import chat, say
 from tests.integration.test_phase9 import CONFIG
+from tests.unit.test_skills import APPROVED
 
 BUG_LINE = "Regra de ferro: nenhum conserto sem investigar a causa antes."
 
@@ -18,7 +19,7 @@ BUG_LINE = "Regra de ferro: nenhum conserto sem investigar a causa antes."
 def test_the_owner_lists_and_switches_the_skills(client, db):
     owner, headers = _owner_client(client, db)
     listed = client.get("/skills", headers=headers).json()["skills"]
-    assert len(listed) == 5
+    assert {s["id"] for s in listed} == APPROVED
     assert all(s["enabled"] and s["origin"] == "instalada" for s in listed)
     bugs = next(s for s in listed if s["id"] == "achar-bugs")
     assert bugs["source"] == "obra/superpowers" and bugs["license"] == "MIT"
