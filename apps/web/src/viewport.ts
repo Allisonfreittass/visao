@@ -27,6 +27,25 @@ export function healShrunkViewport(tallestInner: number, el: HTMLElement | null)
   return true;
 }
 
+/**
+ * Whether the app's bottom edge is the screen's bottom edge. In the app installed from the home
+ * screen, some iOS versions keep a strip at the bottom (by the home bar) where the page does not
+ * paint, and others let the page reach the end of the screen. The tabs sit lower when it does:
+ * with the strip, they would end up under it. Screen sizes are in CSS px, given for portrait.
+ */
+export function reachesScreenBottom(appBottom: number, screenW: number, screenH: number, innerW: number, innerH: number): boolean {
+  const screenHeight = innerH >= innerW ? Math.max(screenW, screenH) : Math.min(screenW, screenH);
+  return screenHeight > 0 && appBottom >= screenHeight - 2;
+}
+
+function measureBottom(root: HTMLElement): void {
+  if (typeof document === "undefined" || !window.screen) return;
+  const app = document.querySelector<HTMLElement>(".app");
+  if (!app || root.hasAttribute("data-teclado")) return;
+  const bottom = app.getBoundingClientRect().bottom;
+  root.toggleAttribute("data-ate-o-fim", reachesScreenBottom(bottom, screen.width, screen.height, window.innerWidth, window.innerHeight));
+}
+
 export function trackVisibleViewport(root: HTMLElement = document.documentElement): () => void {
   const vv = window.visualViewport;
   if (!vv) return () => undefined;
@@ -55,11 +74,15 @@ export function trackVisibleViewport(root: HTMLElement = document.documentElemen
     }
     wasKeyboard = keyboard;
     if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0);
+    if (!keyboard) measureBottom(root);
   };
   vv.addEventListener("resize", apply);
   vv.addEventListener("scroll", apply);
   apply();
+  // The app is drawn after this runs: measure again once it is on the screen.
+  const later = [400, 1500].map((ms) => setTimeout(() => measureBottom(root), ms));
   return () => {
+    later.forEach(clearTimeout);
     vv.removeEventListener("resize", apply);
     vv.removeEventListener("scroll", apply);
   };
