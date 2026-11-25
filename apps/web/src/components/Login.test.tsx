@@ -86,6 +86,10 @@ describe("the entrance", () => {
     expect(html).not.toContain("<img");
   });
 
+  it("keeps the browser's translator off the name", () => {
+    expect(entrada()).toContain('<p class="entrada-marca" translate="no">VISAO</p>');
+  });
+
   it("has no checkbox between the password and Entrar, as in the mockup", () => {
     expect(entrada()).not.toContain('type="checkbox"');
   });

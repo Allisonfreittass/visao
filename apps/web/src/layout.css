@@ -64,9 +64,15 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .lockup-word { font: 500 19px/1 var(--font-mono); letter-spacing: var(--tracking-mono); white-space: nowrap; }
 .lockup-word b { color: var(--text-muted); font-weight: 500; }
 
-/* ---------- Barra lateral (mockup: 248 px, --surface) ---------- */
-.rail { display: flex; flex: 0 0 248px; width: 248px; flex-direction: column; gap: 14px; padding: 16px 12px 12px;
-  border-right: 1px solid var(--border); background: var(--surface-sidebar); overflow-y: auto; }
+/* ---------- Barra lateral (mockup: 248 px, --surface) ----------
+ * Largura fixa: nada dentro dela a alarga. As grades abaixo têm a coluna em minmax(0, 1fr), senão
+ * a coluna automática cresce até o título mais longo e a barra ganha rolagem para os lados; o
+ * título é cortado com reticências (.rail-chat-title). */
+.rail { display: flex; flex: 0 0 248px; width: 248px; min-width: 248px; max-width: 248px; flex-direction: column; gap: 14px; padding: 16px 12px 12px;
+  border-right: 1px solid var(--border); background: var(--surface-sidebar); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.rail > * { min-width: 0; }
+.rail-nav, .rail-section, .rail-chats, .rail-bottom { grid-template-columns: minmax(0, 1fr); }
+.rail-chats li { min-width: 0; }
 .rail-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; margin: 0; color: var(--text); text-decoration: none; border-radius: var(--radius-chip); }
 .rail-wordmark { font: 400 34px/1 var(--font-marca); letter-spacing: .04em; }
 .rail-actions { display: flex; gap: 6px; }
@@ -78,7 +84,6 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .rail-nav { display: grid; gap: 2px; }
 .rail-nav button { display: flex; align-items: center; gap: 11px; width: 100%; height: 38px; padding: 0 12px; border: 0; border-radius: 9px;
   background: transparent; color: var(--text); font: 400 14px/1.2 var(--font-sans); text-align: left; box-shadow: none; transition: background-color .2s var(--ease); }
-.rail-nav button:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .rail-nav button[aria-current] { background: var(--surface-2); }
 .rail-nav .icon { flex-shrink: 0; color: currentColor; }
 .rail-badge { margin-left: auto; min-width: 20px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 9px;
@@ -91,7 +96,11 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .rail-chats { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .rail-chats button { display: flex; align-items: center; gap: 10px; width: 100%; height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text);
   font: 400 13px/1.2 var(--font-sans); text-align: left; overflow: hidden; }
-.rail-chats button:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+/* Hover só onde há mouse (no toque ele fica preso depois do toque); o toque responde com :active. */
+@media (hover: hover) {
+  .rail-nav button:hover, .rail-chats button:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+}
+.rail-nav button:active, .rail-chats button:active { background: var(--surface-2); }
 .rail-chats button[aria-current] { background: var(--surface-2); }
 .rail-chat-dot { flex: none; width: 13px; display: inline-flex; justify-content: center; }
 .rail-chat-dot::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--border-strong); }
@@ -122,7 +131,8 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .mobile-bar { display: flex; }
   .page-bar, .status-bar { display: none; }
   .rail { display: none; }
-  .rail.open { display: flex; position: fixed; z-index: var(--layer-overlay); top: calc(12px + env(safe-area-inset-top)); bottom: 12px; left: 12px; width: min(300px, 86vw);
+  .rail.open { display: flex; position: fixed; z-index: var(--layer-overlay); top: calc(12px + env(safe-area-inset-top)); bottom: 12px; left: 12px;
+    width: min(300px, 86vw); min-width: 0; max-width: min(300px, 86vw);
     border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float); transition: transform .22s var(--ease); }
   .scrim { display: block; position: fixed; inset: 0; z-index: calc(var(--layer-overlay) - 1); background: var(--scrim); }
   .main { padding: var(--space-2) var(--space-4) var(--space-2); }
@@ -665,7 +675,6 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   height: 52px; min-height: 52px; padding: 0 16px; border: 1.5px solid var(--e-linha); border-radius: 12px;
   background: #FFFFFF; color: var(--e-tinta); font: 400 16px/1 var(--font-sans);
 }
-.entrada .rs-campo input:hover { border-color: #CFCAC0; }
 .entrada .rs-campo input:focus-visible { outline: none; border-color: var(--e-tinta); background: #FFFFFF; box-shadow: 0 0 0 1px var(--e-tinta); }
 .entrada .rs-campo[data-estado="erro"] input { border-color: var(--e-erro); }
 .entrada .rs-campo[data-estado="erro"] input:focus-visible { box-shadow: 0 0 0 1px var(--e-erro); }
@@ -680,7 +689,6 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   border: 0; border-radius: 27px; background: var(--e-tinta, #101214); color: var(--e-papel, #F3F1EC);
   font: 500 16px/1 var(--font-sans); cursor: pointer; transition: background-color 150ms ease, transform 120ms ease;
 }
-.login-entrar:hover:not(:disabled) { background: #2A2E33; }
 .login-entrar:active:not(:disabled) { transform: scale(.985); }
 .login-entrar:focus-visible { outline: 2px solid var(--e-tinta, #101214); outline-offset: 3px; }
 .login-entrar:disabled { opacity: 1; cursor: progress; }
@@ -694,27 +702,51 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   font: 400 14px/1.4 var(--font-sans); color: var(--e-tinta, #101214);
   text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer;
 }
-.login-link:hover { text-decoration-thickness: 2px; }
+/* Hover só onde há mouse: no celular ele ficaria preso depois do toque. */
+@media (hover: hover) {
+  .entrada .rs-campo input:hover { border-color: #CFCAC0; }
+  .login-entrar:hover:not(:disabled) { background: #2A2E33; }
+  .login-link:hover { text-decoration-thickness: 2px; }
+}
 .login-link:focus-visible { outline: 2px solid var(--e-tinta, #101214); outline-offset: 3px; }
 .entrada .login--fora { display: grid; gap: 22px; }
 
+/* Celular e tablet: o corvo vira uma faixa em cima e o formulário vem logo abaixo, inteiro na
+ * primeira tela num celular comum. A faixa mostra a cabeça (do alto da cabeça ao bico), sem o
+ * pescoço: o desenho tem a proporção natural, é centrado na cabeça (40% da altura do desenho) e a
+ * altura da faixa acompanha a largura, então o recorte é o mesmo em 320, 375 ou 414 px. Em tela
+ * baixa a faixa encolhe (30% da altura) para os campos aparecerem sem rolar. */
 @media (max-width: 899px) {
   .entrada { flex-direction: column; }
-  .entrada-corvo { flex: 0 0 auto; height: 380px; min-height: 0; }
-  /* Mais largo que a tela e preso à direita: o corvo fica em close e sangra pela esquerda. */
-  .entrada-corvo svg { width: 112%; margin-left: -12%; }
-  .entrada-acesso {
-    flex: 1 0 auto; justify-content: flex-start; gap: 20px; border-left: 0; border-top: 1px solid var(--e-linha);
-    padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  .entrada-corvo {
+    position: relative; flex: 0 0 auto; min-height: 0;
+    height: clamp(136px, min(56vw, 30vh), 300px);
+    height: clamp(136px, min(56vw, 30svh), 300px);
   }
-  .entrada-marca { font-size: 52px; }
-  .entrada-saudacao { margin-top: 8px; }
-  .entrada-acesso h1 { font-size: 38px; }
-  .entrada-lede { font-size: 15px; }
-  .entrada .login { gap: 18px; }
+  /* Um pouco mais largo que a tela e puxado para a esquerda: o corvo sangra pela borda. */
+  .entrada-corvo svg {
+    position: absolute; left: -10%; top: 50%; width: min(110%, 600px); height: auto; aspect-ratio: 470 / 557;
+    transform: translateY(-40.4%);
+  }
+  .entrada-acesso {
+    flex: 1 0 auto; justify-content: flex-start; gap: 18px; border-left: 0; border-top: 1px solid var(--e-linha);
+    /* Dos lados, a área segura: com o celular deitado, o entalhe não cobre o formulário. */
+    padding: 24px max(20px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  }
+  .entrada-marca { font-size: 42px; }
+  .entrada-saudacao { gap: 8px; margin-top: 4px; }
+  .entrada-acesso h1 { font-size: clamp(31px, 9.6vw, 38px); }
+  .entrada-lede { font-size: 15px; line-height: 1.5; }
+  .entrada .login { gap: 16px; }
 }
-@media (max-width: 899px) and (max-height: 700px) {
-  .entrada-corvo { height: 300px; }
+
+/* Dedo, não mouse: "Manter conectado" e os dois links ganham 44 px de altura para tocar (PRODUCT.md),
+ * com margem negativa para o espaço entre as linhas continuar o mesmo. */
+@media (pointer: coarse) {
+  .entrada .memory-toggle { min-height: 44px; margin: -12px 0 -10px; }
+  .entrada .memory-toggle input { width: 20px; height: 20px; }
+  .login-links { align-items: center; margin: -10px 0; }
+  .login-link { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* ---------- Primeira vez (4 passos) ---------- */
