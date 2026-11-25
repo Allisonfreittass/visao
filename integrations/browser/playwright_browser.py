@@ -1,9 +1,11 @@
 """The browser behind core/browse: Chromium driven by Playwright.
 
 In production the browser runs in its own container with no secrets and no database
-(deploy/docker-compose.yml, service `browser`); this process only connects to it. Locally it can
-launch Chromium itself. Either way every request the page makes is checked here: HTTPS only,
-public addresses only, no pictures, media or fonts (faster, and less to load from strangers).
+(deploy/docker-compose.yml, service `browser`); this process only connects to it. Locally it
+launches Chromium itself, inside bubblewrap or sandbox-exec and with a clean environment
+(integrations/browser/sandbox.py, ADR-0026). Either way every request the page makes is checked
+here: HTTPS only, public addresses only, no pictures, media or fonts (faster, and less to load
+from strangers).
 """
 
 import ipaddress
@@ -13,10 +15,14 @@ import socket
 from collections.abc import Callable
 from urllib.parse import urlsplit
 
+from integrations.browser import sandbox
 from integrations.browser.base import Visit
 
 logger = logging.getLogger(__name__)
 
+NO_SANDBOX = (
+    "o navegador local só abre isolado, e falta o bubblewrap (no Linux: apt install bubblewrap)"
+)
 TEXT_CHARS = 14_000
 LINKS_KEPT = 40
 SETTLE_MS = 2500
@@ -63,9 +69,11 @@ class PlaywrightBrowser:
         timeout_seconds: float = 20.0,
         locale: str = "pt-BR",
         timezone: str = "America/Sao_Paulo",
+        sandboxed: bool = True,
     ) -> None:
         self._ws = ws_endpoint or None
         self._executable = executable_path or None
+        self._sandboxed = sandboxed
         self._timeout_ms = int(timeout_seconds * 1000)
         self._locale = locale
         self._timezone = timezone
@@ -76,13 +84,20 @@ class PlaywrightBrowser:
 
         if not urls:
             return []
+        launch = None if self._ws else self.launch_options()
+        if launch is None and not self._ws:
+            logger.warning(
+                "no sandbox for the local browser (bubblewrap or sandbox-exec)",
+                extra={"event": "browser_no_sandbox"},
+            )
+            return [Visit(url=u, ok=False, failure=NO_SANDBOX) for u in urls]
         cache: dict[str, bool] = {}
         try:
             with sync_playwright() as runtime:
                 browser = (
                     runtime.chromium.connect(self._ws, timeout=self._timeout_ms)
                     if self._ws
-                    else runtime.chromium.launch(headless=True, executable_path=self._executable)
+                    else runtime.chromium.launch(**launch)
                 )
                 try:
                     visits = []
@@ -101,6 +116,24 @@ class PlaywrightBrowser:
                 Visit(url=u, ok=False, failure="o navegador não está disponível agora")
                 for u in urls
             ]
+
+    def launch_options(self) -> dict | None:
+        """How the local Chromium is launched: never with the app's environment (its keys), and
+        inside the sandbox unless VISION_BROWSER_SANDBOX=false. None: no sandbox here, so the
+        browser does not run."""
+        executable = self._executable
+        if self._sandboxed:
+            if executable is None:
+                return None  # the sandbox needs to know which Chromium it walls in
+            wrapped = sandbox.wrapper(executable)
+            if wrapped is None:
+                return None
+            executable = str(wrapped)
+        return {
+            "headless": True,
+            "executable_path": executable,
+            "env": sandbox.clean_environment(),
+        }
 
     def _one(self, browser, url: str, cache: dict[str, bool]) -> Visit:
         from playwright.sync_api import Error as PlaywrightError

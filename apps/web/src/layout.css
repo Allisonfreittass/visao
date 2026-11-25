@@ -802,3 +802,34 @@ button.project-tile:hover { border-color: var(--border-strong); }
   .mobile-tabs button .icon { width: 24px; height: 24px; }
 }
 .mobile-tabs button[aria-current] .icon { stroke-width: 2; }
+
+/* ---------- Passos da resposta ----------
+   O cartão antigo (.step-card) era uma grade de três colunas (28px, texto, status). O cartão de
+   agora põe tudo numa linha só (.step-card-row), que caía na coluna de 28px: no celular o nome
+   quebrava palavra por palavra e o "feito" ficava por cima dele. Uma coluna só, e o nome em até
+   duas linhas. */
+.steps .step-card { grid-template-columns: minmax(0, 1fr); }
+.step-card-row > :not(.step-card-text) { flex: none; }
+.steps .step-card-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .steps { margin-left: 0; } }
+/* O resumo quebra em várias linhas no celular: a seta fica na primeira. */
+.steps-toggle { align-items: flex-start; }
+.steps-chevron { line-height: inherit; }
+
+/* ---------- App instalado no iPhone: abas na base, baixas como no Spotify ----------
+   Algumas versões do iOS reservam uma faixa embaixo (junto da barrinha) no app da tela inicial:
+   nada da página pinta ali, nem um elemento fixo, e ela sai na cor de fundo do html. Outras deixam
+   a página ir até o fim da tela. O app mede qual é o caso no próprio iPhone (viewport.ts,
+   data-ate-o-fim):
+   - indo até o fim: as abas descem até perto da barrinha, sem reservar a área inteira dela;
+   - com a faixa: as abas encostam nela, e ela tem a cor das abas, uma barra só até o fim.
+   A janela se prende ao fundo (bottom: 0), que no iOS fica mais embaixo que 100%. Só com as abas
+   na tela: o login não muda. */
+@media (display-mode: standalone) and (max-width: 899px) {
+  .app { height: auto; bottom: 0; }
+  [data-teclado] .app { bottom: auto; height: var(--app-height, 100%); }
+  html:has(.mobile-tabs), html:has(.mobile-tabs) body { background: var(--surface); }
+  .mobile-tabs { padding-bottom: 0; background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .mobile-tabs button { height: 46px; padding-top: 5px; }
+  [data-ate-o-fim] .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
+}

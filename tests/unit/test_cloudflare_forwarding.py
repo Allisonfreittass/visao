@@ -17,6 +17,7 @@ NOT_FORWARDED = {
     "VISION_WORKER_IN_API",
     "VISION_WEB_DIR",
     "VISION_FIRST_RUN_SETUP",  # the edge never signs anybody up
+    "VISION_BROWSER_SANDBOX",  # the edge has no local Chromium
 }
 
 
