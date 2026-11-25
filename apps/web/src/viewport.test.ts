@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { healShrunkViewport, trackVisibleViewport } from "./viewport";
+import { healShrunkViewport, reachesScreenBottom, trackVisibleViewport } from "./viewport";
 
 function fakeWindow(innerHeight: number, vvHeight: number, offsetTop = 0) {
   const listeners: Record<string, () => void> = {};
@@ -71,5 +71,21 @@ describe("the iPhone app gets its full height back after the keyboard", () => {
     const el = { style: { display: "" }, querySelectorAll: vi.fn() } as unknown as HTMLElement;
     expect(healShrunkViewport(844, el)).toBe(false);
     vi.unstubAllGlobals();
+  });
+});
+
+describe("whether the installed app reaches the end of the screen (where the tabs can go)", () => {
+  it("knows when the app ends at the screen's bottom edge", () => {
+    expect(reachesScreenBottom(852, 393, 852, 393, 852)).toBe(true);
+  });
+
+  it("knows when iOS keeps a strip below it", () => {
+    // A strip of 34 px by the home bar, where the page does not paint.
+    expect(reachesScreenBottom(818, 393, 852, 393, 818)).toBe(false);
+  });
+
+  it("turns the screen sizes around in landscape", () => {
+    expect(reachesScreenBottom(393, 393, 852, 852, 393)).toBe(true);
+    expect(reachesScreenBottom(360, 393, 852, 852, 360)).toBe(false);
   });
 });
