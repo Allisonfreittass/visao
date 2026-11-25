@@ -65,6 +65,24 @@ def connected(apps: ComposioClient, owner_ref: str, *, fresh: bool = False) -> l
     return found
 
 
+def names(apps: ComposioClient, slugs: list[str]) -> dict[str, str]:
+    """Each app's name as the catalog says it ("GitHub"), or the slug when it does not answer."""
+    try:
+        catalog = {t.slug: t.name for t in apps.catalog()}
+    except ComposioError:
+        catalog = {}
+    return {slug: catalog.get(slug) or slug.title() for slug in dict.fromkeys(slugs)}
+
+
+def connected_names(api_key: str | None, owner_id: uuid.UUID, secret_key: str) -> tuple[str, ...]:
+    """For the capability manifest: empty without the key or with nothing connected."""
+    apps = client(api_key)
+    if apps is None:
+        return ()
+    slugs = [c.toolkit for c in connected(apps, user_ref(owner_id, secret_key))]
+    return tuple(names(apps, slugs).values()) if slugs else ()
+
+
 def forget(owner_ref: str) -> None:
     """After connecting or disconnecting: the next read asks Composio again."""
     _CONNECTED.pop(owner_ref, None)

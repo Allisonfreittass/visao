@@ -7,6 +7,21 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 25/11/2026
 
+- **Os seus outros apps, pelo Composio** ([APPS.md](APPS.md),
+  [ADR-0028](decisions/0028-apps-pelo-composio.md)).
+  - Com a chave do Composio no servidor, Ajustes › Integrações › Apps mostra o catálogo: Notion,
+    GitHub, Slack, Linear, Trello e quase todos os outros. Você toca em Conectar, entra no app
+    na página do Composio, e pronto. Email e agenda continuam pelo Google.
+  - Quando você pergunta de um app conectado ("quais issues estão abertas no visao?"), ele lê e
+    responde. O que vem do app é texto de terceiros, nunca ordem.
+  - Mudar qualquer coisa (criar uma issue, mandar uma mensagem num canal, editar uma página) vira
+    um cartão com o app, a ferramenta e todos os argumentos por inteiro, e só acontece no seu
+    Aprovar. Apagar pelos apps está desligado.
+  - **A conexão fica guardada no Composio, não no Visão**, e o que passa por ela fica no registro
+    deles por até um ano. O Composio não recebe seu nome nem email.
+  - No máximo 3 chamadas por turno e 8.000 por mês (o plano grátis tem 10.000). No limite, ele diz
+    que acabou em vez de inventar.
+  - Ele não olha os apps sozinho nesta fase, só quando você pergunta.
 - **O Visão como app de Mac** ([APP_MAC.md](APP_MAC.md), [ADR-0027](decisions/0027-app-de-mac.md)).
   - Um app com ícone no Dock e janela própria, que leva o servidor dentro: não precisa de Python,
     Node nem Docker no Mac. A configuração e o banco ficam em `~/.visao`, os mesmos do instalador.

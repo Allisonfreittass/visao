@@ -85,14 +85,6 @@ class Assist:
     failure: str = ""
 
 
-def _names(apps: ComposioClient, connected: list[str]) -> dict[str, str]:
-    try:
-        catalog = {t.slug: t.name for t in apps.catalog()}
-    except ComposioError:
-        catalog = {}
-    return {slug: catalog.get(slug) or slug.title() for slug in connected}
-
-
 def mentioned(text: str, names: dict[str, str]) -> list[str]:
     """The connected apps the message talks about, by name or by a word of their domain."""
     folded = f" {fold(text)} "
@@ -211,7 +203,7 @@ def run(
     connected = [c.toolkit for c in account.connected(apps, ref)]
     if not connected:
         return None
-    names = _names(apps, list(dict.fromkeys(connected)))
+    names = account.names(apps, connected)
     if not candidate(text, names):
         return None
 

@@ -221,6 +221,11 @@ def run_turn(
             pages=True,
             browser=browser is not None,
             continuous=bool(conversation.continuous),
+            apps=(
+                apps_account.connected_names(config.apps_key, owner.id, config.google_secret)
+                if config.apps_key and config.google_secret
+                else ()
+            ),
         ),
     )
     if capabilities.mac_projects:

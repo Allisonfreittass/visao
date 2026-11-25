@@ -235,3 +235,25 @@ def test_a_later_turn_remembers_what_it_read(db, api):
     assert "leu no GitHub da pessoa (List repository issues)" in record.deeds(
         outcome.decision.actions
     )
+
+
+def test_the_manifest_names_the_connected_apps_only_with_the_key(db, api):
+    owner = setup(db)
+    _, provider = turn(db, owner, "bom dia", [])
+    said = system(provider)
+    assert "ler o que está no GitHub do interlocutor quando ele pergunta" in said
+    assert "só saem depois da aprovação dele (apagar pelos apps está desligado)" in said
+    assert "contas que ele não conectou" in said
+    _, provider = turn(db, owner, "bom dia", [], key=None)
+    assert "ler o que está no GitHub" not in system(provider)
+    assert "contas, email, agenda, mensagens" in system(provider)
+
+
+def test_the_manifest_joins_several_names():
+    from core.identity.capabilities import Capabilities
+
+    seen = Capabilities(apps=("Notion", "GitHub", "Slack"), google=True)
+    assert any("ler o que está no Notion, GitHub e Slack do" in a for a in seen.actions())
+    assert "acesso a arquivos, contas que ele não conectou, dispositivos do interlocutor" in (
+        seen.absent()
+    )
