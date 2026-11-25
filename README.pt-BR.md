@@ -32,7 +32,7 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 | **Um corvo de olho âmbar.** Sem mascote: o ícone é um corvo em close, preto sobre papel, com um olho âmbar, e o âmbar é só dele (os pensamentos, os pedidos de aprovação, o ponto que pulsa enquanto ele trabalha). Três temas, trocados na hora em Ajustes: Papel, Tinta e Rótulo. No computador é uma janela de app: barra lateral com nove lugares, a barra da página e a barra de status com o servidor, o Mac, as rotinas, o silêncio, o uso de modelos das últimas 24 h e o modelo, que se troca dali. Ctrl/⌘+K abre a paleta de comandos. O login mostra o selo: VISAO em Six Caps atrás do busto ([DESIGN.md](DESIGN.md)). Dá para continuar escrevendo enquanto ele responde: essas mensagens esperam, mais apagadas, e vão juntas como a próxima mensagem. | feito |
 | **Páginas que ele escreve.** Peça um plano, um comparativo ou um roteiro para guardar: a resposta diz o que vai ter, e um cartão embaixo dela passa de "Criando…" para uma página que você abre, compartilha por um link secreto ou apaga. Escrita a partir da conversa e das pesquisas dela, com datas e fontes, "a confirmar" no que faltar; servida sem scripts e com origem opaca, então não alcança a sua sessão ([docs/ARTEFATOS.md](docs/ARTEFATOS.md)). | feito |
 | **Status ao vivo.** Enquanto trabalha, cada passo vira um cartão no chat ("Procurou no seu Gmail", "Abrindo github.com"), resumido ou técnico, como você preferir, e uma coluna ao lado mostra o que ele está fazendo agora e o que fez de verdade, tirado do registro do sistema. Se você sai do app no meio, a resposta chega também como notificação ([docs/STATUS.md](docs/STATUS.md)). | feito |
-| **Páginas ao vivo.** Para passagens, hotéis, preços ou horários ele abre os sites num Chromium de verdade (Google Voos e Hotéis funcionam; site que bloqueia robô é avisado, nunca contornado), lê o que mostram agora e responde com o site e a hora. Só lê: sem login, formulário ou compra. O navegador roda num container próprio, sem segredos nem banco ([docs/NAVEGADOR.md](docs/NAVEGADOR.md)). | feito |
+| **Páginas ao vivo.** Para passagens, hotéis, preços ou horários ele abre os sites num Chromium de verdade (Google Voos e Hotéis funcionam; site que bloqueia robô é avisado, nunca contornado), lê o que mostram agora e responde com o site e a hora. Só lê: sem login, formulário ou compra. No servidor, o navegador roda num container próprio, sem segredos nem banco; na sua máquina, dentro do bubblewrap ou do sandbox-exec, sem as chaves do app nem a sua pasta pessoal ([docs/NAVEGADOR.md](docs/NAVEGADOR.md)). | feito |
 | **Responder uma mensagem, parar, aprovar ali mesmo.** ↩ em qualquer mensagem cita ela na sua resposta e diz ao modelo de qual você fala; × para o que está rodando (uma resposta sendo escrita não fica); as aprovações (Mac, email, agenda) são cartões dentro da conversa. | feito |
 | **Projetos.** Um assunto com suas conversas, páginas e arquivos; numa conversa do projeto ele sabe o que foi falado nas outras. | feito |
 | **Memória autobiográfica** curada por uma política determinística, opt-in por pessoa, com proveniência, exportação e exclusão. Saúde, religião, política, finanças e terceiros ficam de fora. | feito (benchmark: curada 8/8, passiva 6/8, sem memória 1/8) |
@@ -40,6 +40,7 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 | **Metas com aprovação.** Perguntas sem resposta viram metas que rodam num worker separado, só depois que eu aprovo. | feito |
 | **Adaptação versionada e reversível.** O jeito de responder muda com o retorno; cada mudança é uma versão que dá para desfazer. | feito (−69% de palavras após retorno; desfazer volta à linha de base) |
 | **Orçamento por chamada.** Um razão que falha fechado reserva tokens antes de toda chamada ao modelo, em todos os caminhos. | feito |
+| **Roda na sua máquina.** Um processo só em 127.0.0.1 com a API, o worker e o site, SQLite em `~/.visao`, um serviço que o liga de novo se cair e um app de Mac com o servidor dentro. A primeira conta é criada na primeira tela ([docs/INSTALAR.md](docs/INSTALAR.md), [docs/APP_MAC.md](docs/APP_MAC.md)). | feito; o app de Mac é testado no CI num Mac, ainda não aberto à mão |
 
 ![O chat no tema Tinta: o compositor com o microfone e a coluna com o que ele está fazendo agora e o que fez de verdade](docs/assets/conversa.webp)
 
@@ -50,19 +51,27 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 ```mermaid
 flowchart TB
   web["Web / PWA<br/>conversa · ligação · caderno"] -->|HTTPS| edge["Caddy<br/>TLS · web estático"]
-  edge --> api["FastAPI<br/>apps/api"]
-  worker["Worker<br/>apps/worker"] --> core
-  api --> core["Núcleo cognitivo<br/>core/*"]
+  mac["App de Mac (Tauri)<br/>uma janela para 127.0.0.1"] --> local
+  edge --> api
+  subgraph local["Um processo na sua máquina, ou a API no servidor"]
+    api["FastAPI<br/>apps/api"] --> core["Núcleo cognitivo<br/>core/*"]
+    worker["Worker<br/>uma thread dentro da API"] --> core
+  end
   core --> memory["Memória<br/>curada, opt-in"]
   core --> mind["Mente<br/>pensar · estudar · puxar conversa"]
   core --> decision["Camada de decisão<br/>manifesto de capacidades"]
   core --> gate["Políticas<br/>pausa · aprovações · silêncio"]
   gate --> integrations["Integrações<br/>LLM · busca · voz · Web Push"]
   integrations --> ledger["Razão de custo<br/>falha fechado"]
-  core --> db[("PostgreSQL<br/>auditoria · RLS")]
+  integrations --> browser["Chromium<br/>container no servidor · sandbox na máquina"]
+  core --> db[("SQLite na sua máquina<br/>PostgreSQL no servidor<br/>auditoria · RLS")]
 ```
 
-O desenho completo, com o contrato de cada módulo, está em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+O mesmo código roda de dois jeitos. **Na sua máquina:** um processo Python em 127.0.0.1 serve a
+API, o site e o worker (uma thread), sobre SQLite em `~/.visao`. **No servidor:** o Caddy na
+frente, o PostgreSQL e o navegador num container próprio. O desenho completo, com o contrato de
+cada módulo, está em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); por que e como ele roda na
+máquina, em [docs/research/execucao_local.md](docs/research/execucao_local.md).
 
 ## Decisões de engenharia
 
@@ -83,24 +92,62 @@ O desenho completo, com o contrato de cada módulo, está em [docs/ARCHITECTURE.
 - **Automodificação com limite.** Um job diário opcional deixa ele propor mudança num único
   arquivo de estilo, com AST em lista branca, testes num container sem rede nem credenciais e o
   mesmo CI de tudo ([docs/CODE_EVOLUTION.md](docs/CODE_EVOLUTION.md)).
+- **Um processo só, medido.** Na máquina, o worker roda como thread dentro da API: 149 MB para os
+  dois, contra 269 MB em dois processos. Os modelos de voz (Kokoro, cerca de 0,9 GB, e Whisper,
+  cerca de 0,5 GB) carregam na primeira palavra e saem da memória depois de 10 minutos sem uso
+  ([`integrations/idle_cache.py`](integrations/idle_cache.py)).
+- **Um navegador isolado sem Docker.** Na sua máquina, o Chromium roda dentro do bubblewrap
+  (Linux) ou do sandbox-exec (macOS), com o ambiente limpo e sem a pasta pessoal: o `.env`, o
+  banco e o `~/.ssh` não existem lá dentro. Sem sandbox, ele não abre
+  ([ADR-0026](docs/decisions/0026-navegador-isolado-sem-docker.md)).
+- **A primeira conta, só desta máquina.** A tela de primeiro uso só funciona com uma opção que os
+  jeitos locais ligam, de 127.0.0.1 sem cabeçalho de proxy, e enquanto ninguém tem conta; depois
+  disso a rota some ([ADR-0027](docs/decisions/0027-app-de-mac.md)).
 - **Medido, não prometido.** Cada fase tem critério de aceite e execução registrada em
   [docs/research-log/](docs/research-log/); os números deste README vêm de lá.
 
 ## Como rodar
 
-Para instalar no seu Mac ou Linux, um script, sem Docker e sem sudo, instala o `uv`, o código em
-`~/.visao` e um serviço que sobe o Visão com o login e de novo se ele cair (launchd no Mac, systemd
-do usuário no Linux); detalhes em [docs/INSTALAR.md](docs/INSTALAR.md):
+| Você quer | Use | Precisa de |
+|---|---|---|
+| Uma janela no Mac, sem instalar mais nada | o [app de Mac](docs/APP_MAC.md) | um Mac com Apple Silicon |
+| Ele no seu Mac ou Linux, sempre ligado | o [instalador](docs/INSTALAR.md) | git, curl, Node 22 |
+| Mexer no código | `make setup` e `make start` | Python 3.12, Node 22 |
+| Um servidor com PostgreSQL | `docker compose up --build` | Docker Compose 2.24+ |
+
+Todos os jeitos começam sem conta. O app de Mac, o instalador e o comando `visao` criam a primeira
+na primeira tela, junto com a gênese do agente; nos outros, é um comando no terminal (abaixo). Sem
+todas as variáveis `VISION_LLM_*`, inclusive os preços, ele responde 503 em vez de inventar uma
+resposta ([docs/MODEL_SELECTION.md](docs/MODEL_SELECTION.md)).
+
+### O app de Mac
+
+Baixe o artefato `Visao-mac` de uma execução do `desktop` no Actions (ela roda nos PRs que mexem
+no app, ou à mão), mova o `Visão.app` para Aplicativos e, como ele não é assinado por uma conta
+paga da Apple, tire a quarentena uma vez (macOS 12 ou mais novo, Apple Silicon):
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Visão.app"
+```
+
+O app leva o servidor dentro (congelado pelo PyInstaller, 120 MB): sem Python, Node nem Docker no
+Mac. A configuração e o banco ficam em `~/.visao`, a mesma pasta do instalador. A voz e as páginas
+ao vivo ainda não vêm no app.
+
+### O instalador (macOS e Linux)
+
+Um script, sem Docker e sem sudo: instala o `uv`, o código em `~/.visao` e um serviço que sobe o
+Visão com o login e de novo se ele cair (launchd no Mac, systemd do usuário no Linux).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Allisonfreittass/visao/main/scripts/instalar.sh | bash
-visao conta criar --email voce@exemplo.com   # usuário inicial (a senha é pedida) e gênese
 ```
 
-Ou o app de Mac, com o servidor dentro (sem Python, Node nem Docker no Mac) e a primeira conta
-criada na primeira tela: [docs/APP_MAC.md](docs/APP_MAC.md).
+Preencha o bloco `VISION_LLM_*` em `~/.visao/visao/.env`, rode `visao parar && visao iniciar` e abra
+http://127.0.0.1:8000. `visao estado` diz se está rodando, se responde e se o worker deu sinal;
+`visao servico remover` desliga o serviço.
 
-Para mexer no código, requer Python 3.12, Node 22 e, para o caminho com Docker, Docker Compose 2.24+.
+### A partir do código
 
 ```bash
 make setup                 # .venv e dependências de Python e do web
@@ -108,33 +155,21 @@ cp .env.example .env       # preencha VISION_SECRET_KEY e o bloco VISION_LLM_*
 make start                 # migrações, API :8000 com o worker dentro e web :5173
 ```
 
-`make start` (ou `npm start`) sobe a API, com o worker rodando dentro dela (um processo Python
-só, `VISION_WORKER_IN_API=1`), e o web, no mesmo terminal, com a saída prefixada por `[api]` e
-`[web]`; Ctrl+C para os dois. Com `VISION_DATABASE_URL` apontando para um PostgreSQL
-compartilhado, ele não migra: só confere se o banco está na versão do código.
+`make start` (ou `npm start`) sobe a API, com o worker dentro dela, e o web, no mesmo terminal,
+com a saída prefixada por `[api]` e `[web]`; Ctrl+C para os dois. Ele não tem a tela de primeiro
+uso: crie a primeira conta e a gênese no terminal com
+`.venv/bin/visao conta criar --email voce@exemplo.com`. Para usar no dia a dia, sem o Vite,
+`.venv/bin/visao iniciar --fundo` sobe um processo só em http://127.0.0.1:8000 com a API, o worker e
+o site, e esse tem a tela de primeiro uso (precisa do build do web uma vez,
+`npm --prefix apps/web run build`).
 
-Para usar no dia a dia, sem o Vite, há o comando `visao`: um processo só em
-http://127.0.0.1:8000, com a API, o worker e o site no mesmo endereço (precisa do build do web uma
-vez, `npm --prefix apps/web run build`):
+### Num servidor
 
-```bash
-.venv/bin/visao iniciar --fundo   # sobe em segundo plano; o log fica em ~/.visao/visao.log
-.venv/bin/visao estado            # se está rodando, se responde e o último sinal do worker
-.venv/bin/visao parar
-```
-
-Criar o usuário inicial e executar o genesis (idempotente):
-
-```bash
-.venv/bin/python -m apps.api.cli create-user --email voce@exemplo.com
-.venv/bin/python -m apps.api.cli genesis
-```
-
-Com Docker (PostgreSQL, API e worker): `docker compose up --build`. A API fica em
-http://127.0.0.1:8000 (`/health`, `/ready`, `/docs`) e o PostgreSQL só em `127.0.0.1:5432`.
-
-Sem todas as variáveis `VISION_LLM_*`, inclusive os preços, a API responde 503 em vez de inventar
-uma resposta.
+`docker compose up --build` sobe o PostgreSQL, a API e o worker. A API fica em
+http://127.0.0.1:8000 (`/health`, `/ready`, `/docs`) e o PostgreSQL só em `127.0.0.1:5432`. A
+primeira conta: `docker compose exec api python -m apps.api.cli create-user --email voce@exemplo.com`,
+depois `genesis`. A produção, com o Caddy e o navegador num container próprio, roda num servidor
+Lightsail ([docs/LIGHTSAIL.md](docs/LIGHTSAIL.md)).
 
 ### No celular
 
@@ -173,13 +208,19 @@ make db-test               # testes só de PostgreSQL num pgvector descartável
 ```
 
 O CI roda lint, a suíte Python contra SQLite e PostgreSQL, os testes do web e do Worker e um
-`docker compose up` de fumaça. Uma `main` verde vai por SSH para o servidor Lightsail dele, e volta sozinha para a versão anterior se a nova não responder ([docs/LIGHTSAIL.md](docs/LIGHTSAIL.md)). Toda action está fixada
-por SHA.
+`docker compose up` de fumaça. Num Mac, o job `desktop` monta o app, abre o app com uma pasta
+pessoal vazia, confere que o servidor de dentro responde e fecha o app conferindo que o servidor
+parou junto. Uma `main` verde vai por SSH para o servidor Lightsail dele e volta sozinha para a
+versão anterior se a nova não responder ([docs/LIGHTSAIL.md](docs/LIGHTSAIL.md)). Toda action
+está fixada por SHA.
 
 ## Estado
 
-Fases 0–6 e 9 construídas, assim como a presença na nuvem (mente, ligação e Web Push). A Fase 7
-(fine-tuning, TTS próprio treinado, aprendizado contínuo) só começa com baselines de uso real.
+Fases 0–6 e 9 construídas, assim como a presença na nuvem (mente, ligação e Web Push). Rodar na
+sua própria máquina também: as sete etapas de
+[docs/research/execucao_local.md](docs/research/execucao_local.md), do ajuste do SQLite ao app de
+Mac. A Fase 7 (fine-tuning, TTS próprio treinado, aprendizado contínuo) só começa com baselines de
+uso real.
 Detalhes em [docs/ROADMAP.md](docs/ROADMAP.md); avaliações em [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Documentação
@@ -188,12 +229,13 @@ Detalhes em [docs/ROADMAP.md](docs/ROADMAP.md); avaliações em [docs/EVALUATION
 - [Genesis](docs/GENESIS.md) · [Nome autônomo](docs/AUTONOMOUS_NAMING.md) · [Identidade](docs/IDENTITY.md)
 - [Memória](docs/MEMORY.md) · [Curiosidade](docs/CURIOSITY.md) · [Estudo](docs/STUDY.md)
 - [Mente: pensar, estudar e puxar conversa](docs/MIND.md) · [Autonomia](docs/AUTONOMY.md)
-- [Voz](docs/VOICE.md) · [Servidor (Lightsail)](docs/LIGHTSAIL.md) · [Cloudflare, histórico](docs/CLOUDFLARE.md) · [Evolução de código](docs/CODE_EVOLUTION.md)
+- [Voz](docs/VOICE.md) · [O braço no seu Mac](docs/BRACO.md) · [Páginas ao vivo](docs/NAVEGADOR.md)
+- [Instalador](docs/INSTALAR.md) · [App de Mac](docs/APP_MAC.md) · [Servidor (Lightsail)](docs/LIGHTSAIL.md) · [Cloudflare, histórico](docs/CLOUDFLARE.md) · [Evolução de código](docs/CODE_EVOLUTION.md)
 - [Seleção de modelos](docs/MODEL_SELECTION.md) · [Decisões (ADRs)](docs/decisions/) · [Diário de pesquisa](docs/research-log/)
 
 ## Pilha
 
-`Python 3.12 · FastAPI · SQLAlchemy · Alembic · PostgreSQL · React · Vite · TypeScript · Docker · Caddy · AWS Lightsail`
+`Python 3.12 · FastAPI · SQLAlchemy · Alembic · SQLite · PostgreSQL · React · Vite · TypeScript · Playwright · Tauri · PyInstaller · Docker · Caddy · AWS Lightsail`
 
 ## Licença
 
