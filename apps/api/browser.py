@@ -15,4 +15,5 @@ def get_browser() -> Browser | None:
         ws_endpoint=settings.browser_ws_url,
         executable_path=settings.browser_executable_path,
         timeout_seconds=settings.browser_timeout_seconds,
+        sandboxed=settings.browser_sandbox,
     )

@@ -125,13 +125,34 @@ Se uma página maliciosa explorar o Chromium, ela fica presa num container sem n
 API só conecta (`VISION_BROWSER_WS_URL=ws://browser:3000/`). A versão do container tem de ser a
 mesma do pacote `playwright` do `pyproject.toml`. O container fica limitado a 700 MB de memória (o servidor tem 2 GB, sem swap).
 
-Localmente, `VISION_BROWSER_EXECUTABLE_PATH` aponta para um Chromium e a API o abre ela mesma.
-Sem nenhum dos dois, não há páginas ao vivo e ele não diz que consegue.
+Localmente, `VISION_BROWSER_EXECUTABLE_PATH` aponta para um Chromium e a API o abre ela mesma,
+**isolado** ([ADR-0026](decisions/0026-navegador-isolado-sem-docker.md),
+[`integrations/browser/sandbox.py`](../integrations/browser/sandbox.py)):
+- no Linux, dentro do bubblewrap: só `/usr`, `/etc`, a pasta do Chromium e o perfil, sem a sua
+  pasta pessoal;
+- no Mac, dentro do sandbox-exec: a pasta pessoal fechada para leitura e gravação só no perfil;
+- nos dois, com o ambiente limpo: nenhuma chave do app (`VISION_*`) chega ao navegador.
+
+Sem o bubblewrap no Linux, o navegador local não abre (`apt install bubblewrap`); ele nunca abre
+sem isolamento. `VISION_BROWSER_SANDBOX=false` desliga o isolamento de propósito, e o ambiente
+continua limpo. A rede é compartilhada, porque ele precisa ler páginas: o limite está na ADR.
+
+Para ter um Chromium na máquina, use o do Playwright, só o modo sem janela (cerca de 277 MB):
+
+```bash
+.venv/bin/playwright install --only-shell chromium
+ls ~/.cache/ms-playwright/chromium_headless_shell-*/*/chrome-headless-shell   # no Mac: .../chrome-headless-shell-mac-*/
+```
+
+Depois aponte `VISION_BROWSER_EXECUTABLE_PATH` para esse `chrome-headless-shell` no `.env`.
+Sem nenhum dos dois (container ou Chromium local), não há páginas ao vivo e ele não diz que
+consegue.
 
 | Peça | Onde |
 |---|---|
 | Quando e onde navegar, o bloco para o modelo | [`core/browse.py`](../core/browse.py) |
 | Chromium, filtro de requisições, verificação de robô | [`integrations/browser/playwright_browser.py`](../integrations/browser/playwright_browser.py) |
+| O Chromium local no sandbox | [`integrations/browser/sandbox.py`](../integrations/browser/sandbox.py) |
 | Tabela `browse_visits` | migração `0023` |
 
 ## Limite honesto
