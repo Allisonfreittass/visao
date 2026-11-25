@@ -1,3 +1,8 @@
+import logging
+import threading
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from apps.api.push import configure_push
@@ -30,12 +35,45 @@ from apps.api.routes import (
 from apps.api.settings import get_settings
 from infrastructure.observability.logging import configure_logging
 
+logger = logging.getLogger(__name__)
+
+# How long shutdown waits for the job in hand. Longer than that, the thread is a daemon and goes
+# with the process; the job's lease runs out and it goes back to the queue.
+WORKER_STOP_SECONDS = 15.0
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """With VISION_WORKER_IN_API, the worker runs as a thread of this process (one Python on the
+    owner's machine instead of two); without it, the API runs alone, as on the server."""
+    settings = get_settings()
+    stop = threading.Event()
+    thread = None
+    if settings.worker_in_api:
+        from apps.worker.main import serve
+
+        thread = threading.Thread(
+            target=serve, args=(stop, settings), name="visao-worker", daemon=True
+        )
+        thread.start()
+    app.state.worker_thread = thread
+    try:
+        yield
+    finally:
+        if thread is not None:
+            stop.set()
+            thread.join(WORKER_STOP_SECONDS)
+            if thread.is_alive():
+                logger.warning(
+                    "worker still busy at shutdown", extra={"event": "worker_stop_timeout"}
+                )
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     configure_push(settings)
-    app = FastAPI(title="VISÃO API", version="0.0.1")
+    app = FastAPI(title="VISÃO API", version="0.0.1", lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(system.router)

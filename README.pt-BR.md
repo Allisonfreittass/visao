@@ -93,11 +93,12 @@ Requer Python 3.12, Node 22 e, para o caminho com Docker, Docker Compose 2.24+.
 ```bash
 make setup                 # .venv e dependências de Python e do web
 cp .env.example .env       # preencha VISION_SECRET_KEY e o bloco VISION_LLM_*
-make start                 # migrações, API :8000, worker e web :5173
+make start                 # migrações, API :8000 com o worker dentro e web :5173
 ```
 
-`make start` (ou `npm start`) sobe os três no mesmo terminal, com a saída prefixada por `[api]`,
-`[worker]` e `[web]`; Ctrl+C para todos. Com `VISION_DATABASE_URL` apontando para um PostgreSQL
+`make start` (ou `npm start`) sobe a API, com o worker rodando dentro dela (um processo Python
+só, `VISION_WORKER_IN_API=1`), e o web, no mesmo terminal, com a saída prefixada por `[api]` e
+`[web]`; Ctrl+C para os dois. Com `VISION_DATABASE_URL` apontando para um PostgreSQL
 compartilhado, ele não migra: só confere se o banco está na versão do código.
 
 Criar o usuário inicial e executar o genesis (idempotente):
