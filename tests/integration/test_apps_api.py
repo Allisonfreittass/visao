@@ -2,6 +2,8 @@
 the catalog without Gmail and Calendar, connect with a wait, disconnect as revoke + delete, and
 approving twice runs once. Composio is answered from recorded responses."""
 
+import json
+
 import pytest
 from sqlalchemy import select
 
@@ -9,7 +11,7 @@ from apps.api.settings import Settings, get_settings
 from core.apps import account, actions
 from infrastructure.database.models import AuditLog, ToolAction
 from integrations.composio.client import ComposioClient
-from tests.fake_composio import RecordedComposio
+from tests.fake_composio import API, RecordedComposio
 from tests.integration.test_mind import _owner_client
 
 pytest.importorskip("composio")
@@ -44,8 +46,12 @@ def test_without_the_key_the_section_is_off(client, db, api):
 def test_the_catalog_has_every_app_but_gmail_and_calendar(client, db, api):
     _, headers = owner(client, db)
     slugs = {a["slug"] for a in client.get("/apps/catalog", headers=headers).json()}
-    assert {"github", "notion", "slack", "jira"} <= slugs
+    assert {"github", "notion", "slack", "jira", "perplexityai"} <= slugs
     assert not slugs & {"gmail", "googlecalendar"}
+    items = {a["slug"]: a for a in client.get("/apps/catalog", headers=headers).json()}
+    assert items["perplexityai"]["connectable"] and items["perplexityai"]["asks_key"]
+    assert items["github"]["connectable"] and not items["github"]["asks_key"]
+    assert not items["jira"]["connectable"]
 
 
 def test_connecting_waits_for_the_owner_and_says_where_the_connection_lives(client, db, api):
@@ -128,3 +134,16 @@ def test_someone_elses_action_is_not_found(client, db, api):
     _, headers = owner(client, db)
     missing = "00000000-0000-0000-0000-000000000000"
     assert client.post(f"/apps/actions/{missing}/approve", headers=headers).status_code == 404
+
+
+def test_an_app_asking_for_its_own_key_is_connected_through_composios_page(client, db, api):
+    _, headers = owner(client, db)
+    api.answers[("GET", f"{API}/auth_configs")] = {"items": []}
+    api.answers[("POST", f"{API}/auth_configs")] = {
+        "auth_config": {"id": "ac_novo", "auth_scheme": "API_KEY", "is_composio_managed": False},
+        "toolkit": {"slug": "perplexityai"},
+    }
+    started = client.post("/apps/perplexityai/connect", headers=headers).json()
+    assert started["url"].startswith("https://connect.composio.dev/")
+    [created] = api.sent("POST", "/auth_configs")
+    assert json.loads(created.content)["auth_config"]["authScheme"] == "API_KEY"

@@ -108,8 +108,20 @@ As regras são as de email e agenda (`core/google/actions.py`):
 
 Sem a chave, nada disso aparece: nem a seção em Ajustes, nem os apps no que ele diz que sabe fazer.
 
-Apps que o Composio não conecta com a entrada dele (pedem credenciais próprias) aparecem no
-catálogo desabilitados.
+**Três jeitos de conectar**, todos na página do Composio (conferidos no Composio de verdade em
+25/11/2026; o catálogo tinha 1.929 apps):
+
+- **Com a entrada do próprio Composio** (174 apps, como GitHub, Notion e Slack): você entra na
+  sua conta do app e autoriza.
+- **Com a entrada do próprio app, que se registra sozinha** (`DCR_OAUTH`, 138 apps): igual, sem o
+  Visão registrar nada.
+- **Com a sua chave de API daquele app** (`API_KEY`, cerca de 1.400 apps, como Perplexity,
+  Tavily e Firecrawl): a página do Composio pede a chave, com a explicação de onde criá-la. Ela
+  fica guardada no Composio, como os tokens dos outros. O Visão cria a configuração de entrada
+  sem credencial nenhuma (`use_custom_auth`), só para a página pedir.
+
+Os que só entram com um app OAuth registrado por nós em cada serviço, ou com usuário e senha,
+aparecem no catálogo desabilitados.
 
 ## O que ainda não faz
 

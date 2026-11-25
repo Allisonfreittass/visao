@@ -207,10 +207,76 @@
     "version": "20251111_00",
     "app_url": null
    }
+  },
+  {
+   "slug": "perplexityai",
+   "name": "Perplexity AI",
+   "app": "perplexityai",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "API_KEY"
+   ],
+   "composio_managed_auth_schemes": [],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "Perplexity AI"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "developer-tools",
+      "name": "Developer-Tools"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "Perplexity AI description",
+    "logo": "https://logos.composio.dev/api/jira",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
+  },
+  {
+   "slug": "0xarchive_mcp",
+   "name": "0xArchive",
+   "app": "0xarchive_mcp",
+   "type": "native",
+   "toolkit_type": "api",
+   "is_local_toolkit": false,
+   "no_auth": false,
+   "auth_schemes": [
+    "DCR_OAUTH"
+   ],
+   "composio_managed_auth_schemes": [],
+   "deprecated": {
+    "toolkitId": "x",
+    "displayName": "0xArchive"
+   },
+   "meta": {
+    "categories": [
+     {
+      "id": "developer-tools",
+      "name": "Developer-Tools"
+     }
+    ],
+    "created_at": "2024-01-01",
+    "updated_at": "2026-11-01",
+    "description": "0xArchive description",
+    "logo": "https://logos.composio.dev/api/jira",
+    "tools_count": 40,
+    "triggers_count": 2,
+    "version": "20251111_00",
+    "app_url": null
+   }
   }
  ],
  "current_page": 1,
- "total_items": 6,
+ "total_items": 8,
  "total_pages": 1,
  "next_cursor": null
 }

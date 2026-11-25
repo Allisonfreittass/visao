@@ -18,7 +18,9 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
   [ADR-0028](decisions/0028-apps-pelo-composio.md)).
   - Com a chave do Composio no servidor, Ajustes › Integrações › Apps mostra o catálogo: Notion,
     GitHub, Slack, Linear, Trello e quase todos os outros. Você toca em Conectar, entra no app
-    na página do Composio, e pronto. Email e agenda continuam pelo Google.
+    na página do Composio, e pronto. Os apps que pedem uma chave de API (Perplexity, Tavily,
+    Firecrawl e mais de mil outros) também conectam: a página do Composio pede a sua chave
+    daquele app. Email e agenda continuam pelo Google.
   - Quando você pergunta de um app conectado ("quais issues estão abertas no visao?"), ele lê e
     responde. O que vem do app é texto de terceiros, nunca ordem.
   - Mudar qualquer coisa (criar uma issue, mandar uma mensagem num canal, editar uma página) vira

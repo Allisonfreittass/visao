@@ -44,7 +44,7 @@ describe("the app change card", () => {
 
 describe("the catalog search", () => {
   const item = (slug: string, name: string, categories: string[] = []): AppCatalogItem => ({
-    slug, name, description: "", logo: "", categories, managed: true,
+    slug, name, description: "", logo: "", categories, managed: true, connectable: true, asks_key: false,
   });
   const catalog = [item("github", "GitHub", ["Developer Tools"]), item("notion", "Notion", ["Produtividade"]), item("slack", "Slack")];
 

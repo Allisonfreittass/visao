@@ -388,8 +388,12 @@ export interface AppCatalogItem {
   description: string;
   logo: string;
   categories: string[];
-  /** Connects with Composio's own sign-in; the others need credentials of their own. */
+  /** Connects with Composio's own sign-in. */
   managed: boolean;
+  /** Can be connected from here (docs/APPS.md); the rest need an OAuth app of our own. */
+  connectable: boolean;
+  /** Composio's page will ask for the owner's key to this app. */
+  asks_key: boolean;
 }
 
 /** After a live quote: keep it on the home screen and check the price daily (docs/PAINEIS.md). */
