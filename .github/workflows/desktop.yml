@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   mac:
-    runs-on: macos-14
+    runs-on: macos-latest  # Apple Silicon; a fixed version gets retired (macos-14 was)
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
