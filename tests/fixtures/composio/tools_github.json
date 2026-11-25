@@ -39,9 +39,11 @@
     }
    },
    "tags": [
-    "readOnlyHint",
+    "important",
+    "issues",
     "openWorldHint",
-    "issues"
+    "readOnlyHint",
+    "idempotentHint"
    ],
    "toolkit": {
     "slug": "github",

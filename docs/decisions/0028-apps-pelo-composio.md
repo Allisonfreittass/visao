@@ -83,6 +83,10 @@ então não há conta surpresa. Sem cartão cadastrado, também não.
 - **Ler é livre.** Só conta como leitura uma ferramenta com `readOnlyHint` verdadeiro e sem
   nenhuma das outras dicas. Sem dica, ou com dica de criar ou mudar, **é escrita**. Na dúvida, o
   Visão pede aprovação, porque as dicas são de melhor esforço.
+  - *Ajuste aprovado pelo dono em 25/11/2026:* `openWorldHint` e `idempotentHint` não contam
+    como "outras dicas", porque não dizem se a ferramenta muda algo, e as leituras reais do
+    Composio vêm com elas (listar as issues do GitHub traz `readOnlyHint`, `idempotentHint` e
+    `openWorldHint`). Sozinhas, continuam sendo escrita.
 - **Apagar fica de fora nesta fase.** Ferramentas com `destructiveHint` não são oferecidas ao
   modelo (`tags={"disable": ["destructiveHint"]}` na sessão, e o código confere de novo antes de
   executar). É a mesma linha do Google, que não pede permissão para apagar email.

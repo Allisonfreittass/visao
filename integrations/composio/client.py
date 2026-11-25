@@ -22,13 +22,18 @@ import httpx
 TIMEOUT_SECONDS = 20.0
 CATALOG_TTL_SECONDS = 6 * 3600
 TOOLS_TTL_SECONDS = 600
+MAX_TOOLS = 2000
 # The hints Composio puts in a tool's tags (docs.composio.dev/docs/governance/tool-hints). Only
 # "readOnlyHint" alone, among the ones that say what a tool changes, makes it a read.
 READ_ONLY = "readOnlyHint"
 DESTRUCTIVE = "destructiveHint"
-# Says the tool talks to the outside world, which every app tool does; it says nothing about
-# whether it changes anything.
-NEUTRAL_HINTS = frozenset({"openWorldHint"})
+# Hints that say nothing about whether a tool changes anything: it talks to the outside world
+# (every app tool does), or calling it twice gives the same result. Composio marks its real reads
+# with both, next to readOnlyHint (GITHUB_LIST_REPOSITORY_ISSUES, seen on 2026-11-25). Alone, or
+# with a hint to create or update, they still leave a tool a write.
+NEUTRAL_HINTS = frozenset({"openWorldHint", "idempotentHint"})
+# Composio's tag for a toolkit's main tools; they go first when the list is cut.
+IMPORTANT = "important"
 
 # How the owner connects an app that has no sign-in of Composio's own, with nothing set up by the
 # Visão: the app's own sign-in, which registers itself (DCR_OAUTH), or the owner's key for that
@@ -47,8 +52,8 @@ class ComposioError(Exception):
 
 def kind_of(tags: tuple[str, ...] | list[str]) -> str:
     """ "read", "write" or "destructive", from the tags alone. The hints are Composio's best
-    effort, so any doubt is a write: no hint, a hint to create, update or be idempotent, an
-    unknown hint, or read-only together with any of those."""
+    effort, so any doubt is a write: no hint, a hint to create or update, an unknown hint, or
+    read-only together with any of those. The neutral ones neither make nor break a read."""
     hints = {t for t in tags if isinstance(t, str) and t.endswith("Hint")} - NEUTRAL_HINTS
     if DESTRUCTIVE in hints:
         return "destructive"
@@ -301,7 +306,10 @@ class ComposioClient:
         kept = self._tools.get(toolkit)
         if kept and time.monotonic() - kept[0] < TOOLS_TTL_SECONDS:
             return kept[1]
-        items = self._call(lambda c: c.tools.get_raw_composio_tools(toolkits=[toolkit], limit=200))
+        # All of them: GitHub has about 900, and listing its issues was number 633.
+        items = self._call(
+            lambda c: c.tools.get_raw_composio_tools(toolkits=[toolkit], limit=MAX_TOOLS)
+        )
         found = [_tool(item) for item in items]
         found = [t for t in found if t.slug and t.version and t.toolkit == toolkit]
         self._tools[toolkit] = (time.monotonic(), found)

@@ -30,7 +30,7 @@ from core.conversation.service import Budgets, check_budgets
 from core.memory.text import fold, tokens
 from core.mind import intentions
 from infrastructure.database.models import Conversation, ModelUsage, ToolAction, User
-from integrations.composio.client import ComposioClient, ComposioError, Tool
+from integrations.composio.client import IMPORTANT, ComposioClient, ComposioError, Tool
 from integrations.llm.base import ChatMessage, LLMError, LLMProvider
 
 PICK_APP = "apps_pick_app"
@@ -153,9 +153,9 @@ def _offered(tools: list[Tool], text: str) -> list[Tool]:
     usable = [t for t in tools if t.kind != "destructive"]
     wanted = tokens(text)
 
-    def score(tool: Tool) -> int:
+    def score(tool: Tool) -> tuple[int, bool]:
         words = tokens(f"{tool.slug.replace('_', ' ')} {tool.name} {tool.description}")
-        return len(wanted & words)
+        return len(wanted & words), IMPORTANT in tool.tags
 
     return sorted(usable, key=score, reverse=True)[:TOOLS_OFFERED]
 
