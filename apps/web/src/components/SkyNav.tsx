@@ -42,7 +42,7 @@ export function MobileTabs({ view, onView }: { view: WorkspaceView; onView: (vie
     <nav className="mobile-tabs" aria-label="Lugares principais">
       {TABS.map((t) => (
         <button key={t.view} type="button" aria-current={view === t.view ? "page" : undefined} onClick={() => onView(t.view)}>
-          <Icon name={t.icon} size={20} />
+          <Icon name={t.icon} size={24} />
           <span>{t.label}</span>
         </button>
       ))}

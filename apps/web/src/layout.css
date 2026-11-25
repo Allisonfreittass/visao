@@ -784,3 +784,21 @@ button.project-tile:hover { border-color: var(--border-strong); }
     mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 }
 .mic-button--off, .composer-row > .mic-button--off { background: transparent; border-color: transparent; color: var(--text-muted); opacity: .7; }
+
+/* ---------- App instalado na tela inicial: até o fim da tela, abas como as do iPhone ----------
+   No app instalado, 100dvh deixa de fora a área da barrinha, e a janela terminava antes do fim
+   da tela: sobrava uma faixa do fundo embaixo das abas. Presa às bordas da tela, ela vai até o
+   fim. Com o teclado aberto, a altura visível (--app-height) continua mandando. */
+@media (display-mode: standalone) and (max-width: 899px) {
+  .app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-height, 100%); }
+}
+
+/* Abas no estilo do iPhone: ícone e nome no alto da barra, a área da barrinha embaixo, linha fina
+   em cima, nome pequeno; a aba aberta na cor do texto, as outras em cinza. */
+@media (max-width: 899px) {
+  .mobile-tabs { padding-bottom: max(6px, calc(var(--safe-bottom) - 10px)); border-top: 0.5px solid var(--border-strong);
+    background: color-mix(in srgb, var(--surface) 88%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+  .mobile-tabs button { height: 49px; justify-content: flex-start; gap: 2px; padding-top: 6px; font: 500 10px/12px var(--font-sans); letter-spacing: .01em; }
+  .mobile-tabs button .icon { width: 24px; height: 24px; }
+}
+.mobile-tabs button[aria-current] .icon { stroke-width: 2; }
