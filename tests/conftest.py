@@ -16,6 +16,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 from apps.api.deps import get_session_factory  # noqa: E402
 from apps.api.main import create_app  # noqa: E402
 from infrastructure.database.base import Base  # noqa: E402
+from infrastructure.database.session import configure_sqlite  # noqa: E402
 
 
 @pytest.fixture
@@ -24,6 +25,8 @@ def engine() -> Iterator[Engine]:
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
+    # The same pragmas as the app (foreign keys checked, as PostgreSQL does).
+    configure_sqlite(engine)
     Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
