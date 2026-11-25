@@ -97,6 +97,16 @@ cp .env.example .env       # fill VISION_SECRET_KEY and the VISION_LLM_* block
 make start                 # migrations, API :8000 with the worker inside, and web :5173
 ```
 
+For everyday use without Vite there is the `visao` command: one process on
+http://127.0.0.1:8000 with the API, the worker and the web app on the same address (it needs the
+web build once, `npm --prefix apps/web run build`):
+
+```bash
+.venv/bin/visao iniciar --fundo   # starts in the background; the log goes to ~/.visao/visao.log
+.venv/bin/visao estado            # running or not, answering or not, the worker's last signal
+.venv/bin/visao parar
+```
+
 Create the first user and run genesis (idempotent):
 
 ```bash

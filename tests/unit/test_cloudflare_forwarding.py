@@ -9,8 +9,14 @@ from apps.api.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2] / "infrastructure" / "cloudflare"
 # Local model paths stay at their image defaults at the edge. The worker inside the API is for the
-# owner's machine only (docs/research/execucao_local.md): at the edge the worker is its own thing.
-NOT_FORWARDED = {"VISION_TTS_MODELS_DIR", "VISION_STT_MODELS_DIR", "VISION_WORKER_IN_API"}
+# owner's machine only (docs/research/execucao_local.md): at the edge the worker is its own
+# thing. So is the site served by the API: at the edge the Worker serves it.
+NOT_FORWARDED = {
+    "VISION_TTS_MODELS_DIR",
+    "VISION_STT_MODELS_DIR",
+    "VISION_WORKER_IN_API",
+    "VISION_WEB_DIR",
+}
 
 
 def _app_keys() -> set[str]:

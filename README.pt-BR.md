@@ -101,6 +101,16 @@ só, `VISION_WORKER_IN_API=1`), e o web, no mesmo terminal, com a saída prefixa
 `[web]`; Ctrl+C para os dois. Com `VISION_DATABASE_URL` apontando para um PostgreSQL
 compartilhado, ele não migra: só confere se o banco está na versão do código.
 
+Para usar no dia a dia, sem o Vite, há o comando `visao`: um processo só em
+http://127.0.0.1:8000, com a API, o worker e o site no mesmo endereço (precisa do build do web uma
+vez, `npm --prefix apps/web run build`):
+
+```bash
+.venv/bin/visao iniciar --fundo   # sobe em segundo plano; o log fica em ~/.visao/visao.log
+.venv/bin/visao estado            # se está rodando, se responde e o último sinal do worker
+.venv/bin/visao parar
+```
+
 Criar o usuário inicial e executar o genesis (idempotente):
 
 ```bash
