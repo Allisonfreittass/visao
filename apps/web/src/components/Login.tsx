@@ -66,7 +66,9 @@ type Mode = "entrar" | "criar";
 export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAccount }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
+  // No checkbox, as in the mockup: the installed app (standalone) keeps you signed in; a browser tab
+  // forgets you when it closes.
+  const [remember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
   const [error, setError] = useState<LoginError | null>(null);
   const [missing, setMissing] = useState<MissingField | null>(null);
   const [busy, setBusy] = useState(false);
@@ -236,7 +238,7 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAcc
         )}
         {capsLock && <small id="login-caps">Caps Lock está ligado.</small>}
       </div>
-      {firstRun ? (
+      {firstRun && (
         <div className="rs-campo" data-estado={fieldError}>
           <label htmlFor="login-confirm">Repita a senha</label>
           <input
@@ -251,11 +253,6 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAcc
             required
           />
         </div>
-      ) : (
-        <label className="memory-toggle">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          Manter conectado neste aparelho
-        </label>
       )}
       {error && (
         <p id="login-error" className="login-erro" role="alert">
