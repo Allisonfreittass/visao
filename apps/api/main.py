@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from apps.api.push import configure_push
+from apps.api.routes import apps as owner_apps
 from apps.api.routes import (
     arm,
     artifacts,
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(evolution.router)
     app.include_router(arm.router)
     app.include_router(google.router)
+    app.include_router(owner_apps.router)
     app.include_router(panels.router)
     app.include_router(share.router)
     if settings.web_dir:

@@ -66,6 +66,14 @@ def _hosts(urls: list[str]) -> str:
 _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
     "google_read": _google,
     "google_proposed": lambda a: "preparou um email ou evento, que espera a aprovação da pessoa",
+    "apps_read": lambda a: (
+        f"leu no {', '.join(a.get('apps') or ['app'])} da pessoa"
+        + (f" ({', '.join(a['tools'][:3])})" if a.get("tools") else "")
+    ),
+    "apps_proposed": lambda a: (
+        f"preparou uma mudança no {', '.join(a.get('apps') or ['app'])}, que espera a aprovação "
+        "da pessoa"
+    ),
     "read_links": lambda a: "abriu e leu " + _hosts(a.get("opened") or a.get("urls") or []),
     "read_links_failed": lambda a: (
         "tentou abrir " + _hosts(a.get("urls") or []) + " e não conseguiu"
@@ -177,6 +185,10 @@ _AFFIRM = re.compile(
 )
 _TOPIC = {
     "google_read": re.compile(r"e-?mails?|gmail|caixa|agenda", re.IGNORECASE),
+    "apps_read": re.compile(
+        r"\bapps?\b|issues?|github|notion|slack|linear|trello|jira|p[áa]ginas?|canal|tarefas?",
+        re.IGNORECASE,
+    ),
     "read_links": re.compile(r"links?|site|p[áa]gina", re.IGNORECASE),
     "browsed": re.compile(r"site|p[áa]gina|pre[çc]o|voo|naveg", re.IGNORECASE),
     "read_attachments": re.compile(r"foto|arquivo|anexo|imagem|pdf", re.IGNORECASE),

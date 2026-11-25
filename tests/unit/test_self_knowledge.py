@@ -65,3 +65,8 @@ def test_the_manifest_tells_it_what_it_can_do_now():
     assert "conversa contínua" in said and "sem pedir aprovação" in said
     plain = "; ".join(Capabilities().actions())
     assert "num painel vivo" not in plain and "conversa contínua" not in plain
+
+
+def test_asked_about_its_apps_it_finds_where_the_connection_lives():
+    assert found("como eu conecto o notion em você?")[0] == "docs/APPS.md"
+    assert "docs/APPS.md" in found("onde fica guardada a conexão do composio?")

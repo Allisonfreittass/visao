@@ -44,6 +44,8 @@ class Capabilities:
     morning_briefing: str | None = None
     mac_projects: tuple[str, ...] = ()
     google: bool = False
+    # The owner's other apps connected through Composio, by name (docs/APPS.md, ADR-0028).
+    apps: tuple[str, ...] = ()
     # Devices that get a push with the app closed; None when this was not looked up.
     push_devices: int | None = None
     push_configured: bool = True
@@ -117,6 +119,12 @@ class Capabilities:
             items.append(
                 "ler o Gmail e a Google Agenda do interlocutor quando ele pergunta, e preparar "
                 "emails e eventos que só saem depois da aprovação dele"
+            )
+        if self.apps:
+            items.append(
+                f"ler o que está no {_and(self.apps)} do interlocutor quando ele pergunta, e "
+                "preparar mudanças que só saem depois da aprovação dele (apagar pelos apps está "
+                "desligado)"
             )
         if self.mac_projects:
             items.append(
@@ -269,13 +277,24 @@ class Capabilities:
         if not self.research_source:
             missing.append("pesquisa na internet")
         reach = ["arquivos fora dos projetos liberados no Mac" if self.mac_projects else "arquivos"]
-        reach.append(
-            "outras contas e mensagens" if self.google else "contas, email, agenda, mensagens"
-        )
+        if self.apps:
+            reach.append(
+                "contas que ele não conectou"
+                if self.google
+                else "contas que ele não conectou, email, agenda"
+            )
+        else:
+            reach.append(
+                "outras contas e mensagens" if self.google else "contas, email, agenda, mensagens"
+            )
         if not self.mac_projects:
             reach.append("dispositivos")
         missing.append("acesso a " + ", ".join(reach) + " do interlocutor")
         return missing
+
+
+def _and(names: tuple[str, ...]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " e " + names[-1]
 
 
 @dataclass(frozen=True)
@@ -292,6 +311,8 @@ class CapabilityInputs:
     browser: bool = False
     self_knowledge: bool = True
     continuous: bool = False
+    # Names of the apps connected through Composio; looked up by the caller (core/apps/account.py).
+    apps: tuple[str, ...] = ()
 
 
 def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) -> Capabilities:
@@ -332,6 +353,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
             select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
         )
         is not None,
+        apps=inputs.apps,
         mac_projects=tuple(
             sorted(
                 {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction, PanelOffer } from "../api";
+import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction, PanelOffer, ToolAction } from "../api";
 
 const POLL_MS = 15_000;
 
@@ -9,6 +9,8 @@ export interface Pending {
   armProposals: ArmTask[];
   /** Email to send or events to schedule, waiting for a yes. */
   googleActions: GoogleAction[];
+  /** Changes in the owner's other apps (Composio), waiting for a yes. */
+  toolActions: ToolAction[];
   /** After a live quote, the panel it offered to keep on the home screen. */
   panelOffers: PanelOffer[];
   goals: Goal[];
@@ -30,6 +32,7 @@ export interface Pending {
   decideArm: (task: ArmTask, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   decideGoal: (goal: Goal, decision: "approve" | "reject") => Promise<boolean>;
   decideGoogle: (action: GoogleAction, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
+  decideApp: (action: ToolAction, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   decidePanelOffer: (offer: PanelOffer, decision: "approve" | "reject", via?: "toque" | "voz") => Promise<boolean>;
   dismiss: (notice: AppNotification) => Promise<boolean>;
   reply: (notice: AppNotification, conversationId: string | null) => Promise<string | null>;
@@ -47,6 +50,7 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   const [tasks, setTasks] = useState<ArmTask[]>([]);
   const [google, setGoogle] = useState<GoogleAction[]>([]);
   const [offers, setOffers] = useState<PanelOffer[]>([]);
+  const [tools, setTools] = useState<ToolAction[]>([]);
   const [paused, setPausedState] = useState(false);
   // Bumped by every local change, so a poll that left before it cannot flip the ring back.
   const pauseVersion = useRef(0);
@@ -61,11 +65,14 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     if (!enabled) return;
     // An older server without panel offers answers 404: that is just none.
     const panelOffers = api.panelOffers().catch(() => [] as PanelOffer[]);
+    // Without the Composio key (or on an older server) there are none.
+    const appActions = api.appActions().catch(() => [] as ToolAction[]);
     // Only the ring reads the pause; an error here must not hide what waits.
     const asked = pauseVersion.current;
     api.autonomy().then((a) => { if (pauseVersion.current === asked) setPausedState(a.paused); }, () => undefined);
-    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions(), panelOffers])
-      .then(([g, n, d, t, o, p]) => {
+    Promise.all([api.approvals(), api.notifications(), api.armDevices(), api.armTasks(), api.googleActions(), panelOffers, appActions])
+      .then(([g, n, d, t, o, p, a]) => {
+        setTools(a);
         setOffers(p);
         setGoals(g);
         setNotifications(n);
@@ -108,13 +115,14 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
   return {
     armProposals,
     googleActions: google,
+    toolActions: tools,
     panelOffers: offers,
     goals,
     notices,
     devices,
     tasks,
-    count: armProposals.length + google.length + offers.length + goals.length + notices.length,
-    approvals: armProposals.length + google.length + offers.length + goals.length,
+    count: armProposals.length + google.length + tools.length + offers.length + goals.length + notices.length,
+    approvals: armProposals.length + google.length + tools.length + offers.length + goals.length,
     opening: openings.length > 0,
     paused,
     setPaused,
@@ -122,6 +130,7 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     decideArm: (task, decision, via) => act(() => api.decideArm(task.id, decision, via)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),
     decideGoogle: (action, decision, via) => act(() => api.decideGoogle(action.id, decision, via)),
+    decideApp: (action, decision, via) => act(() => api.decideApp(action.id, decision, via)),
     decidePanelOffer: (offer, decision, via) => act(() => api.decidePanelOffer(offer.id, decision, via)),
     dismiss: (notice) => act(() => api.markRead(notice.id)),
     reply: async (notice, conversationId) => {

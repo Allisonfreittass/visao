@@ -1112,6 +1112,34 @@ class GoogleAction(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ToolAction(Base):
+    """A change in one of the owner's apps (through Composio, docs/APPS.md) waiting for their
+    yes. The states of GoogleAction (core/apps/actions.py), plus which app, tool and version."""
+
+    __tablename__ = "tool_actions"
+    __table_args__ = (Index("ix_tool_actions_owner_status", "owner_user_id", "status"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[str] = mapped_column(String(32))  # write
+    # The arguments in full, the tool's name and description and its hints, as shown on the card.
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # proposed | sending | done | failed | rejected | expired | unknown (core/apps/actions.py)
+    status: Mapped[str] = mapped_column(String(16), default="proposed")
+    result: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    toolkit: Mapped[str] = mapped_column(String(60))
+    tool_slug: Mapped[str] = mapped_column(String(120))
+    # The tool's version when proposed; it runs at exactly this one.
+    tool_version: Mapped[str] = mapped_column(String(40))
+
+
 class PanelOffer(Base):
     """An offer, after a live quote, to keep it on the home screen and check the price daily.
     Only proposed: nothing is created until the owner says yes (docs/PAINEIS.md)."""

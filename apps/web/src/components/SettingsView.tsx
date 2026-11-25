@@ -5,6 +5,7 @@ import type { Api } from "../api";
 import { AccountPanel } from "./AccountPanel";
 import { BrainSettings } from "./BrainSettings";
 import { RoutingSettings } from "./RoutingSettings";
+import { AppsSettings } from "./AppsSettings";
 import { GoogleSettings } from "./GoogleSettings";
 import { PushToggle } from "./PushToggle";
 import { Setting } from "./Setting";
@@ -23,7 +24,7 @@ export const SECTIONS: { id: SectionId; title: string; icon: IconName; keywords:
   { id: "memoria", title: "Memória", icon: "notebook", keywords: "lembrar perguntas iniciais apresentação" },
   { id: "modelo", title: "Modelo", icon: "laptop", keywords: "nuvem local mac automático provedor ordem" },
   { id: "voz", title: "Voz e avisos", icon: "speaker", keywords: "falar ouvir ligação aprovar notificação silêncio horário" },
-  { id: "integracoes", title: "Integrações", icon: "plug", keywords: "google e-mail agenda gmail localização" },
+  { id: "integracoes", title: "Integrações", icon: "plug", keywords: "google e-mail agenda gmail localização apps composio notion github slack" },
   { id: "conta", title: "Conta", icon: "gear", keywords: "senha e-mail sair" },
 ];
 
@@ -323,6 +324,8 @@ export function SettingsView(props: SettingsViewProps) {
           <GoogleSettings api={api} onError={onError} />
         </section>
         )}
+
+        {show("integracoes") && <AppsSettings api={api} onError={onError} />}
 
         {show("memoria") && (
         <section className="settings-group" aria-labelledby="g-memoria">

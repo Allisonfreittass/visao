@@ -9,6 +9,7 @@ import { dayLabel } from "../labels";
 import { Icon } from "./Icon";
 import { brl, panelKnown } from "./PanelsBoard";
 import { MicButton } from "./SkyNav";
+import { argumentLines, cardText } from "../apps";
 
 export interface CallControls {
   state: AssistantState;
@@ -121,6 +122,14 @@ function firstAsk(pending: Pending): Ask | null {
       question: a.kind === "send_email" ? `Posso mandar este e-mail? ${a.summary}` : `Posso marcar isto? ${a.summary}`,
       meta: `pedido ${ago(utcDate(a.created_at))}`, after: a.kind === "send_email" ? "enviando agora" : "marcando agora",
       approve: () => pending.decideGoogle(a, "approve"), reject: () => pending.decideGoogle(a, "reject"),
+    };
+  }
+  const w = pending.toolActions[0];
+  if (w) {
+    return {
+      key: `app-${w.id}`, where: `no ${w.app}`, question: `Posso fazer isto? ${w.summary}`,
+      meta: `pedido ${ago(utcDate(w.created_at))}`, after: "fazendo agora",
+      approve: () => pending.decideApp(w, "approve"), reject: () => pending.decideApp(w, "reject"),
     };
   }
   const g = pending.goals[0];
@@ -336,6 +345,25 @@ export function InboxView({ api, call, onSend, pending, current, onReplied, onli
                 <div className="row">
                   <button type="button" className="primary" onClick={() => void pending.decideGoogle(a, "approve")}>Aprovar</button>
                   <button type="button" className="ghost" onClick={() => void pending.decideGoogle(a, "reject")}>Recusar</button>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+        {pending.toolActions.filter((a) => ask?.key !== `app-${a.id}`).length > 0 && (
+          <section className="list-group">
+            <h2 className="rotulo">Outros apps</h2>
+            {pending.toolActions.filter((a) => ask?.key !== `app-${a.id}`).map((a) => (
+              <article className="list-item" key={a.id}>
+                <div className="list-item-text">
+                  <strong>Posso fazer isto no {a.app}?</strong>
+                  <p className="note">{cardText(a)}</p>
+                  <p className="note pre google-body">{argumentLines(a.arguments)}</p>
+                  <time className="panel-time">{dayLabel(utcDate(a.created_at))}</time>
+                </div>
+                <div className="row">
+                  <button type="button" className="primary" onClick={() => void pending.decideApp(a, "approve")}>Aprovar</button>
+                  <button type="button" className="ghost" onClick={() => void pending.decideApp(a, "reject")}>Recusar</button>
                 </div>
               </article>
             ))}

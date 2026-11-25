@@ -10,7 +10,7 @@
 # and the Playwright driver (the live-page browser). Both stay in the installed way of running.
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 ROOT = Path(SPECPATH).parent
 
@@ -35,6 +35,8 @@ datas = [
     *tree("docs", {".md"}),
     *[item for folder in ("apps/api", "apps/worker", "arm", "core", "integrations", "infrastructure") for item in tree(folder, {".py"})],
     *tree("apps/web/src", {".ts", ".tsx", ".css"}),
+    # The Composio SDK names its own version in every request (docs/APPS.md).
+    *copy_metadata("composio"),
 ]
 
 hiddenimports = [
@@ -44,6 +46,9 @@ hiddenimports = [
     *collect_submodules("integrations"),
     *collect_submodules("infrastructure.database"),
     *collect_submodules("uvicorn"),
+    # Imported only inside integrations/composio/client.py, so named here (docs/APPS.md).
+    *collect_submodules("composio", filter=lambda name: ".integration_test" not in name),
+    *collect_submodules("composio_client"),
     "alembic.runtime.migration",
     "alembic.ddl.sqlite",
     "alembic.ddl.postgresql",
