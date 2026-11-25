@@ -57,6 +57,7 @@ import { parseMacCommand, parsePcCommand } from "./arm";
 import { registerWorker, syncSubscription } from "./push";
 import { loadPreference, loadToken, savePreference, saveToken } from "./session";
 import { AmbientBackground } from "./brand/AmbientBackground";
+import { argumentLines, cardText, spokenApp } from "./apps";
 import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, spokenPanelOffer, VOICE_ANSWER_MS } from "./voice/approval";
 import { followTurn } from "./stream";
 import { MAX_FILES } from "./attachments";
@@ -396,6 +397,22 @@ export function App() {
         spoken: spokenGoogle(a),
         decide: (d: "approve" | "reject", via: "toque" | "voz") =>
           pending.decideGoogle(a, d, via).then((ok) => {
+            if (ok && d === "approve") reloadRef.current();
+            return ok;
+          }),
+      })),
+    ...pending.toolActions
+      .filter((a) => a.conversation_id === current)
+      .map((a) => ({
+        id: a.id,
+        label: a.app,
+        text: cardText(a),
+        detail: argumentLines(a.arguments),
+        onApprove: () => void pending.decideApp(a, "approve").then(() => reloadRef.current()),
+        onReject: () => void pending.decideApp(a, "reject"),
+        spoken: spokenApp(a),
+        decide: (d: "approve" | "reject", via: "toque" | "voz") =>
+          pending.decideApp(a, d, via).then((ok) => {
             if (ok && d === "approve") reloadRef.current();
             return ok;
           }),

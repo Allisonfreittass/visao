@@ -353,6 +353,45 @@ export interface GoogleAction {
   created_at: string;
 }
 
+/** A change in one of the owner's other apps, through Composio, waiting for a yes (docs/APPS.md). */
+export interface ToolAction {
+  id: string;
+  toolkit: string;
+  tool: string;
+  version: string;
+  summary: string;
+  app: string;
+  tool_name: string;
+  description: string;
+  /** Every argument the tool will get, shown in full on the card. */
+  arguments: Record<string, unknown>;
+  status: string;
+  result: string;
+  conversation_id: string | null;
+  created_at: string;
+}
+
+/** Ajustes › Apps: off (no section) without the Composio key on the server. */
+export interface AppsState {
+  enabled: boolean;
+  notice: string;
+  connected: { toolkit: string; name: string; logo: string }[];
+  problem: string;
+  calls_this_month: number;
+  monthly_limit: number;
+  pending: ToolAction[];
+}
+
+export interface AppCatalogItem {
+  slug: string;
+  name: string;
+  description: string;
+  logo: string;
+  categories: string[];
+  /** Connects with Composio's own sign-in; the others need credentials of their own. */
+  managed: boolean;
+}
+
 /** After a live quote: keep it on the home screen and check the price daily (docs/PAINEIS.md). */
 export interface PanelOffer {
   id: string;
@@ -952,6 +991,35 @@ export class Api {
 
   decideGoogle(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<GoogleAction> {
     return this.request(`/google/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  }
+
+  apps(): Promise<AppsState> {
+    return this.request("/apps");
+  }
+
+  appsCatalog(): Promise<AppCatalogItem[]> {
+    return this.request("/apps/catalog");
+  }
+
+  appsConnect(slug: string): Promise<{ connection_id: string; url: string }> {
+    return this.request(`/apps/${encodeURIComponent(slug)}/connect`, { method: "POST" });
+  }
+
+  /** Resolves when the owner finished signing in on Composio's page (up to two minutes). */
+  appsWait(connectionId: string): Promise<AppsState> {
+    return this.request(`/apps/connections/${encodeURIComponent(connectionId)}/wait`, { method: "POST" });
+  }
+
+  appsDisconnect(slug: string): Promise<void> {
+    return this.request(`/apps/${encodeURIComponent(slug)}`, { method: "DELETE" });
+  }
+
+  appActions(): Promise<ToolAction[]> {
+    return this.request("/apps/actions");
+  }
+
+  decideApp(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<ToolAction> {
+    return this.request(`/apps/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
   }
 
   panels(): Promise<Panel[]> {
