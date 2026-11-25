@@ -1,22 +1,38 @@
-import type { ReactNode } from "react";
+import { type FocusEvent, type ReactNode, useState } from "react";
 
-import { Selo } from "../brand/Selo";
+import { CorvoClose } from "../brand/CorvoClose";
 
-/** The logged-out entrance: the seal on one side, the greeting and the form on the other.
- * `firstAccount`: on the owner's machine with nobody signed up, the form makes the account. */
+/** The fields the crow looks at: the ones you type into, not the checkbox or the buttons. */
+function campo(target: EventTarget | null): HTMLInputElement | null {
+  return target instanceof HTMLInputElement && target.type !== "checkbox" ? target : null;
+}
+
+/** The logged-out entrance: the crow in close on one side, the name, the greeting and the form on
+ * the other. `firstAccount`: the form makes the first account instead of signing in. */
 export function Entrance({ children, firstAccount = false }: { children: ReactNode; firstAccount?: boolean }) {
+  const [alvo, setAlvo] = useState<HTMLInputElement | null>(null);
+
+  function focou(event: FocusEvent) {
+    setAlvo(campo(event.target));
+  }
+
+  function saiu(event: FocusEvent) {
+    // Moving from one field to the next keeps him looking; leaving the fields lets the eye rest.
+    if (!campo(event.relatedTarget)) setAlvo(null);
+  }
+
   return (
     <main className="entrada">
-      <Selo className="entrada-selo" />
-      <section className="entrada-acesso" aria-labelledby="entrada-titulo">
-        <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Bem-vindo de volta."}</h1>
-        <p className="entrada-lede">Só você entra aqui. Ele lembra apenas do que você deixar.</p>
+      <div className="entrada-corvo">
+        <CorvoClose alvo={alvo} />
+      </div>
+      <section className="entrada-acesso" aria-labelledby="entrada-titulo" onFocus={focou} onBlur={saiu}>
+        <p className="entrada-marca">VISAO</p>
+        <div className="entrada-saudacao">
+          <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Bem-vindo de volta."}</h1>
+          <p className="entrada-lede">Só você entra aqui. Ele lembra apenas do que você deixar.</p>
+        </div>
         {children}
-        {firstAccount ? (
-          <p className="entrada-nota">Depois de criar a conta, ele te guia em quatro passos.</p>
-        ) : (
-          <p className="entrada-nota">Primeira vez? A conta é criada no servidor, com <code>python -m apps.api.cli create-user</code>. Depois de entrar, ele te guia em quatro passos.</p>
-        )}
       </section>
     </main>
   );

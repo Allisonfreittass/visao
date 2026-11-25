@@ -630,27 +630,93 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .mac-log + .note, .mac-log > .note { padding: 0 16px 12px; }
 @media (max-width: 899px) { .mac-split { grid-template-columns: 1fr; } }
 
-/* ---------- Entrada (login) com o selo ---------- */
-.entrada { position: fixed; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 80px; padding: 32px; overflow: auto; background: var(--bg); }
+/* ---------- Selo (VISAO sobre âmbar, material de marca) ---------- */
 .selo { position: relative; flex: none; aspect-ratio: 1; overflow: hidden; border-radius: 4.7%; background: #E39A2E; }
 .selo-nome { position: absolute; inset: 0; width: 100%; height: 100%; }
 .selo-nome text { font-family: var(--font-marca); font-size: 589px; fill: #C98019; }
 .selo-busto { position: absolute; left: -23.67%; top: 9.83%; width: 142.83%; height: auto; max-width: none; }
-.entrada-selo { width: min(600px, 44vw); }
-.entrada-acesso { width: min(360px, 100%); display: grid; gap: 18px; }
-.entrada-acesso h1 { margin: 0; font: 300 48px/1.05 var(--font-display); color: var(--text); }
-.entrada-lede { margin: 0; font: 400 15px/1.45 var(--font-sans); color: var(--text-muted); }
-.entrada .login { display: grid; gap: 14px; }
-.entrada .rs-campo input { background: var(--surface); }
-.login-entrar { width: 100%; height: 48px; border-radius: 24px; font-size: 15px; }
-.entrada .memory-toggle { display: flex; align-items: center; gap: 8px; font: 400 13px/1.3 var(--font-sans); color: var(--text-muted); }
-.entrada .login-erro, .entrada .login-aviso { margin: 0; font: 400 13px/1.4 var(--font-sans); color: var(--danger); }
-.entrada .login-aviso { color: var(--text-muted); }
-.entrada-nota { margin: 0; font: 400 11px/1.6 var(--font-mono); letter-spacing: .02em; color: var(--text-muted); }
+
+/* ---------- Entrada (login): o corvo em close à esquerda, o formulário à direita ----------
+ * Sempre em papel, qualquer que seja o tema: é a tela do mockup 01-login. O âmbar fica só no olho
+ * e no ponto de carregamento. */
+.entrada {
+  --e-papel: #F3F1EC; --e-tinta: #101214; --e-linha: #E3DFD6; --e-cinza: #5B6066; --e-erro: #B8432F; --e-ambar: #E39A2E;
+  position: fixed; inset: 0; z-index: 2; display: flex; overflow: auto; color-scheme: light;
+  background: var(--e-papel); color: var(--e-tinta);
+}
+.entrada-corvo { flex: 0 0 52.78%; min-height: 100%; overflow: hidden; } /* 760 de 1440, como no mockup */
+.entrada-corvo svg { display: block; width: 100%; height: 100%; }
+.corvo-close-pupila { transition: transform 350ms cubic-bezier(.2, .8, .2, 1); }
+@media (prefers-reduced-motion: reduce) { .corvo-close-pupila { transition: none; transform: none !important; } }
+.entrada-acesso {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 22px;
+  padding: 48px 24px; border-left: 1px solid var(--e-linha);
+}
+.entrada-acesso > * { width: 100%; max-width: 380px; }
+.entrada-marca { margin: 0; font: 400 64px/.8 var(--font-marca); letter-spacing: .03em; color: var(--e-tinta); }
+.entrada-saudacao { display: grid; gap: 10px; margin-top: 18px; }
+.entrada-acesso h1 { margin: 0; font: 300 46px/1.05 var(--font-display); color: var(--e-tinta); text-wrap: balance; }
+.entrada-lede { margin: 0; font: 400 16px/1.55 var(--font-sans); color: var(--e-cinza); }
+
+.entrada .login { display: grid; gap: 22px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.entrada .rs-campo { gap: 8px; }
+.entrada .rs-campo label { font: 500 14px/1.3 var(--font-sans); color: var(--e-tinta); }
+.entrada .rs-campo input {
+  height: 52px; min-height: 52px; padding: 0 16px; border: 1.5px solid var(--e-linha); border-radius: 12px;
+  background: #FFFFFF; color: var(--e-tinta); font: 400 16px/1 var(--font-sans);
+}
+.entrada .rs-campo input:hover { border-color: #CFCAC0; }
+.entrada .rs-campo input:focus-visible { outline: none; border-color: var(--e-tinta); background: #FFFFFF; box-shadow: 0 0 0 1px var(--e-tinta); }
+.entrada .rs-campo[data-estado="erro"] input { border-color: var(--e-erro); }
+.entrada .rs-campo[data-estado="erro"] input:focus-visible { box-shadow: 0 0 0 1px var(--e-erro); }
+.entrada .rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--e-cinza); }
+.entrada .rs-campo[data-estado="erro"] small[role="alert"] { color: var(--e-erro); font-weight: 500; }
+.entrada .memory-toggle { display: flex; align-items: center; gap: 10px; margin-top: -6px; font: 400 14px/1.3 var(--font-sans); color: var(--e-cinza); cursor: pointer; }
+.entrada .memory-toggle input { width: 16px; height: 16px; margin: 0; accent-color: var(--e-tinta); }
+.entrada .login-erro { margin: 0; font: 500 14px/1.45 var(--font-sans); color: var(--e-erro); text-wrap: pretty; }
+.entrada .login-aviso { margin: 0; font: 400 14px/1.5 var(--font-sans); color: var(--e-cinza); text-wrap: pretty; }
+.entrada .login-aviso code { font: 400 12.5px/1.5 var(--font-mono); color: var(--e-tinta); overflow-wrap: anywhere; }
+
+.login-entrar {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 54px;
+  border: 0; border-radius: 27px; background: var(--e-tinta, #101214); color: var(--e-papel, #F3F1EC);
+  font: 500 16px/1 var(--font-sans); cursor: pointer; transition: background-color 150ms ease, transform 120ms ease;
+}
+.login-entrar:hover:not(:disabled) { background: #2A2E33; }
+.login-entrar:active:not(:disabled) { transform: scale(.985); }
+.login-entrar:focus-visible { outline: 2px solid var(--e-tinta, #101214); outline-offset: 3px; }
+.login-entrar:disabled { opacity: 1; cursor: progress; }
+.login-pulso { width: 8px; height: 8px; border-radius: 50%; background: var(--e-ambar, #E39A2E); animation: login-pulso 1.1s ease-in-out infinite; }
+@keyframes login-pulso { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .login-pulso { animation: none; } }
+
+.login-links { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.login-link {
+  min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 0;
+  font: 400 14px/1.4 var(--font-sans); color: var(--e-tinta, #101214);
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer;
+}
+.login-link:hover { text-decoration-thickness: 2px; }
+.login-link:focus-visible { outline: 2px solid var(--e-tinta, #101214); outline-offset: 3px; }
+.entrada .login--fora { display: grid; gap: 22px; }
+
 @media (max-width: 899px) {
-  .entrada { flex-direction: column; justify-content: flex-start; gap: 24px; padding: 24px 16px; }
-  .entrada-selo { width: min(320px, 70vw); }
-  .entrada-acesso h1 { font-size: 36px; }
+  .entrada { flex-direction: column; }
+  .entrada-corvo { flex: 0 0 auto; height: 380px; min-height: 0; }
+  /* Mais largo que a tela e preso à direita: o corvo fica em close e sangra pela esquerda. */
+  .entrada-corvo svg { width: 112%; margin-left: -12%; }
+  .entrada-acesso {
+    flex: 1 0 auto; justify-content: flex-start; gap: 20px; border-left: 0; border-top: 1px solid var(--e-linha);
+    padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  }
+  .entrada-marca { font-size: 52px; }
+  .entrada-saudacao { margin-top: 8px; }
+  .entrada-acesso h1 { font-size: 38px; }
+  .entrada-lede { font-size: 15px; }
+  .entrada .login { gap: 18px; }
+}
+@media (max-width: 899px) and (max-height: 700px) {
+  .entrada-corvo { height: 300px; }
 }
 
 /* ---------- Primeira vez (4 passos) ---------- */
