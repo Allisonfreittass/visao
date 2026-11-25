@@ -16,6 +16,7 @@ NOT_FORWARDED = {
     "VISION_STT_MODELS_DIR",
     "VISION_WORKER_IN_API",
     "VISION_WEB_DIR",
+    "VISION_BROWSER_SANDBOX",  # the edge has no local Chromium
 }
 
 

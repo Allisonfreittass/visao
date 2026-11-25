@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     # (ws://browser:3000/) or, locally, a Chromium to launch. Neither set: no live pages.
     browser_ws_url: str | None = None
     browser_executable_path: str | None = None
+    # The local Chromium runs inside bubblewrap (Linux) or sandbox-exec (macOS), without the app's
+    # keys and without the home folder (ADR-0026). Off only on purpose; the container ignores it.
+    browser_sandbox: bool = True
     browser_max_pages: int = Field(default=4, ge=1, le=8)
     browser_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
     # Live panels on the home screen (docs/PAINEIS.md): how many at once, pages per daily check

@@ -144,7 +144,7 @@ usados e saírem da memória depois**.
 | 3 | API servindo o site e um comando `visao` (iniciar, parar, estado). **Feito** (`VISION_WEB_DIR`, `apps/visao_cli.py`) | médio |
 | 4 | Navegador e voz carregados sob demanda e descarregados depois de parados. **Feito**: a voz sai da memória depois de 10 min sem uso (`VISION_VOICE_IDLE_MINUTES`); o navegador já abria e fechava a cada leitura | médio |
 | 5 | Instalador nos moldes do Hermes e do braço: um script que instala o `uv`, o Visão em `~/.visao` e um serviço do launchd (Mac) ou do systemd do usuário (Linux). **Feito** (`scripts/instalar.sh`, `visao servico`, [INSTALAR.md](../INSTALAR.md)): 21 s numa máquina com o cache do uv, testado aqui com o systemd de verdade | médio |
-| 6 | Isolar o navegador sem Docker: o Chromium como processo separado, sem as chaves no ambiente, dentro do `sandbox-exec` no Mac e do `bubblewrap` no Linux, que o braço já usa | médio, pede ADR |
+| 6 | Isolar o navegador sem Docker: o Chromium como processo separado, sem as chaves no ambiente, dentro do `sandbox-exec` no Mac e do `bubblewrap` no Linux, que o braço já usa. **Feito** ([ADR-0026](../decisions/0026-navegador-isolado-sem-docker.md), `VISION_BROWSER_SANDBOX`): testado aqui com o bubblewrap de verdade; o sandbox-exec ainda não num Mac | médio, pede ADR |
 | 7 | Mais tarde, se quiser um app de Mac: o servidor congelado (PyInstaller no modo pasta, não arquivo único) dentro de um app Tauri. Pede assinatura da Apple (US$ 99 por ano) | grande |
 
 As etapas 1 a 4 também deixam o servidor na nuvem mais leve. Elas valem para a migração para a
