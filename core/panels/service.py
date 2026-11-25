@@ -26,7 +26,7 @@ from core.initiatives import push
 from core.initiatives.notify import deliver_after
 from core.panels import urls
 from core.panels.extract import RECHECK_PURPOSE, Page, extract
-from core.panels.model import Item, Snapshot, Spec, goal_gap, total
+from core.panels.model import Item, Snapshot, Spec, goal_gap, missing, partial, total
 from core.policies.autonomy import is_paused
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import (
@@ -423,6 +423,43 @@ def gap_words(gap: Decimal | None, goal: Decimal | None) -> str | None:
     return f"exatamente na meta de {money(goal)}"
 
 
+KIND_WORDS = {"flight": "voo", "hotel": "hospedagem"}
+
+
+def missing_words(kinds: list[str]) -> str:
+    words = [KIND_WORDS.get(k, k) for k in kinds]
+    return " e ".join(words)
+
+
+def goal_line(
+    value: Decimal | None,
+    goal: Decimal | None,
+    gap: Decimal | None,
+    sum_so_far: Decimal | None,
+    lacking: list[str],
+) -> str | None:
+    """The goal in words. With the total: how far from the goal. With only part of the quote:
+    the partial against the goal and what is left of it for what is still missing, never the
+    price of one item as if it were the package."""
+    if value is not None:
+        return gap_words(gap, goal)
+    if goal is None:
+        return None
+    if sum_so_far is None:
+        return f"meta de {money(goal)}"
+    left = goal - sum_so_far
+    what = missing_words(lacking) or "o resto"
+    if left >= 0:
+        return (
+            f"parcial de {money(sum_so_far)} na meta de {money(goal)}: sobram {money(left)} "
+            f"para {what}"
+        )
+    return (
+        f"parcial de {money(sum_so_far)} já passa a meta de {money(goal)} em {money(-left)}, "
+        f"e ainda falta {what}"
+    )
+
+
 def card(
     session: Session,
     panel: Panel,
@@ -449,6 +486,8 @@ def card(
         owner, panel.checked_at
     ) == local_today(owner, now)
     items: list[Item] = snapshot.items if snapshot else []
+    so_far = partial(snapshot, spec) if snapshot and value is None else None
+    lacking = missing(snapshot, spec) if value is None else []
     return {
         "id": panel.id,
         "kind": panel.kind,
@@ -458,6 +497,11 @@ def card(
         "total": value,
         "goal": spec.goal,
         "goal_gap": goal_gap(value, spec),
+        # Only while the total is "a confirmar": the items already priced, and what is missing.
+        "partial": so_far,
+        "missing": lacking,
+        "quoted": sum(1 for i in items if i.price is not None),
+        "goal_words": goal_line(value, spec.goal, goal_gap(value, spec), so_far, lacking),
         "change": (value - previous) if value is not None and previous is not None else None,
         "items": [{**i.model_dump(mode="json"), "cost": i.cost(spec.travelers)} for i in items],
         "checked_at": panel.checked_at,

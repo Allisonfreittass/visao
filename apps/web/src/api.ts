@@ -454,6 +454,10 @@ export interface Panel {
   goal: string | null;
   goal_gap: string | null;
   goal_words: string | null;
+  /** While the total is "a confirmar": the sum of the items already priced (server math). */
+  partial?: string | null;
+  /** What the quote wants and still has no price ("flight", "hotel"). */
+  missing?: string[];
   change: string | null;
   items: PanelItem[];
   checked_at: string | null;

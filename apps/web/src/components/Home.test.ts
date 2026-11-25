@@ -31,11 +31,20 @@ describe("Início", () => {
   });
 
   it("shows what is already known on a panel", () => {
-    expect(panelKnown({ total: null, items: [] })).toEqual({ amount: "—", tag: "Faltam dados", missingData: true });
+    expect(panelKnown({ total: null, items: [] })).toEqual({ amount: "—", tag: "Faltam dados", missingData: true, sub: null });
     const partial = panelKnown({ total: null, items: [item("hotel", "164"), item("flight", null)] });
-    expect(partial.amount).toMatch(/164 \+ voo$/);
-    expect(partial.tag).toBe("Voo a confirmar");
+    expect(partial.amount).toMatch(/164 parcial$/);
+    expect(partial.tag).toBe("Falta voo");
+    expect(partial.sub).toBe("total parcial: 1 de 2 itens cotados, falta cotar voo");
     expect(panelKnown({ total: "500", items: [item("hotel", "500")] }).tag).toBeNull();
+  });
+
+  it("never shows one item's price as the package total (Pacote Santiago)", () => {
+    // Only the hotel came back; the flight is not even in the list. The server says what is missing.
+    const santiago = panelKnown({ total: null, items: [item("hotel", "1640")], partial: "1640.00", missing: ["flight"] });
+    expect(santiago.amount.replace(/\s/g, " ")).toBe("R$ 1.640 parcial");
+    expect(santiago.tag).toBe("Falta voo");
+    expect(santiago.sub).toBe("total parcial: 1 de 2 itens cotados, falta cotar voo");
   });
 
   it("puts the right sensor on a step", () => {

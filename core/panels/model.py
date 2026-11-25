@@ -99,6 +99,19 @@ def total(snapshot: Snapshot, spec: Spec) -> Decimal | None:
     return sum(costs, Decimal(0)).quantize(Decimal("0.01"))  # type: ignore[arg-type]
 
 
+def partial(snapshot: Snapshot, spec: Spec) -> Decimal | None:
+    """The sum of the items already priced, for the party; None when none has a price. Never
+    the total: a panel with a missing item shows this as "parcial" beside what is missing."""
+    costs = [c for c in (i.cost(spec.travelers) for i in snapshot.items) if c is not None]
+    return sum(costs, Decimal(0)).quantize(Decimal("0.01")) if costs else None
+
+
+def missing(snapshot: Snapshot | None, spec: Spec) -> list[ItemKind]:
+    """What the quote wants and still has no price: an item not found, or found without one."""
+    priced = {i.kind for i in (snapshot.items if snapshot else []) if i.price is not None}
+    return [kind for kind in spec.include if kind not in priced]
+
+
 def goal_gap(value: Decimal | None, spec: Spec) -> Decimal | None:
     """Positive: above the goal by that much; negative: below it. None without a goal or total."""
     if value is None or spec.goal is None:

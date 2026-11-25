@@ -29,18 +29,36 @@ export function checkedLabel(panel: Pick<Panel, "checked_at" | "checked_today">)
   return `conferido em ${at.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}, ${time} · não conferido hoje`;
 }
 
-/** What is already known about a panel: the total, or the sum of the prices it has with what is
- * still missing ("R$ 164 + voo"); a grey tag for what is pending; whether data is missing. */
-export function panelKnown(panel: Pick<Panel, "total" | "items">): { amount: string; tag: string | null; missingData: boolean } {
-  if (panel.items.length === 0) return { amount: "—", tag: "Faltam dados", missingData: true };
+const KIND_WORD: Record<string, string> = { flight: "voo", hotel: "hospedagem" };
+
+/** What is already known about a panel: the total, or, with part of the quote priced, the
+ * partial labelled as partial with what is still missing ("R$ 1.640 parcial", "falta voo"). The
+ * price of one item never shows as the package's total. */
+export function panelKnown(panel: Pick<Panel, "total" | "items"> & Partial<Pick<Panel, "partial" | "missing">>): {
+  amount: string;
+  tag: string | null;
+  missingData: boolean;
+  sub: string | null;
+} {
+  if (panel.items.length === 0) return { amount: "—", tag: "Faltam dados", missingData: true, sub: null };
   const total = brl(panel.total);
-  const open = panel.items.filter((i) => i.cost === null);
-  const known = panel.items.reduce((sum, i) => (i.cost === null ? sum : sum + Number(i.cost)), 0);
-  const missing = [...new Set(open.map((i) => (i.kind === "flight" ? "voo" : "hospedagem")))];
-  if (total && open.length === 0) return { amount: total, tag: null, missingData: false };
-  const tag = missing.length === 1 ? `${missing[0] === "voo" ? "Voo" : "Hospedagem"} a confirmar` : "Preços a confirmar";
-  const amount = known > 0 ? `${brl(String(known))} + ${missing.join(" + ")}` : "a confirmar";
-  return { amount, tag, missingData: false };
+  const priced = panel.items.filter((i) => i.cost !== null);
+  if (total && priced.length === panel.items.length && !(panel.missing ?? []).length) {
+    return { amount: total, tag: null, missingData: false, sub: null };
+  }
+  const missingKinds = panel.missing ?? [...new Set(panel.items.filter((i) => i.cost === null).map((i) => i.kind))];
+  const missing = missingKinds.map((k) => KIND_WORD[k] ?? k);
+  const known = panel.partial ?? (priced.length ? String(priced.reduce((sum, i) => sum + Number(i.cost), 0)) : null);
+  const what = missing.length ? missing.join(" e ") : "preços";
+  const tag = `Falta ${what}`;
+  if (!known || Number(known) <= 0) return { amount: "a confirmar", tag: "Preços a confirmar", missingData: false, sub: null };
+  const wanted = priced.length + missingKinds.filter((k) => !priced.some((i) => i.kind === k)).length;
+  return {
+    amount: `${brl(known)} parcial`,
+    tag,
+    missingData: false,
+    sub: `total parcial: ${priced.length} de ${wanted} ${wanted === 1 ? "item cotado" : "itens cotados"}, falta cotar ${what}`,
+  };
 }
 
 function monogram(provider: string): string {
@@ -85,6 +103,7 @@ function PanelCard({ api, panel, onChanged, onDraft }: { api: Api; panel: Panel;
           {panel.status === "paused" ? <span className="tag">Pausado</span> : known.tag && <span className="tag">{known.tag}</span>}
         </span>
         <span className="live-panel-total" key={panel.total ?? "x"}>{known.amount}</span>
+        {known.sub && <span className="live-panel-sub">{known.sub}</span>}
         {panel.spec.travelers && panel.spec.travelers > 1 && <span className="live-panel-sub">total para {panel.spec.travelers}</span>}
         {assumedLine(panel.spec.assumed) && <span className="live-panel-sub">{assumedLine(panel.spec.assumed)}</span>}
         {panel.goal_words && <span className={`live-panel-goal${below ? " live-panel-goal--below" : ""}`}>{panel.goal_words}</span>}

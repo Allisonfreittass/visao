@@ -220,7 +220,7 @@ def _panels(
         item = {
             "painel": panel.title,
             "total": panels.money(shown["total"]) if shown["total"] is not None else "a confirmar",
-            "meta": panels.gap_words(shown["goal_gap"], shown["goal"]),
+            "meta": shown["goal_words"],
             "abaixo_da_meta_agora": below,
             "conferido": intentions.local(owner, shown["checked_at"])
             if shown["checked_at"]

@@ -59,8 +59,13 @@ class PanelOut(BaseModel):
     total: Decimal | None
     goal: Decimal | None
     goal_gap: Decimal | None
-    # "R$ 555 acima da meta de R$ 6.000", computed here.
+    # "R$ 555 acima da meta de R$ 6.000", or, with part of the quote, "parcial de R$ 164 na meta
+    # de R$ 4.000: sobram R$ 3.836 para voo"; computed here.
     goal_words: str | None
+    # While the total is "a confirmar": the sum of what is priced and what still has no price.
+    partial: Decimal | None = None
+    missing: list[str] = []
+    quoted: int = 0
     change: Decimal | None
     items: list[ItemOut]
     checked_at: datetime | None
@@ -116,7 +121,7 @@ def offer_out(offer: PanelOffer, panel_id: uuid.UUID | None = None) -> OfferOut:
 
 def panel_out(db, panel: Panel, user, limits: panels.Limits) -> PanelOut:
     shown = panels.card(db, panel, user, limits=limits)
-    return PanelOut(**shown, goal_words=panels.gap_words(shown["goal_gap"], shown["goal"]))
+    return PanelOut(**shown)
 
 
 def _own(db, user_id: uuid.UUID, panel_id: uuid.UUID) -> Panel:

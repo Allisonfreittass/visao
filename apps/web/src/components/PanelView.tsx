@@ -90,6 +90,7 @@ export function PanelView({ api, onBack, onDraft, onError }: PanelViewProps) {
   const known = panelKnown(panel);
   const travelers = panel.spec.travelers;
   const sub = [
+    known.sub,
     travelers ? `total para ${travelers}` : null,
     panel.spec.depart && panel.spec.back ? `${panel.spec.depart} a ${panel.spec.back}` : null,
     panel.goal ? `meta ${brl(panel.goal)}` : null,

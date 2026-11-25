@@ -96,9 +96,25 @@ def offer_block(goal: Decimal | None) -> str:
     )
 
 
-def ready_block(title: str, total: str | None, gap: str | None) -> str:
-    """For the reply right after the panel was created from the owner's yes."""
-    numbers = f" Total agora: {total}." if total else " Os preços ainda estão a confirmar."
+def ready_block(
+    title: str,
+    total: str | None,
+    gap: str | None,
+    *,
+    partial: str | None = None,
+    missing: str = "",
+) -> str:
+    """For the reply right after the panel was created from the owner's yes. With only part of
+    the quote priced, the partial goes as partial, with what is missing: never as the total."""
+    if total:
+        numbers = f" Total agora: {total}."
+    elif partial:
+        numbers = (
+            f" Total parcial, só do que já foi cotado: {partial}; falta cotar "
+            f"{missing or 'o resto'}. Não chame esse valor de total do pacote."
+        )
+    else:
+        numbers = " Os preços ainda estão a confirmar."
     distance = f" {gap}." if gap else ""
     return (
         f"A pessoa aceitou, e o painel “{title}” já está no Início, com a cotação lida ao vivo."

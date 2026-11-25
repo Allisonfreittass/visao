@@ -482,7 +482,11 @@ def run_turn(
                 panel_offers.ready_block(
                     created.title,
                     panels.money(shown["total"]) if shown["total"] is not None else None,
-                    panels.gap_words(shown["goal_gap"], shown["goal"]),
+                    shown["goal_words"],
+                    partial=panels.money(shown["partial"])
+                    if shown["partial"] is not None
+                    else None,
+                    missing=panels.missing_words(shown["missing"]),
                 )
             )
 
@@ -528,9 +532,7 @@ def run_turn(
                         target.title,
                         changed,
                         rechecked,
-                        goal=panels.gap_words(shown["goal_gap"], shown["goal"])
-                        if "a meta" in changed
-                        else None,
+                        goal=shown["goal_words"] if "a meta" in changed else None,
                         every_hours=shown["watch_every_hours"] if "a meta" in changed else None,
                     )
                 )
