@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import { Genesis } from "../muninn/Genesis";
-import { T_CURTA } from "../muninn/genesis";
+import { T_CURTA } from "../muninn/genesis.logic";
 import { loadPreference, savePreference } from "../session";
 
 /** How long the opening lasts, end to end. */

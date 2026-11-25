@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     artifact_max_output_tokens: int = Field(default=4096, ge=256)
     # A real browser for live pages (docs/NAVEGADOR.md): the address of the `browser` container
     # (ws://browser:3000/) or, locally, a Chromium to launch. Neither set: no live pages.
+    # The first account made on a screen, on the owner's machine (ADR-0027): only from
+    # 127.0.0.1 and only while nobody is signed up. Turned on by `visao` and the Mac app.
+    first_run_setup: bool = False
     browser_ws_url: str | None = None
     browser_executable_path: str | None = None
     # The local Chromium runs inside bubblewrap (Linux) or sandbox-exec (macOS), without the app's

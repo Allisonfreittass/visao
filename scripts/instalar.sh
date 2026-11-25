@@ -121,10 +121,9 @@ say "Pronto"
 if [ "$fresh_env" = 1 ]; then
   echo "Falta preencher o modelo em $code/.env (o bloco VISION_LLM_*, docs/MODEL_SELECTION.md)."
 fi
-echo "Crie o seu usuário:  visao conta criar --email voce@exemplo.com"
 if [ "$with_service" = 1 ]; then
-  echo "Depois:              visao parar && visao iniciar   (para ler o .env novo)"
+  echo "Depois:  visao parar && visao iniciar   (para ler o .env novo)"
 else
-  echo "Depois:              visao iniciar --fundo"
+  echo "Depois:  visao iniciar --fundo"
 fi
-echo "E abra:              http://127.0.0.1:8000"
+echo "E abra:  http://127.0.0.1:8000   (na primeira vez, a tela cria a sua conta)"

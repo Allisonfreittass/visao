@@ -532,6 +532,24 @@ export class Api {
     return data.access_token;
   }
 
+  /** True only on the owner's machine while nobody is signed up yet (ADR-0027). */
+  async firstRunNeeded(signal?: AbortSignal): Promise<boolean> {
+    const data = await this.request<{ needed: boolean }>("/auth/first-run", { signal });
+    return data.needed;
+  }
+
+  /** The first account and the agent's genesis, made on the first-use screen. */
+  async firstRun(email: string, password: string, signal?: AbortSignal): Promise<string> {
+    const data = await this.request<{ access_token: string }>("/auth/first-run", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+      headers: { "Content-Type": "application/json" },
+      signal,
+    });
+    this.token = data.access_token;
+    return data.access_token;
+  }
+
   health(): Promise<{ status: string }> {
     return this.request("/health");
   }

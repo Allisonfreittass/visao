@@ -18,7 +18,7 @@ import {
   pedir,
   proximaTroca,
   voo,
-} from "./nanorrobos";
+} from "./nanorrobos.logic";
 
 describe("the shape a step asks for", () => {
   it("is the tool of a real kind", () => {

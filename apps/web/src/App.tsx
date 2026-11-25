@@ -183,6 +183,8 @@ export function App() {
   const [demoState, setDemoState] = useState<AnelEstado>("ocioso");
   // The login is checking the credentials: the ring on the entrance shows "pensando".
   const [, setLoginBusy] = useState(false);
+  // On the owner's machine with nobody signed up, the entrance makes the first account (ADR-0027).
+  const [firstAccount, setFirstAccount] = useState(false);
   const demoLevel = useDemoLevel(demo && demoState === "ouvindo");
   const sendingRef = useRef(false);
   const queueRef = useRef<{ id: string; text: string; files: Attachment[]; replyTo: Message | null }[]>([]);
@@ -1231,11 +1233,12 @@ export function App() {
       <Toast message={toast} />
 
       {!firstRun && !ready && !loggedIn && !demo && (
-        <Entrance>
+        <Entrance firstAccount={firstAccount}>
           <Login
             api={api}
             online={online}
             onBusyChange={setLoginBusy}
+            onFirstAccount={setFirstAccount}
             onLoggedIn={(token, remember) => {
               saveToken(token, remember);
               setLoggedIn(true);

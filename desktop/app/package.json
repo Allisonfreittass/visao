@@ -1,0 +1,12 @@
+{
+  "name": "visao-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "O Visão como app de Mac: o servidor congelado dentro de um app Tauri (docs/APP_MAC.md).",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}

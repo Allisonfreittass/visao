@@ -45,3 +45,33 @@ def test_the_database_label_never_shows_the_password():
         "db.exemplo.com:5432/visao"
     )
     assert cli._database_label("sqlite:///./dev.db") == "./dev.db"
+
+
+def test_a_config_of_its_own_with_a_new_key_and_the_database_outside_the_code(tmp_path):
+    example = tmp_path / ".env.example"
+    example.write_text("VISION_SECRET_KEY=\nVISION_DATABASE_URL=sqlite:///./dev.db\nOUTRA=1\n")
+    target = tmp_path / "home" / ".env"
+    cli.criar_config(example, target, tmp_path / "home" / "dados" / "visao.db")
+    lines = target.read_text().splitlines()
+    assert len(lines[0]) > len("VISION_SECRET_KEY=") + 40
+    assert lines[1] == f"VISION_DATABASE_URL=sqlite:///{tmp_path}/home/dados/visao.db"
+    assert lines[2] == "OUTRA=1"
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert (tmp_path / "home" / "dados").is_dir()
+
+
+def test_frozen_in_the_app_it_keeps_the_config_in_its_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("VISAO_HOME", str(tmp_path / ".visao"))
+    environ: dict[str, str] = {}
+    cli._frozen_config(environ)
+    assert environ["VISION_ENV_FILE"] == str(tmp_path / ".visao" / ".env")
+    written = (tmp_path / ".visao" / ".env").read_text()
+    assert f"sqlite:///{tmp_path}/.visao/dados/visao.db" in written
+    cli._frozen_config(environ)  # the second start keeps it
+    assert (tmp_path / ".visao" / ".env").read_text() == written
+
+
+def test_it_runs_itself_again_with_or_without_python(monkeypatch):
+    assert cli.self_command()[1:] == ["-m", "apps.visao_cli"]
+    monkeypatch.setattr(cli, "FROZEN", True)
+    assert cli.self_command() == [cli.sys.executable]

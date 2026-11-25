@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MARKS, T, T_CURTA, flash, flashOf, gapFlash, litHour, markProgress, revealProgress, strokeProgress, strokeStart, thinkingBoost } from "./genesis";
+import { MARKS, T, T_CURTA, flash, flashOf, gapFlash, litHour, markProgress, revealProgress, strokeProgress, strokeStart, thinkingBoost } from "./genesis.logic";
 
 describe("genesis timeline", () => {
   it("draws the strokes in order between 0.4 s and 6.4 s", () => {

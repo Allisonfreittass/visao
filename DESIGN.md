@@ -183,7 +183,7 @@ A animação é onde o Visão se diferencia. Regras (base: skills `emil-design-e
 
 Só na ligação (`CallView`), onde o Muninn já é grande: quando ele usa uma ferramenta, as
 partículas do corpo dele viram a forma dela e voltam a ser o corvo quando termina. Código em
-`apps/web/src/muninn/` (`nanorrobos.ts` puro e testado, `Nanorrobos.tsx` o canvas,
+`apps/web/src/muninn/` (`nanorrobos.logic.ts` puro e testado, `Nanorrobos.tsx` o canvas,
 `MuninnDaLigacao.tsx` a escolha da forma).
 
 - **De onde vem a forma.** Cada passo do turno (`core/conversation/progress.py`, no `/progress` e

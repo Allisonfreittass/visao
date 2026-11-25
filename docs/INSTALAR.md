@@ -28,10 +28,10 @@ para o Visão.
 ## Depois de instalar
 
 1. Preencha o bloco `VISION_LLM_*` em `~/.visao/visao/.env` ([MODEL_SELECTION.md](MODEL_SELECTION.md)).
-2. Crie o seu usuário (a senha é pedida no terminal) e faça a gênese:
-   `visao conta criar --email voce@exemplo.com`
-3. Reinicie para ler o `.env` novo: `visao parar && visao iniciar`.
-4. Abra http://127.0.0.1:8000.
+2. Reinicie para ler o `.env` novo: `visao parar && visao iniciar`.
+3. Abra http://127.0.0.1:8000: na primeira vez, a tela de entrar cria a sua conta e faz a gênese
+   ([ADR-0027](decisions/0027-app-de-mac.md)). Pelo terminal também dá:
+   `visao conta criar --email voce@exemplo.com`.
 
 ## O serviço
 

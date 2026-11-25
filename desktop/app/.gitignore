@@ -1,0 +1,5 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+# The frozen server (PyInstaller), built by desktop/construir.sh.
+servidor/

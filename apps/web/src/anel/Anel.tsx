@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ART, EYE, MARKS, RING, litHour, markAngle } from "../muninn/genesis";
+import { ART, EYE, MARKS, RING, litHour, markAngle } from "../muninn/genesis.logic";
 import { ANEL_LABELS, type AnelEstado, anelForma } from "./state";
 import "./anel.css";
 
