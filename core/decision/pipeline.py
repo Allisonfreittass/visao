@@ -15,6 +15,9 @@ from sqlalchemy.orm import Session
 
 from core import actions as app_actions
 from core import browse, location, owner_goals, projects
+from core.apps import account as apps_account
+from core.apps import actions as apps_actions
+from core.apps import assist as apps_assist
 from core.arm import intent as mac_intent
 from core.arm import screen
 from core.autonomy import continuity
@@ -93,6 +96,9 @@ class TurnConfig:
     web_search: bool = False
     # VISION_SECRET_KEY, to open the owner's Google connection (docs/GOOGLE.md); None: no Google.
     google_secret: str | None = None
+    # VISION_COMPOSIO_API_KEY, for the owner's other apps (docs/APPS.md); None: no apps.
+    apps_key: str | None = None
+    apps_monthly_calls: int = 8000
     # Live pages per turn (docs/NAVEGADOR.md); the browser itself comes with run_turn.
     browse_max_pages: int = 4
     # Live panels (docs/PAINEIS.md).
@@ -291,6 +297,45 @@ def run_turn(
                 waiting.extend(
                     f"deixei esperando o seu Aprovar: {google_actions.describe(a)}"
                     for a in helped.proposed
+                )
+
+    if config.apps_key and config.google_secret:
+        recent = "\n".join(
+            f"{m.role}: {m.content[:300]}" for m in context_history(session, conversation)[-6:]
+        )
+        used = apps_assist.run(
+            session,
+            owner=owner,
+            conversation=conversation,
+            text=text,
+            recent=recent,
+            provider=provider,
+            budgets=config.budgets,
+            apps=apps_account.client(config.apps_key),
+            secret_key=config.google_secret,
+            monthly_limit=config.apps_monthly_calls,
+        )
+        if used is not None:
+            blocks.append(used.block)
+            if used.read:
+                plan.add(
+                    "apps_read",
+                    executed=True,
+                    reason="owner_asked",
+                    apps=used.apps,
+                    tools=used.read,
+                )
+            if used.proposed:
+                plan.add(
+                    "apps_proposed",
+                    executed=True,
+                    reason="owner_asked",
+                    apps=used.apps,
+                    action_ids=[str(a.id) for a in used.proposed],
+                )
+                waiting.extend(
+                    f"deixei esperando o seu Aprovar: {apps_actions.describe(a)}"
+                    for a in used.proposed
                 )
 
     # Projects, notes and panels changed from the conversation, before the reply, so "anotei" is

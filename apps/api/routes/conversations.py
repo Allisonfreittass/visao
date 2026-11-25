@@ -348,6 +348,10 @@ def turn_config(settings: Settings) -> TurnConfig:
         review_every_turns=settings.mind_review_turns,
         web_search=settings.tavily_api_key is not None,
         google_secret=settings.secret_key,
+        apps_key=(
+            settings.composio_api_key.get_secret_value() if settings.composio_api_key else None
+        ),
+        apps_monthly_calls=settings.composio_monthly_calls,
         browse_max_pages=settings.browser_max_pages,
         panel_limits=panel_limits(settings),
     )
@@ -1033,6 +1037,7 @@ def _switch_brain(
 WAITING_FOR_A_TAP = {
     "mac_proposed",
     "google_proposed",
+    "apps_proposed",
     "panel_offered",
     "panel_accepted",
     "panel_edited",
