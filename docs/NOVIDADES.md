@@ -17,8 +17,8 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
   127.0.0.1, só antes da primeira conta e só nos jeitos locais de rodar.
 - **Ícone novo: o corvo de olho âmbar** ([DESIGN.md](../DESIGN.md), seção 5).
   - O corvo em close, preto sobre papel, com o olho âmbar. É o ícone do app (aba do navegador,
-    tela de início do celular, app de Mac), o logo da barra lateral, o avatar das respostas dele e
-    a imagem grande da ligação.
+    tela de início do celular, app de Mac, app do iPhone), o logo da barra lateral, o avatar das
+    respostas dele e a imagem grande da ligação.
   - Sai o corvo no eclipse, o busto diante de um sol âmbar, que tinha chegado na véspera.
   - Quem instalou o app pelo navegador recebe o ícone novo sozinho, quando o navegador conferir o
     app de novo.

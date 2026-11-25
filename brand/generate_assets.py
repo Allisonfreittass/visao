@@ -6,8 +6,9 @@
 As fontes são os dois desenhos em vetor de brand/simbolo/: `corvo-olho-pequeno.svg` (corte fechado
 na cabeça, só o olho e o bico) até 48 px, e `corvo-olho-icone.svg` de 64 px para cima. Cada tamanho
 sai direto do vetor, sem reduzir um PNG grande. Escreve em apps/web/public/ (os dois SVGs vão para
-marca/, de onde o <Corvo> os lê) e os ícones do app de Mac em desktop/app/src-tauri/icons/ (o
-.icns inclusive, sem o `tauri icon`). O cairosvg precisa do libcairo do sistema.
+marca/, de onde o <Corvo> os lê), os ícones do app de Mac em desktop/app/src-tauri/icons/ (o
+.icns inclusive, sem o `tauri icon`) e os do iPhone no AppIcon.appiconset (com cópia em brand/).
+O cairosvg precisa do libcairo do sistema.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ SIMBOLO = ROOT / "brand/simbolo"
 PUB = ROOT / "apps/web/public"
 DESKTOP = ROOT / "desktop/app"
 TAURI_ICONS = DESKTOP / "src-tauri/icons"
+APPICON = ROOT / "apps/ios/Visao/Assets.xcassets/AppIcon.appiconset"
+BRAND = ROOT / "brand"
 
 PAPEL = (243, 241, 236)  # #F3F1EC, the ground of the drawing
 SMALL_MAX = 48  # px: up to here, the close crop of the head
@@ -131,10 +134,21 @@ def icns(path: Path) -> None:
     print("ok", path.relative_to(ROOT))
 
 
-def save(im: Image.Image, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    im.save(path, optimize=True)
-    print("ok", path.relative_to(ROOT))
+def save(im: Image.Image, *paths: Path) -> None:
+    for path in paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        im.save(path, optimize=True)
+        print("ok", path.relative_to(ROOT))
+
+
+def iphone() -> dict[str, Image.Image]:
+    """The iPhone's three appearances, 1024 and edge to edge (iOS rounds and shrinks them; the
+    smallest it shows is 29 pt, so always the whole crow). Dark: the same crow on paper, as on a
+    dark page of the app, where the icon keeps its ground. Tinted: the drawing in grey, which iOS
+    colours by brightness, so the paper takes the tint, the crow stays dark and the eye shows in
+    between."""
+    normal = render(1024, rounded=False).convert("RGB")
+    return {"": normal, "-dark": normal, "-tinted": normal.convert("L").convert("RGB")}
 
 
 def ico(images: list[Image.Image], path: Path) -> None:
@@ -159,6 +173,10 @@ def main() -> None:
     for size in (16, 32):
         save(render(size), PUB / f"favicon-{size}.png")
     ico([render(16), render(32), render(48)], PUB / "favicon.ico")
+
+    # iPhone app (apps/ios): the icon set, and a copy in brand/ for documents.
+    for suffix, im in iphone().items():
+        save(im, APPICON / f"AppIcon{suffix}.png", BRAND / f"app-icon{suffix}.png")
 
     # PWA. The iPhone rounds the touch icon itself: edge to edge.
     save(render(180, rounded=False).convert("RGB"), PUB / "apple-touch-icon.png")
