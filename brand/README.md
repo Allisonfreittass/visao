@@ -1,4 +1,4 @@
-# Marca: o corvo no eclipse (e o anel de rastros, que sai)
+# Marca: o corvo de olho âmbar (e o anel de rastros, que sai)
 
 O Visão nasce sem nome. A marca não desenha um rosto: desenha o que ele deixa. Regras completas
 (cor, tipo, forma, movimento, voz) em [DESIGN.md](../DESIGN.md).
@@ -7,8 +7,10 @@ O Visão nasce sem nome. A marca não desenha um rosto: desenha o que ele deixa.
   enquanto `chosen_name` for null. O ponto âmbar é a chamada ao modelo.
 - **Muninn:** a forma de agora, o corvo da memória de Odin, dentro do anel
   ([muninn/](muninn/README.md)).
-- **Corvo no eclipse:** o ícone do app e o avatar dele, em [`corvo/`](corvo/). Substitui o anel
-  (identidade nova, [`docs/design/telas-visao/`](../docs/design/telas-visao/README.md)).
+- **Corvo de olho âmbar:** o ícone do app e o avatar dele, em vetor em [`simbolo/`](simbolo/): o corvo
+  em close, preto sobre papel, com o olho âmbar. Substitui o anel e o corvo no eclipse (o busto
+  diante de um sol âmbar, que saiu em 25/11/2026). Telas em
+  [`docs/design/telas-visao/`](../docs/design/telas-visao/README.md).
 - **Uma luz só:** âmbar `#E39A2E` sobre tinta `#101214` e papel `#F6F4EF`.
 
 ## Arquivos
@@ -16,7 +18,6 @@ O Visão nasce sem nome. A marca não desenha um rosto: desenha o que ele deixa.
 | Arquivo | Uso |
 |---|---|
 | `simbolo/corvo-olho-icone.svg`, `simbolo/corvo-olho-pequeno.svg` | O corvo de olho âmbar, em vetor: o ícone de 64 px para cima, o pequeno (corte fechado na cabeça, só o olho e o bico) até 48 px. Fonte de todos os ícones do app. |
-| `corvo/icone-grande-512.png`, `corvo/icone-pequeno-256.png` | O corvo no eclipse: o grande acima de 72 px, o pequeno (traço mais grosso) em 72 px ou menos. Fonte de todos os ícones do web. |
 | `app-icon.png`, `app-icon-dark.png`, `app-icon-tinted.png` | Ícone do iPhone, ainda o anel (1024, sem cantos: o iOS arredonda). |
 | `visao-wordmark.svg` | O codinome `VISÃO` em Geist Mono, em contornos (não precisa da fonte). |
 | `og-image.png` | Imagem de compartilhamento 1200 × 630: Muninn no anel e "Nasce sem nome." |

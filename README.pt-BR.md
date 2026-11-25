@@ -8,7 +8,7 @@
 
 <p align="center"><img src="brand/muninn/muninn-ascii.gif" width="620" alt="O Muninn se desenhando em ASCII: os caracteres assentam do peito para as pontas das asas, o anel de 24 marcas se fecha e a falha vazia do topo pisca"></p>
 
-![Início no tema Papel: o corvo diante do sol, a saudação, a barra lateral com os nove lugares e a barra de status no rodapé](docs/assets/inicio.webp)
+![Início no tema Papel: o corvo de olho âmbar, a saudação, a barra lateral com os nove lugares e a barra de status no rodapé](docs/assets/inicio.webp)
 
 Fiz o Visão para ser o amigo para quem eu ligo. Ele me ajuda com código e ideias, lembra só do
 que eu deixo e puxa conversa sozinho quando tem algo que vale dizer.
@@ -29,7 +29,7 @@ nem vida, e as regras que dizem isso ficam fora de tudo o que ele pode reescreve
 | **Lê meu email e minha agenda.** Lê o Gmail e a Google Agenda quando eu pergunto, e prepara respostas e eventos que só saem depois do meu toque em Aprovar. A conexão fica cifrada; um email que tenta dar ordens a ele no máximo vira um pedido que eu leio ([docs/GOOGLE.md](docs/GOOGLE.md)). | feito |
 | **Abre o que eu mando.** Links na mensagem são lidos antes da resposta: repositórios do GitHub pela API, outras páginas por um leitor que só alcança endereços HTTPS públicos. | feito |
 | **Vê fotos, lê arquivos.** Anexe pelo +, cole um print ou arraste um arquivo: fotos vão ao modelo como imagem (reduzidas no navegador antes), PDFs e arquivos de texto ou código vão como o texto lido deles, marcado como dado, nunca como ordem. O que você manda aparece na hora, antes da resposta ([docs/ANEXOS.md](docs/ANEXOS.md)). | feito; fotos pedem um modelo com visão |
-| **Um corvo diante do sol.** Sem mascote e sem olho vigiando: o ícone é o Muninn, o corvo da memória de Odin, em xilogravura diante de um eclipse âmbar, e o âmbar é só dele (os pensamentos, os pedidos de aprovação, o ponto que pulsa enquanto ele trabalha). Três temas, trocados na hora em Ajustes: Papel, Tinta e Rótulo. No computador é uma janela de app: barra lateral com nove lugares, a barra da página e a barra de status com o servidor, o Mac, as rotinas, o silêncio, o uso de modelos das últimas 24 h e o modelo, que se troca dali. Ctrl/⌘+K abre a paleta de comandos. O login mostra o selo: VISAO em Six Caps atrás do busto ([DESIGN.md](DESIGN.md)). Dá para continuar escrevendo enquanto ele responde: essas mensagens esperam, mais apagadas, e vão juntas como a próxima mensagem. | feito |
+| **Um corvo de olho âmbar.** Sem mascote: o ícone é um corvo em close, preto sobre papel, com um olho âmbar, e o âmbar é só dele (os pensamentos, os pedidos de aprovação, o ponto que pulsa enquanto ele trabalha). Três temas, trocados na hora em Ajustes: Papel, Tinta e Rótulo. No computador é uma janela de app: barra lateral com nove lugares, a barra da página e a barra de status com o servidor, o Mac, as rotinas, o silêncio, o uso de modelos das últimas 24 h e o modelo, que se troca dali. Ctrl/⌘+K abre a paleta de comandos. O login mostra o selo: VISAO em Six Caps atrás do busto ([DESIGN.md](DESIGN.md)). Dá para continuar escrevendo enquanto ele responde: essas mensagens esperam, mais apagadas, e vão juntas como a próxima mensagem. | feito |
 | **Páginas que ele escreve.** Peça um plano, um comparativo ou um roteiro para guardar: a resposta diz o que vai ter, e um cartão embaixo dela passa de "Criando…" para uma página que você abre, compartilha por um link secreto ou apaga. Escrita a partir da conversa e das pesquisas dela, com datas e fontes, "a confirmar" no que faltar; servida sem scripts e com origem opaca, então não alcança a sua sessão ([docs/ARTEFATOS.md](docs/ARTEFATOS.md)). | feito |
 | **Status ao vivo.** Enquanto trabalha, cada passo vira um cartão no chat ("Procurou no seu Gmail", "Abrindo github.com"), resumido ou técnico, como você preferir, e uma coluna ao lado mostra o que ele está fazendo agora e o que fez de verdade, tirado do registro do sistema. Se você sai do app no meio, a resposta chega também como notificação ([docs/STATUS.md](docs/STATUS.md)). | feito |
 | **Páginas ao vivo.** Para passagens, hotéis, preços ou horários ele abre os sites num Chromium de verdade (Google Voos e Hotéis funcionam; site que bloqueia robô é avisado, nunca contornado), lê o que mostram agora e responde com o site e a hora. Só lê: sem login, formulário ou compra. O navegador roda num container próprio, sem segredos nem banco ([docs/NAVEGADOR.md](docs/NAVEGADOR.md)). | feito |
@@ -197,7 +197,7 @@ Detalhes em [docs/ROADMAP.md](docs/ROADMAP.md); avaliações em [docs/EVALUATION
 
 ## Licença
 
-Código sob a [licença MIT](LICENSE). A marca (o corvo diante do sol, o selo VISAO, o Muninn, o
+Código sob a [licença MIT](LICENSE). A marca (o corvo de olho âmbar, o selo VISAO, o Muninn, o
 anel de rastros e a identidade visual do [DESIGN.md](DESIGN.md) e de [brand/](brand/)) fica de fora
 dela: quem fizer um fork leva o código, não a marca. As fontes (Newsreader, Geist, Geist Mono, Six
 Caps) vão com o app, sob a SIL Open Font License.

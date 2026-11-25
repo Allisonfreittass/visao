@@ -450,8 +450,8 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .step-card-detail { margin: 0; padding: 8px 10px; overflow-x: auto; border-radius: 6px; background: var(--code); color: var(--code-text); font: 400 12px/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* O ponto âmbar de atividade no compositor: é dele (DESIGN.md §2). */
-.composer-row > .atividade { order: 1; flex: none; width: 14px; height: 14px; margin: 0 6px; border-radius: 50%; background: var(--ambar); animation: sol 1.6s ease-out infinite; }
-@keyframes sol { 0%, 100% { box-shadow: 0 0 0 0 rgb(227 154 46 / .55); } 50% { box-shadow: 0 0 0 7px rgb(227 154 46 / 0); } }
+.composer-row > .atividade { order: 1; flex: none; width: 14px; height: 14px; margin: 0 6px; border-radius: 50%; background: var(--ambar); animation: pulso 1.6s ease-out infinite; }
+@keyframes pulso { 0%, 100% { box-shadow: 0 0 0 0 rgb(227 154 46 / .55); } 50% { box-shadow: 0 0 0 7px rgb(227 154 46 / 0); } }
 @media (prefers-reduced-motion: reduce) { .composer-row > .atividade { animation: none; } }
 
 /* Agora / O que fiz de verdade: coluna com borda, sem cartões (mockup). */
