@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 25/11/2026
 
+- **A tela de entrar nova** ([DESIGN.md](../DESIGN.md), seção 5).
+  - O corvo em close ocupa a metade esquerda e sangra pelas bordas; no celular fica no topo. Quando
+    o e-mail ou a senha recebe foco, a pupila olha de leve para o campo (parada com movimento
+    reduzido).
+  - Senha vazia avisa embaixo do campo, antes de ir ao servidor; enquanto confere, o botão diz
+    "Entrando…". "Primeira vez? Configurar" abre a criação da primeira conta, e "Esqueci a senha"
+    explica como trocar a senha no servidor.
 - **Os seus outros apps, pelo Composio** ([APPS.md](APPS.md),
   [ADR-0028](decisions/0028-apps-pelo-composio.md)).
   - Com a chave do Composio no servidor, Ajustes › Integrações › Apps mostra o catálogo: Notion,
