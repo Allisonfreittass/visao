@@ -49,6 +49,11 @@ hiddenimports = [
     # Imported only inside integrations/composio/client.py, so named here (docs/APPS.md).
     *collect_submodules("composio", filter=lambda name: ".integration_test" not in name),
     *collect_submodules("composio_client"),
+    # The PostgreSQL driver: SQLAlchemy imports it only by the URL (postgresql+psycopg://), so
+    # nothing pulls it in. Without it the app cannot open a shared database such as Supabase.
+    *collect_submodules("psycopg"),
+    *collect_submodules("psycopg_binary"),
+    "sqlalchemy.dialects.postgresql.psycopg",
     "alembic.runtime.migration",
     "alembic.ddl.sqlite",
     "alembic.ddl.postgresql",

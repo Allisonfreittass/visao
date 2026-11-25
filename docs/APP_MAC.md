@@ -61,6 +61,32 @@ comando `visao` e o serviço com os mesmos dados.
   trabalha com o app aberto. Para ele trabalhar sempre, instale o serviço e use o app como janela.
 - **Se o servidor não subir,** a janela diz o motivo e onde está o log.
 
+## Usar o banco do Supabase (o mesmo Visão do servidor)
+
+Por padrão o app tem um banco só dele, em `~/.visao/dados/visao.db`: uma conta nova, sem as
+conversas nem a memória do servidor. Para o app abrir **o mesmo Visão**, aponte-o para o banco que o
+servidor usa (o PostgreSQL do Supabase). Copie do `.env` do servidor para `~/.visao/.env`, trocando
+as linhas que já existem:
+
+| Linha | Por quê |
+|---|---|
+| `VISION_DATABASE_URL` | o banco do Supabase (`postgresql+psycopg://...`) |
+| `VISION_DATABASE_SCHEMA` | se o servidor usa um (ex.: `visao`) |
+| `VISION_SECRET_KEY` | **a mesma do servidor**: ela abre a conexão do Google e dos apps guardada no banco e assina o login; com outra, o Google para de funcionar |
+| `VISION_LLM_*` | o modelo, para ele responder |
+| `VISION_GITHUB_TOKEN`, `VISION_COMPOSIO_API_KEY`, `VISION_TAVILY_API_KEY` | o que estiver configurado lá |
+
+Feche e abra o app, e entre com a sua conta de sempre. Com um banco PostgreSQL:
+
+- **não há tela de primeiro uso** nem migração pelo app: quem migra o banco é o servidor, no deploy;
+- **o worker não roda no app** (pensar, estudar, conferir painéis, o resumo da manhã), porque o
+  servidor já roda o dele e dois falariam em dobro. Quando o servidor for desligado, ponha
+  `VISAO_LOCAL_WORKER=1` no ambiente do app (ou instale o serviço) para o Mac assumir esse papel;
+- o app precisa ser da **mesma versão** do servidor ou mais antigo: um app mais novo que o banco
+  pode procurar uma coluna que a migração ainda não criou.
+
+O banco local antigo fica onde estava e deixa de ser usado; dá para apagar `~/.visao/dados` depois.
+
 ## O que ainda não vem no app
 
 - **Voz** (Kokoro e Whisper, cerca de 2 GB) e o **navegador ao vivo** (Playwright e Chromium).
