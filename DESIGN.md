@@ -4,7 +4,8 @@ Fonte única do visual do Visão. Todo agente (Claude Code, Codex, Cursor) e tod
 em interface lê este arquivo antes. Se uma tela nova não couber nestas regras, a regra muda aqui
 primeiro, depois o código.
 
-> **Identidade nova (24/11/2026): o corvo no eclipse.** O mockup em
+> **Identidade nova (24/11/2026), com o ícone trocado em 25/11/2026: o corvo de olho âmbar.** O
+> corvo no eclipse, o busto diante de um sol âmbar, durou um dia e saiu. O mockup em
 > [`docs/design/telas-visao/`](docs/design/telas-visao/README.md) é a referência de pixel; o app web
 > está migrando por etapas (seção 8, "Telas do VISAO"). Onde este arquivo e o mockup discordarem, vale
 > o mockup e este arquivo é corrigido. O que está marcado **sai** continua no código até a etapa
@@ -13,7 +14,7 @@ primeiro, depois o código.
 > **Estado anterior:** direção aprovada em 23/11/2026 ("Muninn"). No app web, os passos 1 a 5 da
 > [Migração](#migração) estão feitos: tokens e fontes em todo o app, o `<Anel>` no lugar do
 > Ciclope, os sensores como ícones de traço, o login no Muninn e os textos na voz da seção 7.
-> Os ícones e imagens (passo 6) saem do anel por `brand/generate_assets.py`. Falta o iPhone
+> Os ícones e imagens (passo 6) saíam do anel; hoje saem do corvo (seção 5). Falta o iPhone
 > inteiro (`Theme.swift`, `LoginView`). Telas novas já seguem este arquivo.
 
 ## 1. Ideia
@@ -23,14 +24,16 @@ continuar mora em volta: memória que a pessoa autoriza, interesses, versões re
 
 - **Muninn** é a forma que ele usa agora: o corvo da memória de Odin, que voa pelo mundo e volta
   para contar o que viu. É o que o Visão faz: pensa entre conversas, estuda e abre o papo.
-- **O corvo no eclipse** é o ícone: o busto do Muninn em xilogravura na frente de um sol âmbar,
-  sobre tinta. É o avatar das mensagens dele, o logo da barra lateral e o ícone do app.
+- **O corvo de olho âmbar** é o ícone: o corvo em close, preto sobre papel, com o olho âmbar. É o
+  ícone do app, o logo da barra lateral, o avatar das mensagens dele e a imagem grande da ligação.
+- **O corvo com sol saiu** (25/11/2026): o busto diante de um sol âmbar, sobre tinta, foi o ícone
+  por um dia. Não volta em tela, ícone nem texto.
 - **O selo** é o campo âmbar com "VISAO" em Six Caps preenchendo o quadrado atrás do busto. Só no
-  login e em material de marca.
+  login e em material de marca; não mudou com o ícone.
 - **O anel de rastros** (**sai**): 24 marcas radiais, uma por hora, com a falha do nome no topo.
-  Era a marca da direção "Muninn"; o corvo no eclipse toma o lugar dele em cada tela.
-- **Não é vigia.** Nada de câmera, olho que encara, "vigilância", "dê uma ordem". Quem supervisiona
-  é a pessoa.
+  Era a marca da direção "Muninn"; o corvo toma o lugar dele em cada tela.
+- **Não é vigia.** Nada de câmera, "vigilância", "dê uma ordem". O olho âmbar é o do corvo, parte
+  do desenho: não encara a pessoa. Quem supervisiona é a pessoa.
 
 ## 2. Cor
 
@@ -57,8 +60,8 @@ Regras:
 
 - Botão principal é **a cor do texto com o fundo por cima** (tinta sobre papel no Papel). O
   secundário é contorno. Nunca vermelho, nunca âmbar sólido em "Aprovar": aprovar é calmo.
-- Âmbar é dele: o eclipse, o filete dos pensamentos, o pedido de aprovação, o ponto de atividade
-  pulsando e o aviso de versão. Nunca em botões comuns, nunca de fundo (fora o selo), nunca em texto
+- Âmbar é só dele: o olho do corvo, o filete dos pensamentos, o pedido de aprovação, o ponto de
+  atividade pulsando e o aviso de versão. Nunca em botões comuns, nunca de fundo (fora o selo), nunca em texto
   da interface. Nos temas claros o âmbar tem pouco contraste (cerca de 2:1): é ponto, borda e
   desenho, nunca a única pista de algo.
 - A gênese conta como presença: o ponto do peito, as faíscas e o lampejo da falha são dele.
@@ -97,13 +100,31 @@ Regras:
 - Ícones: os traços do mockup, grade de 20, em `apps/web/src/components/Icon.tsx`.
 - Composer: pílula `--grafite` com microfone, campo "Fala comigo…", anexar e enviar (papel).
 
-## 5. O corvo no eclipse e o Muninn
+## 5. O corvo de olho âmbar e o Muninn
 
-O ícone tem dois desenhos, em `brand/corvo/`: `icone-grande-512.png` acima de 72 px e
-`icone-pequeno-256.png` (traço mais grosso) em 72 px ou menos. No app ele é `<Corvo size>`
-(`apps/web/src/brand/Corvo.tsx`), que escolhe o desenho pelo tamanho. `brand/generate_assets.py`
-gera dele o favicon, o `apple-touch-icon` e os ícones do PWA. O ícone do iPhone e a `og-image`
-ainda são os do anel e mudam quando o iPhone e o selo migrarem.
+O ícone tem dois desenhos em vetor, em `brand/simbolo/`, e nenhum é redesenhado à mão:
+
+- `corvo-olho-pequeno.svg`, o corte fechado na cabeça (só o olho e o bico), de 16 a 48 px;
+- `corvo-olho-icone.svg`, o corvo inteiro em close, de 64 px para cima.
+
+Os dois trazem o próprio fundo de papel (`#F3F1EC`) e os cantos arredondados (22,5% do lado).
+
+- **No app:** `<Corvo size>` (`apps/web/src/brand/Corvo.tsx`) escolhe o desenho pelo tamanho
+  (pequeno até 48 px) e lê os SVGs de `apps/web/public/marca/`.
+  - Nos temas claros leva um contorno de 1 px em tinta (`box-shadow: 0 0 0 1px
+    rgba(16,18,20,0.12)`), para o papel do desenho não sumir no papel da página.
+  - No Tinta e na ligação não leva contorno.
+  - É decorativo ao lado do nome dele. Sozinho, o texto alternativo é "O corvo do VISAO, de olho
+    âmbar".
+- **Ícones:** `brand/generate_assets.py` gera, direto do vetor (como rodar em
+  [`brand/README.md`](brand/README.md)):
+  - o favicon (16, 32 e `.ico`);
+  - o `apple-touch-icon` (180);
+  - os ícones do PWA (192 e 512);
+  - o `maskable-512` (o desenho a 84%, no canto de baixo à esquerda, para a cabeça e o bico caberem
+    no círculo seguro do Android);
+  - o ícone do app de Mac.
+- **Ainda do anel:** o ícone do iPhone e a `og-image`. Mudam quando o iPhone e o selo migrarem.
 
 A gênese do Muninn (abaixo) continua sendo a animação do login até a etapa 4 decidir o que fica.
 
@@ -124,16 +145,19 @@ um `.json` ao lado dizendo de onde veio. `strokes.json` fica na mesma pasta.
 Tamanhos (direção anterior, **sai** com o anel): acima de 120 px, Muninn + anel. Entre 32 e 120 px,
 só o anel. Abaixo de 32 px, anel sem as marcas apagadas.
 
-Onde ele aparece no app web hoje (cada linha troca para o corvo na etapa indicada):
+Onde ele aparece no app web hoje:
 
 | Tela | Forma | Tamanho |
 |---|---|---|
-| Entrada (login) | Muninn + anel, gênese de 14 s | até 560 px |
+| Entrada (login) | o selo | até 560 px |
 | Abertura depois do login e a do dia | Muninn + anel, gênese curta (1,8 s) | 180 px; 132 px no celular |
-| Início, no topo | Muninn + anel, com os estados da seção 6 | 200 px; 150 px no celular |
-| Ligação | entre os turnos, o corvo no eclipse grande; durante um passo, Muninn + anel com os nanorrobôs (seção 6) | até 380 px |
-| Avatar das respostas no chat | só o anel (**sai**: corvo, etapa 6) | 36 px |
-| Logo do menu lateral e da barra do celular | anel sem as marcas apagadas (**sai**: corvo + VISAO, etapas 2 e 11) | 28 e 26 px |
+| Carregando, antes do app abrir | o anel, com os estados da seção 6 | 200 px |
+| Primeira vez | o corvo | 260 px; 120 px no celular |
+| Início, no topo | o corvo (no celular não aparece: o corvo já está na barra de cima) | 92 px |
+| Pedido de aprovação | o corvo pequeno | 20 px |
+| Ligação | entre os turnos, o corvo grande; durante um passo, Muninn + anel com os nanorrobôs (seção 6) | até 380 px |
+| Avatar das respostas no chat | o corvo pequeno | 30 px |
+| Logo do menu lateral e da barra do celular | o corvo pequeno + VISAO | 30 e 26 px |
 
 Sensores (Mac, e-mail, Caderno, projetos) são ícones de traço, nunca o corvo.
 
@@ -251,10 +275,11 @@ Sem exclamação, sem emoji.
 5. Textos: seção 7. **Feito** no web: "Acompanhando…", "Fala comigo…", "Acompanhar um preço";
    saíram "Nada sob vigilância ainda", "Sistemas prontos" e "Pronto para a ordem"; avaliar uma
    resposta é "Ajudou" / "Não ajudou", sem emoji.
-6. Ícones e imagens a partir do anel. **Feito**: `brand/generate_assets.py` (Python, roda em
-   qualquer máquina, no lugar do `generate-assets.swift`) gera o ícone do iPhone (normal, escuro e
-   tingido), os do PWA, o favicon, o wordmark `VISÃO` em contornos, o `muninn-512.png` e a
-   `og-image`. Ícones pequenos levam só o anel (seção 5); o Muninn entra a partir de 120 px.
+6. Ícones e imagens a partir do anel. **Feito** e depois substituído: `brand/generate_assets.py`
+   (Python, no lugar do `generate-assets.swift`) gerava do anel o ícone do iPhone, os do PWA, o
+   favicon, o wordmark `VISÃO`, o `muninn-512.png` e a `og-image`. Desde 25/11/2026 ele gera só os
+   ícones do web e do Mac, a partir do corvo de olho âmbar (seção 5); os outros arquivos ficaram
+   como estavam em `brand/`.
 
 Referência visual da direção "Muninn": canvas "Visão — identidade" no Claude.
 
