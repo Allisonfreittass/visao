@@ -124,8 +124,11 @@ Os dois trazem o próprio fundo de papel (`#F3F1EC`) e os cantos arredondados (2
   - o `maskable-512` (o desenho a 84%, no canto de baixo à esquerda, para a cabeça e o bico caberem
     no círculo seguro do Android);
   - os ícones do app de Mac, com o desenho pequeno em 16 e 32 pt (também nos pixels 2x da
-    tela Retina) e o inteiro de 128 pt para cima.
-- **Ainda do anel:** o ícone do iPhone e a `og-image`. Mudam quando o iPhone e o selo migrarem.
+    tela Retina) e o inteiro de 128 pt para cima;
+  - o ícone do iPhone (1024, de ponta a ponta: o iOS arredonda), nas três aparências. O escuro é o
+    mesmo corvo sobre papel, como nas páginas escuras do app; o tingido é o desenho em cinza, que o
+    iOS colore pelo brilho (o papel pega a cor, o corvo fica escuro).
+- **Ainda do anel:** a `og-image`. Muda quando o selo migrar.
 
 A gênese do Muninn (abaixo) continua sendo a animação do login até a etapa 4 decidir o que fica.
 
@@ -279,8 +282,8 @@ Sem exclamação, sem emoji.
 6. Ícones e imagens a partir do anel. **Feito** e depois substituído: `brand/generate_assets.py`
    (Python, no lugar do `generate-assets.swift`) gerava do anel o ícone do iPhone, os do PWA, o
    favicon, o wordmark `VISÃO`, o `muninn-512.png` e a `og-image`. Desde 25/11/2026 ele gera só os
-   ícones do web e do Mac, a partir do corvo de olho âmbar (seção 5); os outros arquivos ficaram
-   como estavam em `brand/`.
+   ícones do web, do Mac e do iPhone, a partir do corvo de olho âmbar (seção 5); os outros
+   arquivos ficaram como estavam em `brand/`.
 
 Referência visual da direção "Muninn": canvas "Visão — identidade" no Claude.
 

@@ -18,7 +18,7 @@ O Visão nasce sem nome. A marca não desenha um rosto: desenha o que ele deixa.
 | Arquivo | Uso |
 |---|---|
 | `simbolo/corvo-olho-icone.svg`, `simbolo/corvo-olho-pequeno.svg` | O corvo de olho âmbar, em vetor: o ícone de 64 px para cima, o pequeno (corte fechado na cabeça, só o olho e o bico) até 48 px. Fonte de todos os ícones do app. |
-| `app-icon.png`, `app-icon-dark.png`, `app-icon-tinted.png` | Ícone do iPhone, ainda o anel (1024, sem cantos: o iOS arredonda). |
+| `app-icon.png`, `app-icon-dark.png`, `app-icon-tinted.png` | Ícone do iPhone, o corvo de olho âmbar (1024, sem cantos: o iOS arredonda): cópias do que vai em `apps/ios/Visao/Assets.xcassets/AppIcon.appiconset/`. O escuro é o mesmo corvo sobre papel; o tingido é o desenho em cinza, que o iOS colore pelo brilho. |
 | `visao-wordmark.svg` | O codinome `VISÃO` em Geist Mono, em contornos (não precisa da fonte). |
 | `og-image.png` | Imagem de compartilhamento 1200 × 630: Muninn no anel e "Nasce sem nome." |
 | `muninn-512.png` | O Muninn no anel, para documentos. |
@@ -43,6 +43,6 @@ uv venv /tmp/marca && uv pip install --python /tmp/marca/bin/python pillow cairo
 ```
 
 Cada tamanho sai direto do vetor (o cairosvg usa o libcairo do sistema), o `.icns` inclusive: não
-precisa do `npx tauri icon`, que tiraria todos os tamanhos de uma imagem só. O ícone do iPhone, o
-wordmark, o `muninn-512.png` e a `og-image` não saem daqui: são os da direção anterior e ficam como
-estão até o iPhone e o selo migrarem.
+precisa do `npx tauri icon`, que tiraria todos os tamanhos de uma imagem só. O wordmark, o
+`muninn-512.png` e a `og-image` não saem daqui: são os da direção anterior e ficam como estão até o
+selo migrar.

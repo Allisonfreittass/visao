@@ -12,9 +12,10 @@ do Caddy, em `/api`); nada no servidor muda por causa dele.
 | `apps/ios/Visao.xcodeproj` | O projeto do Xcode. |
 
 O app se chama **V.I.S.A.O.** na tela inicial, com o bundle id `io.github.allisonfreittass.visao`
-(em `Config/Visao.xcconfig`) e o ícone do PWA. O bundle id não precisa ser criado em lugar
-nenhum: com assinatura automática, o Xcode registra na Apple sozinho na primeira vez que roda no
-iPhone.
+(em `Config/Visao.xcconfig`) e o corvo de olho âmbar como ícone, gerado por
+[`brand/generate_assets.py`](../brand/generate_assets.py). O bundle id não precisa ser criado em
+lugar nenhum: com assinatura automática, o Xcode registra na Apple sozinho na primeira vez que roda
+no iPhone.
 
 iOS 18 ou mais novo, Swift 6, Observation, async/await e URLSession. Uma dependência de terceiros, aprovada: soniqo/speech-swift (só o Kokoro e a Supertonic), para as vozes no iPhone.
 
