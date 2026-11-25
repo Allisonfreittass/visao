@@ -64,7 +64,10 @@ def test_only_read_only_alone_is_a_read():
     assert kind_of([]) == "write"  # no hint: a write
     assert kind_of(["createHint"]) == "write"
     assert kind_of(["readOnlyHint", "updateHint"]) == "write"  # swapped hints: a write
-    assert kind_of(["readOnlyHint", "idempotentHint"]) == "write"
+    # As Composio marks its real reads (GITHUB_LIST_REPOSITORY_ISSUES on 2026-11-25).
+    assert kind_of(["important", "openWorldHint", "readOnlyHint", "idempotentHint"]) == "read"
+    assert kind_of(["idempotentHint"]) == "write"  # neutral alone: no read hint, a write
+    assert kind_of(["readOnlyHint", "idempotentHint", "updateHint"]) == "write"
     assert kind_of(["readOnlyHint", "someNewHint"]) == "write"
     assert kind_of(["readOnlyHint", "destructiveHint"]) == "destructive"
 
@@ -211,3 +214,11 @@ def test_other_ways_of_connecting_are_refused_before_reaching_composio():
     with pytest.raises(ComposioError) as refused:
         apps(api).start_connection("visao-abc", "jira", "OAUTH2")
     assert refused.value.kind == "refused" and api.requests == []
+
+
+def test_all_of_an_apps_tools_are_asked_for_not_just_the_first_200():
+    # GitHub has about 900 tools; listing its issues was number 633 (2026-11-25).
+    api = RecordedComposio()
+    apps(api).tools("github")
+    [listing] = api.sent("GET", "/tools")
+    assert int(listing.url.params["limit"]) >= 1000

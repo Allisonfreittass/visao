@@ -35,8 +35,9 @@ está na [ADR-0028](decisions/0028-apps-pelo-composio.md).
    palavras do domínio, como "issue" para o GitHub ou "página" para o Notion)? Senão, nada roda.
 2. **Uma chamada curta escolhe o app** entre os conectados. Se a mensagem nomeia um só, o código
    já sabe qual e essa chamada não acontece.
-3. **O código pede ao Composio as ferramentas desse app**, cada uma com a versão do momento, e
-   tira as que apagam. Das que sobram, as 40 mais próximas da mensagem vão para **uma segunda
+3. **O código pede ao Composio todas as ferramentas desse app** (o GitHub tem umas 900), cada
+   uma com a versão do momento, e tira as que apagam. Das que sobram, as 40 mais próximas da
+   mensagem (no empate, as que o Composio marca como principais) vão para **uma segunda
    chamada curta, que escolhe a ferramenta e os argumentos** numa lista fechada. Uma ferramenta
    fora da lista é ignorada.
 4. **O código classifica.** Leitura executa e o resultado entra na resposta como **texto de
@@ -50,13 +51,15 @@ no máximo aparece na resposta como texto de terceiros, ou vira um cartão que v
 ## Leitura ou escrita: as dicas
 
 Cada ferramenta do Composio traz dicas nas `tags`: `readOnlyHint`, `createHint`, `updateHint`,
-`destructiveHint`, `idempotentHint`, e outras que não falam de mudar nada (`openWorldHint`, só "fala
-com o mundo lá fora", que quase todas têm). O Composio avisa que elas são de melhor esforço, então
-a regra é estrita:
+`destructiveHint`, e duas que não dizem se a ferramenta muda alguma coisa: `openWorldHint` ("fala
+com o mundo lá fora", quase todas têm) e `idempotentHint` ("chamar duas vezes dá o mesmo
+resultado"). As leituras de verdade do Composio vêm com as duas junto de `readOnlyHint` (listar as
+issues do GitHub, por exemplo). O Composio avisa que as dicas são de melhor esforço, então a regra
+é estrita:
 
-- **Leitura** só com `readOnlyHint` e nenhuma outra dica de mudança.
-- **Escrita** em qualquer dúvida: sem dica, com dica de criar, mudar ou idempotente, com uma dica
-  desconhecida, ou com `readOnlyHint` junto de outra (dicas trocadas).
+- **Leitura** só com `readOnlyHint` e nenhuma dica de mudança; as duas neutras não contam.
+- **Escrita** em qualquer dúvida: sem dica, só com as neutras, com dica de criar ou mudar, com uma
+  dica desconhecida, ou com `readOnlyHint` junto de uma de mudança (dicas trocadas).
 - **Destrutiva** (`destructiveHint`) nunca é oferecida ao modelo, nunca vira cartão, e o cliente
   se recusa a executá-la. Antes de executar uma aprovação, o código confere de novo as dicas que o
   Composio dá naquela hora.

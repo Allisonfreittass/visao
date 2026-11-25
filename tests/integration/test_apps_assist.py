@@ -257,3 +257,24 @@ def test_the_manifest_joins_several_names():
     assert "acesso a arquivos, contas que ele não conectou, dispositivos do interlocutor" in (
         seen.absent()
     )
+
+
+def test_with_many_tools_the_closest_go_first_and_the_main_ones_break_ties():
+    from integrations.composio.client import Tool
+
+    def tool(slug, tags=("readOnlyHint",)):
+        return Tool(slug, slug.title(), "", "github", "1", tuple(tags))
+
+    filler = [tool(f"GITHUB_THING_{i}") for i in range(200)]
+    plain = tool("GITHUB_LIST_ISSUES_FOR_ORG")
+    main = tool("GITHUB_LIST_REPOSITORY_ISSUES", ("important", "readOnlyHint", "idempotentHint"))
+    offered = assist._offered([*filler, plain, main], "lista as issues")
+    assert offered[0] is main and offered[1] is plain
+
+
+def test_a_real_composio_read_is_read_now_not_a_card(db, api):
+    # GITHUB_LIST_REPOSITORY_ISSUES comes with readOnlyHint, idempotentHint and openWorldHint.
+    owner = setup(db)
+    turn(db, owner, "quais issues estão abertas no github?", [LIST])
+    assert executed(api) == ["GITHUB_LIST_REPOSITORY_ISSUES"]
+    assert db.scalar(select(ToolAction)) is None

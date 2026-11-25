@@ -42,7 +42,13 @@ def test_the_hints_are_in_each_tools_tags():
         toolkits=["github"], limit=100
     )
     tags = {t.slug: list(t.tags) for t in tools}
-    assert tags["GITHUB_LIST_REPOSITORY_ISSUES"] == ["readOnlyHint", "openWorldHint", "issues"]
+    assert tags["GITHUB_LIST_REPOSITORY_ISSUES"] == [
+        "important",
+        "issues",
+        "openWorldHint",
+        "readOnlyHint",
+        "idempotentHint",
+    ]
     assert tags["GITHUB_CREATE_AN_ISSUE"] == ["createHint", "openWorldHint"]
     assert tags["GITHUB_STAR_A_REPOSITORY"] == []  # no hint at all
     assert all(t.version == "20251111_00" for t in tools)
