@@ -9,9 +9,9 @@ export interface NotYet {
   meanwhile?: string;
 }
 
-/** The places the server cannot fill yet (Agentes, Canais, Habilidades): what they are for and
+/** The places the server cannot fill yet (Agentes, Canais): what they are for and
  * an honest "ainda não disponível". No example data: nothing here pretends to work. */
-export const NOT_YET: Record<"agents" | "channels" | "skills", NotYet> = {
+export const NOT_YET: Record<"agents" | "channels", NotYet> = {
   agents: {
     icon: "agents",
     title: "Agentes",
@@ -23,12 +23,6 @@ export const NOT_YET: Record<"agents" | "channels" | "skills", NotYet> = {
     title: "Canais",
     promise: "Aqui você vai escolher por onde eu posso falar com você: Telegram, WhatsApp, e-mail ou Discord.",
     meanwhile: "Hoje eu aviso por notificação no aparelho. O e-mail do Google fica em Ajustes › Integrações, e o Slack, o Discord e os outros apps que você conectar pelo Composio ficam em Ajustes › Integrações › Apps: por eles eu leio e preparo mensagens para você aprovar, mas ainda não converso com você por lá.",
-  },
-  skills: {
-    icon: "sparkle",
-    title: "Habilidades",
-    promise: "Aqui vão ficar as habilidades que eu propuser aprender, para você aprovar ou desligar.",
-    meanwhile: "Hoje o que eu proponho fazer chega como pedido de aprovação no Início.",
   },
 };
 

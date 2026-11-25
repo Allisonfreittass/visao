@@ -89,6 +89,22 @@ export interface RoutingState {
   public: string[];
 }
 
+/** One skill in Habilidades (core/skills/catalog.py): a way of working, text only. */
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  /** "instalada": read, adapted and shipped with the app. */
+  origin: string;
+  /** Where it came from, like "anthropics/skills". */
+  source: string;
+  /** The exact version that was read. */
+  source_url: string;
+  license: string;
+  installed_on: string;
+  enabled: boolean;
+}
+
 export interface BrainState {
   mode: BrainMode;
   /** The model a Mac offers right now ("qwen3:4b"); null: none online. */
@@ -963,6 +979,19 @@ export class Api {
 
   routing(): Promise<RoutingState> {
     return this.request("/system/llm-routing");
+  }
+
+  async skills(): Promise<Skill[]> {
+    const data = await this.request<{ skills: Skill[] }>("/skills");
+    return data.skills;
+  }
+
+  setSkill(id: string, enabled: boolean): Promise<Skill> {
+    return this.request(`/skills/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   setRouting(mode: RoutingMode): Promise<RoutingState> {

@@ -7,6 +7,17 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 25/11/2026
 
+- **Habilidades** ([HABILIDADES.md](HABILIDADES.md)).
+  - A tela Habilidades deixou de dizer "ainda não disponível": mostra cinco jeitos de trabalhar,
+    cada um com um interruptor. Achar a causa de um bug; Comunicados e relatórios de status;
+    Design de telas; Escrever documentos junto; Transformar ideia em plano.
+  - Quando o seu pedido combina com uma delas ("deu erro no build", "me ajuda a escrever uma
+    proposta"), ele segue aquele jeito na resposta e nas próximas mensagens da mesma conversa,
+    por até duas horas. Uma por resposta, e só as ligadas.
+  - Vieram das coleções públicas da Anthropic (`anthropics/skills`) e do `obra/superpowers`.
+    Foram lidas, traduzidas e adaptadas ao chat. São só texto: nada nelas roda código, e as regras
+    de verdade, a voz e as aprovações continuam acima delas.
+
 - **A tela de entrar nova** ([DESIGN.md](../DESIGN.md), seção 5).
   - O corvo em close ocupa a metade esquerda e sangra pelas bordas; no celular fica no topo. Quando
     o e-mail ou a senha recebe foco, a pupila olha de leve para o campo (parada com movimento

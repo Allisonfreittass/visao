@@ -41,6 +41,7 @@ import { StatusBar } from "./components/StatusBar";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { NotYetView } from "./components/NotYetView";
 import { RoutinesView } from "./components/RoutinesView";
+import { SkillsView } from "./components/SkillsView";
 import { Entrance } from "./components/Entrance";
 import { PanelView } from "./components/PanelView";
 import { NotebookView } from "./components/NotebookView";
@@ -1127,7 +1128,8 @@ export function App() {
                 {view === "mac" && <MacView api={api} pending={pending} onError={handleError} />}
             {view === "routines" && <RoutinesView routines={routines} />}
             {view === "panel" && <PanelView api={api} onBack={() => go("inbox")} onDraft={draftInChat} onError={handleError} />}
-            {(view === "agents" || view === "channels" || view === "skills") && <NotYetView place={view} />}
+            {(view === "agents" || view === "channels") && <NotYetView place={view} />}
+            {view === "skills" && <SkillsView api={api} onError={handleError} />}
                 {view === "settings" && (
                   <SettingsView
                 key={settingsSection ?? "aparencia"}
