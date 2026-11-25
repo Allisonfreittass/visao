@@ -42,7 +42,7 @@ RESULT_CHARS = 8000
 TOOLS_OFFERED = 40
 # Words that point to an app without naming it, for the apps people connect most.
 DOMAIN: dict[str, tuple[str, ...]] = {
-    "github": ("issue", "issues", "pull request", "repositório", "repositorio", "commit"),
+    "github": ("issue", "pull request", "repositório", "repositorio", "repo", "commit", "branch"),
     "gitlab": ("merge request", "repositório", "repositorio", "pipeline"),
     "notion": ("página", "pagina", "páginas", "paginas", "minhas notas"),
     "slack": ("canal", "canais", "thread"),
@@ -86,25 +86,42 @@ class Assist:
 
 
 def mentioned(text: str, names: dict[str, str]) -> list[str]:
-    """The connected apps the message talks about, by name or by a word of their domain."""
+    """The connected apps the message talks about, by name or by a word of their domain, also in
+    the plural ("commits", "repositórios", "branches")."""
     folded = f" {fold(text)} "
     found = []
     for slug, name in names.items():
         words = {slug, name, *DOMAIN.get(slug, ())}
         for word in words:
             w = fold(word).strip()
-            if len(w) >= 2 and re.search(rf"(?<![\w]){re.escape(w)}(?![\w])", folded):
+            if len(w) >= 2 and re.search(rf"(?<![\w]){re.escape(w)}(?:s|es)?(?![\w])", folded):
                 found.append(slug)
                 break
     return found
 
 
-def candidate(text: str, names: dict[str, str]) -> bool:
+# A short reply ("isso mesmo", "pode ver o do visao") answers the turn before it, so the app that
+# turn was about still counts. Only the end of the recent conversation is read: the last turn or
+# two, not something said long ago.
+FOLLOW_UP_CHARS = 120
+FOLLOW_UP_CONTEXT = 700
+
+
+def about(text: str, recent: str, names: dict[str, str]) -> list[str]:
+    """The apps this message is about: the ones it names, or, for a short follow-up, the ones the
+    turn before was about."""
+    found = mentioned(text, names)
+    if found or len(text.strip()) > FOLLOW_UP_CHARS:
+        return found
+    return mentioned(recent[-FOLLOW_UP_CONTEXT:], names)
+
+
+def candidate(text: str, names: dict[str, str], recent: str = "") -> bool:
     return (
         bool(names)
         and len(text) <= 4000
         and not text.lstrip().startswith("/")
-        and bool(mentioned(text, names))
+        and bool(about(text, recent, names))
     )
 
 
@@ -204,10 +221,10 @@ def run(
     if not connected:
         return None
     names = account.names(apps, connected)
-    if not candidate(text, names):
+    if not candidate(text, names, recent):
         return None
 
-    named = mentioned(text, names)
+    named = about(text, recent, names)
     if len(named) == 1:
         slug = named[0]
     else:
@@ -237,7 +254,10 @@ def run(
         result.failure = str(exc)
         result.block = f"Não consegui falar com o {app} agora: {exc}. Diga isso à pessoa."
         return result
-    offered = _offered(tools, text)
+    # A follow-up has few words of its own ("isso mesmo"): the tools are ranked with the turn
+    # before it too.
+    follow_up = not mentioned(text, names)
+    offered = _offered(tools, f"{recent[-FOLLOW_UP_CONTEXT:]}\n{text}" if follow_up else text)
     if not offered:
         return None
     by_slug = {t.slug: t for t in offered}
