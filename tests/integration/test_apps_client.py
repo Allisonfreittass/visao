@@ -175,3 +175,39 @@ def test_the_month_ceiling_is_counted_in_the_audit_log(db):
         row.created_at = datetime.now(UTC).replace(day=1) - timedelta(days=1)
     db.flush()
     assert account.calls_this_month(db) == 0
+
+
+def test_apps_with_their_own_key_or_self_registering_sign_in_can_be_connected():
+    catalog = {t.slug: t for t in apps(RecordedComposio()).catalog()}
+    assert catalog["github"].connectable and catalog["github"].owner_scheme == ""
+    perplexity, archive, jira = catalog["perplexityai"], catalog["0xarchive_mcp"], catalog["jira"]
+    assert perplexity.connectable and perplexity.asks_key and perplexity.owner_scheme == "API_KEY"
+    assert archive.connectable and not archive.asks_key and archive.owner_scheme == "DCR_OAUTH"
+    assert not jira.connectable  # an OAuth app of our own: still out
+
+
+@pytest.mark.parametrize("scheme", ["API_KEY", "DCR_OAUTH"])
+def test_connecting_without_composios_sign_in_sets_up_no_credentials(scheme):
+    api = RecordedComposio()
+    api.answers[("GET", f"{API}/auth_configs")] = {"items": []}
+    api.answers[("POST", f"{API}/auth_configs")] = {
+        "auth_config": {"id": "ac_novo", "auth_scheme": scheme, "is_composio_managed": False},
+        "toolkit": {"slug": "perplexityai"},
+    }
+    connection_id, url = apps(api).start_connection("visao-abc", "perplexityai", scheme)
+    assert connection_id == "ca_github1" and url.startswith("https://connect.composio.dev/")
+    [created] = api.sent("POST", "/auth_configs")
+    body = json.loads(created.content)
+    assert body["toolkit"] == {"slug": "perplexityai"}
+    assert body["auth_config"]["type"] == "use_custom_auth"
+    assert body["auth_config"]["authScheme"] == scheme
+    assert body["auth_config"]["credentials"] == {}  # the owner types the key on Composio's page
+    [link] = api.sent("POST", "/connected_accounts/link")
+    assert json.loads(link.content)["auth_config_id"] == "ac_novo"
+
+
+def test_other_ways_of_connecting_are_refused_before_reaching_composio():
+    api = RecordedComposio()
+    with pytest.raises(ComposioError) as refused:
+        apps(api).start_connection("visao-abc", "jira", "OAUTH2")
+    assert refused.value.kind == "refused" and api.requests == []

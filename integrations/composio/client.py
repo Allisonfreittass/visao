@@ -30,6 +30,12 @@ DESTRUCTIVE = "destructiveHint"
 # whether it changes anything.
 NEUTRAL_HINTS = frozenset({"openWorldHint"})
 
+# How the owner connects an app that has no sign-in of Composio's own, with nothing set up by the
+# Visão: the app's own sign-in, which registers itself (DCR_OAUTH), or the owner's key for that
+# app (API_KEY), typed on Composio's page. Both checked against the real Composio on 2026-11-25;
+# the others (an OAuth app of our own, user and password) stay out.
+OWNER_FILLED = ("DCR_OAUTH", "API_KEY")
+
 T = TypeVar("T")
 
 
@@ -56,8 +62,26 @@ class Toolkit:
     description: str = ""
     logo: str = ""
     categories: tuple[str, ...] = ()
-    # Connects with Composio's own OAuth app (one click); others need credentials of their own.
+    # Connects with Composio's own OAuth app (one click).
     managed: bool = True
+    # The app's sign-in methods as Composio names them (OAUTH2, API_KEY, DCR_OAUTH...).
+    schemes: tuple[str, ...] = ()
+
+    @property
+    def owner_scheme(self) -> str:
+        """Without Composio's own sign-in: the method the owner completes on Composio's page."""
+        if self.managed:
+            return ""
+        return next((s for s in OWNER_FILLED if s in self.schemes), "")
+
+    @property
+    def connectable(self) -> bool:
+        return self.managed or bool(self.owner_scheme)
+
+    @property
+    def asks_key(self) -> bool:
+        """Composio's page asks the owner for their key to this app."""
+        return self.owner_scheme == "API_KEY"
 
 
 @dataclass(frozen=True)
@@ -98,6 +122,7 @@ def _toolkit(item: object) -> Toolkit:
         logo=str(_get(meta, "logo", "") or ""),
         categories=tuple(c for c in categories if c),
         managed=bool(_get(item, "composio_managed_auth_schemes") or _get(item, "no_auth")),
+        schemes=tuple(str(s) for s in (_get(item, "auth_schemes") or [])),
     )
 
 
@@ -213,8 +238,12 @@ class ComposioClient:
             for item in (_get(page, "items") or [])
         ]
 
-    def start_connection(self, user_id: str, toolkit: str) -> tuple[str, str]:
-        """(connection id, the page where the owner signs in to the app)."""
+    def start_connection(self, user_id: str, toolkit: str, scheme: str = "") -> tuple[str, str]:
+        """(connection id, the page where the owner signs in to the app). `scheme` empty: with
+        Composio's own sign-in; else one of OWNER_FILLED, set up with no credentials so that
+        Composio's page asks the owner for what is missing."""
+        if scheme and scheme not in OWNER_FILLED:
+            raise ComposioError("refused", "esse jeito de conectar ainda não é aceito")
 
         def start(c: Any) -> tuple[str, str]:
             configs = _get(c.auth_configs.list(toolkit_slug=toolkit), "items") or []
@@ -223,8 +252,17 @@ class ComposioClient:
                 newest = sorted(enabled, key=lambda a: str(_get(a, "created_at") or ""))[-1]
                 config_id = str(_get(newest, "id"))
             else:
-                managed = {"type": "use_composio_managed_auth"}
-                config_id = str(_get(c.auth_configs.create(toolkit, managed), "id"))
+                options: dict[str, Any] = (
+                    {
+                        "type": "use_custom_auth",
+                        "auth_scheme": scheme,
+                        "name": f"visao-{toolkit}"[:60],
+                        "credentials": {},
+                    }
+                    if scheme
+                    else {"type": "use_composio_managed_auth"}
+                )
+                config_id = str(_get(c.auth_configs.create(toolkit, options), "id"))
             request = c.connected_accounts.link(user_id, config_id)
             return str(request.id), str(request.redirect_url or "")
 

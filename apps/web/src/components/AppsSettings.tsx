@@ -122,9 +122,10 @@ export function AppsSettings({ api, onError }: { api: Api; onError: (e: unknown)
                   <div>
                     <strong>{a.name}</strong>
                     {a.description && <p className="note">{a.description}</p>}
-                    {!a.managed && <p className="note">Pede credenciais próprias no Composio; ainda não dá para conectar daqui.</p>}
+                    {a.asks_key && <p className="note">Na conexão, a página do Composio pede a sua chave de API desse app; ela fica guardada lá.</p>}
+                    {!a.connectable && <p className="note">Pede um app OAuth próprio no Composio; ainda não dá para conectar daqui.</p>}
                   </div>
-                  <button type="button" className="ghost" disabled={!a.managed} onClick={() => void connect(a)}>Conectar</button>
+                  <button type="button" className="ghost" disabled={!a.connectable} onClick={() => void connect(a)}>Conectar</button>
                 </li>
               ))}
               {!found.length && <li className="note">Nenhum app com esse nome.</li>}

@@ -63,8 +63,13 @@ class CatalogItemOut(BaseModel):
     description: str
     logo: str
     categories: list[str]
-    # Connects with Composio's own sign-in; the others need credentials of their own (not yet).
+    # Connects with Composio's own sign-in.
     managed: bool
+    # Can be connected from here: Composio's own sign-in, the app's self-registering sign-in, or
+    # the owner's key for the app typed on Composio's page (docs/APPS.md).
+    connectable: bool
+    # Composio's page will ask for the owner's key to this app.
+    asks_key: bool
 
 
 class ConnectOut(BaseModel):
@@ -102,6 +107,11 @@ def _action(a: ToolAction) -> ActionOut:
     )
 
 
+def _scheme(apps: ComposioClient, toolkit: str) -> str:
+    found = next((t for t in apps.catalog() if t.slug == toolkit), None)
+    return found.owner_scheme if found else ""
+
+
 def _catalog(apps: ComposioClient) -> dict[str, CatalogItemOut]:
     try:
         found = apps.catalog()
@@ -117,6 +127,8 @@ def _catalog(apps: ComposioClient) -> dict[str, CatalogItemOut]:
             logo=t.logo,
             categories=list(t.categories),
             managed=t.managed,
+            connectable=t.connectable,
+            asks_key=t.asks_key,
         )
         for t in found
         if t.slug not in account.EXCLUDED
@@ -168,14 +180,15 @@ def connect(toolkit: str, db: DbSession, user: CurrentUser, settings: AppSetting
     known = _catalog(apps)
     if toolkit not in known:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "App não encontrado.")
-    if not known[toolkit].managed:
+    if not known[toolkit].connectable:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            "Esse app pede credenciais próprias no Composio; ainda não dá para conectar daqui.",
+            "Esse app pede um app OAuth próprio no Composio; ainda não dá para conectar daqui.",
         )
+    scheme = "" if known[toolkit].managed else _scheme(apps, toolkit)
     try:
         connection_id, url = apps.start_connection(
-            account.user_ref(user.id, settings.secret_key), toolkit
+            account.user_ref(user.id, settings.secret_key), toolkit, scheme
         )
     except ComposioError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"O Composio recusou: {exc}") from exc
