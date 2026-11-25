@@ -94,6 +94,24 @@ def test_only_talk_about_a_connected_app_reaches_the_extra_calls():
     assert assist.mentioned("cria uma issue no GitHub", names) == ["github"]
 
 
+def test_plurals_and_short_follow_ups_still_reach_the_app():
+    # The owner's own turns on 25/11/2026: none of them passed, so the chat never looked.
+    names = {"github": "GitHub"}
+    assert assist.candidate("Cara, uma dúvida, quantos commits meus foram feitos hoje?", names)
+    assert assist.mentioned("liste os repositórios e as branches", names) == ["github"]
+    before = (
+        "user: quantos commits meus foram feitos hoje?\n"
+        "assistant: Não consigo ver seus commits no GitHub daqui ainda. Qual repositório?"
+    )
+    assert assist.candidate("pode ver o do visao", names, before)
+    assert assist.candidate("Isso mesmo", names, before)
+    # A short message with nothing about an app before it stays out; so does a long new topic.
+    assert not assist.candidate("Isso mesmo", names, "user: bom dia\nassistant: Bom dia!")
+    assert not assist.candidate("me conta uma história comprida " * 6, names, before)
+    # Something said long ago does not count.
+    assert not assist.candidate("pode ver", names, before + "\n" + "user: e o tempo hoje?\n" * 60)
+
+
 def test_a_read_runs_and_enters_the_reply_as_third_party_text(db, api, steps):
     owner = setup(db)
     outcome, provider = turn(db, owner, "quais issues estão abertas no github do visao?", [LIST])
