@@ -27,6 +27,16 @@ export function loginError(e: unknown): LoginError {
   return { text: "Sem conexão com o servidor. Confira a internet e tente de novo.", credentials: false };
 }
 
+/** The first account needs a password at least this long (the server says the same). */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/** What is wrong with the first account before it goes to the server, or null. */
+export function firstRunProblem(password: string, confirm: string): string | null {
+  if (password.length < MIN_PASSWORD_LENGTH) return `A senha precisa de pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+  if (password !== confirm) return "As duas senhas não são iguais.";
+  return null;
+}
+
 interface LoginProps {
   api: Api;
   onLoggedIn: (token: string, remember: boolean) => void;
@@ -34,37 +44,58 @@ interface LoginProps {
   online?: boolean;
   /** The credentials are being checked (the ring shows "pensando" meanwhile). */
   onBusyChange?: (busy: boolean) => void;
+  /** Whether this screen makes the first account (so the frame around it says so too). */
+  onFirstAccount?: (firstAccount: boolean) => void;
 }
 
-export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginProps) {
+export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAccount }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
   const [error, setError] = useState<LoginError | null>(null);
   const [busy, setBusy] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
+  // On the owner's machine with nobody signed up, this screen makes the first account instead.
+  const [firstRun, setFirstRun] = useState(false);
+  const [confirm, setConfirm] = useState("");
   const pending = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.firstRunNeeded(controller.signal).then(setFirstRun, () => setFirstRun(false));
+    return () => controller.abort();
+  }, [api]);
 
   // Leaving the screen mid-request cancels it instead of logging in behind the user's back.
   useEffect(() => () => pending.current?.abort(), []);
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
+  useEffect(() => onFirstAccount?.(firstRun), [firstRun, onFirstAccount]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    if (firstRun) {
+      const problem = firstRunProblem(password, confirm);
+      if (problem) {
+        setError({ text: problem, credentials: true });
+        return;
+      }
+    }
     const controller = new AbortController();
     pending.current = controller;
     const timer = window.setTimeout(() => controller.abort(new DOMException("timeout", "TimeoutError")), LOGIN_TIMEOUT_MS);
     setBusy(true);
     setError(null);
     try {
-      const token = await api.login(email.trim(), password, controller.signal);
-      if (!controller.signal.aborted) onLoggedIn(token, remember);
+      const token = firstRun
+        ? await api.firstRun(email.trim(), password, controller.signal)
+        : await api.login(email.trim(), password, controller.signal);
+      if (!controller.signal.aborted) onLoggedIn(token, firstRun || remember);
     } catch (e) {
       const reason: unknown = controller.signal.aborted ? controller.signal.reason : e;
       // An abort that is not the timeout means the screen went away: nothing left to tell.
       if (!controller.signal.aborted || (reason instanceof DOMException && reason.name === "TimeoutError")) {
-        setError(loginError(reason));
+        setError(firstRun && reason instanceof ApiError && reason.status === 422 && reason.message ? { text: reason.message, credentials: true } : loginError(reason));
       }
     } finally {
       window.clearTimeout(timer);
@@ -88,6 +119,11 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginPro
 
   return (
     <form className="login" onSubmit={submit} aria-busy={busy}>
+      {firstRun && (
+        <p className="login-aviso" role="status">
+          Primeira vez nesta máquina: crie a sua conta. Ela fica só aqui, e a senha precisa de {MIN_PASSWORD_LENGTH} caracteres ou mais.
+        </p>
+      )}
       {!online && !error && (
         <p className="login-aviso" role="status">
           O servidor não respondeu à última verificação. Você pode tentar mesmo assim.
@@ -115,7 +151,7 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginPro
         <input
           id="login-password"
           type="password"
-          autoComplete="current-password"
+          autoComplete={firstRun ? "new-password" : "current-password"}
           maxLength={1024}
           value={password}
           onChange={(e) => edit(setPassword, e.target.value)}
@@ -128,17 +164,34 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange }: LoginPro
         />
         {capsLock && <small id="login-caps">Caps Lock está ligado.</small>}
       </div>
-      <label className="memory-toggle">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        Manter conectado neste aparelho
-      </label>
+      {firstRun ? (
+        <div className="rs-campo" data-estado={fieldError}>
+          <label htmlFor="login-confirm">Repita a senha</label>
+          <input
+            id="login-confirm"
+            type="password"
+            autoComplete="new-password"
+            maxLength={1024}
+            value={confirm}
+            onChange={(e) => edit(setConfirm, e.target.value)}
+            aria-invalid={error?.credentials || undefined}
+            aria-describedby={describedBy}
+            required
+          />
+        </div>
+      ) : (
+        <label className="memory-toggle">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          Manter conectado neste aparelho
+        </label>
+      )}
       {error && (
         <p id="login-error" className="login-erro" role="alert">
           {error.text}
         </p>
       )}
       <button type="submit" className="btn-primary login-entrar" disabled={busy}>
-        {busy ? "Verificando…" : "Entrar"}
+        {busy ? (firstRun ? "Criando…" : "Verificando…") : firstRun ? "Criar minha conta" : "Entrar"}
       </button>
     </form>
   );

@@ -1,0 +1,21 @@
+[package]
+name = "visao-app"
+version = "0.1.0"
+description = "O Visão como app de Mac (docs/APP_MAC.md)"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true

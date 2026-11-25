@@ -25,7 +25,8 @@ O Visão nasce sem nome. A marca não desenha um rosto: desenha o que ele deixa.
 No web (`apps/web/public/`): `favicon.ico` (16, 32 e 48, do desenho pequeno), `apple-touch-icon.png`
 (180, de ponta a ponta), `icon-192.png` e `icon-512.png` (com os cantos arredondados do desenho),
 `maskable-512.png` (de ponta a ponta) e `marca/corvo-256.png` e `marca/corvo-512.png` para o
-`<Corvo>`. A `og-image.png` ainda é a do anel.
+`<Corvo>`. No app de Mac, `desktop/app/app-icon.png` (1024, o quadrado arredondado de 824 com sombra,
+na grade da Apple), de onde `npx tauri icon` tira os tamanhos. A `og-image.png` ainda é a do anel.
 
 ## Regenerar
 

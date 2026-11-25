@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- The voice call: the macOS asks once, with this sentence, before the microphone opens. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>O Visão usa o microfone só durante uma ligação com ele, quando você toca no microfone.</string>
+</dict>
+</plist>

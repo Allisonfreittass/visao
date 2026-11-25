@@ -30,3 +30,12 @@ describe("loginError", () => {
     expect(loginError(new TypeError("Failed to fetch")).text).toMatch(/^Sem conexão/);
   });
 });
+
+describe("the first account on the owner's machine", () => {
+  it("asks for 12 characters and the same password twice before going to the server", async () => {
+    const { firstRunProblem } = await import("./Login");
+    expect(firstRunProblem("curta", "curta")).toMatch(/12 caracteres/);
+    expect(firstRunProblem("uma senha bem longa", "outra senha longa")).toMatch(/não são iguais/);
+    expect(firstRunProblem("uma senha bem longa", "uma senha bem longa")).toBeNull();
+  });
+});

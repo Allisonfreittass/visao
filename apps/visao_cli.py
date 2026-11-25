@@ -27,10 +27,15 @@ from pathlib import Path
 
 from apps import visao_servico as servico
 
-ROOT = Path(__file__).resolve().parents[1]
+# Inside the Mac app the code is frozen (PyInstaller, docs/APP_MAC.md): its files are in the app's
+# folder, read-only, and the configuration lives in ~/.visao instead of beside the code.
+FROZEN = bool(getattr(sys, "frozen", False))
+ROOT = Path(getattr(sys, "_MEIPASS", "")) if FROZEN else Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT / "apps" / "web" / "dist"
 DEFAULT_PORT = 8000
-START_WAIT_SECONDS = 30.0
+# The first start makes the database (41 migrations: 15 s here, more on a Mac checking every
+# library the first time); a process that dies is seen at once, not after this.
+START_WAIT_SECONDS = 120.0
 STOP_WAIT_SECONDS = 25.0
 
 
@@ -44,6 +49,38 @@ def state_file() -> Path:
 
 def log_file() -> Path:
     return home() / "visao.log"
+
+
+def self_command() -> list[str]:
+    """How this command runs itself again (in the background, or as the system's service)."""
+    return [sys.executable] if FROZEN else [sys.executable, "-m", "apps.visao_cli"]
+
+
+def criar_config(example: Path, target: Path, database: Path) -> None:
+    """A .env of its own: the example, with a new secret key and the database in `database`."""
+    import secrets
+
+    lines = []
+    for line in example.read_text(encoding="utf-8").splitlines():
+        if line.startswith("VISION_SECRET_KEY="):
+            line = "VISION_SECRET_KEY=" + secrets.token_urlsafe(48)
+        elif line.startswith("VISION_DATABASE_URL="):
+            line = "VISION_DATABASE_URL=sqlite:///" + str(database)
+        lines.append(line)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    database.parent.mkdir(parents=True, exist_ok=True)
+    database.parent.chmod(0o700)
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    target.chmod(0o600)
+
+
+def _frozen_config(environ: dict[str, str]) -> None:
+    """The app keeps its .env in ~/.visao, made on the first start."""
+    env_file = Path(environ.setdefault("VISION_ENV_FILE", str(home() / ".env")))
+    if not env_file.exists():
+        home().mkdir(parents=True, exist_ok=True)
+        home().chmod(0o700)
+        criar_config(ROOT / ".env.example", env_file, home() / "dados" / "visao.db")
 
 
 def read_state() -> dict | None:
@@ -111,6 +148,9 @@ def _prepare(environ: dict[str, str]) -> tuple[str, bool]:
     # (scripts/dev.sh). VISAO_LOCAL_WORKER=1 overrides it on purpose.
     worker = local or environ.get("VISAO_LOCAL_WORKER") == "1"
     environ["VISION_WORKER_IN_API"] = "1" if worker else "0"
+    if local:
+        # On this machine only: the first account can be made on the screen (ADR-0027).
+        environ.setdefault("VISION_FIRST_RUN_SETUP", "1")
     get_settings.cache_clear()
     if local:
         from alembic import command
@@ -159,7 +199,7 @@ def _iniciar_no_fundo(port: int) -> int:
     home().mkdir(parents=True, exist_ok=True)
     with log_file().open("ab") as log:
         child = subprocess.Popen(  # noqa: S603
-            [sys.executable, "-m", "apps.visao_cli", "iniciar", "--porta", str(port)],
+            [*self_command(), "iniciar", "--porta", str(port)],
             cwd=ROOT,
             stdin=subprocess.DEVNULL,
             stdout=log,
@@ -283,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     create = account_sub.add_parser("criar", help="pede a senha no terminal e faz a gênese")
     create.add_argument("--email", required=True)
     args = parser.parse_args(argv)
+    if FROZEN:
+        _frozen_config(os.environ)
     if args.comando == "servico":
         if args.acao == "instalar":
             return servico.instalar(ROOT, args.porta, home(), log_file())

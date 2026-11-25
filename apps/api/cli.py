@@ -20,7 +20,7 @@ from infrastructure.database.session import get_sessionmaker
 MIN_PASSWORD_LENGTH = 12
 
 
-def create_user(session: Session, email: str, password: str) -> User:
+def create_user(session: Session, email: str, password: str, via: str = "cli") -> User:
     normalized = validate_email(email, check_deliverability=False).normalized.lower()
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"senha precisa ter pelo menos {MIN_PASSWORD_LENGTH} caracteres")
@@ -29,7 +29,7 @@ def create_user(session: Session, email: str, password: str) -> User:
     user = User(email=normalized, password_hash=hash_password(password))
     session.add(user)
     session.flush()
-    record_audit(session, "user.create", "success", actor_user_id=user.id, details={"via": "cli"})
+    record_audit(session, "user.create", "success", actor_user_id=user.id, details={"via": via})
     session.commit()
     return user
 

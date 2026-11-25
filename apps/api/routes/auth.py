@@ -11,7 +11,7 @@ from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession
 from apps.api.security import create_access_token, hash_password, verify_password
@@ -223,3 +223,59 @@ def change_email(
         raise HTTPException(status.HTTP_409_CONFLICT, "Esse email já está em uso")
     user.email = email
     return _fresh_token(db, user, settings, "auth.email_change")
+
+
+# ---------- First use on the owner's machine (docs/APP_MAC.md, ADR-0027) ----------
+# The app and `visao iniciar` run on 127.0.0.1 with nobody signed up yet: the first account (and
+# the agent's genesis) is made on a screen instead of in a terminal. Three locks, all needed: the
+# setting (only the local ways of running turn it on), a request from this machine itself with no
+# proxy in between, and no user in the database. After the first account, it is gone for good.
+
+_LOOPBACK = {"127.0.0.1", "::1"}
+_PROXY_HEADERS = ("x-forwarded-for", "x-real-ip", "forwarded", "cf-connecting-ip")
+
+
+class FirstRunStatus(BaseModel):
+    needed: bool
+
+
+class FirstRun(BaseModel):
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=1024)
+
+
+def _first_run_open(request: Request, db: DbSession, settings: AppSettings) -> bool:
+    if not settings.first_run_setup:
+        return False
+    if request.client is None or request.client.host not in _LOOPBACK:
+        return False
+    if any(request.headers.get(name) for name in _PROXY_HEADERS):
+        return False
+    return db.scalar(select(func.count()).select_from(User)) == 0
+
+
+@router.get("/first-run")
+def first_run_status(request: Request, db: DbSession, settings: AppSettings) -> FirstRunStatus:
+    return FirstRunStatus(needed=_first_run_open(request, db, settings))
+
+
+@router.post("/first-run")
+def first_run(
+    body: FirstRun, request: Request, db: DbSession, settings: AppSettings
+) -> TokenResponse:
+    from apps.api.cli import create_user
+    from core.identity.genesis import run_genesis
+
+    if not _first_run_open(request, db, settings):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Não encontrado")
+    try:
+        user = create_user(db, body.email, body.password, via="first_run")
+    except (ValueError, EmailNotValidError) as exc:
+        message = str(exc) if isinstance(exc, ValueError) else "Email inválido"
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, message) from exc
+    run_genesis(db, actor_user_id=user.id)
+    db.commit()
+    return TokenResponse(
+        access_token=create_access_token(user.id, settings),
+        expires_in=settings.access_token_ttl_minutes * 60,
+    )

@@ -98,6 +98,9 @@ curl -fsSL https://raw.githubusercontent.com/Allisonfreittass/visao/main/scripts
 visao conta criar --email you@example.com   # first user (password asked) and genesis
 ```
 
+Or the Mac app, with the server inside it (no Python, Node or Docker on the Mac) and the first
+account made on its first screen: [docs/APP_MAC.md](docs/APP_MAC.md).
+
 To work on the code, requires Python 3.12, Node 22 and, for the Docker path, Docker Compose 2.24+.
 
 ```bash

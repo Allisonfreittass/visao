@@ -5,6 +5,17 @@ em você?" e "o que você consegue fazer agora?" com fatos. Cada item aponta par
 detalhes. O que está ligado **agora** vem do manifesto de capacidades
 (`core/identity/capabilities.py`), que entra em todo prompt; este arquivo conta a história.
 
+## 25/11/2026
+
+- **O Visão como app de Mac** ([APP_MAC.md](APP_MAC.md), [ADR-0027](decisions/0027-app-de-mac.md)).
+  - Um app com ícone no Dock e janela própria, que leva o servidor dentro: não precisa de Python,
+    Node nem Docker no Mac. A configuração e o banco ficam em `~/.visao`, os mesmos do instalador.
+  - Se o Visão já está rodando (o serviço), o app só abre a janela nele.
+  - Nesta primeira versão, sem voz e sem o navegador ao vivo: os dois continuam no Visão instalado.
+- **A primeira conta numa tela.** Na máquina do dono, enquanto ninguém tem conta, a tela de entrar
+  vira a de primeiro uso: e-mail e senha criam a conta e fazem a gênese, sem terminal. Só de
+  127.0.0.1, só antes da primeira conta e só nos jeitos locais de rodar.
+
 ## 24/11/2026
 
 - **Seus objetivos, só com o seu sim** ([ADR-0025](decisions/0025-objetivos-do-dono.md)).

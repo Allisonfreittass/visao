@@ -5,8 +5,9 @@
 
 As fontes são os dois desenhos em brand/corvo/: `icone-grande-512.png` para tudo acima de 72 px e
 `icone-pequeno-256.png` (traço mais grosso, lê melhor pequeno) para 72 px ou menos. Escreve em
-apps/web/public/. O ícone do iPhone e a og-image ainda são os da marca anterior e não saem daqui:
-mudam quando o iPhone e o selo do login migrarem.
+apps/web/public/ e o ícone do app de Mac em desktop/app/app-icon.png. O ícone do iPhone e a
+og-image ainda são os da marca anterior e não saem daqui: mudam quando o iPhone e o selo do login
+migrarem.
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ import io
 import struct
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 CORVO = ROOT / "brand/corvo"
 PUB = ROOT / "apps/web/public"
+DESKTOP = ROOT / "desktop/app"
 
 TINTA = (16, 18, 20)  # the ground of the drawing, under its rounded corners
 SMALL_MAX = 72  # px: up to here, the small drawing
@@ -39,6 +41,27 @@ def full_bleed(size: int) -> Image.Image:
     """Edge to edge, the corners filled with tinta: for whoever masks the icon (iOS, Android)."""
     ground = Image.new("RGBA", (size, size), (*TINTA, 255))
     return Image.alpha_composite(ground, icon(size)).convert("RGB")
+
+
+def mac_icon() -> Image.Image:
+    """The Mac app's icon on Apple's grid: the macOS does not round or inset icons, so the
+    drawing sits as an 824 px rounded square in 1024, with a soft shadow under it."""
+    canvas, body, radius = 1024, 824, 185
+    art = Image.open(CORVO / "icone-grande-512.png").convert("RGBA")
+    art = art.resize((body, body), Image.LANCZOS)
+    ground = Image.new("RGBA", (body, body), (*TINTA, 255))
+    art = Image.alpha_composite(ground, art)
+    mask = Image.new("L", (body, body), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, body - 1, body - 1), radius, fill=255)
+    art.putalpha(mask)
+    at = (canvas - body) // 2
+    shadow = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    shape = Image.new("RGBA", (body, body), (0, 0, 0, 90))
+    shape.putalpha(mask.point(lambda v: v * 90 // 255))
+    shadow.paste(shape, (at, at + 12), shape)
+    out = shadow.filter(ImageFilter.GaussianBlur(14))
+    out.alpha_composite(art, (at, at))
+    return out
 
 
 def save(im: Image.Image, path: Path) -> None:
@@ -77,6 +100,9 @@ def main() -> None:
     # In the app (<Corvo>): the two drawings, as they are.
     save(source(512), PUB / "marca/corvo-512.png")
     save(source(SMALL_MAX), PUB / "marca/corvo-256.png")
+
+    # The Mac app (docs/APP_MAC.md): `npx tauri icon app-icon.png` makes the sizes from it.
+    save(mac_icon(), DESKTOP / "app-icon.png")
 
 
 if __name__ == "__main__":

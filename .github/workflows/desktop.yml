@@ -1,0 +1,48 @@
+name: desktop
+
+# The Mac app (docs/APP_MAC.md, ADR-0027): the frozen server and the Tauri app around it, built
+# on a Mac with Apple Silicon. The app comes out as an artifact of the run (Visao-mac), not signed
+# by a paid Apple account: see docs/APP_MAC.md for opening it the first time.
+on:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "apps/**"
+      - "core/**"
+      - "integrations/**"
+      - "infrastructure/database/**"
+      - "migrations/**"
+      - "pyproject.toml"
+      - "infrastructure/deployment/constraints.txt"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Build
+        run: bash desktop/construir.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Visao-mac
+          path: desktop/app/Visao-mac.zip
+          retention-days: 30

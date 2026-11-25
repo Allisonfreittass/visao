@@ -48,7 +48,9 @@ def installed() -> bool:
 
 
 def _command(root: Path, port: int) -> list[str]:
-    return [sys.executable, "-m", "apps.visao_cli", "iniciar", "--porta", str(port)]
+    from apps.visao_cli import self_command
+
+    return [*self_command(), "iniciar", "--porta", str(port)]
 
 
 def plist_text(root: Path, port: int, home: Path, log: Path) -> str:
