@@ -290,6 +290,11 @@ class Capabilities:
         if not self.mac_projects:
             reach.append("dispositivos")
         missing.append("acesso a " + ", ".join(reach) + " do interlocutor")
+        # Without this it answered "não consigo ver" and stopped, with no way forward.
+        missing.append(
+            "apps que ele não conectou: ele conecta o GitHub, o Notion, o Slack e outros em "
+            "Ajustes › Integrações › Apps, e é isso que você diz quando ele pede algo de um deles"
+        )
         return missing
 
 
