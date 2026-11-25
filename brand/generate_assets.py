@@ -7,7 +7,8 @@ As fontes são os dois desenhos em vetor de brand/simbolo/: `corvo-olho-pequeno.
 na cabeça, só o olho e o bico) até 48 px, e `corvo-olho-icone.svg` de 64 px para cima. Cada tamanho
 sai direto do vetor, sem reduzir um PNG grande. Escreve em apps/web/public/ (os dois SVGs vão para
 marca/, de onde o <Corvo> os lê), os ícones do app de Mac em desktop/app/src-tauri/icons/ (o
-.icns inclusive, sem o `tauri icon`) e os do iPhone no AppIcon.appiconset (com cópia em brand/).
+.icns inclusive, sem o `tauri icon`), os do iPhone no AppIcon.appiconset (com cópia em brand/) e a
+imagem de compartilhamento (og-image.png, no web e em brand/).
 O cairosvg precisa do libcairo do sistema.
 """
 
@@ -19,7 +20,7 @@ import struct
 from pathlib import Path
 
 import cairosvg
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 SIMBOLO = ROOT / "brand/simbolo"
@@ -30,6 +31,10 @@ APPICON = ROOT / "apps/ios/Visao/Assets.xcassets/AppIcon.appiconset"
 BRAND = ROOT / "brand"
 
 PAPEL = (243, 241, 236)  # #F3F1EC, the ground of the drawing
+TINTA = (16, 18, 20)  # --text in Papel
+CINZA = (91, 96, 102)  # --text-muted in Papel
+AMBAR = (227, 154, 46)
+FONTS = PUB / "fonts"
 SMALL_MAX = 48  # px: up to here, the close crop of the head
 
 
@@ -134,6 +139,31 @@ def icns(path: Path) -> None:
     print("ok", path.relative_to(ROOT))
 
 
+def og_image() -> Image.Image:
+    """The link preview, 1200 × 630, on the paper of the drawing so the two are one ground: the
+    crow runs off the left and the bottom, as in the icon, and the words sit to its right. His
+    line ("Lembra só do que você deixar.") is in his voice, with the amber rule of what he says."""
+    w, h = 1200, 630
+    im = Image.new("RGB", (w, h), PAPEL)
+    im.paste(render(h, rounded=False).convert("RGB"), (0, 0))
+    d = ImageDraw.Draw(im)
+
+    def font(name: str, size: int) -> ImageFont.FreeTypeFont:
+        return ImageFont.truetype(str(FONTS / name), size)
+
+    x = 690
+    d.text((x, 92), "VISAO", font=font("six-caps-latin.woff2", 120), fill=TINTA)
+    d.text((x, 248), "Nasce sem nome.", font=font("newsreader-300-latin.woff2", 54), fill=TINTA)
+    voz = font("newsreader-300-italic-latin.woff2", 46)
+    d.line([(x, 330), (x, 432)], fill=AMBAR, width=2)
+    d.text((x + 22, 326), "Lembra só do que", font=voz, fill=CINZA)
+    d.text((x + 22, 380), "você deixar.", font=voz, fill=CINZA)
+    mono = font("geist-mono-latin.woff2", 17)
+    d.text((x, 492), "Virtual Intelligence with", font=mono, fill=CINZA)
+    d.text((x, 518), "Supervised Autonomy & Opt-in memory", font=mono, fill=CINZA)
+    return im
+
+
 def save(im: Image.Image, *paths: Path) -> None:
     for path in paths:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -183,6 +213,9 @@ def main() -> None:
     for size in (192, 512):
         save(render(size), PUB / f"icon-{size}.png")
     save(maskable(512), PUB / "maskable-512.png")
+
+    # The link preview (index.html, og:image).
+    save(og_image(), PUB / "og-image.png", BRAND / "og-image.png")
 
     # In the app (<Corvo>): the two drawings as vectors, sharp at any size.
     for name, out in (

@@ -128,7 +128,9 @@ Os dois trazem o próprio fundo de papel (`#F3F1EC`) e os cantos arredondados (2
   - o ícone do iPhone (1024, de ponta a ponta: o iOS arredonda), nas três aparências. O escuro é o
     mesmo corvo sobre papel, como nas páginas escuras do app; o tingido é o desenho em cinza, que o
     iOS colore pelo brilho (o papel pega a cor, o corvo fica escuro).
-- **Ainda do anel:** a `og-image`. Muda quando o selo migrar.
+- **A imagem de compartilhamento** (`og-image.png`, 1200 × 630), do mesmo gerador: o corvo sobre
+  papel saindo pela esquerda e por baixo, VISAO em Six Caps, "Nasce sem nome." e a fala dele em
+  itálico, com o filete âmbar.
 
 A gênese do Muninn (abaixo) continua sendo a animação do login até a etapa 4 decidir o que fica.
 
@@ -282,8 +284,8 @@ Sem exclamação, sem emoji.
 6. Ícones e imagens a partir do anel. **Feito** e depois substituído: `brand/generate_assets.py`
    (Python, no lugar do `generate-assets.swift`) gerava do anel o ícone do iPhone, os do PWA, o
    favicon, o wordmark `VISÃO`, o `muninn-512.png` e a `og-image`. Desde 25/11/2026 ele gera só os
-   ícones do web, do Mac e do iPhone, a partir do corvo de olho âmbar (seção 5); os outros
-   arquivos ficaram como estavam em `brand/`.
+   ícones do web, do Mac e do iPhone e a `og-image`, a partir do corvo de olho âmbar (seção 5); os
+   outros arquivos ficaram como estavam em `brand/`.
 
 Referência visual da direção "Muninn": canvas "Visão — identidade" no Claude.
 
