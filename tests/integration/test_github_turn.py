@@ -125,3 +125,22 @@ def test_owner_data_without_a_tool_is_never_searched_on_the_web(db):
     assert any(a["action"] == "owner_data_missing" for a in outcome.plan.actions)
     assert len(provider.prompts) == 1  # no curiosity assessment, no research
     assert "precisa conectar o Google em Ajustes" in provider.prompts[0][0].content
+
+
+def test_a_reply_that_echoes_the_question_is_written_again(db):
+    owner = setup(db)
+    drafts = iter(["Você quer saber quantos commits teve hoje no visao?", "Hoje foram 3 commits."])
+    provider = FakeLLMProvider(responder=lambda messages: next(drafts))
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="quantos commits teve hoje no visao?",
+        provider=provider,
+        search=None,
+        config=CONFIG,
+        github=github(3),
+    )
+    assert outcome.result.assistant_message.content == "Hoje foram 3 commits."
+    assert "só devolveu a pergunta" in provider.prompts[-1][-1].content

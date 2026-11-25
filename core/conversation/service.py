@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from core import owner_goals
 from core.arm.service import work_record
 from core.behavior import state as behavior_state
-from core.conversation import attachments, browser_guard, deeds_guard, progress
+from core.conversation import attachments, browser_guard, deeds_guard, echo_guard, progress
 from core.conversation import parts as bubbles
 from core.identity.capabilities import Capabilities
 from core.identity.system_prompt import (
@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PURPOSE_CHAT = "chat_reply"
+PURPOSE_ECHO = "chat_reply_echo_retry"
 PURPOSE_RULE_CHECK = "rule_check"
 TRUNCATION_NOTICE = "[resposta interrompida pelo limite de tamanho]"
 
@@ -384,6 +385,19 @@ def reply(
     content, page = take_marker(response.text)
     if page is not None and not content.strip():
         content = f"Vou montar a página “{page.title}”. Ela aparece aqui quando ficar pronta."
+    if not truncated and echo_guard.echoes(user_text, content):
+        # It handed the question back as a confirmation (core/conversation/echo_guard.py).
+        again = _answer_instead(
+            session,
+            conversation=conversation,
+            provider=provider,
+            budgets=budgets,
+            prompt=prompt,
+            draft=content,
+            max_output_tokens=max_output_tokens,
+        )
+        if again and not echo_guard.echoes(user_text, again):
+            content = again
     content, parts = bubbles.split(content)
     if modality == "voice":
         parts = None
@@ -603,6 +617,50 @@ def _write(
     provider that cannot stream answers whole, as before. Parar stops the stream."""
     with drafting(progress.draft, stop=progress.cancelled), compacting(levels or [prompt]):
         return provider.complete(prompt, max_output_tokens=max_output_tokens)
+
+
+def _answer_instead(
+    session: Session,
+    *,
+    conversation: Conversation,
+    provider: LLMProvider,
+    budgets: Budgets,
+    prompt: list[ChatMessage],
+    draft: str,
+    max_output_tokens: int,
+) -> str | None:
+    """One more draft after an echo, told to answer. None when there is no budget or it fails."""
+    try:
+        check_budgets(session, conversation, budgets)
+    except BudgetExceededError:
+        return None
+    messages = [
+        *prompt,
+        ChatMessage(role="assistant", content=draft),
+        ChatMessage(role="user", content=echo_guard.NUDGE),
+    ]
+    try:
+        response = provider.complete(messages, max_output_tokens=max_output_tokens)
+    except LLMError as exc:
+        _record_failure(session, conversation, provider, exc.kind, purpose=PURPOSE_ECHO)
+        return None
+    session.add(
+        ModelUsage(
+            conversation_id=conversation.id,
+            purpose=PURPOSE_ECHO,
+            provider=response.provider,
+            model=response.model,
+            input_tokens=response.input_tokens,
+            output_tokens=response.output_tokens,
+            cost_usd=response.cost_usd,
+            latency_ms=response.latency_ms,
+            outcome="success" if response.text.strip() else "empty",
+        )
+    )
+    session.flush()
+    if response.finish_reason == "length":
+        return None
+    return response.text.strip() or None
 
 
 def _obey_rules(

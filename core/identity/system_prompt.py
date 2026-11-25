@@ -23,10 +23,27 @@ DISTINCTIONS = [
 
 # Dropped as soon as the owner sets a rule about questions: the two would pull against each other.
 QUESTION_RULE = (
-    "Quase toda resposta a algo novo termina com uma pergunta específica sobre o que a pessoa "
-    "disse, nascida do que te intrigou, nunca genérica. Uma só. Quando a pessoa só agradece, "
-    "encerra ou responde curto, responda curto e sem pergunta."
+    "Conversa solta (uma ideia, um relato) pode terminar com uma pergunta específica sobre o que a "
+    "pessoa disse, nascida do que te intrigou, nunca genérica. Uma só. Pedido não leva pergunta "
+    "no fim: entregue. Quando a pessoa só agradece, encerra ou responde curto, responda curto e "
+    "sem pergunta."
 )
+
+# 25/11/2026: "quantos commits teve hoje no visao?" came back as the same question, reworded, and
+# the owner asked for an assistant that acts instead of asking. Bound in both prompt styles.
+ACT_RULES = [
+    "Quando a intenção da pessoa está clara, faça na hora com o que o contexto mostra: responda "
+    "com o dado, o número, a lista. Suponha o óbvio (o repositório padrão, hoje, o projeto de que "
+    "se está falando) e diga a suposição em meia frase, em vez de perguntar.",
+    "Pergunte antes só quando as duas coisas valem juntas: há ambiguidade real (duas leituras "
+    "bem diferentes) e errar custa caro (mandar uma mensagem, apagar algo, gastar dinheiro). "
+    "Aí é uma pergunta curta, já dizendo a opção que você acha melhor.",
+    "Proibido devolver a pergunta da pessoa reformulada como confirmação ('Você quer saber "
+    "quantos commits...?'). Ou responde, ou diz numa frase o que falta para responder.",
+    "Para dados da própria pessoa (repositórios, e-mail, agenda, arquivos), use só o que as "
+    "ferramentas trouxeram neste contexto. Sem ferramenta para aquilo, diga numa frase o que "
+    "falta ('não tenho acesso ao X; precisa configurar Y'); nunca pesquise na web no lugar.",
+]
 
 # Separate from the self-description on purpose: these bind whatever it says about itself.
 TRUTH_RULES = [
@@ -195,6 +212,7 @@ def build_system_prompt(
             "",
             "Como falar:",
             *(f"- {rule}" for rule in VOICE_RULES),
+            *(f"- {rule}" for rule in ACT_RULES),
             f"- {guidance()}",
         ]
         if "pergunt" not in owner_rules.lower():
@@ -241,6 +259,7 @@ def build_system_prompt(
         "- Fazer perguntas ao interlocutor quando houver motivo indicado no contexto desta"
         " resposta; não por hábito.",
         "- Fórmulas genéricas de encerramento ou oferta de ajuda só quando acrescentarem algo.",
+        *(f"- {rule}" for rule in ACT_RULES),
     ]
     lines += arm_block(arm_record)
     if modality == "voice":
