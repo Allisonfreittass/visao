@@ -54,12 +54,24 @@ describe("Rail", () => {
     expect(html).toContain(`<span class="rail-chat-title">${LONGO}</span>`);
   });
 
+  it("keeps the browser's translator off the name", () => {
+    expect(barra([])).toMatch(/<span class="rail-wordmark"[^>]*translate="no"[^>]*>VISAO<\/span>/);
+  });
+
+  // On a touch screen :hover sticks after the tap; the rows answer the touch with :active instead.
+  it("shows hover only where there is a mouse", () => {
+    expect(css).toMatch(/@media \(hover: hover\) \{\n {2}\.rail-nav button:hover, \.rail-chats button:hover/);
+    expect(regra(".rail-nav button:active, .rail-chats button:active")).toMatch(/background: var\(--surface-2\)/);
+  });
+
   // The bar is 248 px and a long title must not widen it: an auto grid column grows to the longest
   // title (the horizontal scroll bar in the owner's screenshot), minmax(0, 1fr) does not.
   it("keeps a fixed width that its items cannot stretch", () => {
     expect(regra(".rail")).toMatch(/width: 248px/);
     expect(regra(".rail")).toMatch(/max-width: 248px/);
     expect(regra(".rail")).toMatch(/overflow-x: hidden/);
+    // As a drawer on the phone, scrolling it does not carry on to the page behind.
+    expect(regra(".rail")).toMatch(/overscroll-behavior: contain/);
     expect(regra(".rail-nav, .rail-section, .rail-chats, .rail-bottom")).toMatch(/grid-template-columns: minmax\(0, 1fr\)/);
     expect(regra(".rail-chat-title")).toMatch(/text-overflow: ellipsis/);
     expect(regra(".rail-chat-title")).toMatch(/white-space: nowrap/);

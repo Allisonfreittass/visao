@@ -86,6 +86,10 @@ describe("the entrance", () => {
     expect(html).not.toContain("<img");
   });
 
+  it("keeps the browser's translator off the name", () => {
+    expect(entrada()).toContain('<p class="entrada-marca" translate="no">VISAO</p>');
+  });
+
   it("greets the first account without 'de volta'", () => {
     expect(entrada(true)).toContain(">Bem-vindo.</h1>");
     expect(String(MIN_PASSWORD_LENGTH)).toBe("12");

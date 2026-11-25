@@ -74,7 +74,7 @@ export function Rail(props: RailProps) {
     >
       <a className="rail-brand" href="/" aria-label="VISAO, início">
         <Corvo size={30} />
-        <span className="rail-wordmark" aria-hidden="true">VISAO</span>
+        <span className="rail-wordmark" aria-hidden="true" translate="no">VISAO</span>
       </a>
       <div className="rail-actions">
         <button type="button" className="rail-new" onClick={props.onNewChat}>

@@ -27,7 +27,7 @@ export function Entrance({ children, firstAccount = false }: { children: ReactNo
         <CorvoClose alvo={alvo} />
       </div>
       <section className="entrada-acesso" aria-labelledby="entrada-titulo" onFocus={focou} onBlur={saiu}>
-        <p className="entrada-marca">VISAO</p>
+        <p className="entrada-marca" translate="no">VISAO</p>
         <div className="entrada-saudacao">
           <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Bem-vindo de volta."}</h1>
           <p className="entrada-lede">Só você entra aqui. Ele lembra apenas do que você deixar.</p>
