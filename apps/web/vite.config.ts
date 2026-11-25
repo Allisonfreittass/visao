@@ -15,5 +15,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Tests that read the stylesheet (Rail.test.tsx) get the real file, not an empty string.
+    css: { include: [/layout\.css/] },
   },
 });

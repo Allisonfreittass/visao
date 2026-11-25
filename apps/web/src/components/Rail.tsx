@@ -109,6 +109,7 @@ export function Rail(props: RailProps) {
               <li key={c.id}>
                 <button
                   type="button"
+                  title={c.title ?? undefined}
                   aria-current={view === "conversation" && props.currentConversation === c.id ? "page" : undefined}
                   onClick={() => props.onOpenConversation(c)}
                 >
