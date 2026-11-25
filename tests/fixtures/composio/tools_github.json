@@ -106,8 +106,7 @@
     }
    },
    "tags": [
-    "readOnlyHint",
-    "idempotentHint"
+    "readOnlyHint"
    ],
    "toolkit": {
     "slug": "github",

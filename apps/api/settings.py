@@ -177,6 +177,11 @@ class Settings(BaseSettings):
     # Optional: web search in the conversation through Tavily (free plan: 1000 searches a month).
     # Without it, research in the conversation uses Wikipedia and arXiv.
     tavily_api_key: SecretStr | None = None
+    # Optional: the owner's other apps (Notion, GitHub, Slack...) through Composio (docs/APPS.md,
+    # ADR-0028). Without the key there are no apps: no section in Ajustes, nothing in the chat.
+    composio_api_key: SecretStr | None = None
+    # Composio executions a month, all apps together; below the free plan's 10,000 on purpose.
+    composio_monthly_calls: int = Field(default=8000, ge=0)
     autonomy_llm_calls_per_day: int = Field(default=20, ge=0)
     autonomy_tokens_per_day: int = Field(default=60_000, ge=0)
     autonomy_max_actions_per_cycle: int = Field(default=3, ge=0)
@@ -213,6 +218,7 @@ class Settings(BaseSettings):
         "webpush_subject",
         "github_token",
         "tavily_api_key",
+        "composio_api_key",
         "llm_max_request_tokens",
         "llm_fallback_max_request_tokens",
         "llm_fallback2_max_request_tokens",
