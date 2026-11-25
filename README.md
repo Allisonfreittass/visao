@@ -89,7 +89,16 @@ The full picture, with each module's contract, is in [docs/ARCHITECTURE.md](docs
 
 ## Run it
 
-Requires Python 3.12, Node 22 and, for the Docker path, Docker Compose 2.24+.
+To install it on your own Mac or Linux machine, one script, without Docker or sudo, installs `uv`,
+the code in `~/.visao` and a service that starts it at login and again if it falls (launchd on the
+Mac, a systemd user unit on Linux); details in [docs/INSTALAR.md](docs/INSTALAR.md):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Allisonfreittass/visao/main/scripts/instalar.sh | bash
+visao conta criar --email you@example.com   # first user (password asked) and genesis
+```
+
+To work on the code, requires Python 3.12, Node 22 and, for the Docker path, Docker Compose 2.24+.
 
 ```bash
 make setup                 # .venv + Python and web dependencies

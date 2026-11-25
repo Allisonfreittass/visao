@@ -3,6 +3,8 @@
     visao iniciar [--porta 8000] [--fundo]
     visao parar
     visao estado
+    visao servico instalar [--porta 8000] | remover
+    visao conta criar --email voce@exemplo.com
 
 One process on 127.0.0.1: the API with the worker inside it (VISION_WORKER_IN_API) and the web
 app on the same address (VISION_WEB_DIR), with SQLite migrated on start. It runs from the code's
@@ -22,6 +24,8 @@ import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
+
+from apps import visao_servico as servico
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB_DIR = ROOT / "apps" / "web" / "dist"
@@ -128,6 +132,13 @@ def iniciar(port: int, fundo: bool) -> int:
             file=sys.stderr,
         )
         return 1
+    # Installed as a service: the system starts it (a process of our own would only fight the
+    # service for the port). The service itself runs this command with VISAO_SERVICO=1.
+    if servico.installed() and os.environ.get("VISAO_SERVICO") != "1":
+        if servico.start() != 0:
+            print("O serviço não ligou.", file=sys.stderr)
+            return 1
+        return _wait_up(port, lambda: False, "pelo serviço")
     if fundo:
         return _iniciar_no_fundo(port)
 
@@ -155,14 +166,18 @@ def _iniciar_no_fundo(port: int) -> int:
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+    return _wait_up(port, lambda: child.poll() is not None, f"processo {child.pid}")
+
+
+def _wait_up(port: int, died, how: str) -> int:
     deadline = time.monotonic() + START_WAIT_SECONDS
     while time.monotonic() < deadline:
-        if child.poll() is not None:
+        if died():
             print(f"O Visão não subiu. Veja o log: {log_file()}", file=sys.stderr)
             return 1
         status, _ = get_json(port, "/api/health", timeout=1.0)
         if status == 200:
-            print(f"Visão em http://127.0.0.1:{port} (processo {child.pid}, log em {log_file()})")
+            print(f"Visão em http://127.0.0.1:{port} ({how}, log em {log_file()})")
             return 0
         time.sleep(0.5)
     print(f"O Visão demorou para responder. Veja o log: {log_file()}", file=sys.stderr)
@@ -175,7 +190,11 @@ def parar() -> int:
         print("O Visão não está rodando.")
         return 0
     pid = int(current["pid"])
-    os.kill(pid, signal.SIGTERM)
+    if servico.installed():
+        # The service manager would start it again after a plain SIGTERM.
+        servico.stop()
+    else:
+        os.kill(pid, signal.SIGTERM)
     deadline = time.monotonic() + STOP_WAIT_SECONDS
     while time.monotonic() < deadline and alive(pid):
         time.sleep(0.2)
@@ -202,10 +221,16 @@ def _database_label(url: str) -> str:
     return url.split("@")[-1]  # never the user and password
 
 
+def _service_line() -> str:
+    if servico.kind() is None:
+        return "Serviço: não disponível neste sistema"
+    return f"Serviço: {'instalado' if servico.installed() else 'não instalado'} ({servico.kind()})"
+
+
 def estado() -> int:
     current = running()
     if current is None:
-        print("Parado.")
+        print(f"Parado.\n{_service_line()}")
         return 1
     port = int(current["port"])
     status, _ = get_json(port, "/api/health")
@@ -224,8 +249,20 @@ def estado() -> int:
     ]
     age = _heartbeat_age()
     lines.append("Worker: sem sinal ainda" if age is None else f"Worker: sinal há {age:.0f} s")
+    lines.append(_service_line())
     print("\n".join(lines))
     return 0 if status == 200 else 1
+
+
+def conta_criar(email: str) -> int:
+    """The first user (the password is asked in the terminal) and the agent's genesis."""
+    os.chdir(ROOT)
+    from apps.api import cli as account
+
+    code = account.main(["create-user", "--email", email])
+    if code == 0:
+        code = account.main(["genesis"])
+    return code
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -236,7 +273,22 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument("--fundo", action="store_true", help="roda em segundo plano, com log")
     sub.add_parser("parar", help="desliga o Visão que está rodando")
     sub.add_parser("estado", help="diz se está rodando, se responde e o último sinal do worker")
+    service = sub.add_parser("servico", help="sobe com o login e volta sozinho se cair")
+    service_sub = service.add_subparsers(dest="acao", required=True)
+    install = service_sub.add_parser("instalar", help="launchd no macOS, systemd no Linux")
+    install.add_argument("--porta", type=int, default=DEFAULT_PORT)
+    service_sub.add_parser("remover", help="desliga e apaga o serviço")
+    account = sub.add_parser("conta", help="cria o primeiro usuário")
+    account_sub = account.add_subparsers(dest="acao", required=True)
+    create = account_sub.add_parser("criar", help="pede a senha no terminal e faz a gênese")
+    create.add_argument("--email", required=True)
     args = parser.parse_args(argv)
+    if args.comando == "servico":
+        if args.acao == "instalar":
+            return servico.instalar(ROOT, args.porta, home(), log_file())
+        return servico.remover()
+    if args.comando == "conta":
+        return conta_criar(args.email)
     if args.comando == "iniciar":
         return iniciar(args.porta, args.fundo)
     if args.comando == "parar":
