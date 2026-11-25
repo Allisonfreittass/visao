@@ -67,6 +67,7 @@ from core.panels.extract import extract as extract_prices
 from core.policies.autonomy import is_paused
 from core.skills import catalog as skills
 from core.study.service import related_context
+from core.tools import registry as tools
 from infrastructure.database.models import (
     AgentIdentity,
     Attachment,
@@ -234,6 +235,7 @@ def run_turn(
             ),
         ),
     )
+    mac = tools.mac_state(session, owner.id)
     # The owner's GitHub, read on the server (a "cloud" tool): before the Mac, so a question about
     # commits of a Mac project is answered now instead of waiting for a Mac that may be off.
     from_github = (
@@ -260,10 +262,22 @@ def run_turn(
             provider=provider,
             budgets=config.budgets,
         )
-        if wanted:
+        # A "mac" tool: with the Mac off it is not proposed, and the reply says so in one line.
+        off = tools.blocked("mac_task", mac) if wanted else None
+        if wanted and not off:
             progress.step("Montando o pedido ao Mac", wanted.project, kind="mac")
-        task = mac_intent.propose(session, owner.id, wanted, conversation.id) if wanted else None
-        if task is not None:
+        task = (
+            mac_intent.propose(session, owner.id, wanted, conversation.id)
+            if wanted and not off
+            else None
+        )
+        if off:
+            plan.add("mac_blocked", executed=False, reason="mac_offline", project=wanted.project)
+            blocks.append(
+                "A pessoa pediu trabalho no Mac, e ele não está disponível. Nada foi pedido ao "
+                f"Mac. Responda só isto, numa frase curta: «{off}»"
+            )
+        elif task is not None:
             plan.add(
                 "mac_proposed",
                 executed=True,
@@ -365,6 +379,28 @@ def run_turn(
                     f"deixei esperando o seu Aprovar: {apps_actions.describe(a)}"
                     for a in used.proposed
                 )
+
+    # The owner's own data (repositories, email, calendar, files) comes from a tool or not at all:
+    # without one the reply says what is missing, and the web is never searched in its place.
+    own_data = bool(tools.owner_data(text)) or from_github is not None
+    available = {
+        name
+        for name, on in (
+            ("github", github is not None),
+            ("google", capabilities.google),
+            ("apps", bool(capabilities.apps)),
+        )
+        if on
+    }
+    missing = tools.missing_access(text, available=available, mac=mac)
+    if missing:
+        blocks.append(tools.block(missing))
+        plan.add(
+            "owner_data_missing",
+            executed=False,
+            reason="no_tool_for_owner_data",
+            kinds=tools.owner_data(text),
+        )
 
     # Projects, notes and panels changed from the conversation, before the reply, so "anotei" is
     # true when it is said (core/actions.py, ADR-0021). A "sim, apaga" answers the deletion the
@@ -511,13 +547,7 @@ def run_turn(
     offering = False
     quote_table = None
     budget_goal = None
-    if (
-        browser is not None
-        and not read
-        and accepted is None
-        and edited is None
-        and from_github is None
-    ):
+    if browser is not None and not read and accepted is None and edited is None and not own_data:
         browsed = browse.run(
             session,
             owner=owner,
@@ -618,7 +648,7 @@ def run_turn(
         config.curiosity_enabled
         and modality != "voice"
         and not read
-        and from_github is None
+        and not own_data
         and not (browsed and (browsed.opened or browsed.missing))
     ):
         outcome = consider(

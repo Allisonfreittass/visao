@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core import llm_routing
+from core.arm.service import online as arm_online
 from core.initiatives import push
 from core.policies.autonomy import is_paused
 from core.skills import catalog as skill_catalog
@@ -44,6 +45,8 @@ class Capabilities:
     # "HH:MM" of the morning briefing (ADR-0017); None when the owner turned it off.
     morning_briefing: str | None = None
     mac_projects: tuple[str, ...] = ()
+    # The paired Mac answered in the last 90 s (core/arm/service.py); off blocks only Mac tools.
+    mac_online: bool = False
     google: bool = False
     # The owner's other apps connected through Composio, by name (docs/APPS.md, ADR-0028).
     apps: tuple[str, ...] = ()
@@ -158,6 +161,12 @@ class Capabilities:
                 "vê a tela a cada passo e faz uma ação por vez (clicar, digitar, tecla, rolar); "
                 "ele para mexendo o mouse ou com /pc parar; você nunca abre uma sessão por conta "
                 "própria, nem digita senhas, compra, envia mensagens ou apaga algo"
+            )
+        if self.mac_projects and not self.mac_online:
+            items.append(
+                "agora o Mac está desligado: só o que roda no Mac (tarefas nos projetos, ver a "
+                "tela, /pc, arquivos dele) espera ele voltar, e você diz isso numa frase; GitHub, "
+                "e-mail, agenda, apps, painéis, sites e pesquisa rodam no servidor normalmente"
             )
         if self.continuous:
             items.append(
@@ -369,6 +378,10 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         )
         is not None,
         apps=inputs.apps,
+        mac_online=any(
+            arm_online(d)
+            for d in session.scalars(select(ArmDevice).where(ArmDevice.owner_user_id == owner.id))
+        ),
         mac_projects=tuple(
             sorted(
                 {

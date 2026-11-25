@@ -3,6 +3,7 @@ that only waits for the owner's tap; nothing the model inferred runs on its own.
 
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -17,6 +18,14 @@ from tests.integration.test_mind_temperament import chat, mac
 from tests.integration.test_phase9 import CONFIG
 
 PROJECTS = ["mercado", "visao"]
+
+
+def mac_on(db, owner, projects):
+    """A paired Mac that answered just now: a Mac task is proposed only while it is on."""
+    device = mac(db, owner, projects)
+    device.last_seen_at = datetime.now(UTC)
+    db.commit()
+    return device
 
 
 def test_only_a_named_project_or_the_mac_with_an_action_reaches_the_model():
@@ -38,7 +47,7 @@ def test_a_slash_mac_in_the_middle_of_a_sentence_is_a_request_too():
 
 def test_a_slash_mac_without_a_project_goes_to_the_only_one_and_waits_for_a_tap(db, steps):
     owner = setup(db)
-    mac(db, owner, ["visao"])
+    mac_on(db, owner, ["visao"])
     outcome, _ = turn(
         db,
         owner,
@@ -88,7 +97,7 @@ def turn(db, owner, text, extraction):
 
 def test_a_plain_request_becomes_a_task_that_waits_for_a_tap(db, monkeypatch):
     owner = setup(db)
-    mac(db, owner, PROJECTS)
+    mac_on(db, owner, PROJECTS)
     pushed = []
     monkeypatch.setattr("core.arm.service.push.send_to_owner", lambda *a, **k: pushed.append(k))
     outcome, provider = turn(

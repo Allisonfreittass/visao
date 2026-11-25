@@ -77,3 +77,51 @@ def test_a_message_without_github_never_reads_it(db):
         github=github(0),
     )
     assert not any(a.startswith("github") for a in outcome.plan.executed())
+
+
+def test_a_mac_request_with_the_mac_off_gets_one_short_sentence(db):
+    owner = setup(db)
+    mac(db, owner, ["visao"])  # off
+    extraction = {"mac_task": True, "project": "visao", "task": "Rode os testes do visao."}
+
+    def answer(messages):
+        if '"mac_task"' in messages[0].content:
+            import json
+
+            return json.dumps(extraction)
+        return "Seu Mac está desligado agora."
+
+    provider = FakeLLMProvider(responder=answer)
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="roda os testes do visao",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, curiosity_enabled=False),
+        github=github(0),
+    )
+    assert db.scalar(select(ArmTask)) is None
+    assert any(a["action"] == "mac_blocked" for a in outcome.plan.actions)
+    system = provider.prompts[-1][0].content
+    assert "Seu Mac está desligado agora" in system and "Nada foi pedido ao Mac" in system
+
+
+def test_owner_data_without_a_tool_is_never_searched_on_the_web(db):
+    owner = setup(db)
+    provider = FakeLLMProvider(reply_text="Não tenho acesso ao seu e-mail.")
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="tem algo importante nos meus e-mails hoje?",
+        provider=provider,
+        search=None,
+        config=CONFIG,  # curiosity on: it would have assessed and maybe searched
+    )
+    assert any(a["action"] == "owner_data_missing" for a in outcome.plan.actions)
+    assert len(provider.prompts) == 1  # no curiosity assessment, no research
+    assert "precisa conectar o Google em Ajustes" in provider.prompts[0][0].content
