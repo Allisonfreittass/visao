@@ -22,7 +22,7 @@ export const NOT_YET: Record<"agents" | "channels" | "skills", NotYet> = {
     icon: "plug",
     title: "Canais",
     promise: "Aqui você vai escolher por onde eu posso falar com você: Telegram, WhatsApp, e-mail ou Discord.",
-    meanwhile: "Hoje eu aviso por notificação no aparelho, e o e-mail do Google fica em Ajustes › Integrações.",
+    meanwhile: "Hoje eu aviso por notificação no aparelho. O e-mail do Google fica em Ajustes › Integrações, e o Slack, o Discord e os outros apps que você conectar pelo Composio ficam em Ajustes › Integrações › Apps: por eles eu leio e preparo mensagens para você aprovar, mas ainda não converso com você por lá.",
   },
   skills: {
     icon: "sparkle",

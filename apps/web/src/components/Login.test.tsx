@@ -90,6 +90,10 @@ describe("the entrance", () => {
     expect(entrada()).toContain('<p class="entrada-marca" translate="no">VISAO</p>');
   });
 
+  it("has no checkbox between the password and Entrar, as in the mockup", () => {
+    expect(entrada()).not.toContain('type="checkbox"');
+  });
+
   it("greets the first account without 'de volta'", () => {
     expect(entrada(true)).toContain(">Bem-vindo.</h1>");
     expect(String(MIN_PASSWORD_LENGTH)).toBe("12");

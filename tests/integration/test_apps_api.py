@@ -47,7 +47,7 @@ def test_the_catalog_has_every_app_but_gmail_and_calendar(client, db, api):
     _, headers = owner(client, db)
     slugs = {a["slug"] for a in client.get("/apps/catalog", headers=headers).json()}
     assert {"github", "notion", "slack", "jira", "perplexityai"} <= slugs
-    assert not slugs & {"gmail", "googlecalendar"}
+    assert not slugs & {"gmail", "googlecalendar", "composio"}
     items = {a["slug"]: a for a in client.get("/apps/catalog", headers=headers).json()}
     assert items["perplexityai"]["connectable"] and items["perplexityai"]["asks_key"]
     assert items["github"]["connectable"] and not items["github"]["asks_key"]

@@ -23,6 +23,10 @@ AUDIT_ACTION = "composio_call"
 # Gmail and Google Calendar stay on the Visão's own integration (docs/GOOGLE.md): two paths to
 # the same email would mean two different approvals for the same thing.
 EXCLUDED = frozenset({"gmail", "googlecalendar", "google_calendar"})
+# Composio's own toolkit (searching tools, managing connections) is not one of the owner's apps.
+NOT_APPS = frozenset({"composio"})
+# Never in the catalog nor among the connected apps.
+HIDDEN = EXCLUDED | NOT_APPS
 CONNECTIONS_TTL_SECONDS = 300
 MONTH_OVER = "o limite do mês dos apps acabou"
 
@@ -58,7 +62,7 @@ def connected(apps: ComposioClient, owner_ref: str, *, fresh: bool = False) -> l
     if not fresh and kept and time.monotonic() - kept[0] < CONNECTIONS_TTL_SECONDS:
         return kept[1]
     try:
-        found = [c for c in apps.connections(owner_ref) if c.toolkit not in EXCLUDED]
+        found = [c for c in apps.connections(owner_ref) if c.toolkit not in HIDDEN]
     except ComposioError:
         return kept[1] if kept else []
     _CONNECTED[owner_ref] = (time.monotonic(), found)
