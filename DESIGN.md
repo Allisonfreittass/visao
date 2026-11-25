@@ -123,7 +123,8 @@ Os dois trazem o próprio fundo de papel (`#F3F1EC`) e os cantos arredondados (2
   - os ícones do PWA (192 e 512);
   - o `maskable-512` (o desenho a 84%, no canto de baixo à esquerda, para a cabeça e o bico caberem
     no círculo seguro do Android);
-  - o ícone do app de Mac.
+  - os ícones do app de Mac, com o desenho pequeno em 16 e 32 pt (também nos pixels 2x da
+    tela Retina) e o inteiro de 128 pt para cima.
 - **Ainda do anel:** o ícone do iPhone e a `og-image`. Mudam quando o iPhone e o selo migrarem.
 
 A gênese do Muninn (abaixo) continua sendo a animação do login até a etapa 4 decidir o que fica.
