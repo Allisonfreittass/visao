@@ -36,7 +36,7 @@ import { Corvo } from "./brand/Corvo";
 import { Icon } from "./components/Icon";
 import { PageBar, pageTitle } from "./components/PageBar";
 import { Rail, type WorkspaceView } from "./components/Rail";
-import { SettingsView } from "./components/SettingsView";
+import { type SectionId, SettingsView } from "./components/SettingsView";
 import { StatusBar } from "./components/StatusBar";
 import { CommandPalette, type PaletteItem } from "./components/CommandPalette";
 import { NotYetView } from "./components/NotYetView";
@@ -164,6 +164,8 @@ export function App() {
   /** The "Agora / O que fiz de verdade" column beside the chat. */
   /** "Novo projeto" in the page bar: Projetos opens its form each time this goes up. */
   const [newProject, setNewProject] = useState(0);
+  /** Ajustes opens on this section (the microphone, when a call is not possible, opens "voz"). */
+  const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
   const [benchOpen, setBenchOpen] = useState(() => loadPreference("bench") !== "0");
   // The opening animation, once a day (components/Intro.tsx).
   // `?intro` in the address plays it again on demand (to see it).
@@ -883,7 +885,7 @@ export function App() {
     hint: callHint,
     onCall: () => { setError(null); void voice.startCall(); },
     onStopSpeaking: voice.stopSpeaking,
-    onOpenSettings: () => showView("settings"),
+    onOpenSettings: () => { setSettingsSection("voz"); showView("settings"); },
   };
   const currentConversation = conversations.find((c) => c.id === current);
   const currentProjectId = currentConversation?.project_id ?? null;
@@ -920,6 +922,7 @@ export function App() {
   /** The pill and the menu: "Chat" is the main conversation; "Projetos" is the grid of projects. */
   function go(next: WorkspaceView) {
     if (next === "conversation") return openChat();
+    if (next === "settings") setSettingsSection(undefined);
     showView(next);
   }
 
@@ -1108,6 +1111,8 @@ export function App() {
             {(view === "agents" || view === "channels" || view === "skills") && <NotYetView place={view} />}
                 {view === "settings" && (
                   <SettingsView
+                key={settingsSection ?? "aparencia"}
+                initialSection={settingsSection}
                     api={api}
                     onPausedChange={pending.setPaused}
                     memoryEnabled={memoryEnabled}
@@ -1143,7 +1148,7 @@ export function App() {
                   olderLeft={olderLeft}
                   onLoadOlder={() => void loadOlder()}
                   placeholder="Fala comigo…"
-                  composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} />}
+                  composerStart={<MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={voice.inCall} onExplain={call.onOpenSettings} />}
                   anel={anel}
                   macWorking={macWorking}
                   voiceLevel={voice.level}

@@ -51,13 +51,16 @@ export function MobileTabs({ view, onView }: { view: WorkspaceView; onView: (vie
 }
 
 /** The microphone left of the message box: a tap starts a voice call (the ring listens). */
-export function MicButton({ canCall, hint, onCall, live }: { canCall: boolean; hint: string | null; onCall: () => void; live?: boolean }) {
+export function MicButton({ canCall, hint, onCall, live, onExplain }: { canCall: boolean; hint: string | null; onCall: () => void; live?: boolean; onExplain?: () => void }) {
+  // When a call is not possible here, a tap says why and opens the voice settings, instead of a
+  // dead button (the sentence about it no longer sits under the box on a phone).
+  const explains = !canCall && !!onExplain;
   return (
     <button
       type="button"
-      className={`mic-button${live ? " mic-button--live" : ""}`}
-      onClick={onCall}
-      disabled={!canCall}
+      className={`mic-button${live ? " mic-button--live" : ""}${explains ? " mic-button--off" : ""}`}
+      onClick={explains ? onExplain : onCall}
+      disabled={!canCall && !explains}
       aria-label={canCall ? "Falar (ligar por voz)" : hint ?? "Falar"}
       title={canCall ? "Falar" : hint ?? undefined}
     >

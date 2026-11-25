@@ -761,3 +761,26 @@ button.project-tile:hover { border-color: var(--border-strong); }
 .goal-source { font: italic 300 15px/1.45 var(--font-display); color: var(--text-muted); }
 .goal-past summary { cursor: pointer; font: 400 13px/1.4 var(--font-sans); color: var(--text-muted); }
 .goals > .btn-secondary { justify-self: start; }
+
+/* ---------- Celular instalado na tela inicial (iPhone) ----------
+   A margem de segurança de baixo (a barrinha, 34 pt) era somada duas vezes: as abas a reservavam
+   inteira e a janela de novo por baixo delas, o que deixava uma faixa branca e outra bege. Agora só
+   as abas cuidam dela, encostando na barrinha como nos apps nativos. --safe-bottom permite simular
+   a margem num navegador comum. */
+@media (max-width: 899px) {
+  :root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
+  .app { padding-bottom: 0; }
+  .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
+  .mobile-tabs button { height: 52px; }
+  /* Teclado aberto: as abas somem e a caixa encosta no teclado. */
+  [data-teclado] .mobile-tabs { display: none; }
+  /* O menu aberto (e o fundo escurecido) fica por cima das abas. */
+  .app > .layout:has(.rail.open) { z-index: 5; }
+  .rail.open { bottom: calc(12px + var(--safe-bottom)); }
+  /* Sem a frase fixa sobre o microfone: tocar nele explica e leva aos ajustes. */
+  .home-hint { display: none; }
+  /* As sugestões rolam para o lado; a borda some aos poucos em vez de cortar a palavra. */
+  .suggestion-chips { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+}
+.mic-button--off, .composer-row > .mic-button--off { background: transparent; border-color: transparent; color: var(--text-muted); opacity: .7; }

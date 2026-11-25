@@ -14,7 +14,7 @@ import type { ToolsMode } from "./ChatView";
 import { fold } from "./CommandPalette";
 import { Icon, type IconName } from "./Icon";
 
-type SectionId = "aparencia" | "autonomia" | "memoria" | "modelo" | "voz" | "integracoes" | "conta";
+export type SectionId = "aparencia" | "autonomia" | "memoria" | "modelo" | "voz" | "integracoes" | "conta";
 
 /** The sections on the left, with the words the search also finds them by. */
 export const SECTIONS: { id: SectionId; title: string; icon: IconName; keywords: string }[] = [
@@ -83,6 +83,8 @@ interface SettingsViewProps {
   onToggleVoiceApproval: () => void;
   toolsMode: ToolsMode;
   onToolsMode: (mode: ToolsMode) => void;
+  /** The section to open on (the microphone opens "voz"). */
+  initialSection?: SectionId;
 }
 
 /** All the switches in one place, grouped by what they touch. */
@@ -95,7 +97,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [here, setHere] = useState(locationOn());
   const [hereNote, setHereNote] = useState("");
   const [theme, setTheme] = useState<Theme>(loadTheme);
-  const [section, setSection] = useState<SectionId>("aparencia");
+  const [section, setSection] = useState<SectionId>(props.initialSection ?? "aparencia");
   const [query, setQuery] = useState("");
   const shown = query.trim() ? matchSections(query) : [section];
   const show = (id: SectionId) => shown.includes(id);

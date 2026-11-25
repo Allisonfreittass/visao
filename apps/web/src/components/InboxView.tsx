@@ -432,7 +432,7 @@ function HomeComposer({ call, onSend, suggestions, working }: { call: CallContro
       </ul>
       <form className="composer composer--home" onSubmit={submit}>
         <div className="composer-row">
-          <MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={call.inCall} />
+          <MicButton canCall={call.canCall} hint={call.hint} onCall={call.onCall} live={call.inCall} onExplain={call.onOpenSettings} />
           <textarea
             ref={box}
             value={draft}
