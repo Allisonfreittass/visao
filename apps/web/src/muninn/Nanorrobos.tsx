@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { ART, EYE, easeOutCubic } from "./genesis";
+import { ART, EYE, easeOutCubic } from "./genesis.logic";
 import { type Palette, STROKES_URL, artUrl, readPalette } from "./Genesis";
 import {
   DESENHOS,
@@ -15,7 +15,7 @@ import {
   nuvem,
   particleCount,
   voo,
-} from "./nanorrobos";
+} from "./nanorrobos.logic";
 import "./nanorrobos.css";
 
 /** Illustration in and out, and the eye, once the particles are in the crow (s). */

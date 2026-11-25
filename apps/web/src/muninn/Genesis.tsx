@@ -18,7 +18,7 @@ import {
   strokeProgress,
   strokeStart,
   thinkingBoost,
-} from "./genesis";
+} from "./genesis.logic";
 import "./genesis.css";
 
 // Colours of DESIGN.md §2, read from the scoped tokens so the canvas follows the CSS.

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Anel } from "../anel/Anel";
 import type { AnelEstado } from "../anel/state";
 import { Nanorrobos } from "./Nanorrobos";
-import { DESENHOS, FADE_MS, type Ferramenta, type Forma, MORPH_MS, type Passo, agendaInicial, formaDoPasso, pathOf, pedir, proximaTroca } from "./nanorrobos";
+import { DESENHOS, FADE_MS, type Ferramenta, type Forma, MORPH_MS, type Passo, agendaInicial, formaDoPasso, pathOf, pedir, proximaTroca } from "./nanorrobos.logic";
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
 
