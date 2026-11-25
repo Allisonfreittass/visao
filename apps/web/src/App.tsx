@@ -1038,7 +1038,7 @@ export function App() {
             }}
             onClose={() => setMenuOpen(false)}
           />
-          {menuOpen && <div className="scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+          <div className={`scrim${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
           <div className="principal">
             <PageBar
               title={pageTitle(view, conversations.find((c) => c.id === current)?.title ?? (inProject ? projectNames[inProject] : null))}

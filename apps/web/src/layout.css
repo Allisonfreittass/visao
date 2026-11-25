@@ -130,11 +130,19 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 @media (max-width: 899px) {
   .mobile-bar { display: flex; }
   .page-bar, .status-bar { display: none; }
-  .rail { display: none; }
-  .rail.open { display: flex; position: fixed; z-index: var(--layer-overlay); top: calc(12px + env(safe-area-inset-top)); bottom: 12px; left: 12px;
+  /* A gaveta fica montada fora da tela e desliza; antes ela trocava de display e aparecia de
+     estalo. Fechada, `visibility: hidden` a tira do toque, do Tab e do leitor de tela, mas só
+     depois de sair (o atraso de .2s). Sai mais rápido do que entra. */
+  .rail { display: flex; position: fixed; z-index: var(--layer-overlay); top: calc(12px + env(safe-area-inset-top)); bottom: 12px; left: 12px;
     width: min(300px, 86vw); min-width: 0; max-width: min(300px, 86vw);
-    border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float); transition: transform .22s var(--ease); }
-  .scrim { display: block; position: fixed; inset: 0; z-index: calc(var(--layer-overlay) - 1); background: var(--scrim); }
+    border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float);
+    transform: translateX(calc(-100% - 24px)); visibility: hidden;
+    transition: transform .2s var(--ease-mech), visibility 0s linear .2s; }
+  .rail.open { transform: none; visibility: visible; transition: transform .34s var(--ease-out), visibility 0s; }
+  /* O fundo escurece junto com a gaveta, e clareia junto quando ela sai. */
+  .scrim { display: block; position: fixed; inset: 0; z-index: calc(var(--layer-overlay) - 1); background: var(--scrim);
+    opacity: 0; visibility: hidden; transition: opacity .2s ease-out, visibility 0s linear .2s; }
+  .scrim.open { opacity: 1; visibility: visible; transition: opacity .3s var(--ease-out), visibility 0s; }
   .main { padding: var(--space-2) var(--space-4) var(--space-2); }
 }
 
@@ -865,8 +873,10 @@ button.project-tile:hover { border-color: var(--border-strong); }
   /* Teclado aberto: as abas somem e a caixa encosta no teclado. */
   [data-teclado] .mobile-tabs { display: none; }
   /* O menu aberto (e o fundo escurecido) fica por cima das abas. */
-  .app > .layout:has(.rail.open) { z-index: 5; }
-  .rail.open { bottom: calc(12px + var(--safe-bottom)); }
+  /* Ao fechar, ele só desce depois que a gaveta saiu, para as abas não a cobrirem no caminho. */
+  .app > .layout { transition: z-index 0s linear .2s; }
+  .app > .layout:has(.rail.open) { z-index: 5; transition: none; }
+  .rail { bottom: calc(12px + var(--safe-bottom)); }
   /* Sem a frase fixa sobre o microfone: tocar nele explica e leva aos ajustes. */
   .home-hint { display: none; }
   /* As sugestões rolam para o lado; a borda some aos poucos em vez de cortar a palavra. */
@@ -923,3 +933,22 @@ button.project-tile:hover { border-color: var(--border-strong); }
   .mobile-tabs button { height: 46px; padding-top: 5px; }
   [data-ate-o-fim] .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
 }
+
+/* ---------- Movimento do app (DESIGN.md §6) ----------
+   O resto do app é ferramenta: o movimento só explica o que mudou, rápido, e sai mais depressa do
+   que entra. Só opacidade e transform. Com prefers-reduced-motion tudo isto some (styles.css). */
+
+/* Trocar de tela: a nova aparece sem estalo. Só opacidade, porque um transform aqui viraria o
+   referencial dos elementos fixos de dentro da tela (a folha do artefato, a caixa do chat). */
+.principal-corpo > .main > * { animation: tela-entra .2s ease-out backwards; }
+@keyframes tela-entra { from { opacity: 0; } }
+
+/* Busca e comandos: o fundo escurece e a caixa desce um pouco, de onde o atalho foi chamado. */
+.palette-scrim { animation: fundo-entra .16s ease-out backwards; }
+.palette { animation: paleta-entra .24s var(--ease-out) backwards; transform-origin: 50% 0; }
+@keyframes fundo-entra { from { opacity: 0; } }
+@keyframes paleta-entra { from { opacity: 0; transform: translateY(-8px) scale(.98); } }
+
+/* Abas do celular: o ícone afunda no toque e volta, como nos apps nativos. */
+.mobile-tabs button .icon { transition: transform .16s var(--ease-out); }
+.mobile-tabs button:active .icon { transform: scale(.86); transition-duration: .08s; }

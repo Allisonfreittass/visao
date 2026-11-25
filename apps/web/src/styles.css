@@ -529,7 +529,7 @@ button.projects-primary { background: var(--text); color: var(--bg); border-colo
   .artifact-viewer--dragging { transition: none !important; }
   .artifact-viewer:not(.artifact-viewer--docked) .artifact-viewer-bar { position: relative; padding-top: 18px; touch-action: none; }
   .sheet-grabber { display: block; position: absolute; top: 7px; left: 50%; width: 38px; height: 5px; margin-left: -19px; border-radius: 3px; background: var(--border-strong); }
-  .rail { transition: transform .22s ease-out; touch-action: pan-y; }
+  .rail { touch-action: pan-y; }
 }
 @keyframes folha-sobe { from { transform: translateY(100%); } }
 
