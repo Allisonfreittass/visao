@@ -723,6 +723,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .notebook-tabs button { border-radius: 0; box-shadow: none; min-height: 0; }
 /* Camadas por cima de tudo: o seletor .app > :not(.ambient) não pode puxá-las para o fluxo. */
 .app > .palette-scrim, .app > .toast-region { position: fixed; }
+.app > .call { position: fixed; z-index: var(--camada-sobreposicao); }
 .app > .palette-scrim { z-index: calc(var(--layer-overlay) + 10); }
 .app > .toast-region { z-index: calc(var(--layer-overlay) + 20); }
 .palette-search input:focus-visible { outline: none; box-shadow: none; }
