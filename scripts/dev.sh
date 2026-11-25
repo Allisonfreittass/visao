@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts API, worker and web together for local use; Ctrl+C stops all three.
+# Starts the API (with the worker inside it) and the web for local use; Ctrl+C stops both.
 # Usage: npm start   (or: scripts/dev.sh). Written for macOS's bash 3.2; also runs on Linux.
 set -eo pipefail
 cd "$(dirname "$0")/.."
@@ -72,13 +72,15 @@ run() {
   pids="$pids $!"
 }
 
-run api .venv/bin/uvicorn apps.api.main:app --port 8000 --reload
-# The shared database already has its worker, on the server (docs/LIGHTSAIL.md): two workers
-# would think and speak twice. VISAO_LOCAL_WORKER=1 overrides it on purpose.
+# The worker runs inside the API (VISION_WORKER_IN_API): one Python process instead of two
+# (docs/research/execucao_local.md, etapa 2). The shared database already has its worker, on the
+# server (docs/LIGHTSAIL.md): two workers would think and speak twice. VISAO_LOCAL_WORKER=1
+# overrides it on purpose.
 if [ -z "$shared_db" ] || [ "${VISAO_LOCAL_WORKER:-}" = 1 ]; then
-  run worker .venv/bin/python -m apps.worker.main
+  run api env VISION_WORKER_IN_API=1 .venv/bin/uvicorn apps.api.main:app --port 8000 --reload
 else
   echo "Banco compartilhado: o worker do servidor cuida da mente; este não sobe."
+  run api .venv/bin/uvicorn apps.api.main:app --port 8000 --reload
 fi
 run web npm --prefix apps/web run dev
 

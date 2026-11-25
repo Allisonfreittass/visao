@@ -94,7 +94,7 @@ Requires Python 3.12, Node 22 and, for the Docker path, Docker Compose 2.24+.
 ```bash
 make setup                 # .venv + Python and web dependencies
 cp .env.example .env       # fill VISION_SECRET_KEY and the VISION_LLM_* block
-make start                 # migrations, API :8000, worker and web :5173
+make start                 # migrations, API :8000 with the worker inside, and web :5173
 ```
 
 Create the first user and run genesis (idempotent):

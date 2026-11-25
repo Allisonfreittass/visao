@@ -144,6 +144,10 @@ class Settings(BaseSettings):
     # Autonomous cycle (docs/AUTONOMY.md): one scheduled job per window, plus a daily budget for
     # everything the agent does on its own. Zero calls = no autonomous model call at all.
     autonomy_cycle_minutes: int = Field(default=60, ge=5)
+    # The worker as a thread inside the API (apps/worker/main.py): one process on the owner's
+    # machine. Off on the server, where the worker is its own service. Never with more than one
+    # uvicorn worker: each would start its own.
+    worker_in_api: bool = False
     # Inner life (docs/MIND.md): thinking between turns, interest-led study, starting conversations.
     mind_enabled: bool = False
     mind_think_minutes: int = Field(default=20, ge=5)
