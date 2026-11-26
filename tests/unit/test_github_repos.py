@@ -110,3 +110,19 @@ def test_a_message_without_github_does_nothing():
         raise AssertionError("no call")
 
     assert run("bom dia", api=github(handler), now=datetime.now(UTC), timezone="UTC") is None
+
+
+def test_a_rate_limit_without_a_token_says_to_set_one_and_never_blames_the_mac():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, json={"message": "API rate limit exceeded"})
+
+    client = httpx.Client(base_url="https://api.github.com", transport=httpx.MockTransport(handler))
+    done = run(
+        "quantos commits teve hoje no visao?",
+        api=GitHubAPI(None, client=client),
+        now=datetime.now(UTC),
+        timezone="UTC",
+    )
+    assert done is not None and not done.read
+    assert "60 leituras por hora" in done.block and "VISION_GITHUB_TOKEN" in done.block
+    assert "não fale do Mac" in done.block
