@@ -167,6 +167,16 @@ SCENARIOS = [
 ]
 
 
+class _NoWeb:
+    """A web search that finds nothing: the eval checks WHETHER the turn searched (the step
+    "research"), never what it found."""
+
+    name = "avaliacao"
+
+    def search(self, query: str, max_results: int) -> list:
+        return []
+
+
 @dataclass
 class Result:
     name: str
@@ -289,7 +299,7 @@ def run(label: str, dry: bool) -> int:
                 owner=owner,
                 text=scenario.message,
                 provider=provider,
-                search=None,
+                search=_NoWeb(),
                 config=config,
                 github=_github() if scenario.github else None,
                 modality="voice" if scenario.voice else "text",
