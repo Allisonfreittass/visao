@@ -196,6 +196,27 @@ class _FakeApps:
         return self._issues if tool.kind == "read" else self._created
 
 
+class _Recorder:
+    """Wraps the provider and keeps what the model answered when picking an app or a tool, so a
+    miss can be told apart: no call chosen, a call outside the list, or a failed read."""
+
+    def __init__(self, provider) -> None:
+        self._provider, self.picks = provider, []
+        self.name, self.model = provider.name, provider.model
+        self.pricing = getattr(provider, "pricing", None)
+
+    def __getattr__(self, name):
+        return getattr(self._provider, name)
+
+    def complete(self, messages, *, max_output_tokens):
+        from core.apps import assist as apps_assist
+
+        response = self._provider.complete(messages, max_output_tokens=max_output_tokens)
+        if messages[0].content in (apps_assist.APP_INSTRUCTIONS, apps_assist.TOOL_INSTRUCTIONS):
+            self.picks.append(response.text[:400])
+        return response
+
+
 class _NoWeb:
     """A web search that finds nothing: the eval checks WHETHER the turn searched (the step
     "research"), never what it found."""
@@ -215,6 +236,7 @@ class Result:
     checks: dict[str, bool] = field(default_factory=dict)
     # What the Visão saw as connected in an apps scenario: tells a harness fault from the model's.
     seen_apps: list[str] = field(default_factory=list)
+    picks: list[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -336,13 +358,14 @@ def run(label: str, dry: bool) -> int:
                 apps_key="ck_eval" if scenario.apps else None,
                 web_search=False,
             )
+            recorder = _Recorder(provider)
             outcome = run_turn(
                 db,
                 conversation=chat,
                 identity=get_identity(db),
                 owner=owner,
                 text=scenario.message,
-                provider=provider,
+                provider=recorder,
                 search=_NoWeb(),
                 config=config,
                 github=_github() if scenario.github else None,
@@ -363,6 +386,7 @@ def run(label: str, dry: bool) -> int:
             steps,
             _checks(scenario, reply, steps),
             seen_apps,
+            recorder.picks,
         )
         results.append(result)
         mark = "ok " if result.passed else "FALHOU"
@@ -391,6 +415,7 @@ def run(label: str, dry: bool) -> int:
                             "checks": r.checks,
                             "passed": r.passed,
                             "seen_apps": r.seen_apps,
+                            "picks": r.picks,
                         }  # fmt: skip
                         for r in results
                     ],
