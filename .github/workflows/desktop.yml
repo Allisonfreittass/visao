@@ -45,4 +45,4 @@ jobs:
         with:
           name: Visao-mac
           path: desktop/app/Visao-mac.zip
-          retention-days: 30
+          retention-days: 7

@@ -10,7 +10,7 @@ O Visão num app: um ícone no Dock, uma janela, nada de terminal. O app leva o 
 
 O CI monta o app num Mac com Apple Silicon a cada PR que mexe nele (`.github/workflows/desktop.yml`)
 e também quando você roda o workflow à mão (Actions > desktop > Run workflow). O app sai como
-artefato da execução, `Visao-mac` (um zip, guardado por 30 dias).
+artefato da execução, `Visao-mac` (um zip, guardado por 7 dias).
 
 ```bash
 gh run download --repo Allisonfreittass/visao --name Visao-mac
