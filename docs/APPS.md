@@ -93,6 +93,28 @@ As regras são as de email e agenda (`core/google/actions.py`):
 - **20 s por chamada**, sem repetir nada. Um 429 (limite do Composio) encerra as leituras daquele
   turno.
 
+## Pagamentos
+
+Os apps de pagamento do Composio (Stripe, PayPal, Square, Mercado Pago…) têm ferramentas que
+movem dinheiro. Elas seguem regras próprias ([`core/apps/money.py`](../core/apps/money.py)):
+
+- **Desligado por padrão.** Uma ferramenta que paga, transfere, cobra, estorna ou saca nunca é
+  oferecida ao modelo, em nenhum app. O código reconhece essas ferramentas pelas palavras do nome e
+  da descrição; "transferir" sozinho só conta num app de pagamento, porque o GitHub transfere
+  repositórios.
+- **Ligado por app, com teto.** Em Ajustes › Integrações › Apps, "Pagamentos pelo …" pede um teto
+  por dia. Só aparece para apps de pagamento.
+- **Só pelas suas palavras.** Nunca a partir de algo compartilhado de outro app, nunca pela mente
+  nem pelo "Olhar sozinho".
+- **O valor, ou nada.** Um pagamento cujo valor não está nos argumentos não é preparado. O cartão
+  diz quanto, em que moeda e para quem ("Posso pagar BRL 50,00 pelo Stripe?"), e o botão é
+  **Pagar**.
+- **Na aprovação:** só com toque, nunca com um "sim" dito na ligação. O app pede para confirmar o
+  valor, e o servidor confere que o valor bate, que o interruptor continua ligado, que a moeda é a
+  do teto e que o total do dia não passa do teto.
+- **Pix e boleto direto do banco não dá:** iniciar pagamento pelo Open Finance exige ser
+  instituição regulada.
+
 ## Olhar sozinho
 
 Em Ajustes › Integrações › Apps, cada app conectado tem o interruptor **Olhar o … sozinho**, que

@@ -7,6 +7,13 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 26/11/2026
 
+- **Pagamentos pelos apps, com trava** ([APPS.md](APPS.md), seção "Pagamentos").
+  - Antes, um app de pagamento conectado (Stripe, PayPal…) deixava "mandar dinheiro" virar um
+    pedido comum, sem mostrar o valor nem ter limite. Agora isso fica desligado por padrão.
+  - Em Ajustes › Integrações › Apps você liga "Pagamentos" num app de pagamento, com um teto por
+    dia. O cartão mostra quanto, em que moeda e para quem, e o pagamento só sai com um toque seu
+    confirmando o valor. Pela voz, nunca.
+
 - **Olhar os apps sozinho** ([APPS.md](APPS.md), seção "Olhar sozinho").
   - Em Ajustes › Integrações › Apps, cada app conectado ganhou o interruptor **Olhar sozinho**.
     Ligado, eu escolho uma leitura de novidades daquele app (no GitHub, por exemplo, as issues ou

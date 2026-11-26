@@ -13,12 +13,15 @@ Destructive tools are never proposed, and the hints are checked again right befo
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from core.apps import account
+from core.apps import money as money_rules
+from core.apps.money import Money
 from core.initiatives import push
 from infrastructure.database.models import Conversation, Message, ToolAction, User
 from integrations.composio.client import ComposioClient, ComposioError, Tool, kind_of
@@ -80,6 +83,7 @@ def propose(
     app_name: str,
     arguments: dict[str, Any],
     conversation_id: uuid.UUID | None = None,
+    money: Money | None = None,
 ) -> ToolAction:
     if tool.toolkit in account.EXCLUDED:
         raise ActionError("email e agenda são pela integração do Google")
@@ -109,6 +113,17 @@ def propose(
             "description": tool.description[:500],
             "tags": list(tool.tags)[:20],
             "arguments": json.loads(encoded),
+            **(
+                {
+                    "money": {
+                        "amount": str(money.amount),
+                        "currency": money.currency,
+                        "to": money.to,
+                    }
+                }
+                if money is not None
+                else {}
+            ),
         },
         status="proposed",
         result="",
@@ -124,7 +139,12 @@ def propose(
 
 def describe(action: ToolAction) -> str:
     p = action.payload
-    return f"{p.get('app') or action.toolkit}: {p.get('tool_name') or action.tool_slug}"
+    base = f"{p.get('app') or action.toolkit}: {p.get('tool_name') or action.tool_slug}"
+    paid = p.get("money")
+    if paid:
+        amount = Decimal(str(paid["amount"]))
+        base += " — " + Money(amount, paid.get("currency") or "", paid.get("to") or "").words()
+    return base
 
 
 def _owned(session: Session, owner_id: uuid.UUID, action_id: uuid.UUID) -> ToolAction:
@@ -228,7 +248,11 @@ def approve(
     apps: ComposioClient | None,
     secret_key: str,
     monthly_limit: int,
+    via: str = "toque",
+    confirm_amount: str | None = None,
 ) -> ToolAction:
+    """`via` and `confirm_amount` matter for a payment (core/apps/money.py): a tap only, with the
+    amount the owner confirmed."""
     action = _owned(session, owner.id, action_id)
     now = datetime.now(UTC)
     if not _claim(session, owner.id, action_id, now):
@@ -243,6 +267,12 @@ def approve(
     app = action.payload.get("app") or action.toolkit
     if apps is None:
         action.status, action.result = "failed", "Os apps estão desligados neste servidor."
+        return _finish(session, owner, action)
+    refused = money_rules.refusal_at_approval(
+        session, owner, action, via=via, confirmed=confirm_amount, now=now
+    )
+    if refused:
+        action.status, action.result = "failed", refused
         return _finish(session, owner, action)
     if not _still_safe(apps, action):
         action.status, action.result = "failed", "Essa ferramenta apaga coisas; não fiz."

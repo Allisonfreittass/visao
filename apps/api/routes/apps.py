@@ -4,6 +4,7 @@ changes it prepared. Without VISION_COMPOSIO_API_KEY everything here answers "of
 
 import uuid
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 from apps.api.deps import AppSettings, CurrentUser, DbSession
 from apps.api.llm import get_llm_provider
 from apps.api.settings import Settings
-from core.apps import account, actions, glance
+from core.apps import account, actions, glance, money
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ToolAction
 from integrations.composio.client import ComposioClient, ComposioError
@@ -41,6 +42,9 @@ class ActionOut(BaseModel):
     result: str
     conversation_id: uuid.UUID | None
     created_at: datetime
+    # A payment (core/apps/money.py): amount, currency and recipient, shown big on the card; the
+    # approval must confirm the amount.
+    money: dict[str, str] | None = None
 
 
 class ConnectedOut(BaseModel):
@@ -49,6 +53,15 @@ class ConnectedOut(BaseModel):
     logo: str = ""
     # "Olhar sozinho" (core/apps/glance.py): the read it runs every few hours, or "" when off.
     glance: str = ""
+    # "Pagamentos": the daily ceiling when on; payment_app says whether to offer the switch.
+    payments: dict[str, str] | None = None
+    payment_app: bool = False
+
+
+class PaymentsIn(BaseModel):
+    enabled: bool
+    cap: str = ""
+    currency: str = money.DEFAULT_CURRENCY
 
 
 class GlanceIn(BaseModel):
@@ -117,6 +130,7 @@ def _action(a: ToolAction) -> ActionOut:
         result=a.result,
         conversation_id=a.conversation_id,
         created_at=a.created_at,
+        money=a.payload.get("money"),
     )
 
 
@@ -165,6 +179,7 @@ def read_apps(db: DbSession, user: CurrentUser, settings: AppSettings) -> AppsOu
         names = {}
     seen = dict.fromkeys(c.toolkit for c in connections)
     looking = glance.chosen(user)
+    paying = money.allowed(user)
     return AppsOut(
         enabled=True,
         connected=[
@@ -173,6 +188,10 @@ def read_apps(db: DbSession, user: CurrentUser, settings: AppSettings) -> AppsOu
                 name=names[slug].name if slug in names else slug.title(),
                 logo=names[slug].logo if slug in names else "",
                 glance=str((looking.get(slug) or {}).get("name") or ""),
+                payments=paying.get(slug),
+                payment_app=money.payment_app(
+                    slug, names[slug].categories if slug in names else ()
+                ),
             )
             for slug in seen
         ],
@@ -259,6 +278,47 @@ def set_glance(
     return GlanceOut(enabled=True, tool_name=choice.tool_name)
 
 
+@router.post("/{toolkit}/payments")
+def set_payments(
+    toolkit: str, body: PaymentsIn, db: DbSession, user: CurrentUser, settings: AppSettings
+) -> AppsOut:
+    """ "Pagamentos" for one app: off by default, on only with a daily ceiling
+    (core/apps/money.py)."""
+    if not body.enabled:
+        money.set_allowed(user, toolkit, None)
+        record_audit(
+            db, "apps.payments", "off", actor_user_id=user.id, details={"toolkit": toolkit}
+        )
+        db.commit()
+        return read_apps(db, user, settings)
+    try:
+        cap = Decimal(body.cap.replace(",", ".").strip())
+    except InvalidOperation as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Teto inválido.") from exc
+    if not cap.is_finite() or cap <= 0 or cap > money.MAX_CAP:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"O teto por dia vai de 0,01 a {money.MAX_CAP}.",
+        )
+    apps = _required(settings)
+    ref = account.user_ref(user.id, settings.secret_key)
+    if toolkit not in {c.toolkit for c in account.connected(apps, ref, fresh=True)}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Esse app não está conectado.")
+    currency = (body.currency or money.DEFAULT_CURRENCY).strip().upper()
+    if not currency.isalpha() or not 3 <= len(currency) <= 4:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Moeda inválida.")
+    money.set_allowed(user, toolkit, cap, currency)
+    record_audit(
+        db,
+        "apps.payments",
+        "on",
+        actor_user_id=user.id,
+        details={"toolkit": toolkit, "cap": str(cap), "currency": currency},
+    )
+    db.commit()
+    return read_apps(db, user, settings)
+
+
 @router.post("/connections/{connection_id}/wait")
 def wait(
     connection_id: str,
@@ -321,6 +381,7 @@ def decide(
     user: CurrentUser,
     settings: AppSettings,
     via: Literal["toque", "voz"] = "toque",
+    confirm_amount: str | None = Query(default=None, max_length=32),
 ) -> ActionOut:
     """`via=voz`: said in a call after it read the change aloud (docs/VOICE.md); recorded."""
     try:
@@ -332,6 +393,8 @@ def decide(
                 apps=_apps(settings),
                 secret_key=settings.secret_key,
                 monthly_limit=settings.composio_monthly_calls,
+                via=via,
+                confirm_amount=confirm_amount,
             )
         elif decision == "reject":
             action = actions.reject(db, user.id, action_id)

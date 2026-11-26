@@ -24,7 +24,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from core.apps import account, actions
+from core.apps import account, actions, money
 from core.conversation import progress
 from core.conversation.service import Budgets, check_budgets
 from core.memory.text import fold, tokens
@@ -218,6 +218,7 @@ def run(
     secret_key: str,
     monthly_limit: int,
     known: dict[str, list[str]] | None = None,
+    money_allowed: bool = True,
 ) -> Assist | None:
     """None when there are no apps, the message is not about one, or nothing came of it.
     `known`: what the server already knows of the owner's account in an app, by toolkit (the
@@ -266,6 +267,14 @@ def run(
     # A follow-up has few words of its own ("isso mesmo"): the tools are ranked with the turn
     # before it too.
     follow_up = not mentioned(text, names)
+    # Tools that move money only where the owner turned payments on, and only for their own
+    # words (core/apps/money.py): otherwise the model never even sees them.
+    paying = money_allowed and slug in money.allowed(owner)
+    tools = [
+        t
+        for t in tools
+        if t.kind == "read" or paying or not money.is_money(slug, t.slug, t.name, t.description)
+    ]
     offered = _offered(tools, f"{recent[-FOLLOW_UP_CONTEXT:]}\n{text}" if follow_up else text)
     if not offered:
         return None
@@ -307,6 +316,20 @@ def run(
         if tool is None or tool.kind == "destructive":
             continue  # only from the closed list, never one that deletes
         if tool.kind == "write":
+            paid = None
+            if money.is_money(slug, tool.slug, tool.name, tool.description):
+                paid = money.read(slug, arguments) if paying else None
+                if paid is None:
+                    parts.append(
+                        f"Não preparei {tool.name}: é um pagamento e "
+                        + (
+                            "não achei o valor nos argumentos. Diga isso à pessoa."
+                            if paying
+                            else "os pagamentos desse app estão desligados. Diga onde ligar: "
+                            "Ajustes › Integrações › Apps."
+                        )
+                    )
+                    continue
             try:
                 result.proposed.append(
                     actions.propose(
@@ -316,6 +339,7 @@ def run(
                         app_name=app,
                         arguments=arguments,
                         conversation_id=conversation.id,
+                        money=paid,
                     )
                 )
             except actions.ActionError as exc:

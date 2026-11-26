@@ -457,6 +457,8 @@ def run_turn(
             secret_key=config.google_secret,
             monthly_limit=config.apps_monthly_calls,
             known=_known_accounts(github, capabilities),
+            # Content shared from another app is third-party text: it never prepares a payment.
+            money_allowed=not shared,
         )
         if used is not None:
             blocks.append(used.block)
