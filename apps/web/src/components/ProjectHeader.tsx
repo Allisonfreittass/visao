@@ -5,6 +5,7 @@ import { attachmentUrl, formatSize } from "../attachments";
 import { Icon } from "./Icon";
 import { PanelsBoard } from "./PanelsBoard";
 import { projectSummary } from "./ProjectsView";
+import { confirmar, perguntar } from "../ask";
 
 interface ProjectHeaderProps {
   api: Api;
@@ -48,7 +49,7 @@ export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, on
 
   async function rename() {
     if (!project) return;
-    const next = window.prompt("Novo nome do projeto", project.name);
+    const next = await perguntar("Novo nome do projeto", project.name);
     if (!next?.trim()) return;
     try {
       const saved = await api.renameProject(project.id, next.trim());
@@ -60,7 +61,7 @@ export function ProjectHeader({ api, projectId, refreshKey, showBack, onBack, on
   }
 
   async function remove() {
-    if (!project || !window.confirm(`Apagar o projeto “${project.name}”? As anotações vão junto; o chat, as páginas, os arquivos e os painéis continuam, fora de projeto.`)) return;
+    if (!project || !(await confirmar(`Apagar o projeto “${project.name}”? As anotações vão junto; o chat, as páginas, os arquivos e os painéis continuam, fora de projeto.`, "Apagar"))) return;
     try {
       await api.deleteProject(project.id);
       onDeleted();

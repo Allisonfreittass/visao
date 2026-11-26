@@ -4,6 +4,7 @@ import { type Api, type ArmDevice, type ArmTask, utcDate } from "../api";
 import { taskDetail, undoQuestion } from "../arm";
 import type { Pending } from "../hooks/usePending";
 import { dayLabel, TASK_STATUS } from "../labels";
+import { confirmar } from "../ask";
 
 interface MacViewProps {
   api: Api;
@@ -44,13 +45,13 @@ export function MacView({ api, pending, onError }: MacViewProps) {
   }
 
   async function unpair(device: ArmDevice) {
-    if (!window.confirm(`Desconectar ${device.name}? O braço dele para na hora.`)) return;
+    if (!(await confirmar(`Desconectar ${device.name}? O braço dele para na hora.`, "Desconectar"))) return;
     await api.unpairArm(device.id).catch(onError);
     pending.refresh();
   }
 
   async function undo(task: ArmTask) {
-    if (!window.confirm(undoQuestion(task))) return;
+    if (!(await confirmar(undoQuestion(task), "Desfazer"))) return;
     await api.undoArm(task.id).catch(onError);
     pending.refresh();
   }

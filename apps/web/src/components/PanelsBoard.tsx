@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type Api, type Panel, type PanelItem, type PanelSuggestion, utcDate } from "../api";
 import { assumedLine } from "./QuoteTable";
 import { Icon } from "./Icon";
+import { confirmar } from "../ask";
 
 const REFRESH_MS = 60_000;
 
@@ -150,8 +151,8 @@ function PanelCard({ api, panel, onChanged, onDraft }: { api: Api; panel: Panel;
             <button
               type="button"
               className="ghost"
-              onClick={() => {
-                if (!window.confirm(`Apagar o painel “${panel.title}”?`)) return;
+              onClick={async () => {
+                if (!(await confirmar(`Apagar o painel “${panel.title}”?`, "Apagar"))) return;
                 void api.deletePanel(panel.id).then(onChanged);
               }}
             >

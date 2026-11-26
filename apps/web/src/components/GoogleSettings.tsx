@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Api, GoogleState } from "../api";
 import { Setting } from "./Setting";
+import { confirmar } from "../ask";
 
 /** Gmail and Google Calendar: whether they are connected, and the one switch that matters. */
 export function GoogleSettings({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
@@ -21,7 +22,7 @@ export function GoogleSettings({ api, onError }: { api: Api; onError: (e: unknow
   }
 
   async function disconnect() {
-    if (!window.confirm("Desconectar o Google? Eu paro de ler seu email e sua agenda na hora.")) return;
+    if (!(await confirmar("Desconectar o Google? Eu paro de ler seu email e sua agenda na hora.", "Desconectar"))) return;
     try {
       await api.googleDisconnect();
       setState(await api.google());

@@ -25,6 +25,7 @@ import { QuoteTable, tableBubble } from "./QuoteTable";
 import { commonPrefix, revealStep } from "../stream";
 import { FeedbackBar } from "./FeedbackBar";
 import { SourcesPill } from "./SourcesPill";
+import { confirmar } from "../ask";
 
 interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
@@ -542,8 +543,8 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           artifact={viewing}
           url={pageUrl(viewing.path)}
           onClose={() => setViewing(null)}
-          onDelete={() => {
-            if (!window.confirm(`Apagar “${viewing.title}”? O link para de funcionar.`)) return;
+          onDelete={async () => {
+            if (!(await confirmar(`Apagar “${viewing.title}”? O link para de funcionar.`, "Apagar"))) return;
             onDeleteArtifact(viewing);
             setViewing(null);
           }}

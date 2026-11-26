@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { type Api, ApiError, type MemoryItem, type Mind, type NameRecord, type OwnerGoal, type OwnerGoals, utcDate } from "../api";
 import { dayLabel } from "../labels";
 import { StudyPanel } from "./StudyPanel";
+import { confirmar } from "../ask";
 
 type Tab = "memoria" | "pensamentos" | "interesses" | "nome" | "retrato";
 const TABS: { id: Tab; label: string }[] = [
@@ -128,7 +129,7 @@ function MemoryTab({ api, mind, reloadMind, memoryEnabled, onToggleMemory, onErr
   useEffect(() => { api.memories().then(setItems, (e) => { setItems([]); onError(e); }); }, [api, onError]);
 
   async function forget(item: MemoryItem) {
-    if (!window.confirm(`Esquecer “${item.content}”? Não dá para desfazer.`)) return;
+    if (!(await confirmar(`Esquecer “${item.content}”? Não dá para desfazer.`, "Esquecer"))) return;
     try {
       await api.forgetMemory(item.id);
       setItems((list) => list?.filter((i) => i.id !== item.id) ?? list);

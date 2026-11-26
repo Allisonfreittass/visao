@@ -62,6 +62,7 @@ import { argumentLines, cardText, spokenApp } from "./apps";
 import { heardVerdict, type SpokenAsk, spokenArm, spokenGoogle, spokenPanelOffer, VOICE_ANSWER_MS } from "./voice/approval";
 import { followTurn } from "./stream";
 import { MAX_FILES } from "./attachments";
+import { confirmar } from "./ask";
 
 interface TurnLatency {
   sttMs: number;
@@ -1215,8 +1216,8 @@ export function App() {
                     artifact={sidePage}
                     url={api.pageUrl(sidePage.path)}
                     onClose={() => setSidePage(null)}
-                    onDelete={() => {
-                      if (window.confirm(`Apagar “${sidePage.title}”? O link para de funcionar.`)) void deleteArtifact(sidePage);
+                    onDelete={async () => {
+                      if (await confirmar(`Apagar “${sidePage.title}”? O link para de funcionar.`, "Apagar")) void deleteArtifact(sidePage);
                     }}
                   />
                 ) : benchOpen ? (

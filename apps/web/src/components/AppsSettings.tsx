@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Api, AppCatalogItem, AppsState } from "../api";
 import { searchCatalog } from "../apps";
+import { confirmar } from "../ask";
 
 /**
  * Ajustes › Apps (docs/APPS.md): the owner's other apps through Composio. Hidden when the server
@@ -49,7 +50,7 @@ export function AppsSettings({ api, onError }: { api: Api; onError: (e: unknown)
   }
 
   async function disconnect(slug: string, name: string) {
-    if (!window.confirm(`Desconectar o ${name}? A conexão é revogada e apagada no Composio, e o que esperava sua aprovação nele é recusado.`)) return;
+    if (!(await confirmar(`Desconectar o ${name}? A conexão é revogada e apagada no Composio, e o que esperava sua aprovação nele é recusado.`, "Desconectar"))) return;
     try {
       await api.appsDisconnect(slug);
       setState(await api.apps());
