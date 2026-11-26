@@ -7,6 +7,15 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 26/11/2026
 
+- **Olhar os apps sozinho** ([APPS.md](APPS.md), seção "Olhar sozinho").
+  - Em Ajustes › Integrações › Apps, cada app conectado ganhou o interruptor **Olhar sozinho**.
+    Ligado, eu escolho uma leitura de novidades daquele app (no GitHub, por exemplo, as issues ou
+    as notificações) e mostro qual é.
+  - A cada 3 horas eu rodo essa mesma leitura e só te chamo se algo pedir a sua atenção. Só leio,
+    nunca mudo nada, e o que o app devolve não muda o que eu olho.
+  - As olhadas contam no limite do mês do Composio e param antes do fim, para sobrar para as
+    conversas.
+
 - **Entender quando a pergunta é sobre os seus dados, mesmo sem a palavra certa**
   (`core/decision/route.py`).
   - Antes, cada fonte (GitHub, Gmail e Agenda, os apps) só entrava se a mensagem tivesse uma

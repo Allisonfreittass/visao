@@ -139,7 +139,8 @@ class Capabilities:
             items.append(
                 f"ler o que está no {_and(self.apps)} do interlocutor quando ele pergunta, e "
                 "preparar mudanças que só saem depois da aprovação dele (apagar pelos apps está "
-                "desligado)"
+                "desligado); nos apps em que ele ligou 'Olhar sozinho' (Ajustes › Integrações › "
+                "Apps), olhar as novidades a cada 3 horas, só lendo"
             )
         if self.mac_projects:
             items.append(

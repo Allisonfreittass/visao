@@ -93,6 +93,24 @@ As regras são as de email e agenda (`core/google/actions.py`):
 - **20 s por chamada**, sem repetir nada. Um 429 (limite do Composio) encerra as leituras daquele
   turno.
 
+## Olhar sozinho
+
+Em Ajustes › Integrações › Apps, cada app conectado tem o interruptor **Olhar o … sozinho**, que
+começa desligado ([`core/apps/glance.py`](../core/apps/glance.py)).
+
+- **Ao ligar**, uma chamada curta do modelo escolhe, entre as ferramentas **só de leitura** do
+  app, a que melhor responde "o que é novo ou precisa da minha atenção?", com argumentos fixos. A
+  tela mostra a escolha ("A cada 3 horas eu olho: List notifications"). Uma escolha fora da lista,
+  ou que escreve, é recusada, e a tela diz por quê.
+- **Depois disso, nenhum modelo escolhe nada.** A cada 3 horas, quando a mente pensa, o servidor
+  roda exatamente aquela chamada. O que um app devolve nunca muda o que é lido. A cada vez, a
+  ferramenta é conferida de novo: se o Composio deixar de marcá-la como leitura, ela não roda.
+- **A mente recebe** um trecho de até 1.500 caracteres por app, marcado como texto de terceiros,
+  ao lado do bloco do Google. Ela só fala se algo pede a sua atenção, com as regras de sempre.
+- **Custo:** cada olhada é uma execução do mês (umas 240 por app ligado). As olhadas param em 80%
+  de `VISION_COMPOSIO_MONTHLY_CALLS`, deixando o resto para as conversas. A escolha fica em
+  `users.autonomy_permissions["apps_glance"]`, sem tabela nova.
+
 ## Configurar
 
 1. Crie a conta em [composio.dev](https://composio.dev) (o plano grátis não pede cartão) e gere uma
@@ -128,8 +146,6 @@ aparecem no catálogo desabilitados.
 
 ## O que ainda não faz
 
-- **Olhar sozinho.** A mente não olha os apps sem você perguntar. Um "Olhar sozinho" como o do
-  Google fica para depois, app por app.
 - **Apagar** qualquer coisa pelos apps.
 - **Gmail e Google Agenda pelo Composio**: ficam de fora de propósito, para não haver dois caminhos
   (e duas aprovações) para o mesmo email.

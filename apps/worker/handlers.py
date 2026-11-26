@@ -89,6 +89,10 @@ def autonomy_budget(
             initiatives_per_day=settings.mind_initiatives_per_day,
             review_provider=review_provider,
             google_secret=settings.secret_key,
+            apps_key=(
+                settings.composio_api_key.get_secret_value() if settings.composio_api_key else None
+            ),
+            apps_monthly_calls=settings.composio_monthly_calls,
         )
         if settings.mind_enabled
         else None,

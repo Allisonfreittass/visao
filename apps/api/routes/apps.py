@@ -4,17 +4,19 @@ changes it prepared. Without VISION_COMPOSIO_API_KEY everything here answers "of
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from apps.api.deps import AppSettings, CurrentUser, DbSession
+from apps.api.llm import get_llm_provider
 from apps.api.settings import Settings
-from core.apps import account, actions
+from core.apps import account, actions, glance
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ToolAction
 from integrations.composio.client import ComposioClient, ComposioError
+from integrations.llm.base import LLMProvider
 
 router = APIRouter(prefix="/apps", tags=["apps"])
 
@@ -45,6 +47,17 @@ class ConnectedOut(BaseModel):
     toolkit: str
     name: str
     logo: str = ""
+    # "Olhar sozinho" (core/apps/glance.py): the read it runs every few hours, or "" when off.
+    glance: str = ""
+
+
+class GlanceIn(BaseModel):
+    enabled: bool
+
+
+class GlanceOut(BaseModel):
+    enabled: bool
+    tool_name: str = ""
 
 
 class AppsOut(BaseModel):
@@ -151,6 +164,7 @@ def read_apps(db: DbSession, user: CurrentUser, settings: AppSettings) -> AppsOu
     except ComposioError:
         names = {}
     seen = dict.fromkeys(c.toolkit for c in connections)
+    looking = glance.chosen(user)
     return AppsOut(
         enabled=True,
         connected=[
@@ -158,6 +172,7 @@ def read_apps(db: DbSession, user: CurrentUser, settings: AppSettings) -> AppsOu
                 toolkit=slug,
                 name=names[slug].name if slug in names else slug.title(),
                 logo=names[slug].logo if slug in names else "",
+                glance=str((looking.get(slug) or {}).get("name") or ""),
             )
             for slug in seen
         ],
@@ -197,6 +212,51 @@ def connect(toolkit: str, db: DbSession, user: CurrentUser, settings: AppSetting
     record_audit(db, "apps.connect", "started", actor_user_id=user.id, details={"toolkit": toolkit})
     db.commit()
     return ConnectOut(connection_id=connection_id, url=url)
+
+
+@router.post("/{toolkit}/glance")
+def set_glance(
+    toolkit: str,
+    body: GlanceIn,
+    db: DbSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    provider: Annotated[LLMProvider | None, Depends(get_llm_provider)],
+) -> GlanceOut:
+    """ "Olhar sozinho" for one connected app. On: one call picks the read it will run, shown back
+    to the owner. Off: nothing is looked at again."""
+    if not body.enabled:
+        glance.turn_off(user, toolkit)
+        record_audit(db, "apps.glance", "off", actor_user_id=user.id, details={"toolkit": toolkit})
+        db.commit()
+        return GlanceOut(enabled=False)
+    apps = _required(settings)
+    ref = account.user_ref(user.id, settings.secret_key)
+    try:
+        connected = {c.toolkit for c in apps.connections(ref)}
+    except ComposioError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, f"O Composio não respondeu: {exc}"
+        ) from exc
+    if toolkit not in connected:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Esse app não está conectado.")
+    name = account.names(apps, [toolkit]).get(toolkit, toolkit)
+    try:
+        choice = glance.choose(
+            db, user, provider=provider, apps=apps, toolkit=toolkit, app_name=name
+        )
+    except glance.GlanceError as exc:
+        db.commit()  # the model call is still counted
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    record_audit(
+        db,
+        "apps.glance",
+        "on",
+        actor_user_id=user.id,
+        details={"toolkit": toolkit, "tool": choice.tool},
+    )
+    db.commit()
+    return GlanceOut(enabled=True, tool_name=choice.tool_name)
 
 
 @router.post("/connections/{connection_id}/wait")
