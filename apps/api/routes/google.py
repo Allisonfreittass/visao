@@ -4,7 +4,9 @@ and approve or reject the email and events it prepared.
 On the owner's own machine (the Mac app, `visao iniciar`) there is a button: the server, which runs
 right there, opens Google's sign-in in the browser, and Google comes back to it at
 http://127.0.0.1:<port>/google/callback, the loopback address a "Desktop app" client allows. On the
-hosted server the button does not show: there the terminal command still connects.
+hosted server the button is "Conectar" instead: the owner types the ID and the secret of their
+own "Web application" client once, and Google comes back to this server at
+/api/google/web/callback (apps/api/google_web.py). The terminal command still connects too.
 """
 
 import html
@@ -16,12 +18,14 @@ import webbrowser
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from apps.api import google_connect as oauth
+from apps.api import google_web as web
 from apps.api.deps import AppSettings, CurrentUser, DbSession
 from core.google import account as accounts
 from core.google import actions
@@ -59,6 +63,8 @@ class GoogleOut(BaseModel):
     # whether the client is already configured (VISION_GOOGLE_CLIENT_*) or its file is needed.
     connect_here: bool = False
     client_ready: bool = False
+    # Connected, but the kept connection no longer opens (the server key changed).
+    reconnect: bool = False
 
 
 class StartIn(BaseModel):
@@ -69,6 +75,19 @@ class StartIn(BaseModel):
 class StartOut(BaseModel):
     url: str
     opened: bool
+
+
+class WebStartIn(BaseModel):
+    """The page's own address (Google comes back to it) and the owner's "Web application"
+    client. The secret is kept only encrypted with the connection and never sent back."""
+
+    origin: str = Field(min_length=8, max_length=300)
+    client_id: str = Field(min_length=10, max_length=300)
+    client_secret: str = Field(min_length=6, max_length=300)
+
+
+class WebStartOut(BaseModel):
+    url: str
 
 
 # A sign-in started here and not finished: kept in memory for a few minutes, by its state.
@@ -140,6 +159,7 @@ def read_google(
         connected=True,
         email=account.email,
         background=account.background,
+        reconnect=unreadable,
         problem="Conecte de novo: a chave do servidor mudou." if unreadable else account.last_error,
         pending=[_action(a) for a in actions.pending(db, user.id)],
     )
@@ -238,6 +258,82 @@ def sign_in_callback(
     if missing:
         said += f" Você não marcou {', '.join(missing)}; essa parte não vai funcionar."
     return _page("Google conectado", said, True)
+
+
+@router.post("/web/start")
+def web_start(body: WebStartIn, response: Response, user: CurrentUser) -> WebStartOut:
+    """The "Conectar" button on the hosted server: the page then goes to Google in this tab."""
+    client_id, client_secret = body.client_id.strip(), body.client_secret.strip()
+    if not client_id.endswith(".apps.googleusercontent.com"):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "O ID do cliente termina em .apps.googleusercontent.com. Confira o que foi colado.",
+        )
+    try:
+        url, nonce = web.start(user.id, client_id, client_secret, body.origin)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    response.set_cookie(
+        web.COOKIE,
+        nonce,
+        max_age=web.FLOW_SECONDS,
+        path=web.COOKIE_PATH,
+        secure=body.origin.strip().startswith("https://"),
+        httponly=True,
+        samesite="lax",
+    )
+    return WebStartOut(url=url)
+
+
+@router.get("/web/callback", include_in_schema=False)
+def web_callback(
+    request: Request,
+    db: DbSession,
+    settings: AppSettings,
+    state: str = "",
+    code: str = "",
+    error: str = "",
+) -> RedirectResponse:
+    """Where Google sends the browser back. There is no Visão login on this request: the one-time
+    `state`, the cookie from /web/start and PKCE stand for it. It always ends on the app, at
+    `/?google=conectado` or `/?google=erro&motivo=<code>`, which Ajustes turns into words."""
+    try:
+        flow = web.take(state[:200], request.cookies.get(web.COOKIE))
+        if error or not code:
+            raise web.FlowError("recusado", flow.owner_id)
+        refresh, _why, missing = oauth.exchange(
+            code[:2000], flow.client_id, flow.client_secret, flow.redirect, flow.verifier
+        )
+        if not refresh:
+            raise web.FlowError("troca", flow.owner_id)
+        try:
+            accounts.connect(
+                db,
+                flow.owner_id,
+                Credentials(flow.client_id, flow.client_secret, refresh),
+                settings.secret_key,
+            )
+        except GoogleError as exc:
+            raise web.FlowError("google", flow.owner_id) from exc
+        db.commit()
+        query = {"google": "conectado"} | ({"faltou": ",".join(missing)} if missing else {})
+    except web.FlowError as exc:
+        db.rollback()
+        if exc.owner_id is not None:
+            record_audit(
+                db,
+                "google.connect",
+                "failure",
+                actor_user_id=exc.owner_id,
+                details={"via": "web", "reason": exc.reason},
+            )
+            db.commit()
+        query = {"google": "erro", "motivo": exc.reason}
+    answer = RedirectResponse("/?" + urlencode(query), status_code=status.HTTP_303_SEE_OTHER)
+    answer.delete_cookie(web.COOKIE, path=web.COOKIE_PATH)
+    answer.headers["Cache-Control"] = "no-store"
+    answer.headers["Referrer-Policy"] = "no-referrer"
+    return answer
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
