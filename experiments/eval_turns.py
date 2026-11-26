@@ -177,11 +177,14 @@ class _FakeApps:
     def __init__(self) -> None:
         from tests.fake_composio import recorded
 
+        self.log: list[str] = []
+
         self._tools = [_tool(i) for i in recorded("tools_github")["items"]]
         self._issues = recorded("execute_list_issues")
         self._created = recorded("execute_create_issue")
 
     def connections(self, owner_ref: str) -> list[Connection]:
+        self.log.append("connections")
         return [Connection("ca_github1", "github", "ACTIVE")]
 
     def catalog(self) -> list:
@@ -190,9 +193,11 @@ class _FakeApps:
         return [SimpleNamespace(slug="github", name="GitHub")]
 
     def tools(self, toolkit: str) -> list:
+        self.log.append(f"tools:{toolkit}")
         return self._tools if toolkit == "github" else []
 
     def execute(self, owner_ref: str, tool, arguments: dict) -> object:
+        self.log.append(f"execute:{tool.slug}")
         return self._issues if tool.kind == "read" else self._created
 
 
@@ -328,6 +333,22 @@ def run(label: str, dry: bool) -> int:
     google = FakeGoogle()
     google_accounts.client_for = lambda account, key: google if key == KEY else None  # type: ignore[assignment]
     composio = _FakeApps()
+    from core.apps import assist as apps_assist_module
+    from core.decision import pipeline as pipeline_module
+
+    real_run = apps_assist_module.run
+
+    def traced_run(*args, **kwargs):
+        composio.log.append(f"assist.run text={kwargs.get('text')!r}")
+        try:
+            out = real_run(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 (a diagnostic: say what broke, then re-raise)
+            composio.log.append(f"assist.run raised {exc!r}")
+            raise
+        composio.log.append(f"assist.run -> {'None' if out is None else out.apps}")
+        return out
+
+    pipeline_module.apps_assist.run = traced_run
     apps_account.client = lambda key: composio if key == "ck_eval" else None  # type: ignore[assignment]
 
     results: list[Result] = []
@@ -358,6 +379,7 @@ def run(label: str, dry: bool) -> int:
                 apps_key="ck_eval" if scenario.apps else None,
                 web_search=False,
             )
+            composio.log.clear()
             recorder = _Recorder(provider)
             outcome = run_turn(
                 db,
@@ -386,7 +408,7 @@ def run(label: str, dry: bool) -> int:
             steps,
             _checks(scenario, reply, steps),
             seen_apps,
-            recorder.picks,
+            recorder.picks + (list(composio.log) if scenario.apps else []),
         )
         results.append(result)
         mark = "ok " if result.passed else "FALHOU"
