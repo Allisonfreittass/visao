@@ -230,7 +230,15 @@ def run(label: str, dry: bool) -> int:
 
         provider = FakeLLMProvider(reply_text="Hoje foram 3 commits no visao.")
     else:
-        provider = build_llm_provider(settings)
+        # The spending ledger in a database of its own, in memory: the eval never needs, nor
+        # writes to, the app's database (on the server, Postgres on the internal network).
+        ledger = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        Base.metadata.create_all(ledger)
+        provider = build_llm_provider(
+            settings, session_factory=sessionmaker(bind=ledger, expire_on_commit=False)
+        )
         if provider is None:
             print("LLM não configurado. Faltam: " + ", ".join(missing_llm_settings(settings)))
             return 1
