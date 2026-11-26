@@ -170,6 +170,12 @@ guarda suas chaves. Por isso:
     desktop de verdade. Ela para quando você mexe o mouse, escreve `/pc parar` ou toca em Parar.
     O braço recusa terminal, a tecla Super e texto com cara de comando.
 
+14. **Habilidades no Claude Code** (versão 7, [HABILIDADES.md](HABILIDADES.md), seção "No Braço").
+    Quando a tarefa aprovada combina com uma habilidade ligada que serve ao Mac (achar bugs, design
+    de telas, revisar código), o servidor a manda junto, e o braço a acrescenta ao texto de
+    `--append-system-prompt`, num valor só e com até 8.000 caracteres. Permissões e sandbox não
+    mudam. Um braço mais velho ignora e roda sem ela.
+
    **Para atualizar o Mac:** rode `bash arm/instalar-mac.sh` de novo, de dentro do repositório. O
    `braco.json` é mantido.
 

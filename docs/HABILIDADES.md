@@ -33,9 +33,16 @@ para ele saber dizer o que sabe fazer.
 
 ## No Braço
 
-As habilidades com `arm: sim` no cabeçalho também vão para o executor de código do Visão no Mac
-([ADR-0023](decisions/0023-executor-de-codigo-proprio.md), `core/arm/coder.py`): Achar a causa de
-um bug, Design de telas e Revisar código.
+As habilidades com `arm: sim` no cabeçalho também vão para as tarefas de código no Mac, com os
+dois executores: Achar a causa de um bug, Design de telas e Revisar código.
+
+- **Executor do Visão** ([ADR-0023](decisions/0023-executor-de-codigo-proprio.md),
+  `core/arm/coder.py`): a habilidade entra no prompt de cada passo, montado no servidor.
+- **Claude Code:** o servidor manda a habilidade junto com a tarefa (`skill` em
+  `GET /arm/device/next`, só nas tarefas de trabalho), e o braço a acrescenta, até 8.000
+  caracteres, ao texto que já passava em `--append-system-prompt`. Vai como um único valor, nunca
+  como flag, e não muda o que pode rodar: as permissões e o sandbox continuam os mesmos. Precisa
+  do braço 7 no Mac; um braço mais velho ignora o campo e roda sem a habilidade.
 
 - A escolha usa os mesmos gatilhos, só sobre a tarefa que o dono aprovou, e é a mesma em todos os
   passos da tarefa. Entra no máximo uma, e só se estiver ligada.
@@ -45,8 +52,7 @@ um bug, Design de telas e Revisar código.
 - As que pedem conversa (Escrever documentos, Comunicados, Ideias) ou o e-mail e a agenda não vão:
   no meio de uma tarefa o braço não pergunta nada. "Ideias" ainda travaria a tarefa já aprovada
   esperando a aprovação de um desenho.
-- Não vale para as tarefas feitas pelo Claude Code no Mac nem para mouse e teclado
-  ([MEXER.md](MEXER.md)).
+- Não vale para mouse e teclado ([MEXER.md](MEXER.md)) nem para desfazer uma tarefa.
 
 ## Ligar e desligar
 
@@ -108,4 +114,3 @@ Ficaram de fora:
 
 - **Habilidades que ele propõe** ("Já conferi preços 9 vezes do mesmo jeito. Guardo como
   habilidade?"), com aprovar e recusar: issue #9.
-- **O Claude Code no Mac não as recebe:** só o executor do próprio Visão (seção "No Braço").

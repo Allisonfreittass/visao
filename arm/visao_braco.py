@@ -42,7 +42,7 @@ from pathlib import Path
 # 5: looks at the screen when the owner asks ("tela": true), on a line of its own.
 # 4: the arm's own executor (ADR-0023): tools implemented here, the model asked step by step
 # through the server, tests and git in a sandbox of the arm's own (bubblewrap on Linux too).
-VERSION = "6"
+VERSION = "7"
 DEFAULT_CONFIG = Path("~/.config/visao/braco.json").expanduser()
 HEARTBEAT_SECONDS = 60
 LONG_POLL_SECONDS = 25
@@ -101,6 +101,18 @@ SYSTEM_NOTE = (
     "Trabalhe só dentro deste projeto. No fim, responda em português do Brasil com um resumo "
     "curto: o que mudou, onde, e o que ficou pendente ou precisa da decisão dele."
 )
+
+
+# A skill the owner switched on in Habilidades, sent by the server with the task: text only, it
+# goes after the note and never decides what may run (the flags above do).
+MAX_SKILL_CHARS = 8000
+
+
+def system_note(task: dict) -> str:
+    skill = task.get("skill")
+    if not isinstance(skill, str) or not skill.strip():
+        return SYSTEM_NOTE
+    return f"{SYSTEM_NOTE}\n\n{skill.strip()[:MAX_SKILL_CHARS]}"
 
 
 @dataclass
@@ -291,7 +303,7 @@ def command(
         "--max-budget-usd",
         str(round(config.max_budget_usd if budget is None else budget, 2)),
         "--append-system-prompt",
-        SYSTEM_NOTE,
+        system_note(task),
     ]
     if task.get("resume_session"):
         args += ["--resume", str(task["resume_session"])]

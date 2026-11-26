@@ -13,6 +13,9 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
     só você decide.
   - As que pedem conversa, e-mail ou agenda ficam só no chat. Desligar uma em Habilidades tira ela
     do Braço também.
+  - Vale também quando o Braço trabalha pelo Claude Code: a habilidade vai junto com a tarefa.
+    Para isso o Mac precisa do braço 7: rode `bash arm/instalar-mac.sh` de novo, de dentro do
+    repositório.
 
 ## 25/11/2026
 

@@ -557,3 +557,20 @@ def test_tests_never_run_outside_the_sandbox(tmp_path, monkeypatch):
     assert body["ok"] is False and body["error"] == braco.NO_TEST_SANDBOX
     runs = (cfg.projects["visao"] / "prompts.log").read_text().count("---")
     assert runs == 1  # an error of the arm is not for Claude to fix
+
+
+def test_a_skill_from_the_server_goes_after_the_note_and_never_as_a_flag(tmp_path):
+    cfg = config(tmp_path)
+    plain = braco.command(cfg, {"prompt": "x"}, [])
+    assert plain[plain.index("--append-system-prompt") + 1] == braco.SYSTEM_NOTE
+
+    skill = "Habilidade ligada pelo dono: ache a causa antes de consertar."
+    argv = braco.command(cfg, {"prompt": "x", "skill": skill}, [])
+    note = argv[argv.index("--append-system-prompt") + 1]
+    assert note.startswith(braco.SYSTEM_NOTE) and note.endswith(skill)
+    assert len(argv) == len(plain)  # one value, never extra flags
+
+    huge = braco.command(cfg, {"prompt": "x", "skill": "y" * 50_000}, [])
+    assert len(huge[huge.index("--append-system-prompt") + 1]) < braco.MAX_SKILL_CHARS + 600
+    odd = braco.command(cfg, {"prompt": "x", "skill": {"not": "text"}}, [])
+    assert odd[odd.index("--append-system-prompt") + 1] == braco.SYSTEM_NOTE
