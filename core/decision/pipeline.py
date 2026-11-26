@@ -44,15 +44,17 @@ from core.curiosity.engine import (
     consider,
 )
 from core.decision import record as deed_record
+from core.decision import route as source_route
 from core.decision.turn import TurnPlan
 from core.github import assist as github_assist
+from core.github import repos as github_repos
 from core.google import account as google_accounts
 from core.google import actions as google_actions
 from core.google import assist as google_assist
 from core.identity import name_deliberation, self_knowledge
 from core.identity.capabilities import CapabilityInputs, build_capabilities
 from core.initiatives.followup import IDLE_BEFORE_FOLLOWUP
-from core.memory.text import tokens
+from core.memory.text import fold, tokens
 from core.mind import agenda as mind_agenda
 from core.mind import initiative as mind_initiative
 from core.mind import intentions as mind_intentions
@@ -238,10 +240,62 @@ def run_turn(
         ),
     )
     mac = tools.mac_state(session, owner.id)
+    # When no word list caught the message, one short call says which source it needs and writes
+    # the request whole, for the same path a matching word would have opened (core/decision/
+    # route.py). "Isso mesmo" after "quantos commits hoje?" reaches GitHub this way.
+    routed = None
+    github_text = google_text = apps_text = text
+    if (
+        not shared
+        and not files
+        and not read
+        and not screen.wants_screen(text)
+        and day_summary.asks(text) is None
+        and not followups.asks(text)
+        and not _word_lists_caught(text, github=github, capabilities=capabilities)
+        and source_route.worth_asking(
+            text,
+            voice=modality == "voice",
+            sources={
+                "github": github is not None,
+                "google": capabilities.google,
+                "apps": capabilities.apps,
+            },
+        )
+    ):
+        routed = source_route.route(
+            session,
+            conversation=conversation,
+            provider=provider,
+            budgets=config.budgets,
+            text=text,
+            recent=source_route.recent_lines(context_history(session, conversation)),
+            github=github is not None,
+            google=capabilities.google,
+            apps=tuple(capabilities.apps),
+        )
+        if routed is not None:
+            plan.add(
+                "routed",
+                executed=True,
+                reason="word_lists_missed",
+                source=routed.source,
+                **({"app": routed.app} if routed.app else {}),
+            )
+            if routed.source == source_route.GITHUB:
+                github_text = routed.request
+            elif routed.source == source_route.GOOGLE:
+                google_text = routed.request
+            elif routed.source == source_route.APPS:
+                apps_text = routed.request
+            else:
+                blocks.append(source_route.not_connected_block(routed.app))
     # The owner's GitHub, read on the server (a "cloud" tool): before the Mac, so a question about
     # commits of a Mac project is answered now instead of waiting for a Mac that may be off.
     from_github = (
-        github_assist.run(text, api=github, now=datetime.now(UTC), timezone=owner.timezone or "UTC")
+        github_assist.run(
+            github_text, api=github, now=datetime.now(UTC), timezone=owner.timezone or "UTC"
+        )
         if github is not None and not shared
         else None
     )
@@ -357,7 +411,7 @@ def run_turn(
             session,
             owner=owner,
             conversation=conversation,
-            text=text,
+            text=google_text,
             recent=recent,
             provider=provider,
             budgets=config.budgets,
@@ -395,7 +449,7 @@ def run_turn(
             session,
             owner=owner,
             conversation=conversation,
-            text=text,
+            text=apps_text,
             recent=recent,
             provider=provider,
             budgets=config.budgets,
@@ -430,6 +484,7 @@ def run_turn(
     # without one the reply says what is missing, and the web is never searched in its place.
     own_data = (
         bool(tools.owner_data(text))
+        or routed is not None
         or from_github is not None
         or the_day is not None
         or followup is not None
@@ -1043,6 +1098,20 @@ def run_turn(
         browsed=tuple(browsed.visits) if browsed else (),
         panel=created or edited,
     )
+
+
+def _word_lists_caught(text: str, *, github: GitHubAPI | None, capabilities) -> bool:
+    """Whether a source's own check in code already caught the message: then it goes as before,
+    with no routing call."""
+    if github is not None and github_repos.kinds(text):
+        return True
+    if capabilities.google and google_assist.candidate(text):
+        return True
+    if capabilities.apps:
+        names = {fold(n).replace(" ", ""): n for n in capabilities.apps}
+        if apps_assist.mentioned(text, names):
+            return True
+    return bool(tools.owner_data(text))
 
 
 # How far back a skill keeps going after the message that called it (a document written section

@@ -7,6 +7,17 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 26/11/2026
 
+- **Entender quando a pergunta é sobre os seus dados, mesmo sem a palavra certa**
+  (`core/decision/route.py`).
+  - Antes, cada fonte (GitHub, Gmail e Agenda, os apps) só entrava se a mensagem tivesse uma
+    palavra da lista dela. "Isso mesmo", depois de "quantos commits hoje?", não chegava a lugar
+    nenhum, e a resposta ia buscar na web.
+  - Agora, quando nenhuma lista reconhece a mensagem, uma chamada curta lê o que está conectado e
+    os últimos turnos, escolhe a fonte e reescreve o pedido inteiro. Ele segue pelo mesmo caminho
+    de antes, com as mesmas travas: só lê, e escrever continua dependendo do seu Aprovar.
+  - Se o app não estiver conectado, ele diz onde conectar em vez de buscar na web. Na ligação por
+    voz e em mensagens só sociais ("valeu"), essa chamada não acontece.
+
 - **Conectar o Gmail e a Google Agenda pelo navegador** ([GOOGLE.md](GOOGLE.md)).
   - Em Ajustes › Integrações › Google, no servidor, o botão **Conectar** faz tudo pelo navegador,
     do computador ou do celular. Antes era só um comando de terminal.
