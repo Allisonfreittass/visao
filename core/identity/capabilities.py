@@ -128,6 +128,13 @@ class Capabilities:
                 "ler o Gmail e a Google Agenda do interlocutor quando ele pergunta, e preparar "
                 "emails e eventos que só saem depois da aprovação dele"
             )
+        else:
+            items.append(
+                "dizer como ligar o Gmail e a Google Agenda quando o interlocutor pede email ou "
+                "agenda: ele conecta em Ajustes › Integrações › Google, no botão Conectar, do "
+                "computador ou do celular, com o ID e a chave do cliente 'Aplicativo da Web' que "
+                "ele cria no Google Cloud (docs/GOOGLE.md); você não conecta por ele"
+            )
         if self.apps:
             items.append(
                 f"ler o que está no {_and(self.apps)} do interlocutor quando ele pergunta, e "

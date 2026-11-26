@@ -7,6 +7,16 @@ detalhes. O que está ligado **agora** vem do manifesto de capacidades
 
 ## 26/11/2026
 
+- **Conectar o Gmail e a Google Agenda pelo navegador** ([GOOGLE.md](GOOGLE.md)).
+  - Em Ajustes › Integrações › Google, no servidor, o botão **Conectar** faz tudo pelo navegador,
+    do computador ou do celular. Antes era só um comando de terminal.
+  - Na primeira vez você cola o ID e a chave do seu cliente "Aplicativo da Web" do Google Cloud.
+    Eles ficam cifrados com a conexão e não voltam para a tela.
+  - O login começa e termina no mesmo navegador, vale uma vez e por 10 minutos. Na volta, Ajustes
+    diz se conectou, que permissão faltou ou por que não deu.
+  - Se a chave do servidor mudar, aparece **Conectar de novo**. O comando do terminal e o botão do
+    app de Mac continuam valendo. Nada sai sem o seu Aprovar, como antes.
+
 - **O Braço também segue as habilidades** ([HABILIDADES.md](HABILIDADES.md), seção "No Braço").
   - Quando você aprova uma tarefa de código no Mac que combina com Achar a causa de um bug, Design
     de telas ou Revisar código, ele trabalha desse jeito em cada passo e põe no resumo final o que
