@@ -488,6 +488,8 @@ export interface GoogleState {
   connect_here?: boolean;
   /** The server already has the Google client; false: the button asks for its JSON file once. */
   client_ready?: boolean;
+  /** Connected, but the kept connection no longer opens (the server key changed): connect again. */
+  reconnect?: boolean;
 }
 
 export interface Goal {
@@ -1020,6 +1022,18 @@ export class Api {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ client: client ?? null }),
+    });
+  }
+
+  /**
+   * The "Conectar" button on the hosted server: the owner's "Web application" client, typed once.
+   * Returns Google's sign-in address; the page goes there and Google comes back to the server.
+   */
+  googleWebStart(clientId: string, clientSecret: string): Promise<{ url: string }> {
+    return this.request("/google/web/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ origin: window.location.origin, client_id: clientId, client_secret: clientSecret }),
     });
   }
 

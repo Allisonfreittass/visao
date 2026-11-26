@@ -115,6 +115,11 @@ function requestedConversation(): string | null {
   return new URLSearchParams(window.location.search).get("c");
 }
 
+/** Back from Google's sign-in (`/?google=…`, apps/api/routes/google.py): Ajustes says how it went. */
+function backFromGoogle(): boolean {
+  return new URLSearchParams(window.location.search).has("google");
+}
+
 /** One per message sent, so the server runs its turn once even if it arrives twice. */
 function messageId(): string | null {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : null;
@@ -168,15 +173,18 @@ export function App() {
   /** "Novo projeto" in the page bar: Projetos opens its form each time this goes up. */
   const [newProject, setNewProject] = useState(0);
   /** Ajustes opens on this section (the microphone, when a call is not possible, opens "voz"). */
-  const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(undefined);
+  const [settingsSection, setSettingsSection] = useState<SectionId | undefined>(() =>
+    backFromGoogle() ? "integracoes" : undefined,
+  );
   const [benchOpen, setBenchOpen] = useState(() => loadPreference("bench") !== "0");
   // The opening animation, once a day (components/Intro.tsx).
   // `?intro` in the address plays it again on demand (to see it).
   const [intro, setIntro] = useState(() => introDue() || new URLSearchParams(window.location.search).has("intro"));
   const endIntro = useCallback(() => setIntro(false), []);
   // A notification about Mac work opens the list of what waits for a yes (`/?mac=1`).
+  // Back from Google's sign-in, Ajustes › Integrações opens with how it went.
   const [view, setView] = useState<WorkspaceView>(() =>
-    new URLSearchParams(window.location.search).get("mac") ? "inbox" : "conversation",
+    new URLSearchParams(window.location.search).get("mac") ? "inbox" : backFromGoogle() ? "settings" : "conversation",
   );
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null);
   const [speakReplies, setSpeakReplies] = useState(() => loadPreference("speak") === "1");
