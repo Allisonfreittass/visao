@@ -391,7 +391,8 @@ export interface ToolAction {
 export interface AppsState {
   enabled: boolean;
   notice: string;
-  connected: { toolkit: string; name: string; logo: string }[];
+  /** glance: the read "Olhar sozinho" runs every few hours, or "" when it is off. */
+  connected: { toolkit: string; name: string; logo: string; glance?: string }[];
   problem: string;
   calls_this_month: number;
   monthly_limit: number;
@@ -1072,6 +1073,14 @@ export class Api {
   /** Resolves when the owner finished signing in on Composio's page (up to two minutes). */
   appsWait(connectionId: string): Promise<AppsState> {
     return this.request(`/apps/connections/${encodeURIComponent(connectionId)}/wait`, { method: "POST" });
+  }
+
+  /** "Olhar sozinho": on, the server picks one read of this app and returns its name. */
+  appsGlance(slug: string, enabled: boolean): Promise<{ enabled: boolean; tool_name: string }> {
+    return this.request(`/apps/${encodeURIComponent(slug)}/glance`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
   }
 
   appsDisconnect(slug: string): Promise<void> {
