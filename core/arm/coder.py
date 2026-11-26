@@ -543,7 +543,7 @@ def step(
     if provider is None:
         return {"stop": NO_PROVIDER, "cost_usd": str(spent)}
     # Chosen from the owner's request alone, the same at every step (and so the cache holds).
-    skill = skills.choose([s for s in skills.enabled(session) if s.arm], prompt)
+    skill = skills.for_arm_task(session, prompt)
     # The step is taken before the call: two requests at once never pass the limit.
     taken = session.execute(
         update(ArmTask)

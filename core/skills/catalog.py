@@ -179,13 +179,30 @@ def context_block(skill: Skill) -> str:
     )
 
 
-def arm_block(skill: Skill) -> str:
-    """The skill for the arm's code steps: the task is already approved and runs on the Mac."""
+# How each executor on the Mac turns "ask the owner" into what it can do (core/arm/coder.py for the
+# Visão's own, `claude -p` for Claude Code).
+_ARM_TOOLS = {
+    "visao": (
+        "use as ferramentas que tem (ler, buscar, rodar_testes) e deixe no resumo do terminar o "
+        "que só ele pode decidir"
+    ),
+    "claude": (
+        "use as ferramentas que tem neste projeto e deixe no resumo final o que só ele pode decidir"
+    ),
+}
+
+
+def arm_block(skill: Skill, executor: str = "visao") -> str:
+    """The skill for a code task on the Mac: it is already approved and runs there."""
     return (
         f'Habilidade ligada pelo dono em Habilidades: "{skill.name}" (de {skill.source}). Siga '
         "este jeito de trabalhar nesta tarefa. Você já está no Mac, numa tarefa que o dono "
-        "aprovou, com as ferramentas acima: onde ela fala em perguntar ao dono, pedir a mensagem "
-        "de erro ou rodar algo no Mac, use as ferramentas que tem (ler, buscar, rodar_testes) e "
-        "deixe no resumo do terminar o que só ele pode decidir. As regras acima continuam "
-        f"valendo acima dela.\n\n{_clip(skill.body)}"
+        "aprovou: onde ela fala em perguntar ao dono, pedir a mensagem de erro ou rodar algo no "
+        f"Mac, {_ARM_TOOLS[executor]}. As regras acima continuam valendo acima dela.\n\n"
+        f"{_clip(skill.body)}"
     )
+
+
+def for_arm_task(session: Session, prompt: str) -> Skill | None:
+    """The switched-on skill (`arm: sim`) an approved code task asks for, if any."""
+    return choose([s for s in enabled(session) if s.arm], prompt)

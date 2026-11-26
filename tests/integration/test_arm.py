@@ -481,3 +481,30 @@ def test_tests_that_never_passed_show_the_end_of_the_output(client, db, sender):
     reply = _arm_replies(db)[-1].content
     assert reply.startswith("Não deu certo no Mac") and "tentei de tudo" in reply
     assert "não passaram depois de 3 tentativa(s)" in reply and "2 failed" in reply
+
+
+def test_a_task_that_asks_for_a_skill_brings_it_for_claude_code(client, db):
+    from core.skills import catalog
+
+    owner_user, owner = _owner_client(client, db)
+    _, arm = _pair(client, owner)
+    chat = _conversation(client, owner)
+
+    def job_for(prompt):
+        client.post(
+            "/arm/tasks",
+            json={"project": "visao", "prompt": prompt, "conversation_id": chat},
+            headers=owner,
+        )
+        return client.get("/arm/device/next", headers=arm).json()
+
+    bug = job_for("os testes estão falhando, acha o bug")
+    assert "Regra de ferro" in bug["skill"] and "resumo final" in bug["skill"]
+    assert "rodar_testes" not in bug["skill"]  # the Visão executor's tools are not Claude's
+    assert job_for("rode os testes")["skill"] is None
+    # Writing a document asks the owner questions: never on the Mac.
+    assert job_for("escrever um documento de decisão em docs/")["skill"] is None
+
+    catalog.set_enabled(db, catalog.by_id("achar-bugs"), False, actor_user_id=owner_user.id)
+    db.commit()
+    assert job_for("os testes estão falhando, acha o bug")["skill"] is None

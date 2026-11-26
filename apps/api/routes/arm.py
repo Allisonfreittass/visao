@@ -11,12 +11,14 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from apps.api.deps import CurrentUser, DbSession
 from apps.api.llm import get_code_provider, get_screen_provider
 from apps.api.settings import Settings, get_settings
 from core import brain
 from core.arm import coder, desktop, local_llm, screen, service
+from core.skills import catalog as skills
 from infrastructure.database.audit import record_audit
 from infrastructure.database.models import ArmDevice, ArmTask, Conversation, Message
 from integrations.llm.base import LLMProvider
@@ -92,6 +94,9 @@ class NextOut(BaseModel):
     kind: str = "work"
     undo_of: uuid.UUID | None = None
     until_tests: bool = False
+    # A skill the owner switched on, for Claude Code's system prompt (core/skills/catalog.py).
+    # The Visão's own executor gets it in each step instead; an older arm ignores it.
+    skill: str | None = None
 
 
 class ChangedIn(BaseModel):
@@ -462,6 +467,13 @@ def device_heartbeat(body: HeartbeatIn, device: Device, db: DbSession) -> None:
     db.commit()
 
 
+def _skill(db: Session, task: ArmTask) -> str | None:
+    if task.kind != "work":
+        return None
+    skill = skills.for_arm_task(db, task.prompt)
+    return skills.arm_block(skill, "claude") if skill else None
+
+
 @router.get("/device/next", response_model=NextOut | None)
 def device_next(
     device: Device, db: DbSession, wait: Annotated[int, Query(ge=0, le=LONG_POLL_MAX)] = 0
@@ -481,6 +493,7 @@ def device_next(
                 kind=task.kind,
                 undo_of=task.undo_of,
                 until_tests=task.until_tests,
+                skill=_skill(db, task),
             )
         if time.monotonic() >= deadline:
             return None
