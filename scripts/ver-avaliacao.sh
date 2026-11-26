@@ -14,6 +14,8 @@ for r in data["results"]:
     if failed:
         w("falhou: " + "; ".join(failed), "  ")
     w("passos: " + ", ".join(r["steps"]), "  ")
+    if r["name"].startswith(("issue", "criar")):
+        w("apps vistos: " + repr(r.get("seen_apps")), "  ")
     w("> " + r["message"], "  ")
     w(r["reply"].replace("\n", " "), "  ")
 PY

@@ -213,6 +213,8 @@ class Result:
     reply: str
     steps: list[str]
     checks: dict[str, bool] = field(default_factory=dict)
+    # What the Visão saw as connected in an apps scenario: tells a harness fault from the model's.
+    seen_apps: list[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -346,11 +348,21 @@ def run(label: str, dry: bool) -> int:
                 github=_github() if scenario.github else None,
                 modality="voice" if scenario.voice else "text",
             )
+            seen_apps = (
+                list(apps_account.connected_names(config.apps_key, owner.id, KEY))
+                if scenario.apps
+                else []
+            )
             reply = outcome.result.assistant_message.content
             steps = outcome.plan.executed()
             cost += db.scalar(select(func.coalesce(func.sum(ModelUsage.cost_usd), 0))) or 0
         result = Result(
-            scenario.name, scenario.message, reply, steps, _checks(scenario, reply, steps)
+            scenario.name,
+            scenario.message,
+            reply,
+            steps,
+            _checks(scenario, reply, steps),
+            seen_apps,
         )
         results.append(result)
         mark = "ok " if result.passed else "FALHOU"
@@ -378,6 +390,7 @@ def run(label: str, dry: bool) -> int:
                             "steps": r.steps,
                             "checks": r.checks,
                             "passed": r.passed,
+                            "seen_apps": r.seen_apps,
                         }  # fmt: skip
                         for r in results
                     ],
