@@ -48,7 +48,15 @@ mostra o destinatário, o assunto e o texto inteiro, ou o título, a hora e os c
      cada 7 dias. Como só você usa, ele não exige verificação: no login aparece o aviso "o Google
      não verificou este app", e você segue por *Avançado › Acessar Visão*.
 4. **Clientes › Criar cliente:** tipo **App para computador**, nome `Visão PC`. Baixe o JSON.
-5. No seu computador, na pasta do projeto:
+5. **No app de Mac:** Ajustes › Integrações › **Conectar com o Google**. Na primeira vez ele pede o
+   JSON do passo 4 (ou use `VISION_GOOGLE_CLIENT_ID` e `VISION_GOOGLE_CLIENT_SECRET` no
+   `~/.visao/.env`, e ele não pede nada). O servidor, que roda no próprio Mac, abre o login no
+   navegador; marque as três permissões, e o Google volta para `http://127.0.0.1:<porta>/google/callback`,
+   que guarda a conexão. A tela vira "Conectado" sozinha. O botão só aparece quando a tela e o
+   servidor estão na mesma máquina (pedido de 127.0.0.1, sem proxy no meio): no servidor
+   hospedado, use o comando abaixo.
+
+   **Pelo terminal** (qualquer servidor), no seu computador, na pasta do projeto:
    ```bash
    .venv/bin/python -m apps.api.cli google-connect --client-file ~/Downloads/client_secret_*.json --server https://<o-endereço-do-visão>
    ```

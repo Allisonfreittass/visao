@@ -484,6 +484,10 @@ export interface GoogleState {
   background: boolean;
   problem: string;
   pending: GoogleAction[];
+  /** The "Conectar com o Google" button works here (the Mac app, on the owner's machine). */
+  connect_here?: boolean;
+  /** The server already has the Google client; false: the button asks for its JSON file once. */
+  client_ready?: boolean;
 }
 
 export interface Goal {
@@ -1008,6 +1012,15 @@ export class Api {
 
   google(): Promise<GoogleState> {
     return this.request("/google");
+  }
+
+  /** Opens Google's sign-in in this machine's browser; `client` is the downloaded client JSON. */
+  googleStart(client?: unknown): Promise<{ url: string; opened: boolean }> {
+    return this.request("/google/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client: client ?? null }),
+    });
   }
 
   googleDisconnect(): Promise<void> {

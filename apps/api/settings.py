@@ -174,6 +174,10 @@ class Settings(BaseSettings):
     # Optional read-only GitHub token: opens the owner's private repositories when a link to one
     # is sent, lets the conversation read commits, PRs and issues on the server (core/github), and
     # raises the API limit from 60 to 5000 reads an hour. GITHUB_TOKEN is accepted too.
+    # Optional: the Google "Desktop app" client for the "Conectar com o Google" button of the Mac
+    # app (docs/GOOGLE.md). Without it the button asks for the client's JSON file once.
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
     github_token: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("VISION_GITHUB_TOKEN", "GITHUB_TOKEN")
     )
@@ -220,6 +224,8 @@ class Settings(BaseSettings):
         "webpush_private_key",
         "webpush_subject",
         "github_token",
+        "google_client_id",
+        "google_client_secret",
         "tavily_api_key",
         "composio_api_key",
         "llm_max_request_tokens",

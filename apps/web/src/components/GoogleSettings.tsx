@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Api, GoogleState } from "../api";
 import { Setting } from "./Setting";
 import { confirmar } from "../ask";
 
+const SIGN_IN_WAIT_MS = 10 * 60 * 1000;
+
+type Signing = { step: "abrindo" } | { step: "esperando"; url?: string } | { step: "erro"; message: string };
+
 /** Gmail and Google Calendar: whether they are connected, and the one switch that matters. */
 export function GoogleSettings({ api, onError }: { api: Api; onError: (e: unknown) => void }) {
   const [state, setState] = useState<GoogleState | null>(null);
+  const [signing, setSigning] = useState<Signing | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.google().then(setState).catch(onError);
@@ -31,6 +37,44 @@ export function GoogleSettings({ api, onError }: { api: Api; onError: (e: unknow
     }
   }
 
+  async function start(client?: unknown) {
+    setSigning({ step: "abrindo" });
+    try {
+      const { url, opened } = await api.googleStart(client);
+      setSigning({ step: "esperando", url: opened ? undefined : url });
+    } catch (e) {
+      setSigning({ step: "erro", message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function pickedFile(file: File | undefined) {
+    if (!file) return;
+    try {
+      await start(JSON.parse(await file.text()));
+    } catch {
+      setSigning({ step: "erro", message: "Esse arquivo não é o JSON do cliente do Google." });
+    }
+  }
+
+  // While the sign-in happens in the browser, the server is asked every few seconds.
+  useEffect(() => {
+    if (signing?.step !== "esperando") return;
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      if (Date.now() - started > SIGN_IN_WAIT_MS) {
+        setSigning({ step: "erro", message: "Passaram 10 minutos sem o login. Tente de novo." });
+        return;
+      }
+      api.google().then((next) => {
+        if (next.connected) {
+          setState(next);
+          setSigning(null);
+        }
+      }, () => undefined);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [api, signing?.step]);
+
   if (!state) return null;
   if (!state.connected) {
     return (
@@ -38,11 +82,48 @@ export function GoogleSettings({ api, onError }: { api: Api; onError: (e: unknow
         <div className="setting-text">
           <span className="setting-title">Gmail e Google Agenda</span>
           <p className="note">
-            Desconectado. Para eu ler seu email e sua agenda (e preparar respostas e eventos para você
-            aprovar), conecte pelo seu computador:
+            Desconectado. Conecte para eu ler seu email e sua agenda quando você pedir (e preparar
+            respostas e eventos para você aprovar).
           </p>
-          <code>python -m apps.api.cli google-connect --client-file cliente.json --server {window.location.origin}</code>
+          {state.connect_here ? (
+            <>
+              {signing?.step === "esperando" && (
+                <p className="note">
+                  Abri o login do Google no navegador. Termine lá e volte aqui: eu percebo sozinho.
+                  {signing.url && <> Se não abriu, <a href={signing.url} target="_blank" rel="noopener noreferrer">abra este endereço</a>.</>}
+                </p>
+              )}
+              {signing?.step === "erro" && <p className="error">{signing.message}</p>}
+              {!state.client_ready && signing?.step !== "esperando" && (
+                <p className="note">
+                  Na primeira vez, escolha o arquivo do cliente do Google (o JSON de um "App para
+                  computador" criado no Google Cloud, como explica o docs/GOOGLE.md).
+                </p>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(e) => { void pickedFile(e.target.files?.[0]); e.target.value = ""; }}
+              />
+            </>
+          ) : (
+            <>
+              <p className="note">Pelo terminal do seu computador:</p>
+              <code>python -m apps.api.cli google-connect --client-file cliente.json --server {window.location.origin}</code>
+            </>
+          )}
         </div>
+        {state.connect_here && (
+          <button
+            type="button"
+            disabled={signing?.step === "abrindo"}
+            onClick={() => (state.client_ready ? void start() : fileRef.current?.click())}
+          >
+            {signing?.step === "esperando" ? "Abrir de novo" : state.client_ready ? "Conectar com o Google" : "Escolher arquivo e conectar"}
+          </button>
+        )}
       </div>
     );
   }

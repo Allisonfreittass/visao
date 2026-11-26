@@ -18,6 +18,9 @@ NOT_FORWARDED = {
     "VISION_WEB_DIR",
     "VISION_FIRST_RUN_SETUP",  # the edge never signs anybody up
     "VISION_BROWSER_SANDBOX",  # the edge has no local Chromium
+    # The "Conectar com o Google" button runs only on the owner's own machine (docs/GOOGLE.md).
+    "VISION_GOOGLE_CLIENT_ID",
+    "VISION_GOOGLE_CLIENT_SECRET",
 }
 
 
