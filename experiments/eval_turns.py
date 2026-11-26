@@ -130,6 +130,7 @@ SCENARIOS = [
     Scenario(
         "criar_issue",
         "cria uma issue no visao dizendo que o login quebra no celular",
+        github=True,  # as in production: GitHub read directly too, so the repositories are known
         apps=True,
         must=("apps_proposed",),
         says=("aprov",),

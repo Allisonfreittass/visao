@@ -72,7 +72,12 @@ Responda SOMENTE JSON:
 
 No máximo 3. "muda" muda algo no app: só use quando a pessoa pedir isso claramente, com o texto
 completo, na voz dela, em português se for o caso; nada muda antes de ela aprovar. Para só ler,
-prefira as de "lê". Sem ferramenta que sirva: {"calls": []}."""
+prefira as de "lê". Sem ferramenta que sirva: {"calls": []}.
+
+"conhecido", quando existe, é o que já se sabe da conta da pessoa nesse app, como os
+repositórios dela por nome completo ("dono/nome"). Use para completar argumentos que ela não
+disse inteiros: "o visao" é o repositório da lista que se chama visao, com o dono dele. Não
+invente um que não esteja ali."""
 
 
 @dataclass
@@ -212,8 +217,12 @@ def run(
     apps: ComposioClient | None,
     secret_key: str,
     monthly_limit: int,
+    known: dict[str, list[str]] | None = None,
 ) -> Assist | None:
-    """None when there are no apps, the message is not about one, or nothing came of it."""
+    """None when there are no apps, the message is not about one, or nothing came of it.
+    `known`: what the server already knows of the owner's account in an app, by toolkit (the
+    GitHub repositories by full name): the tools ask for "owner" and "repo", and with only
+    "visao" in the message the model chose no call at all (eval_turns, 26/11/2026)."""
     if apps is None:
         return None
     ref = account.user_ref(owner.id, secret_key)
@@ -282,6 +291,7 @@ def run(
             ],
             "recent_conversation": recent,
             "message": text,
+            **({"conhecido": known[slug]} if known and known.get(slug) else {}),
         },
     )
     calls = chosen.get("calls") if chosen else None

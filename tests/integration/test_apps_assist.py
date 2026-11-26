@@ -296,3 +296,42 @@ def test_a_real_composio_read_is_read_now_not_a_card(db, api):
     turn(db, owner, "quais issues estão abertas no github?", [LIST])
     assert executed(api) == ["GITHUB_LIST_REPOSITORY_ISSUES"]
     assert db.scalar(select(ToolAction)) is None
+
+
+def test_the_tool_pick_knows_the_owners_repositories_when_github_is_read_directly(db, api):
+    # 26/11/2026 (experiments/eval_turns.py): with only "visao" in the message the model chose
+    # no call, since the GitHub tools ask for "owner" and "repo".
+    from integrations.github.api import GitHubAPI
+
+    def handler(request):
+        assert request.url.path == "/user/repos"
+        return httpx.Response(200, json=[{"full_name": "dono/visao", "name": "visao"}])
+
+    github = GitHubAPI(
+        "tok",
+        client=httpx.Client(
+            base_url="https://api.github.com", transport=httpx.MockTransport(handler)
+        ),
+    )
+    owner = setup(db)
+
+    def answer(messages):
+        if messages[0].content == assist.TOOL_INSTRUCTIONS:
+            return json.dumps({"calls": [CREATE]})
+        return "Preparei a issue; ela sai quando você aprovar."
+
+    provider = FakeLLMProvider(responder=answer)
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="cria uma issue no visao dizendo que o login quebra no celular",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, curiosity_enabled=False, google_secret=KEY, apps_key="ck_test"),
+        github=github,
+    )
+    [picked] = [p for p in provider.prompts if p[0].content == assist.TOOL_INSTRUCTIONS]
+    assert json.loads(picked[1].content)["conhecido"] == ["dono/visao"]
+    assert "apps_proposed" in outcome.plan.executed()

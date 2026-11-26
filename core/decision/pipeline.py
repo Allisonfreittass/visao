@@ -456,6 +456,7 @@ def run_turn(
             apps=apps_account.client(config.apps_key),
             secret_key=config.google_secret,
             monthly_limit=config.apps_monthly_calls,
+            known=_known_accounts(github, capabilities),
         )
         if used is not None:
             blocks.append(used.block)
@@ -1098,6 +1099,15 @@ def run_turn(
         browsed=tuple(browsed.visits) if browsed else (),
         panel=created or edited,
     )
+
+
+def _known_accounts(github: GitHubAPI | None, capabilities) -> dict[str, list[str]] | None:
+    """What the server already knows of the owner's apps, for the apps step to fill "owner" and
+    "repo": the GitHub repositories, when GitHub is connected there and read directly too."""
+    if github is None or not any(fold(a) == "github" for a in capabilities.apps):
+        return None
+    repos = github_assist.known_repos(github)
+    return {"github": list(repos)[:50]} if repos else None
 
 
 def _word_lists_caught(text: str, *, github: GitHubAPI | None, capabilities) -> bool:
