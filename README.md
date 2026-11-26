@@ -124,11 +124,11 @@ making up a reply ([docs/MODEL_SELECTION.md](docs/MODEL_SELECTION.md)).
 ### The Mac app
 
 Download the `Visao-mac` artifact from a `desktop` run in Actions (it runs on pull requests that
-touch the app, or by hand), move `Visão.app` to Applications and, since it is not signed by a paid
+touch the app, or by hand), move `V.I.S.A.O..app` to Applications and, since it is not signed by a paid
 Apple account, clear the quarantine once (macOS 12 or later, Apple Silicon):
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Visão.app"
+xattr -dr com.apple.quarantine "/Applications/V.I.S.A.O..app"
 ```
 
 The app carries the server (frozen by PyInstaller, 120 MB): no Python, Node or Docker on the Mac.

@@ -123,11 +123,11 @@ resposta ([docs/MODEL_SELECTION.md](docs/MODEL_SELECTION.md)).
 ### O app de Mac
 
 Baixe o artefato `Visao-mac` de uma execução do `desktop` no Actions (ela roda nos PRs que mexem
-no app, ou à mão), mova o `Visão.app` para Aplicativos e, como ele não é assinado por uma conta
+no app, ou à mão), mova o `V.I.S.A.O..app` para Aplicativos e, como ele não é assinado por uma conta
 paga da Apple, tire a quarentena uma vez (macOS 12 ou mais novo, Apple Silicon):
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Visão.app"
+xattr -dr com.apple.quarantine "/Applications/V.I.S.A.O..app"
 ```
 
 O app leva o servidor dentro (congelado pelo PyInstaller, 120 MB): sem Python, Node nem Docker no

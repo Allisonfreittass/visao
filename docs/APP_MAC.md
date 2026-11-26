@@ -14,8 +14,8 @@ artefato da execução, `Visao-mac` (um zip, guardado por 30 dias).
 
 ```bash
 gh run download --repo Allisonfreittass/visao --name Visao-mac
-unzip Visao-mac.zip && mv Visão.app /Applications/
-xattr -dr com.apple.quarantine "/Applications/Visão.app"
+unzip Visao-mac.zip && mv V.I.S.A.O..app /Applications/
+xattr -dr com.apple.quarantine "/Applications/V.I.S.A.O..app"
 ```
 
 O último comando é por causa da assinatura: o app não é assinado por uma conta paga da Apple, e o
@@ -47,7 +47,7 @@ conta e só nos jeitos locais de rodar. Depois da primeira conta, ela não volta
 | Configuração (chave secreta, modelo) | `~/.visao/.env`, criado na primeira abertura |
 | Banco de dados | `~/.visao/dados/visao.db` |
 | Log do servidor aberto pelo app | `~/.visao/visao-app.log` |
-| O servidor congelado | dentro do app, `Visão.app/Contents/Resources/visao-servidor/` |
+| O servidor congelado | dentro do app, `V.I.S.A.O..app/Contents/Resources/visao-servidor/` |
 
 É a mesma pasta do instalador e do serviço ([INSTALAR.md](INSTALAR.md)): dá para usar o app, o
 comando `visao` e o serviço com os mesmos dados.

@@ -64,8 +64,9 @@ command -v cargo >/dev/null 2>&1 || die "falta o Rust (https://rustup.rs)."
 say "App (Tauri)"
 npm --prefix "$root/desktop/app" ci --silent --no-audit --no-fund
 (cd "$root/desktop/app" && npx tauri build --bundles app)
-app="$root/desktop/app/src-tauri/target/release/bundle/macos/Visão.app"
-[ -d "$app" ] || die "o app não saiu em $app"
+# The bundle is named after productName in tauri.conf.json ("V.I.S.A.O..app"); found, not spelled.
+app="$(ls -d "$root"/desktop/app/src-tauri/target/release/bundle/macos/*.app 2>/dev/null | head -1)"
+[ -n "$app" ] && [ -d "$app" ] || die "o app não saiu em target/release/bundle/macos"
 say "Teste do app"
 # Opened for real, with an empty home: it has to find the server inside it, start it, and stop
 # it when it quits. Nothing else may be answering on the usual port.

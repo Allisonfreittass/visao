@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Visão",
+  "productName": "V.I.S.A.O.",
   "version": "0.1.0",
   "identifier": "digital.visao.mac",
   "build": {

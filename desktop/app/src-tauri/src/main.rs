@@ -154,7 +154,7 @@ fn main() {
         .manage(Server(Mutex::new(None)))
         .setup(|app| {
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Visão")
+                .title("V.I.S.A.O.")
                 .inner_size(1200.0, 820.0)
                 .min_inner_size(420.0, 600.0)
                 .build()?;

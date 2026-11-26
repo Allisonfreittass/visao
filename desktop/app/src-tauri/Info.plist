@@ -4,6 +4,6 @@
 <dict>
   <!-- The voice call: the macOS asks once, with this sentence, before the microphone opens. -->
   <key>NSMicrophoneUsageDescription</key>
-  <string>O Visão usa o microfone só durante uma ligação com ele, quando você toca no microfone.</string>
+  <string>O V.I.S.A.O. usa o microfone só durante uma ligação com ele, quando você toca no microfone.</string>
 </dict>
 </plist>
