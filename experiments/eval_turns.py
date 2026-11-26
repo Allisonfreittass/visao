@@ -39,7 +39,7 @@ from core.identity.genesis import get_identity
 from core.memory.text import fold
 from infrastructure.database.base import Base
 from infrastructure.database.models import Conversation, Message, ModelUsage
-from integrations.composio.client import ComposioClient
+from integrations.composio.client import Connection, _tool
 from integrations.github.api import GitHubAPI
 
 RESULTS_DIR = Path(__file__).parent / "results"
@@ -139,7 +139,8 @@ SCENARIOS = [
         "pergunta_geral",
         "como funciona o git rebase, explica rapidinho?",
         github=True,
-        must_not=("routed", "github_read", "research"),
+        # Researching the web is fine for a general question; reading the owner's data is not.
+        must_not=("routed", "github_read"),
         max_words=140,
     ),
     Scenario(
@@ -153,8 +154,8 @@ SCENARIOS = [
         "mac_desligado",
         "roda os testes do visao no meu mac",
         mac_off=True,
-        must=("mac_blocked",),
-        says=("mac",),
+        # What matters is saying the Mac is off, in one line; the step's name is the code's.
+        says=("deslig", "offline", "fora do ar"),
         max_words=45,
     ),
     Scenario(
@@ -165,6 +166,34 @@ SCENARIOS = [
         note="Registro: responde solto, opina, sem lista de opções.",
     ),
 ]
+
+
+class _FakeApps:
+    """The owner's Composio with GitHub connected, from the recorded tools and issues
+    (tests/fixtures/composio). It stands in for the client object, not for the SDK's HTTP: on the
+    server the SDK inside the container did not take the recorded transport, and the apps path
+    never opened (26/11/2026)."""
+
+    def __init__(self) -> None:
+        from tests.fake_composio import recorded
+
+        self._tools = [_tool(i) for i in recorded("tools_github")["items"]]
+        self._issues = recorded("execute_list_issues")
+        self._created = recorded("execute_create_issue")
+
+    def connections(self, owner_ref: str) -> list[Connection]:
+        return [Connection("ca_github1", "github", "ACTIVE")]
+
+    def catalog(self) -> list:
+        from types import SimpleNamespace
+
+        return [SimpleNamespace(slug="github", name="GitHub")]
+
+    def tools(self, toolkit: str) -> list:
+        return self._tools if toolkit == "github" else []
+
+    def execute(self, owner_ref: str, tool, arguments: dict) -> object:
+        return self._issues if tool.kind == "read" else self._created
 
 
 class _NoWeb:
@@ -236,9 +265,25 @@ def _checks(scenario: Scenario, reply: str, steps: list[str]) -> dict[str, bool]
 def run(label: str, dry: bool) -> int:
     settings = get_settings()
     if dry:
+        from core.apps import assist as apps_assist
         from tests.fakes import FakeLLMProvider
 
-        provider = FakeLLMProvider(reply_text="Hoje foram 3 commits no visao.")
+        def answer(messages):
+            # Enough JSON for the apps path to open, so the dry run exercises it end to end.
+            if messages[0].content == apps_assist.TOOL_INSTRUCTIONS:
+                asked = messages[-1].content
+                slug = (
+                    "GITHUB_CREATE_AN_ISSUE" if "cria" in asked else "GITHUB_LIST_REPOSITORY_ISSUES"
+                )
+                args = {
+                    "owner": "Allisonfreittass",
+                    "repo": "visao",
+                    "title": "Login quebra no celular",
+                }
+                return json.dumps({"calls": [{"tool": slug, "arguments": args}]})
+            return "Hoje foram 3 commits no visao."
+
+        provider = FakeLLMProvider(responder=answer)
     else:
         # The spending ledger in a database of its own, in memory: the eval never needs, nor
         # writes to, the app's database (on the server, Postgres on the internal network).
@@ -252,16 +297,13 @@ def run(label: str, dry: bool) -> int:
         if provider is None:
             print("LLM não configurado. Faltam: " + ", ".join(missing_llm_settings(settings)))
             return 1
-    from tests.fake_composio import RecordedComposio
     from tests.integration.test_google import CREDS, FakeGoogle
     from tests.integration.test_mind import setup
     from tests.integration.test_mind_temperament import mac
 
     google = FakeGoogle()
     google_accounts.client_for = lambda account, key: google if key == KEY else None  # type: ignore[assignment]
-    recorded = RecordedComposio()
-    recorded.connected()
-    composio = ComposioClient("chave-composio", http=recorded.http())
+    composio = _FakeApps()
     apps_account.client = lambda key: composio if key == "ck_eval" else None  # type: ignore[assignment]
 
     results: list[Result] = []
