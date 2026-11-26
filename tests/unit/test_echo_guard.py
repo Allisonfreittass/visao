@@ -24,3 +24,14 @@ def test_the_prompt_tells_it_to_act_and_ask_only_when_a_mistake_is_costly():
     assert "Proibido devolver a pergunta" in rules
     assert "nunca pesquise na web" in rules
     assert "Pedido não leva pergunta" in QUESTION_RULE
+
+
+def test_facts_guard_reads_denials_and_leaves_true_replies_alone():
+    from core.conversation import facts_guard
+
+    assert facts_guard.github_contradicted("Não abri o GitHub ainda.", ["42"])
+    assert facts_guard.github_contradicted("Teve bastante coisa hoje!", ["42"])
+    assert not facts_guard.github_contradicted("Hoje foram 42 commits.", ["42"])
+    assert not facts_guard.github_contradicted("Foram 142 linhas e 42 commits.", ["42"])
+    assert facts_guard.fix_mac_off("Tudo certo. Seu Mac está ligado agora.") is None
+    assert facts_guard.fix_mac_off("Não estou conectado no momento ao seu Mac.") is not None

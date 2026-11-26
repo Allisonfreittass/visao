@@ -144,3 +144,52 @@ def test_a_reply_that_echoes_the_question_is_written_again(db):
     )
     assert outcome.result.assistant_message.content == "Hoje foram 3 commits."
     assert "só devolveu a pergunta" in provider.prompts[-1][-1].content
+
+
+def test_a_reply_that_denies_the_github_read_is_replaced_by_the_numbers(db):
+    owner = setup(db)
+    # A small model copying an earlier reply instead of the data it was given (25/11/2026).
+    provider = FakeLLMProvider(
+        reply_text="Não, não abri o GitHub do Visao e o Mac continua desligado, então não tenho "
+        "esse número."
+    )
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="quantos commits teve hoje no visao?",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, curiosity_enabled=False),
+        github=github(42),
+    )
+    content = outcome.result.assistant_message.content
+    assert content.startswith("Hoje foram 42 commits no Allisonfreittass/visao")
+    assert "não abri" not in content and "desligado" not in content
+    assert "github_denial_fixed" in outcome.plan.executed()
+
+
+def test_the_mac_on_is_never_called_off(db):
+    owner = setup(db)
+    device = mac(db, owner, ["visao"])
+    device.last_seen_at = datetime.now(UTC)
+    db.commit()
+    provider = FakeLLMProvider(
+        reply_text="Sou pareado com o seu Mac, sim. O Mac está desligado. Use /mac visao rode git "
+        "status."
+    )
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="você está conectado ao meu pc né?",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, curiosity_enabled=False),
+    )
+    content = outcome.result.assistant_message.content
+    assert "desligado" not in content and "Seu Mac está ligado agora" in content
+    assert content.startswith("Sou pareado com o seu Mac, sim.")
+    assert "mac_off_fixed" in outcome.plan.executed()

@@ -27,6 +27,10 @@ class Assist:
     repo: str = ""
     read: list[str] = field(default_factory=list)
     failure: str = ""
+    # The same numbers in sentences written by code, and the counts themselves: if the reply
+    # leaves them out or denies the read, it is replaced by these (core/conversation/facts_guard).
+    facts: list[str] = field(default_factory=list)
+    counts: list[str] = field(default_factory=list)
 
 
 def known_repos(api: GitHubAPI) -> tuple[str, ...]:
@@ -87,7 +91,10 @@ def run(text: str, *, api: GitHubAPI, now: datetime, timezone: str) -> Assist | 
     done = Assist(repo=ask.repo)
     for kind in ask.kinds:
         try:
-            lines.append(_section(kind, ask, api, zone))
+            text_block, fact, count = _section(kind, ask, api, zone)
+            lines.append(text_block)
+            done.facts.append(fact)
+            done.counts.append(count)
             done.read.append(kind)
         except GitHubError as exc:
             done.failure = str(exc)
@@ -124,7 +131,8 @@ _WHAT = {
 }
 
 
-def _section(kind: str, ask: repos.Ask, api: GitHubAPI, zone: ZoneInfo) -> str:
+def _section(kind: str, ask: repos.Ask, api: GitHubAPI, zone: ZoneInfo) -> tuple[str, str, str]:
+    """The block's lines, one sentence for the owner, and the count."""
     if kind == repos.COMMITS and ask.period is not None:
         found = api.commits(ask.repo, ask.period.since, ask.period.until)
         count = f"pelo menos {len(found.items)}" if found.capped else str(len(found.items))
@@ -137,7 +145,11 @@ def _section(kind: str, ask: repos.Ask, api: GitHubAPI, zone: ZoneInfo) -> str:
             f"  · {_clock(c.date, zone)} {c.sha} {c.message} ({c.author})"
             for c in found.items[:SHOWN]
         ]
-        return "\n".join([head, *listed])
+        word = "commit" if count == "1" else "commits"
+        fact = f"{ask.period.words.capitalize()} foram {count} {word} no {ask.repo}"
+        if found.items:
+            fact += f"; o mais recente: “{found.items[0].message}”"
+        return "\n".join([head, *listed]), fact + ".", count
     if kind == repos.REPOS:
         found = api.repos()
         head = f"- Repositórios do dono ({len(found)}, do push mais recente ao mais antigo):"
@@ -146,7 +158,11 @@ def _section(kind: str, ask: repos.Ask, api: GitHubAPI, zone: ZoneInfo) -> str:
             f"{_clock(r.pushed_at, zone)}{': ' + r.description if r.description else ''}"
             for r in found[:15]
         ]
-        return "\n".join([head, *listed])
+        names = ", ".join(r.full_name.split("/")[-1] for r in found[:8])
+        fact = f"Você tem {len(found)} repositórios"
+        if names:
+            fact += f", os mais recentes: {names}"
+        return "\n".join([head, *listed]), fact + ".", str(len(found))
     items = api.pulls(ask.repo) if kind == repos.PULLS else api.issues(ask.repo)
     label = "PRs abertos" if kind == repos.PULLS else "Issues abertas"
     head = f"- {label} em {ask.repo}: {len(items)}."
@@ -154,4 +170,8 @@ def _section(kind: str, ask: repos.Ask, api: GitHubAPI, zone: ZoneInfo) -> str:
         f"  · #{i.number} {i.title} (de {i.author}, aberto em {_clock(i.created_at, zone)})"
         for i in items[:SHOWN]
     ]
-    return "\n".join([head, *listed])
+    what = "PRs abertos" if kind == repos.PULLS else "issues abertas"
+    fact = f"No {ask.repo} há {len(items)} {what}"
+    if items:
+        fact += ": " + "; ".join(f"#{i.number} {i.title}" for i in items[:3])
+    return "\n".join([head, *listed]), fact + ".", str(len(items))

@@ -22,7 +22,7 @@ from core.apps import assist as apps_assist
 from core.arm import intent as mac_intent
 from core.arm import screen
 from core.autonomy import continuity
-from core.conversation import attachments, browser_guard, progress, share
+from core.conversation import attachments, browser_guard, facts_guard, progress, share
 from core.conversation import links as conversation_links
 from core.conversation.service import (
     BudgetExceededError,
@@ -861,6 +861,27 @@ def run_turn(
             executed=True,
             reason=getattr(exc, "kind", None) or type(exc).__name__,
         )
+    # What the turn measured wins over a reply that contradicts it (core/conversation/facts_guard).
+    if modality != "voice":
+        said = result.assistant_message.content
+        fixed = said
+        if (
+            from_github is not None
+            and from_github.read
+            and facts_guard.github_contradicted(said, from_github.counts)
+        ):
+            fixed = facts_guard.github_reply(from_github.facts)
+            plan.add("github_denial_fixed", executed=True, reason="reply_contradicted_github_read")
+        if mac.online:
+            no_off = facts_guard.fix_mac_off(fixed)
+            if no_off is not None:
+                fixed = no_off
+                plan.add("mac_off_fixed", executed=True, reason="reply_said_mac_off_while_on")
+        if fixed != said:
+            result.assistant_message.content = fixed
+            result.assistant_message.parts = None
+            progress.final(fixed)
+            session.commit()
     linked = next(
         (
             d.project_id
