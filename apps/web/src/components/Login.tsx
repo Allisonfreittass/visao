@@ -63,12 +63,19 @@ interface LoginProps {
 /** What the screen is for: signing in, or making the first account ("Primeira vez? Configurar"). */
 type Mode = "entrar" | "criar";
 
+/** Whether signing in here should last past closing the window: the installed phone app, or the
+ * Visão on this very machine (the Mac app opens http://127.0.0.1). */
+export function staysSignedIn(hostname: string, standalone: boolean): boolean {
+  return standalone || hostname === "127.0.0.1" || hostname === "localhost" || hostname === "[::1]";
+}
+
 export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAccount }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  // No checkbox, as in the mockup: the installed app (standalone) keeps you signed in; a browser tab
-  // forgets you when it closes.
-  const [remember] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches ?? false);
+  // No checkbox, as in the mockup: the installed app keeps you signed in (the phone's standalone
+  // app, and the Mac app, which opens the server on this very machine); a browser tab on a server
+  // elsewhere forgets you when it closes.
+  const [remember] = useState(() => staysSignedIn(window.location?.hostname ?? "", window.matchMedia?.("(display-mode: standalone)").matches ?? false));
   const [error, setError] = useState<LoginError | null>(null);
   const [missing, setMissing] = useState<MissingField | null>(null);
   const [busy, setBusy] = useState(false);

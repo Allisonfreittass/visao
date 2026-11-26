@@ -183,6 +183,8 @@ def iniciar(port: int, fundo: bool) -> int:
         return _iniciar_no_fundo(port)
 
     _, worker = _prepare(os.environ)
+    if os.environ.get("VISAO_PARENT_WATCH") == "1":
+        watch_parent()
     write_state(os.getpid(), port)
     note = "" if worker else " (sem o worker: banco compartilhado)"
     print(f"Visão em http://127.0.0.1:{port}{note}")
@@ -193,6 +195,26 @@ def iniciar(port: int, fundo: bool) -> int:
     finally:
         clear_state(os.getpid())
     return 0
+
+
+def watch_parent(every: float = 2.0) -> None:
+    """The Mac app's server stops when the app is gone. The app stops it on a normal quit, but
+    killed (Force Quit, a crash) it left the server running with the old settings, and the next
+    app found it on the port and used it (25/11/2026). Only the app sets VISAO_PARENT_WATCH: the
+    service and `iniciar --fundo` have no parent on purpose."""
+    import threading
+
+    parent = os.getppid()
+    if parent <= 1:
+        return
+
+    def watch() -> None:
+        while os.getppid() == parent:
+            time.sleep(every)
+        print("O app que abriu o servidor fechou; desligando.", flush=True)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=watch, name="visao-parent-watch", daemon=True).start()
 
 
 def _iniciar_no_fundo(port: int) -> int:

@@ -73,9 +73,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 )
 
 
+class _HideSignInCode(logging.Filter):
+    """The access log printed Google's sign-in code with the return address (25/11/2026). It is
+    used once and expires, but a log is not where a credential goes: the query is cut."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            path = args[2]
+            if "/google/callback" in path and "?" in path:
+                record.args = (*args[:2], path.split("?", 1)[0] + "?…", *args[3:])
+        return True
+
+
+_HIDE_SIGN_IN_CODE = _HideSignInCode()
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    access = logging.getLogger("uvicorn.access")
+    if _HIDE_SIGN_IN_CODE not in access.filters:
+        access.addFilter(_HIDE_SIGN_IN_CODE)
     configure_push(settings)
     VOICE_IDLE.set(settings.voice_idle_minutes * 60)
     app = FastAPI(title="VISÃO API", version="0.0.1", lifespan=lifespan)

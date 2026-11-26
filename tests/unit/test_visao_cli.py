@@ -75,3 +75,33 @@ def test_it_runs_itself_again_with_or_without_python(monkeypatch):
     assert cli.self_command()[1:] == ["-m", "apps.visao_cli"]
     monkeypatch.setattr(cli, "FROZEN", True)
     assert cli.self_command() == [cli.sys.executable]
+
+
+def test_the_apps_server_stops_when_its_parent_is_gone(monkeypatch):
+    import signal
+
+    from apps import visao_cli
+
+    parents = iter([4242, 4242, 1])
+    killed = []
+    monkeypatch.setattr(visao_cli.os, "getppid", lambda: next(parents, 1))
+    monkeypatch.setattr(visao_cli.os, "kill", lambda pid, sig: killed.append(sig))
+    monkeypatch.setattr(visao_cli.time, "sleep", lambda s: None)
+    import time as real_time
+
+    visao_cli.watch_parent(every=0)
+
+    deadline = real_time.monotonic() + 2
+    while not killed and real_time.monotonic() < deadline:
+        real_time.sleep(0.01)
+    assert killed == [signal.SIGTERM]
+
+
+def test_a_server_without_a_parent_is_not_watched(monkeypatch):
+    from apps import visao_cli
+
+    started = []
+    monkeypatch.setattr(visao_cli.os, "getppid", lambda: 1)
+    monkeypatch.setattr("threading.Thread.start", lambda self: started.append(self))
+    visao_cli.watch_parent()
+    assert started == []

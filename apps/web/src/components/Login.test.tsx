@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Api, ApiError } from "../api";
 import { OLHAR_PX, olhar } from "../brand/CorvoClose";
 import { Entrance } from "./Entrance";
-import { Login, MIN_PASSWORD_LENGTH, loginError, missingField } from "./Login";
+import { Login, MIN_PASSWORD_LENGTH, loginError, missingField, staysSignedIn } from "./Login";
 
 const api = { firstRunNeeded: async () => false } as unknown as Api;
 
@@ -114,5 +114,15 @@ describe("the pupil", () => {
   it("stays put when there is nowhere to look", () => {
     expect(olhar({ x: 5, y: 5 }, { x: 5, y: 5 }, 1)).toEqual({ dx: 0, dy: 0 });
     expect(olhar({ x: 0, y: 0 }, { x: 10, y: 0 }, 0)).toEqual({ dx: 0, dy: 0 });
+  });
+});
+
+
+describe("staysSignedIn", () => {
+  it("keeps the Mac app and the phone app signed in, never a tab on a server elsewhere", () => {
+    expect(staysSignedIn("127.0.0.1", false)).toBe(true);
+    expect(staysSignedIn("localhost", false)).toBe(true);
+    expect(staysSignedIn("visao.exemplo.com", true)).toBe(true);
+    expect(staysSignedIn("54-20-150-130.sslip.io", false)).toBe(false);
   });
 });

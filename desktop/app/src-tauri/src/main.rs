@@ -84,6 +84,8 @@ fn start_server(app: &AppHandle, port: u16) -> Result<Child, String> {
     Command::new(executable)
         .args(["iniciar", "--porta", &port.to_string()])
         .env("VISAO_HOME", &home)
+        // The server stops by itself if this app goes away without stopping it (killed, crashed).
+        .env("VISAO_PARENT_WATCH", "1")
         .current_dir(&home)
         .stdin(Stdio::null())
         .stdout(log)

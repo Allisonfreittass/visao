@@ -90,3 +90,21 @@ def test_a_wrong_file_says_so(local, db, browser):
     assert wrong.status_code == 422 and "App para computador" in wrong.json()["detail"]
     assert local.post("/google/start", json={}, headers=headers).status_code == 422
     assert browser == []
+
+
+def test_the_access_log_never_shows_the_sign_in_code():
+    import logging
+
+    from apps.api.main import _HIDE_SIGN_IN_CODE
+
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:5", "GET", "/google/callback?state=abc&code=4/0secret", "1.1", 200),
+        None,
+    )
+    _HIDE_SIGN_IN_CODE.filter(record)
+    assert "secret" not in record.getMessage() and "/google/callback?…" in record.getMessage()
