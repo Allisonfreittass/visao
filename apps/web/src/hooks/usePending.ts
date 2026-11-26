@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Api, AppNotification, ArmDevice, ArmTask, Goal, GoogleAction, PanelOffer, ToolAction } from "../api";
+import { moneyWords } from "../api";
+import { confirmar } from "../ask";
 
 const POLL_MS = 15_000;
 
@@ -130,7 +132,18 @@ export function usePending(api: Api, enabled: boolean, onError: (e: unknown) => 
     decideArm: (task, decision, via) => act(() => api.decideArm(task.id, decision, via)),
     decideGoal: (goal, decision) => act(() => api.decideGoal(goal.id, decision)),
     decideGoogle: (action, decision, via) => act(() => api.decideGoogle(action.id, decision, via)),
-    decideApp: (action, decision, via) => act(() => api.decideApp(action.id, decision, via)),
+    decideApp: async (action, decision, via) => {
+      // A payment: the amount is confirmed here, on every card that approves (core/apps/money.py).
+      if (decision === "approve" && action.money) {
+        const ok = await confirmar(
+          `Pagar ${moneyWords(action.money)} pelo ${action.app}? Sai agora e conta no teto de hoje.`,
+          "Pagar",
+        );
+        if (!ok) return false;
+        return act(() => api.decideApp(action.id, decision, via, action.money!.amount));
+      }
+      return act(() => api.decideApp(action.id, decision, via));
+    },
     decidePanelOffer: (offer, decision, via) => act(() => api.decidePanelOffer(offer.id, decision, via)),
     dismiss: (notice) => act(() => api.markRead(notice.id)),
     reply: async (notice, conversationId) => {

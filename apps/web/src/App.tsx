@@ -127,6 +127,8 @@ function messageId(): string | null {
 
 type LiveAsk = Ask & {
   spoken: SpokenAsk;
+  /** A payment: never read aloud for a spoken "sim"; it waits for a tap confirming the amount. */
+  tapOnly?: boolean;
   decide: (decision: "approve" | "reject", via: "toque" | "voz") => Promise<boolean>;
 };
 
@@ -421,6 +423,7 @@ export function App() {
         onApprove: () => void pending.decideApp(a, "approve").then(() => reloadRef.current()),
         onReject: () => void pending.decideApp(a, "reject"),
         spoken: spokenApp(a),
+        tapOnly: Boolean(a.money),
         decide: (d: "approve" | "reject", via: "toque" | "voz") =>
           pending.decideApp(a, d, via).then((ok) => {
             if (ok && d === "approve") reloadRef.current();
@@ -456,7 +459,7 @@ export function App() {
       return;
     }
     if (!voiceApproval || sending || voice.speaking) return;
-    const next = liveAsksRef.current.find((a) => !announcedRef.current.has(a.id));
+    const next = liveAsksRef.current.find((a) => !a.tapOnly && !announcedRef.current.has(a.id));
     if (!next) return;
     announcedRef.current.add(next.id);
     askedRef.current = { ask: next, at: Date.now() };

@@ -1,6 +1,6 @@
 import { type FormEvent, type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { type Api, type Panel, utcDate } from "../api";
+import { type Api, type Panel, moneyWords, utcDate } from "../api";
 import { homeGreeting } from "../brand/copy";
 import { Corvo } from "../brand/Corvo";
 import type { AnelEstado, AssistantState } from "../anel/state";
@@ -127,7 +127,8 @@ function firstAsk(pending: Pending): Ask | null {
   const w = pending.toolActions[0];
   if (w) {
     return {
-      key: `app-${w.id}`, where: `no ${w.app}`, question: `Posso fazer isto? ${w.summary}`,
+      key: `app-${w.id}`, where: `no ${w.app}`,
+      question: w.money ? `Posso pagar ${moneyWords(w.money)}?` : `Posso fazer isto? ${w.summary}`,
       meta: `pedido ${ago(utcDate(w.created_at))}`, after: "fazendo agora",
       approve: () => pending.decideApp(w, "approve"), reject: () => pending.decideApp(w, "reject"),
     };
@@ -356,13 +357,13 @@ export function InboxView({ api, call, onSend, pending, current, onReplied, onli
             {pending.toolActions.filter((a) => ask?.key !== `app-${a.id}`).map((a) => (
               <article className="list-item" key={a.id}>
                 <div className="list-item-text">
-                  <strong>Posso fazer isto no {a.app}?</strong>
+                  <strong>{a.money ? `Posso pagar ${moneyWords(a.money)} pelo ${a.app}?` : `Posso fazer isto no ${a.app}?`}</strong>
                   <p className="note">{cardText(a)}</p>
                   <p className="note pre google-body">{argumentLines(a.arguments)}</p>
                   <time className="panel-time">{dayLabel(utcDate(a.created_at))}</time>
                 </div>
                 <div className="row">
-                  <button type="button" className="primary" onClick={() => void pending.decideApp(a, "approve")}>Aprovar</button>
+                  <button type="button" className="primary" onClick={() => void pending.decideApp(a, "approve")}>{a.money ? "Pagar" : "Aprovar"}</button>
                   <button type="button" className="ghost" onClick={() => void pending.decideApp(a, "reject")}>Recusar</button>
                 </div>
               </article>

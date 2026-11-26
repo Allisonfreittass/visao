@@ -385,6 +385,17 @@ export interface ToolAction {
   result: string;
   conversation_id: string | null;
   created_at: string;
+  /** A payment (core/apps/money.py): shown big on the card; approving confirms this amount. */
+  money?: { amount: string; currency: string; to: string } | null;
+}
+
+/** "BRL 1.234,50 para Ana": how a payment is said on the card and in the confirmation. */
+export function moneyWords(m: { amount: string; currency: string; to: string }): string {
+  const n = Number(m.amount);
+  const shown = Number.isFinite(n)
+    ? n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : m.amount;
+  return `${m.currency} ${shown}`.trim() + (m.to ? ` para ${m.to}` : "");
 }
 
 /** Ajustes › Apps: off (no section) without the Composio key on the server. */
@@ -392,7 +403,16 @@ export interface AppsState {
   enabled: boolean;
   notice: string;
   /** glance: the read "Olhar sozinho" runs every few hours, or "" when it is off. */
-  connected: { toolkit: string; name: string; logo: string; glance?: string }[];
+  connected: {
+    toolkit: string;
+    name: string;
+    logo: string;
+    glance?: string;
+    /** "Pagamentos": the daily ceiling when on. */
+    payments?: { cap: string; currency: string } | null;
+    /** Whether the app is one where the Pagamentos switch makes sense. */
+    payment_app?: boolean;
+  }[];
   problem: string;
   calls_this_month: number;
   monthly_limit: number;
@@ -1091,8 +1111,18 @@ export class Api {
     return this.request("/apps/actions");
   }
 
-  decideApp(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque"): Promise<ToolAction> {
-    return this.request(`/apps/actions/${encodeURIComponent(id)}/${decision}?via=${via}`, { method: "POST" });
+  /** A payment needs `confirmAmount`, the amount the owner just confirmed. */
+  decideApp(id: string, decision: "approve" | "reject", via: "toque" | "voz" = "toque", confirmAmount?: string): Promise<ToolAction> {
+    const confirm = confirmAmount ? `&confirm_amount=${encodeURIComponent(confirmAmount)}` : "";
+    return this.request(`/apps/actions/${encodeURIComponent(id)}/${decision}?via=${via}${confirm}`, { method: "POST" });
+  }
+
+  /** "Pagamentos" for one app: on only with a daily ceiling. */
+  appsPayments(slug: string, enabled: boolean, cap = "", currency = "BRL"): Promise<AppsState> {
+    return this.request(`/apps/${encodeURIComponent(slug)}/payments`, {
+      method: "POST",
+      body: JSON.stringify({ enabled, cap, currency }),
+    });
   }
 
   panels(): Promise<Panel[]> {

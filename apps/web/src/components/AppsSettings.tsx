@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Api, AppCatalogItem, AppsState } from "../api";
 import { searchCatalog } from "../apps";
-import { confirmar } from "../ask";
+import { confirmar, perguntar } from "../ask";
 import { Setting } from "./Setting";
 
 /**
@@ -58,6 +58,20 @@ export function AppsSettings({ api, onError }: { api: Api; onError: (e: unknown)
     try {
       await api.appsDisconnect(slug);
       setState(await api.apps());
+    } catch (e) {
+      onError(e);
+    }
+  }
+
+  async function togglePayments(slug: string, name: string, on: boolean) {
+    try {
+      if (!on) {
+        setState(await api.appsPayments(slug, false));
+        return;
+      }
+      const cap = await perguntar(`Até quanto, em reais, eu posso pagar pelo ${name} num dia?`, "200", "Ligar");
+      if (cap === null) return;
+      setState(await api.appsPayments(slug, true, cap, "BRL"));
     } catch (e) {
       onError(e);
     }
@@ -120,6 +134,18 @@ export function AppsSettings({ api, onError }: { api: Api; onError: (e: unknown)
             {choosing === a.toolkit && <p className="note">Escolhendo o que olhar no {a.name}…</p>}
             {glanceNote?.toolkit === a.toolkit && <p className="error">{glanceNote.text}</p>}
           </Setting>
+          {(a.payment_app || a.payments) && (
+            <Setting
+              title={`Pagamentos pelo ${a.name}`}
+              description={
+                a.payments
+                  ? `Até ${a.payments.currency} ${a.payments.cap} por dia. Cada pagamento mostra o valor e para quem, e só sai com um toque seu confirmando o valor; pela voz, nunca.`
+                  : "Desligado: eu nunca preparo pagamentos aqui. Ligado, com um teto por dia, cada um ainda espera o seu toque confirmando o valor."
+              }
+              checked={Boolean(a.payments)}
+              onChange={() => void togglePayments(a.toolkit, a.name, !a.payments)}
+            />
+          )}
         </div>
       ))}
       {waiting ? (
