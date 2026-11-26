@@ -44,6 +44,9 @@ class Skill:
     license: str
     installed_on: date
     body: str
+    # `arm: sim`: it also goes to the arm's code steps on the Mac (core/arm/coder.py). Only ways of
+    # working that need no conversation: the arm cannot ask anything in the middle of a task.
+    arm: bool = False
 
 
 class SkillFileError(ValueError):
@@ -81,7 +84,14 @@ def parse(skill_id: str, text: str) -> Skill:
         license=meta["license"],
         installed_on=date.fromisoformat(meta["installed_on"]),
         body=body,
+        arm=_yes(skill_id, meta.get("arm", "não")),
     )
+
+
+def _yes(skill_id: str, value: str) -> bool:
+    if value not in {"sim", "não"}:
+        raise SkillFileError(f"{skill_id}: arm é sim ou não")
+    return value == "sim"
 
 
 @lru_cache(maxsize=1)
@@ -155,14 +165,27 @@ def choose(skills: Sequence[Skill], text: str, earlier: Sequence[str] = ()) -> S
     return None
 
 
+def _clip(body: str) -> str:
+    return body if len(body) <= BODY_CHARS else body[:BODY_CHARS].rsplit("\n", 1)[0] + "\n[…]"
+
+
 def context_block(skill: Skill) -> str:
-    body = skill.body
-    if len(body) > BODY_CHARS:
-        body = body[:BODY_CHARS].rsplit("\n", 1)[0] + "\n[…]"
     return (
         f'Habilidade ligada pelo interlocutor em Habilidades: "{skill.name}" '
         f"(de {skill.source}). Use este jeito de trabalhar se servir ao que ele pediu agora; se "
         "não servir, ignore. As regras de verdade, a sua voz e as aprovações continuam acima "
         "dela. Não cite a habilidade pelo nome a menos que ele pergunte.\n\n"
-        f"{body}"
+        f"{_clip(skill.body)}"
+    )
+
+
+def arm_block(skill: Skill) -> str:
+    """The skill for the arm's code steps: the task is already approved and runs on the Mac."""
+    return (
+        f'Habilidade ligada pelo dono em Habilidades: "{skill.name}" (de {skill.source}). Siga '
+        "este jeito de trabalhar nesta tarefa. Você já está no Mac, numa tarefa que o dono "
+        "aprovou, com as ferramentas acima: onde ela fala em perguntar ao dono, pedir a mensagem "
+        "de erro ou rodar algo no Mac, use as ferramentas que tem (ler, buscar, rodar_testes) e "
+        "deixe no resumo do terminar o que só ele pode decidir. As regras acima continuam "
+        f"valendo acima dela.\n\n{_clip(skill.body)}"
     )

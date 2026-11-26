@@ -6,6 +6,7 @@ source: anthropics/skills
 source_url: https://github.com/anthropics/skills/tree/e4bb5d960d87126ff3b3a8af1a104b7db67560ba/skills/frontend-design
 license: Apache-2.0
 installed_on: 2026-11-25
+arm: sim
 ---
 
 Adaptada da habilidade "frontend-design" da Anthropic (Apache-2.0) para o chat do Visão.

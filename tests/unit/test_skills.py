@@ -126,3 +126,19 @@ def test_the_manifest_names_the_skills_that_are_on():
         a for a in Capabilities(skills=("Design de telas",)).actions() if "Habilidades" in a
     )
     assert "Design de telas" in line and "liga e desliga" in line
+
+
+def test_only_ways_of_working_without_a_conversation_go_to_the_arm():
+    assert {s.id for s in catalog.installed() if s.arm} == {"achar-bugs", "design-de-telas"}
+    with pytest.raises(catalog.SkillFileError):
+        catalog.parse(
+            "braco-talvez",
+            "---\nname: x\ndescription: y\ntriggers: z\nsource: a\nsource_url: b\n"
+            "license: MIT\ninstalled_on: 2026-11-25\narm: talvez\n---\ntexto",
+        )
+
+
+def test_the_arm_block_points_to_its_own_tools():
+    block = catalog.arm_block(catalog.by_id("achar-bugs"))
+    assert "rodar_testes" in block and "resumo do terminar" in block
+    assert "Regra de ferro" in block

@@ -281,3 +281,18 @@ def test_gemini_never_reads_code_not_even_as_the_last_resort(engine):
     assert isinstance(code, FallbackLLMProvider) and code.name == "openai+anthropic"
     alone = _three(llm_fallback_provider_name="", llm_fallback2_provider_name="")
     assert build_llm_provider(alone, session_factory=factory, only=("claude", "openai")) is None
+
+
+def test_a_skill_goes_after_the_rules():
+    messages = coder.build_messages(
+        "visao",
+        "x",
+        [],
+        SPECS,
+        max_steps=7,
+        until_tests=False,
+        budget_chars=48_000,
+        skill="Habilidade ligada pelo dono: teste",
+    )
+    system = messages[0].content
+    assert system.index("Ferramentas:") < system.index("Habilidade ligada pelo dono: teste")

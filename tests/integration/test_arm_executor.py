@@ -284,3 +284,31 @@ def test_only_the_device_running_the_task_gets_steps(mac, db):
     assert stolen.status_code == 409
     taken = client.post(f"/arm/device/tasks/{asked['id']}/step", json=body, headers=headers)
     assert taken.status_code == 200 and taken.json()["action"] == {"tool": "listar", "args": {}}
+
+
+BUG_LINE = "Regra de ferro: nenhum conserto sem investigar a causa antes."
+
+
+def test_a_switched_on_skill_goes_with_the_task_that_asks_for_it(mac, db):
+    fake = scripted([("tool", "terminar", {"resumo": "Achei a causa."})])
+    use(mac["client"], fake)
+
+    task_of(db, run(mac, "os testes estão falhando desde ontem, acha o bug"))
+
+    system = fake.prompts[0][0].content
+    assert BUG_LINE in system and "Você já está no Mac" in system
+
+
+def test_a_skill_that_needs_a_conversation_or_is_off_stays_out(mac, db):
+    from core.skills import catalog
+
+    fake = scripted([("tool", "terminar", {"resumo": "Feito."})])
+    use(mac["client"], fake)
+    # Escrever documentos asks the owner questions: it never goes to the arm.
+    task_of(db, run(mac, "escrever um documento de decisão em docs/"))
+    owner = db.scalar(select(ArmTask)).owner_user_id
+    catalog.set_enabled(db, catalog.by_id("achar-bugs"), False, actor_user_id=owner)
+    db.commit()
+    task_of(db, run(mac, "os testes estão falhando, acha o bug"))
+
+    assert "Habilidade ligada" not in everything_sent(fake)

@@ -6,6 +6,7 @@ source: obra/superpowers
 source_url: https://github.com/obra/superpowers/tree/22f0b463e7a5e579904dd6211a520321035526f7/skills/systematic-debugging
 license: MIT
 installed_on: 2026-11-25
+arm: sim
 ---
 
 Adaptada da habilidade "systematic-debugging" do obra/superpowers (MIT, Copyright (c) 2025 Jesse Vincent) para o chat do Visão. No Mac, só o Braço mexe nos arquivos, com a aprovação do dono.

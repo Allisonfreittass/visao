@@ -26,6 +26,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from core import llm_routing
+from core.skills import catalog as skills
 from infrastructure.database.models import ArmDevice, ArmTask, ModelUsage
 from integrations.llm.base import (
     ChatMessage,
@@ -220,9 +221,11 @@ def build_messages(
     max_steps: int,
     until_tests: bool,
     budget_chars: int,
+    skill: str = "",
 ) -> list[ChatMessage]:
     """System, the owner's request, then each step as the model's action and what it got back.
-    Old results are shortened first, so the newest ones always arrive whole."""
+    Old results are shortened first, so the newest ones always arrive whole. `skill` is a way of
+    working the owner switched on in Habilidades, after the rules (core/skills/catalog.py)."""
     system = SYSTEM.format(
         project=project,
         finish=FINISH,
@@ -230,6 +233,8 @@ def build_messages(
         until=UNTIL if until_tests else "",
         catalog=_catalog(specs),
     )
+    if skill:
+        system += f"\n\n{skill}"
     head = [
         ChatMessage("system", system),
         ChatMessage("user", f"Tarefa do dono:\n{prompt}"),
@@ -537,6 +542,8 @@ def step(
         return {"stop": COST_LIMIT.format(limit=limit), "cost_usd": str(spent)}
     if provider is None:
         return {"stop": NO_PROVIDER, "cost_usd": str(spent)}
+    # Chosen from the owner's request alone, the same at every step (and so the cache holds).
+    skill = skills.choose([s for s in skills.enabled(session) if s.arm], prompt)
     # The step is taken before the call: two requests at once never pass the limit.
     taken = session.execute(
         update(ArmTask)
@@ -563,6 +570,7 @@ def step(
         max_steps=max_steps,
         until_tests=until,
         budget_chars=budget_chars,
+        skill=skills.arm_block(skill) if skill else "",
     )
     try:
         # One cache per task: the system prompt and the history only grow, step after step.
