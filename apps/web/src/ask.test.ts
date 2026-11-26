@@ -1,22 +1,20 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-function sources(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return sources(path);
-    return /\.tsx?$/.test(name) && !/\.test\./.test(name) && name !== "ask.ts" ? [path] : [];
-  });
-}
+// Every source file of the app, as text (Vite reads them at test time).
+const files = import.meta.glob(["./**/*.ts", "./**/*.tsx", "!./**/*.test.*", "!./ask.ts"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 describe("confirmações", () => {
   // The Mac app's window (Tauri, macOS WebKit) shows no native confirm or prompt: they answer
   // "cancel" at once, and "Desconectar o Google" did nothing (25/11/2026). src/ask.ts draws them.
   it("never use the browser's native confirm, prompt or alert", () => {
-    const found = sources(join(__dirname)).filter((path) =>
-      /\bwindow\.(confirm|prompt|alert)\s*\(|(?<![\w.])(confirm|prompt|alert)\s*\(\s*[`"']/.test(readFileSync(path, "utf8")),
-    );
+    expect(Object.keys(files).length).toBeGreaterThan(20);
+    const found = Object.entries(files)
+      .filter(([, text]) => /\bwindow\.(confirm|prompt|alert)\s*\(|(?<![\w.])(confirm|prompt|alert)\s*\(\s*[`"']/.test(text))
+      .map(([path]) => path);
     expect(found).toEqual([]);
   });
 });
