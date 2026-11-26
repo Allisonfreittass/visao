@@ -6,6 +6,7 @@ source: anthropics/knowledge-work-plugins
 source_url: https://github.com/anthropics/knowledge-work-plugins/tree/5e504ae11498f2b8daa30d86b7dab97b2ecd8092/engineering/skills/code-review
 license: Apache-2.0
 installed_on: 2026-11-25
+arm: sim
 ---
 
 Adaptada da habilidade "code-review" do anthropics/knowledge-work-plugins (Apache-2.0, Copyright Anthropic) para o Visão: o código chega colado, num link do GitHub que o sistema abre ou por uma tarefa no Mac.

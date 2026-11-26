@@ -31,6 +31,23 @@ causa de um bug, escrever um documento por etapas, transformar uma ideia em plan
 O manifesto de capacidades (`core/identity/capabilities.py`) lista os nomes das que estão ligadas,
 para ele saber dizer o que sabe fazer.
 
+## No Braço
+
+As habilidades com `arm: sim` no cabeçalho também vão para o executor de código do Visão no Mac
+([ADR-0023](decisions/0023-executor-de-codigo-proprio.md), `core/arm/coder.py`): Achar a causa de
+um bug, Design de telas e Revisar código.
+
+- A escolha usa os mesmos gatilhos, só sobre a tarefa que o dono aprovou, e é a mesma em todos os
+  passos da tarefa. Entra no máximo uma, e só se estiver ligada.
+- O texto vai no fim do prompt de sistema, depois das regras do braço, com um aviso: ele já está
+  no Mac, numa tarefa aprovada; onde a habilidade fala em perguntar ao dono, ele usa as
+  ferramentas que tem e deixa no resumo do `terminar` o que só o dono decide.
+- As que pedem conversa (Escrever documentos, Comunicados, Ideias) ou o e-mail e a agenda não vão:
+  no meio de uma tarefa o braço não pergunta nada. "Ideias" ainda travaria a tarefa já aprovada
+  esperando a aprovação de um desenho.
+- Não vale para as tarefas feitas pelo Claude Code no Mac nem para mouse e teclado
+  ([MEXER.md](MEXER.md)).
+
 ## Ligar e desligar
 
 - `GET /skills`: cada habilidade com `id`, `name`, `description`, `origin` (`instalada`), `source`,
@@ -91,5 +108,4 @@ Ficaram de fora:
 
 - **Habilidades que ele propõe** ("Já conferi preços 9 vezes do mesmo jeito. Guardo como
   habilidade?"), com aprovar e recusar: issue #9.
-- **O Braço não as recebe:** o ciclo de código do Mac ([ADR-0023](decisions/0023-executor-de-codigo-proprio.md))
-  ainda não lê as habilidades.
+- **O Claude Code no Mac não as recebe:** só o executor do próprio Visão (seção "No Braço").

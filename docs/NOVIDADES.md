@@ -5,6 +5,15 @@ em você?" e "o que você consegue fazer agora?" com fatos. Cada item aponta par
 detalhes. O que está ligado **agora** vem do manifesto de capacidades
 (`core/identity/capabilities.py`), que entra em todo prompt; este arquivo conta a história.
 
+## 26/11/2026
+
+- **O Braço também segue as habilidades** ([HABILIDADES.md](HABILIDADES.md), seção "No Braço").
+  - Quando você aprova uma tarefa de código no Mac que combina com Achar a causa de um bug, Design
+    de telas ou Revisar código, ele trabalha desse jeito em cada passo e põe no resumo final o que
+    só você decide.
+  - As que pedem conversa, e-mail ou agenda ficam só no chat. Desligar uma em Habilidades tira ela
+    do Braço também.
+
 ## 25/11/2026
 
 - **Sete habilidades novas, para o dia a dia** ([HABILIDADES.md](HABILIDADES.md)).

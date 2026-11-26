@@ -58,6 +58,8 @@ class Capabilities:
     provider_by_task: bool = False
     # Skills the owner left on in Habilidades, by name (core/skills/catalog.py).
     skills: tuple[str, ...] = ()
+    # Of those, the ones that also go with the arm's code tasks on the Mac (`arm: sim`).
+    arm_skills: tuple[str, ...] = ()
 
     def actions(self) -> list[str]:
         """Operational actions this system can select and execute, within permissions."""
@@ -251,6 +253,12 @@ class Capabilities:
                 "o pedido combina com uma, o sistema põe o jeito de trabalhar dela no contexto "
                 "desta resposta; o interlocutor liga e desliga cada uma nessa tela"
             )
+        if self.arm_skills and self.mac_projects:
+            items.append(
+                f"levar para as tarefas de código do Braço no Mac as habilidades "
+                f"{'; '.join(self.arm_skills)}, quando a tarefa aprovada combina com uma: o Braço "
+                "trabalha desse jeito e diz no resumo final o que só o interlocutor decide"
+            )
         if self.notifications:
             if not self.push_configured:
                 items.append(
@@ -373,6 +381,7 @@ def build_capabilities(session: Session, owner: User, inputs: CapabilityInputs) 
         self_knowledge=inputs.self_knowledge,
         provider_by_task=llm_routing.get_mode(session) == "por_tarefa",
         skills=tuple(s.name for s in skill_catalog.enabled(session)),
+        arm_skills=tuple(s.name for s in skill_catalog.enabled(session) if s.arm),
         google=session.scalar(
             select(GoogleAccount.id).where(GoogleAccount.owner_user_id == owner.id)
         )

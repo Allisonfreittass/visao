@@ -312,3 +312,12 @@ def test_a_skill_that_needs_a_conversation_or_is_off_stays_out(mac, db):
     task_of(db, run(mac, "os testes estão falhando, acha o bug"))
 
     assert "Habilidade ligada" not in everything_sent(fake)
+
+
+def test_a_code_review_task_goes_with_the_review_skill(mac, db):
+    fake = scripted([("tool", "terminar", {"resumo": "Revisado."})])
+    use(mac["client"], fake)
+
+    task_of(db, run(mac, "revisa o código do login antes do merge"))
+
+    assert "Revisar código" in fake.prompts[0][0].content

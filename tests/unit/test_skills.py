@@ -129,7 +129,8 @@ def test_the_manifest_names_the_skills_that_are_on():
 
 
 def test_only_ways_of_working_without_a_conversation_go_to_the_arm():
-    assert {s.id for s in catalog.installed() if s.arm} == {"achar-bugs", "design-de-telas"}
+    arm = {s.id for s in catalog.installed() if s.arm}
+    assert arm == {"achar-bugs", "design-de-telas", "revisar-codigo"}
     with pytest.raises(catalog.SkillFileError):
         catalog.parse(
             "braco-talvez",
@@ -142,3 +143,10 @@ def test_the_arm_block_points_to_its_own_tools():
     block = catalog.arm_block(catalog.by_id("achar-bugs"))
     assert "rodar_testes" in block and "resumo do terminar" in block
     assert "Regra de ferro" in block
+
+
+def test_the_manifest_names_the_arm_skills_only_with_a_mac():
+    names = ("Revisar código",)
+    assert not any("Braço no Mac" in a for a in Capabilities(arm_skills=names).actions())
+    with_mac = Capabilities(arm_skills=names, mac_projects=("visao",)).actions()
+    assert any("Braço no Mac as habilidades Revisar código" in a for a in with_mac)
