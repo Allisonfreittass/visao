@@ -70,6 +70,8 @@ _SAY: dict[str, Callable[[dict[str, Any]], str]] = {
         f"leu no {', '.join(a.get('apps') or ['app'])} da pessoa"
         + (f" ({', '.join(a['tools'][:3])})" if a.get("tools") else "")
     ),
+    "followup_recorded": lambda a: f"registrou uma cobrança para {a.get('when') or 'depois'}",
+    "day_read": lambda a: "juntou o dia da pessoa (" + ", ".join(a.get("sources") or []) + ")",
     "github_read": lambda a: (
         f"leu o GitHub da pessoa pelo servidor ({a.get('repo') or 'repositório'}: "
         + ", ".join(a.get("read") or [])

@@ -18,6 +18,8 @@ _DESCRIBE = {
     "ask_question": "há uma lacuna que só o interlocutor pode responder (pergunta indicada acima)",
     "research": "pesquisa feita agora; fontes listadas acima",
     "github_read": "GitHub do dono lido agora pelo servidor; os números estão acima",
+    "day_read": "o dia do dono foi medido agora (commits, Mac, agenda, e-mails), dados acima",
+    "followup_recorded": "a cobrança que o dono pediu ficou registrada, com dia e hora (acima)",
     "research_deferred": "pesquisa adiada por orçamento; nada foi pesquisado agora",
     "conversation_thread_detected": (
         "uma pendência de conversa foi registrada para possível retomada; nenhuma pesquisa"

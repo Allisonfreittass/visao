@@ -15,7 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core import actions as app_actions
-from core import browse, location, owner_goals, projects
+from core import browse, followups, location, owner_goals, projects
+from core import day as day_summary
 from core.apps import account as apps_account
 from core.apps import actions as apps_actions
 from core.apps import assist as apps_assist
@@ -45,6 +46,7 @@ from core.curiosity.engine import (
 from core.decision import record as deed_record
 from core.decision.turn import TurnPlan
 from core.github import assist as github_assist
+from core.google import account as google_accounts
 from core.google import actions as google_actions
 from core.google import assist as google_assist
 from core.identity import name_deliberation, self_knowledge
@@ -253,7 +255,51 @@ def run_turn(
             read=from_github.read,
             **({"failure": from_github.failure} if from_github.failure else {}),
         )
-    if capabilities.mac_projects and from_github is None:
+    # "Como foi meu dia?": the day measured before the reply (core/day.py).
+    day_kind = None if shared else day_summary.asks(text)
+    the_day = None
+    if day_kind is not None:
+        progress.step("Juntando o seu dia")
+        account = google_accounts.get(session, owner.id) if config.google_secret else None
+        the_day = day_summary.gather(
+            session,
+            owner,
+            kind=day_kind,
+            now=datetime.now(UTC),
+            github=github,
+            google=(
+                google_accounts.client_for(account, config.google_secret)
+                if account is not None and config.google_secret
+                else None
+            ),
+        )
+        blocks.append(the_day.block)
+        plan.add(
+            "day_read",
+            executed=bool(the_day.read),
+            reason="owner_asked_about_day",
+            sources=the_day.read,
+        )
+    # "Me cobra", "me lembra de": recorded before the reply, with its hour (core/followups.py).
+    followup = None
+    if not shared and followups.asks(text):
+        if config.mind_enabled:
+            followup = followups.record(session, owner, text, datetime.now(UTC))
+            blocks.append(followups.block(followup))
+            plan.add(
+                "followup_recorded" if followup.intention else "followup_refused",
+                executed=followup.intention is not None,
+                reason="owner_asked",
+                when=followup.when_words,
+                **({"why": followup.refused} if followup.refused else {}),
+            )
+        else:
+            blocks.append(
+                "A pessoa pediu para ser cobrada, mas a mente está desligada "
+                "(VISION_MIND_ENABLED): nada vai lembrar disso depois. Diga isso numa frase; não "
+                "prometa cobrar."
+            )
+    if capabilities.mac_projects and from_github is None and day_kind is None:
         wanted = mac_intent.detect(
             session,
             conversation=conversation,
@@ -382,7 +428,12 @@ def run_turn(
 
     # The owner's own data (repositories, email, calendar, files) comes from a tool or not at all:
     # without one the reply says what is missing, and the web is never searched in its place.
-    own_data = bool(tools.owner_data(text)) or from_github is not None
+    own_data = (
+        bool(tools.owner_data(text))
+        or from_github is not None
+        or the_day is not None
+        or followup is not None
+    )
     available = {
         name
         for name, on in (
@@ -872,6 +923,9 @@ def run_turn(
         ):
             fixed = facts_guard.github_reply(from_github.facts)
             plan.add("github_denial_fixed", executed=True, reason="reply_contradicted_github_read")
+        if the_day is not None and the_day.facts and day_summary.contradicted(fixed):
+            fixed = " ".join(the_day.facts)
+            plan.add("day_denial_fixed", executed=True, reason="reply_said_it_did_not_know_the_day")
         if mac.online:
             no_off = facts_guard.fix_mac_off(fixed)
             if no_off is not None:

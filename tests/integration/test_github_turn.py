@@ -193,3 +193,64 @@ def test_the_mac_on_is_never_called_off(db):
     assert "desligado" not in content and "Seu Mac está ligado agora" in content
     assert content.startswith("Sou pareado com o seu Mac, sim.")
     assert "mac_off_fixed" in outcome.plan.executed()
+
+
+def test_how_was_my_day_is_built_on_what_was_measured(db):
+    owner = setup(db)
+    # The model still says it does not know: code puts the measured day in its place.
+    provider = FakeLLMProvider(reply_text="Não sei como foi seu dia; você ainda não me contou.")
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="E aí, como foi meu dia hoje?",
+        provider=provider,
+        search=None,
+        config=CONFIG,
+        github=github(3),
+    )
+    system = provider.prompts[0][0].content
+    assert "O dia do dono hoje" in system and "Commits hoje em Allisonfreittass/visao: 3." in system
+    assert len(provider.prompts) == 1  # no curiosity question in between
+    content = outcome.result.assistant_message.content
+    assert content.startswith("Hoje foram 3 commits no visao")
+    assert "day_denial_fixed" in outcome.plan.executed()
+
+
+def test_hold_me_to_it_records_the_follow_up_with_its_hour(db):
+    from infrastructure.database.models import Intention
+
+    owner = setup(db)
+    provider = FakeLLMProvider(reply_text="Fechado, te cobro sexta às 17h.")
+    outcome = run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="me cobra: eu disse que ia terminar o painel de preços essa semana",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, mind_enabled=True, curiosity_enabled=False),
+    )
+    intention = db.scalar(select(Intention))
+    assert intention is not None and "painel de preços" in intention.about
+    assert "followup_recorded" in outcome.plan.executed()
+    system = provider.prompts[-1][0].content
+    assert "A cobrança foi registrada agora pelo sistema" in system
+
+
+def test_without_the_mind_it_never_promises_to_follow_up(db):
+    owner = setup(db)
+    provider = FakeLLMProvider()
+    run_turn(
+        db,
+        conversation=chat(db, owner),
+        identity=get_identity(db),
+        owner=owner,
+        text="me cobra o painel essa semana",
+        provider=provider,
+        search=None,
+        config=replace(CONFIG, mind_enabled=False, curiosity_enabled=False),
+    )
+    assert "não prometa cobrar" in provider.prompts[-1][0].content
