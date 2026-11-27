@@ -377,11 +377,14 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 .bubble.user .bubble-more { right: auto; left: -38px; }
 .bubble:hover .bubble-more, .bubble-more:focus-visible, .bubble-more[aria-expanded="true"] { opacity: 1; }
 @media (hover: none) {
-  /* On a phone you hold the message; the button stays for VoiceOver. */
-  .bubble-more { width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 1; }
+  /* On touch screens, expose a real 44px target; long press remains a shortcut. */
+  .bubble-more { position: static; display: flex; width: 44px; height: 44px; min-height: 44px; margin: 6px 0 0 auto; padding: 0; overflow: visible; clip: auto; border: 1px solid var(--border-strong); opacity: 1; }
   .bubble { -webkit-touch-callout: none; }
 }
-.message-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.message-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; opacity: 1; transform: translateY(0); transition: opacity .16s var(--ease-out), transform .16s var(--ease-out); }
+@starting-style {
+  .message-menu { opacity: 0; transform: translateY(4px); }
+}
 .message-menu button { min-height: 44px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--text); font: 500 13px/1.2 var(--font-sans); }
 .message-menu .message-menu-close { color: var(--text-muted); }
 /* A reply in 2 or 3 bubbles: each part its own block, coming in one after the other. */
