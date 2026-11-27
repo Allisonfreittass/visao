@@ -245,7 +245,6 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
   const cancelRequested = useRef(false);
   const [announcement, setAnnouncement] = useState("");
   const [rating, setRating] = useState<string | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   /** Whether you are at the end of the conversation: only then does it follow the new text. */
   const atEnd = useRef(true);
@@ -278,7 +277,15 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
   const lastIsYours = messages.at(-1)?.role === "user";
   useEffect(() => {
     // What you just sent always shows; the rest follows only if you are at the end.
-    if (atEnd.current || lastIsYours) endRef.current?.scrollIntoView({ block: "end" });
+    const list = listRef.current;
+    if (!list || (!atEnd.current && !lastIsYours)) return;
+    let cancelled = false;
+    const follow = () => {
+      if (!cancelled && list.isConnected && (atEnd.current || lastIsYours)) list.scrollTop = list.scrollHeight;
+    };
+    const frame = requestAnimationFrame(follow);
+    void document.fonts?.ready.then(follow);
+    return () => { cancelled = true; cancelAnimationFrame(frame); };
   }, [messages.length, sending, status?.label, asks.length, lastIsYours]);
   useEffect(() => {
     const list = listRef.current;
@@ -517,7 +524,6 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             <span className="action-card-note">Nada roda sem o seu toque.</span>
           </div>
         ))}
-        <div ref={endRef} />
       </div>
       {error && <p className="error" role="alert">× {error}</p>}
       <div className="composer-dock">
