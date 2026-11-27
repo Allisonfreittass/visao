@@ -26,6 +26,7 @@ import { commonPrefix, revealStep } from "../stream";
 import { FeedbackBar } from "./FeedbackBar";
 import { SourcesPill } from "./SourcesPill";
 import { confirmar } from "../ask";
+import { turnAnnouncement } from "./turn-announcements";
 
 interface ChatViewProps {
   /** The slim bar above the messages: which conversation, and the call on smaller screens. */
@@ -199,7 +200,7 @@ function LiveBubble({ text, status, onStop, settling, onSettled, steps = [], too
   }, [settling, reveal.done, onSettled]);
   if (!reveal.text) {
     return (
-      <div className="live-status" role="status" aria-live="polite">
+      <div className="live-status" aria-live="off">
         <div className="bubble assistant pending">
           <Corvo size={30} className="message-avatar" />
           <span key={status?.label ?? "pensando"} className="live-status-label">{status?.label ?? "Processando"}</span>
@@ -238,6 +239,11 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   /** The message whose menu is open (long press, right click or the ⋯ button). */
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const lastToolAnnouncement = useRef<string | null>(null);
+  const wasSending = useRef(false);
+  const cancelRequested = useRef(false);
+  const [announcement, setAnnouncement] = useState("");
   const [rating, setRating] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -245,6 +251,29 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
   const atEnd = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pickerRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (sending) {
+      if (!wasSending.current) {
+        cancelRequested.current = false;
+        lastToolAnnouncement.current = null;
+        setAnnouncement(turnAnnouncement({ type: "start" }));
+      }
+      if (!cancelRequested.current && status?.kind && lastToolAnnouncement.current !== status.label) {
+        lastToolAnnouncement.current = status.label;
+        setAnnouncement(turnAnnouncement({ type: "tool", label: status.label }));
+      }
+    } else if (wasSending.current && !error && !cancelRequested.current) {
+      setAnnouncement(turnAnnouncement({ type: "complete" }));
+      lastToolAnnouncement.current = null;
+    }
+    wasSending.current = sending;
+  }, [sending, status?.kind, status?.label, error]);
+
+  function closeMenu(restoreFocus = true) {
+    setMenuFor(null);
+    if (restoreFocus) requestAnimationFrame(() => menuTriggerRef.current?.focus());
+  }
 
   const lastIsYours = messages.at(-1)?.role === "user";
   useEffect(() => {
@@ -352,10 +381,10 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
       }}
       onDrop={onDrop}
     >
+      <div className="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{announcement}</div>
       {header}
       <div
         className="messages"
-        aria-live="polite"
         ref={listRef}
         onScroll={(e) => {
           const el = e.currentTarget;
@@ -386,7 +415,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
               setReplyTo(m);
               textareaRef.current?.focus();
             }}
-            onMenu={() => setMenuFor(m.id)}
+            onMenu={() => { menuTriggerRef.current = null; setMenuFor(m.id); }}
           >
             {!m.local && (
               <button
@@ -439,18 +468,25 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
             )}
             {m.sources && m.sources.length > 0 && <SourcesPill sources={m.sources} at={m.created_at} />}
             {!m.local && (
-              <button type="button" className="bubble-more" onClick={() => setMenuFor(menuFor === m.id ? null : m.id)} aria-label="Mais opções desta mensagem" aria-expanded={menuFor === m.id} title="Mais">
+              <button type="button" className="bubble-more" onClick={(event) => {
+                if (menuFor === m.id) closeMenu();
+                else { menuTriggerRef.current = event.currentTarget; setMenuFor(m.id); }
+              }} onKeyDown={(event) => {
+                if (event.key === "Escape" && menuFor === m.id) { event.preventDefault(); closeMenu(); }
+              }} aria-label="Mais opções desta mensagem" aria-expanded={menuFor === m.id} title="Mais">
                 <span aria-hidden="true">⋯</span>
               </button>
             )}
             {menuFor === m.id && (
-              <div className="message-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setReplyTo(m); setMenuFor(null); textareaRef.current?.focus(); }}>Responder</button>
-                <button type="button" role="menuitem" onClick={() => { void navigator.clipboard?.writeText(m.content); setMenuFor(null); }}>Copiar texto</button>
+              <div className="message-menu" onKeyDown={(event) => {
+                if (event.key === "Escape") { event.preventDefault(); closeMenu(); }
+              }}>
+                <button type="button" onClick={() => { setReplyTo(m); closeMenu(false); textareaRef.current?.focus(); }}>Responder</button>
+                <button type="button" onClick={() => { void navigator.clipboard?.writeText(m.content); closeMenu(); }}>Copiar texto</button>
                 {m.role === "assistant" && (
-                  <button type="button" role="menuitem" onClick={() => { setRating(m.id); setMenuFor(null); }}>Avaliar resposta</button>
+                  <button type="button" onClick={() => { setRating(m.id); closeMenu(); }}>Avaliar resposta</button>
                 )}
-                <button type="button" role="menuitem" className="message-menu-close" onClick={() => setMenuFor(null)}>Fechar</button>
+                <button type="button" className="message-menu-close" onClick={() => closeMenu()}>Fechar</button>
               </div>
             )}
             {rating === m.id && m.role === "assistant" && (
@@ -463,7 +499,11 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           </Fragment>
         ))}
         {(sending || settlingId) && (
-          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop} settling={!!settlingId && !sending} onSettled={onSettled} steps={steps} toolsMode={toolsMode} />
+          <LiveBubble text={liveText ?? ""} status={status} onStop={onStop ? () => {
+            cancelRequested.current = true;
+            setAnnouncement(turnAnnouncement({ type: "cancel" }));
+            onStop();
+          } : undefined} settling={!!settlingId && !sending} onSettled={onSettled} steps={steps} toolsMode={toolsMode} />
         )}
         {asks.map((ask) => (
           <div key={ask.id} className="action-card" role="group" aria-label={`${ask.label}: ${ask.text}, esperando você`}>
@@ -495,6 +535,8 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
         <div className="composer-row">
           <textarea
             ref={textareaRef}
+            name="message"
+            autoComplete="off"
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);
@@ -522,6 +564,7 @@ export function ChatView({ header, onOpenProject, projectName, messages, segment
           <input
             ref={pickerRef}
             type="file"
+            name="attachments"
             accept={ACCEPT}
             multiple
             hidden

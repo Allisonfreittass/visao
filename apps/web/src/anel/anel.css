@@ -89,6 +89,7 @@
 .anel[data-animado="nao"] *, .anel[data-animado="nao"] { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .anel *, .anel { animation: none !important; transition: none !important; }
+  .anel[data-estado="ouvindo"] .anel-ponto-forma { transform: scale(1) !important; }
   .anel[data-estado="pensando"] .anel-marca--hora { stroke: var(--ambar); }
   .anel[data-estado="ouvindo"] .anel-marca { opacity: .7; }
   .anel[data-estado="aprovacao"] .anel-falha { opacity: 1; }

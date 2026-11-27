@@ -373,7 +373,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 
 /* Rating a reply lives in its menu (long press, right click or ⋯), not under every reply. */
 .message-feedback-title { display: block; margin-bottom: 6px; font: 500 13px/1.2 var(--font-sans); color: var(--text-muted); }
-.bubble-more { position: absolute; top: 40px; right: -38px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--text-muted); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
+.bubble-more { position: absolute; top: 40px; right: -44px; width: 44px; height: 44px; min-height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--text-muted); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
 .bubble.user .bubble-more { right: auto; left: -38px; }
 .bubble:hover .bubble-more, .bubble-more:focus-visible, .bubble-more[aria-expanded="true"] { opacity: 1; }
 @media (hover: none) {
@@ -382,7 +382,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
   .bubble { -webkit-touch-callout: none; }
 }
 .message-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.message-menu button { padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--text); font: 500 13px/1.2 var(--font-sans); }
+.message-menu button { min-height: 44px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--text); font: 500 13px/1.2 var(--font-sans); }
 .message-menu .message-menu-close { color: var(--text-muted); }
 /* A reply in 2 or 3 bubbles: each part its own block, coming in one after the other. */
 .bubble-part + .bubble-part { margin-top: 14px; }
@@ -453,7 +453,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 
 /* Responder: a small button on each message, the quote in the answer, the strip above the box. */
 .bubble { position: relative; }
-.bubble-reply { position: absolute; top: 6px; right: -6px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--text-muted); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
+.bubble-reply { position: absolute; top: 6px; right: -6px; width: 44px; height: 44px; min-height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--surface); color: var(--text-muted); font: 400 15px/1 var(--font-sans); opacity: 0; transition: opacity .2s; }
 .bubble.user .bubble-reply { right: auto; left: -38px; }
 .bubble:hover .bubble-reply, .bubble-reply:focus-visible { opacity: 1; }
 /* On touch screens you drag the message to the right instead; the button stays for VoiceOver. */
@@ -470,7 +470,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 .bubble-quote-text { font: 400 13px/1.35 var(--font-sans); color: var(--text-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .composer-reply { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-left: 3px solid var(--accent-text); border-radius: 10px; background: var(--surface-2); }
 .composer-reply-text { flex: 1; min-width: 0; font: 400 13px/1.35 var(--font-sans); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.composer-reply-cancel { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); font: 400 17px/1 var(--font-sans); }
+.composer-reply-cancel { width: 44px; height: 44px; min-height: 44px; flex: none; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-muted); font: 400 17px/1 var(--font-sans); }
 .composer-reply-cancel:hover { background: var(--surface); color: var(--text); }
 @media (max-width: 560px) {
   .bubble.user .bubble-reply { left: -34px; }
@@ -490,7 +490,7 @@ button.active, button[aria-pressed="true"] { border-color: var(--accent-text); c
 .action-card-yes:hover { background: var(--accent-hover); }
 .action-card-note { font: 400 12px/1.3 var(--font-sans); color: var(--card-ink-muted); }
 
-.live-status-stop { width: 28px; height: 28px; margin-left: 6px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: var(--text); color: var(--bg); font: 400 17px/1 var(--font-sans); cursor: pointer; }
+.live-status-stop { width: 44px; height: 44px; min-height: 44px; margin-left: 6px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: var(--text); color: var(--bg); font: 400 17px/1 var(--font-sans); cursor: pointer; }
 .live-status-stop:hover { opacity: .85; }
 .bubble--stopped { opacity: .7; }
 

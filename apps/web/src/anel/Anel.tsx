@@ -78,17 +78,39 @@ export function Anel({ estado, size = 36, level, animated = true, decorative = f
       el.style.removeProperty("--nivel");
       return;
     }
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (typeof level === "number") {
-      el.style.setProperty("--nivel", level.toFixed(3));
+      el.style.setProperty("--nivel", motion.matches ? "0" : level.toFixed(3));
       return;
     }
     let raf = 0;
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    };
     const tick = () => {
+      if (motion.matches) {
+        stop();
+        el.style.setProperty("--nivel", "0");
+        return;
+      }
       el.style.setProperty("--nivel", Math.max(0, Math.min(1, level())).toFixed(3));
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const syncMotion = () => {
+      if (motion.matches) {
+        stop();
+        el.style.setProperty("--nivel", "0");
+      } else if (!raf) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    syncMotion();
+    motion.addEventListener("change", syncMotion);
+    return () => {
+      stop();
+      motion.removeEventListener("change", syncMotion);
+    };
   }, [voiced, level]);
 
   const rest = muninn ? { x: u(EYE.x), y: u(EYE.y) } : { x: 0, y: 0 };
