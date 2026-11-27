@@ -72,18 +72,18 @@ describe("the empty field", () => {
 describe("the entrance", () => {
   it("shows, in order, the name, the greeting, the line, the fields, Entrar and the two links", () => {
     const html = entrada();
-    const order = ["VISAO</p>", "Que bom ter você de volta.", "Só você entra aqui. Ele lembra apenas do que você deixar.", ">E-mail</label>", ">Senha</label>", ">Entrar</button>", ">Esqueci a senha</button>", ">Primeira vez? Configurar</button>"];
+    const order = ["VISAO</p>", "A conversa continua.", "Só você entra aqui. Ele lembra apenas do que você deixar.", ">E-mail</label>", ">Senha</label>", ">Entrar</button>", ">Esqueci a senha</button>", ">Primeira vez? Configurar</button>"];
     const positions = order.map((text) => html.indexOf(text));
     expect(positions.every((at) => at >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 
-  it("draws the crow inline, with the amber only in his eye", () => {
+  it("keeps the focused crow artwork inline and uses the compact mark in the mobile lockup", () => {
     const html = entrada();
     expect(html).toContain('aria-label="O corvo do VISAO, de olho âmbar"');
     expect(html).toContain('class="corvo-close-pupila"');
+    expect(html).toContain('class="corvo entrada-marca-corvo"');
     expect(html.match(/#E39A2E/g)).toHaveLength(1);
-    expect(html).not.toContain("<img");
   });
 
   it("keeps the browser's translator off the name", () => {
@@ -92,6 +92,14 @@ describe("the entrance", () => {
 
   it("has no checkbox between the password and Entrar, as in the mockup", () => {
     expect(entrada()).not.toContain('type="checkbox"');
+  });
+
+  it("names the credentials for password managers", () => {
+    const html = entrada();
+    expect(html).toContain('name="email"');
+    expect(html).toContain('name="password"');
+    expect(html).toContain('placeholder="voce@exemplo.com"');
+    expect(html).toContain('placeholder="Sua senha"');
   });
 
   it("greets the first account without 'de volta'", () => {

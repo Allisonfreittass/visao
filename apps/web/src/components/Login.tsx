@@ -198,69 +198,76 @@ export function Login({ api, onLoggedIn, online = true, onBusyChange, onFirstAcc
           O servidor não respondeu à última verificação. Você pode tentar mesmo assim.
         </p>
       )}
-      <div className="rs-campo" data-estado={fieldError || (emailMissing ? "erro" : undefined)}>
-        <label htmlFor="login-email">E-mail</label>
-        <input
-          id="login-email"
-          type="email"
-          inputMode="email"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          maxLength={254}
-          value={email}
-          onChange={(e) => edit(setEmail, e.target.value, "email")}
-          aria-invalid={error?.credentials || emailMissing || undefined}
-          aria-describedby={[describedBy, emailMissing ? "login-email-falta" : undefined].filter(Boolean).join(" ") || undefined}
-          required
-        />
-        {emailMissing && (
-          <small id="login-email-falta" role="alert">
-            {missing?.text}
-          </small>
-        )}
-      </div>
-      <div className="rs-campo" data-estado={fieldError || (passwordMissing ? "erro" : undefined)}>
-        <label htmlFor="login-password">Senha</label>
-        <input
-          id="login-password"
-          type="password"
-          autoComplete={firstRun ? "new-password" : "current-password"}
-          maxLength={1024}
-          value={password}
-          onChange={(e) => edit(setPassword, e.target.value, "password")}
-          onKeyDown={watchCapsLock}
-          onKeyUp={watchCapsLock}
-          onBlur={() => setCapsLock(false)}
-          aria-invalid={error?.credentials || passwordMissing || undefined}
-          aria-describedby={
-            [describedBy, passwordMissing ? "login-senha-falta" : undefined, capsLock ? "login-caps" : undefined].filter(Boolean).join(" ") || undefined
-          }
-          required
-        />
-        {passwordMissing && (
-          <small id="login-senha-falta" role="alert">
-            {missing?.text}
-          </small>
-        )}
-        {capsLock && <small id="login-caps">Caps Lock está ligado.</small>}
-      </div>
-      {firstRun && (
-        <div className="rs-campo" data-estado={fieldError}>
-          <label htmlFor="login-confirm">Repita a senha</label>
+      <fieldset className="login-credentials" aria-label="Dados de acesso">
+        <div className="rs-campo" data-estado={fieldError || (emailMissing ? "erro" : undefined)}>
+          <label htmlFor="login-email">E-mail</label>
           <input
-            id="login-confirm"
-            type="password"
-            autoComplete="new-password"
-            maxLength={1024}
-            value={confirm}
-            onChange={(e) => edit(setConfirm, e.target.value)}
-            aria-invalid={error?.credentials || undefined}
-            aria-describedby={describedBy}
+            id="login-email"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="voce@exemplo.com"
+            maxLength={254}
+            value={email}
+            onChange={(e) => edit(setEmail, e.target.value, "email")}
+            aria-invalid={error?.credentials || emailMissing || undefined}
+            aria-describedby={[describedBy, emailMissing ? "login-email-falta" : undefined].filter(Boolean).join(" ") || undefined}
             required
           />
+          {emailMissing && (
+            <small id="login-email-falta" role="alert">
+              {missing?.text}
+            </small>
+          )}
         </div>
-      )}
+        <div className="rs-campo" data-estado={fieldError || (passwordMissing ? "erro" : undefined)}>
+          <label htmlFor="login-password">Senha</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autoComplete={firstRun ? "new-password" : "current-password"}
+            placeholder="Sua senha"
+            maxLength={1024}
+            value={password}
+            onChange={(e) => edit(setPassword, e.target.value, "password")}
+            onKeyDown={watchCapsLock}
+            onKeyUp={watchCapsLock}
+            onBlur={() => setCapsLock(false)}
+            aria-invalid={error?.credentials || passwordMissing || undefined}
+            aria-describedby={
+              [describedBy, passwordMissing ? "login-senha-falta" : undefined, capsLock ? "login-caps" : undefined].filter(Boolean).join(" ") || undefined
+            }
+            required
+          />
+          {passwordMissing && (
+            <small id="login-senha-falta" role="alert">
+              {missing?.text}
+            </small>
+          )}
+          {capsLock && <small id="login-caps">Caps Lock está ligado.</small>}
+        </div>
+        {firstRun && (
+          <div className="rs-campo" data-estado={fieldError}>
+            <label htmlFor="login-confirm">Repita a senha</label>
+            <input
+              id="login-confirm"
+              name="confirm-password"
+              type="password"
+              autoComplete="new-password"
+              maxLength={1024}
+              value={confirm}
+              onChange={(e) => edit(setConfirm, e.target.value)}
+              aria-invalid={error?.credentials || undefined}
+              aria-describedby={describedBy}
+              required
+            />
+          </div>
+        )}
+      </fieldset>
       {error && (
         <p id="login-error" className="login-erro" role="alert">
           {error.text}

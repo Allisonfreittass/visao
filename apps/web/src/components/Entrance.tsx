@@ -1,5 +1,6 @@
 import { type FocusEvent, type ReactNode, useState } from "react";
 
+import { Corvo } from "../brand/Corvo";
 import { CorvoClose } from "../brand/CorvoClose";
 
 /** The fields the crow looks at: the ones you type into, not the checkbox or the buttons. */
@@ -27,9 +28,12 @@ export function Entrance({ children, firstAccount = false }: { children: ReactNo
         <CorvoClose alvo={alvo} />
       </div>
       <section className="entrada-acesso" aria-labelledby="entrada-titulo" onFocus={focou} onBlur={saiu}>
-        <p className="entrada-marca" translate="no">VISAO</p>
+        <div className="entrada-identidade">
+          <Corvo size={48} className="entrada-marca-corvo" />
+          <p className="entrada-marca" translate="no">VISAO</p>
+        </div>
         <div className="entrada-saudacao">
-          <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Que bom ter você de volta."}</h1>
+          <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "A conversa continua."}</h1>
           <p className="entrada-lede">Só você entra aqui. Ele lembra apenas do que você deixar.</p>
         </div>
         {children}

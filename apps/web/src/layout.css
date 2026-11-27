@@ -680,12 +680,15 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   padding: 48px 24px; border-left: 1px solid var(--e-linha);
 }
 .entrada-acesso > * { width: 100%; max-width: 380px; }
+.entrada-identidade { display: block; width: 100%; animation: entrada-chega .32s var(--ease-out) backwards; }
+.entrada-marca-corvo { display: none; }
 .entrada-marca { margin: 0; font: 400 64px/.8 var(--font-marca); letter-spacing: .03em; color: var(--e-tinta); }
-.entrada-saudacao { display: grid; gap: 10px; margin-top: 18px; }
+.entrada-saudacao { display: grid; gap: 10px; margin-top: 18px; animation: entrada-chega .32s var(--ease-out) .06s backwards; }
 .entrada-acesso h1 { margin: 0; font: 300 46px/1.05 var(--font-display); color: var(--e-tinta); text-wrap: balance; }
 .entrada-lede { margin: 0; font: 400 16px/1.55 var(--font-sans); color: var(--e-cinza); }
 
-.entrada .login { display: grid; gap: 22px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.entrada .login { display: grid; gap: 22px; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; animation: entrada-chega .32s var(--ease-out) .12s backwards; }
+@keyframes entrada-chega { from { opacity: 0; transform: translateY(7px); } }
 .entrada .rs-campo { gap: 8px; }
 .entrada .rs-campo label { font: 500 14px/1.3 var(--font-sans); color: var(--e-tinta); }
 .entrada .rs-campo input {
@@ -695,6 +698,18 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 .entrada .rs-campo input:focus-visible { outline: none; border-color: var(--e-tinta); background: #FFFFFF; box-shadow: 0 0 0 1px var(--e-tinta); }
 .entrada .rs-campo[data-estado="erro"] input { border-color: var(--e-erro); }
 .entrada .rs-campo[data-estado="erro"] input:focus-visible { box-shadow: 0 0 0 1px var(--e-erro); }
+.entrada .login-credentials {
+  min-width: 0; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--e-linha); border-radius: 14px; background: #FFFFFF;
+}
+.entrada .login-credentials .rs-campo { gap: 3px; padding: 10px 14px 9px; }
+.entrada .login-credentials .rs-campo + .rs-campo { border-top: 1px solid var(--e-linha); }
+.entrada .login-credentials .rs-campo label { font: 500 12px/1.2 var(--font-sans); color: var(--e-cinza); }
+.entrada .login-credentials .rs-campo input {
+  height: 24px; min-height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; box-shadow: none;
+}
+.entrada .login-credentials .rs-campo input:focus-visible { outline: 2px solid var(--e-tinta); outline-offset: -2px; background: #FFFFFF; box-shadow: none; }
+.entrada .login-credentials .rs-campo input::placeholder { color: var(--e-cinza); opacity: .68; }
+.entrada .login-credentials:has(.rs-campo[data-estado="erro"]) { border-color: var(--e-erro); }
 .entrada .rs-campo small { font: 400 13px/1.4 var(--font-sans); color: var(--e-cinza); }
 .entrada .rs-campo[data-estado="erro"] small[role="alert"] { color: var(--e-erro); font-weight: 500; }
 .entrada .login-erro { margin: 0; font: 500 14px/1.45 var(--font-sans); color: var(--e-erro); text-wrap: pretty; }
@@ -735,23 +750,15 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
  * baixa a faixa encolhe (30% da altura) para os campos aparecerem sem rolar. */
 @media (max-width: 899px) {
   .entrada { flex-direction: column; }
-  .entrada-corvo {
-    position: relative; flex: 0 0 auto; min-height: 0;
-    height: clamp(128px, min(48vw, 26vh), 264px);
-    height: clamp(128px, min(48vw, 26svh), 264px);
-  }
-  /* Um pouco mais largo que a tela e puxado para a esquerda: o corvo sangra pela borda. */
-  .entrada-corvo svg {
-    position: absolute; left: -10%; top: 50%; width: min(110%, 600px); height: auto; aspect-ratio: 470 / 557;
-    transform: translateY(-40.4%);
-  }
+  .entrada-corvo { display: none; }
   .entrada-acesso {
-    flex: 1 0 auto; justify-content: flex-start; gap: 18px; border-left: 0; border-top: 1px solid var(--e-linha);
-    /* Dos lados, a área segura: com o celular deitado, o entalhe não cobre o formulário. */
-    padding: 24px max(20px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    flex: 1 0 auto; display: grid; grid-template-rows: auto 1fr auto; align-items: stretch; gap: 16px; border: 0;
+    padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   }
+  .entrada-identidade { display: flex; align-items: center; gap: 12px; }
+  .entrada-marca-corvo { display: block; flex: none; width: 48px; height: 48px; }
   .entrada-marca { font-size: 48px; }
-  .entrada-saudacao { gap: 8px; margin-top: 4px; }
+  .entrada-saudacao { align-self: center; gap: 8px; margin-top: 0; }
   .entrada-acesso h1 { font-size: clamp(30px, 8.8vw, 36px); }
   .entrada-lede { font-size: 15px; line-height: 1.5; }
   .entrada .login { gap: 16px; }
@@ -767,7 +774,7 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
 }
 @media (max-width: 899px) and (max-height: 720px) {
   .entrada-corvo { height: clamp(104px, 20vh, 144px); height: clamp(104px, 20svh, 144px); }
-  .entrada-acesso { gap: 14px; padding-top: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .entrada-acesso { gap: 14px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .entrada-saudacao { gap: 6px; }
   .entrada-acesso h1 { font-size: clamp(28px, 8vw, 32px); }
   .entrada .login { gap: 12px; }
@@ -957,25 +964,23 @@ button.project-tile:hover { border-color: var(--border-strong); }
   .mobile-bar-title { font: 400 18px/1.15 var(--font-display); letter-spacing: -.01em; }
   .mobile-bar-button { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 14px; }
   .mobile-tabs {
-    align-items: stretch; gap: 2px; padding: 4px 8px max(6px, calc(var(--safe-bottom) - 10px));
-    border-top: 0.5px solid var(--border); background: color-mix(in srgb, var(--surface) 90%, transparent);
+    align-items: stretch; gap: 4px; margin: 0 12px 8px; padding: 6px 6px max(6px, calc(var(--safe-bottom) - 10px));
+    border: 1px solid var(--border); border-radius: 22px; background: color-mix(in srgb, var(--surface) 94%, transparent);
     -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
   }
   .mobile-tabs button, .mobile-tabs button[aria-current] {
-    height: 52px; min-width: 44px; justify-content: center; gap: 2px; padding: 0 3px;
-    border-radius: 12px; background: transparent; box-shadow: none; color: var(--text-muted);
-    font: 400 10px/12px var(--font-sans); letter-spacing: .01em; transition: color .16s var(--ease-out);
+    height: 50px; min-width: 44px; justify-content: center; gap: 2px; padding: 0 3px;
+    border-radius: 16px; background: transparent; box-shadow: none; color: var(--text-muted);
+    font: 400 10px/12px var(--font-sans); letter-spacing: .01em; transition: color .14s var(--ease-out), background-color .14s var(--ease-out);
   }
-  .mobile-tabs button[aria-current] { color: var(--text); font-weight: 600; }
+  .mobile-tabs button[aria-current] { color: var(--text); font-weight: 600; background: var(--surface-2); }
   .mobile-tab-icon {
-    width: 48px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
-    border-radius: 999px; color: inherit; transition: background-color .18s var(--ease-out), transform .16s var(--ease-out);
+    height: 25px; display: inline-flex; align-items: center; justify-content: center; color: inherit;
   }
-  .mobile-tabs button[aria-current] .mobile-tab-icon { background: var(--surface-2); }
-  .mobile-tabs button:active .mobile-tab-icon { transform: scale(.92); transition-duration: .08s; }
+  .mobile-tabs button:active { transform: scale(.97); transition-duration: .08s; }
 }
 @media (display-mode: standalone) and (max-width: 899px) {
-  .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
+  .mobile-tabs { padding-bottom: max(6px, calc(var(--safe-bottom) - 12px)); }
 }
 
 /* ---------- Movimento do app (DESIGN.md §6) ----------
