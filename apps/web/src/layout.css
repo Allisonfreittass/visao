@@ -737,8 +737,8 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .entrada { flex-direction: column; }
   .entrada-corvo {
     position: relative; flex: 0 0 auto; min-height: 0;
-    height: clamp(136px, min(56vw, 30vh), 300px);
-    height: clamp(136px, min(56vw, 30svh), 300px);
+    height: clamp(128px, min(48vw, 26vh), 264px);
+    height: clamp(128px, min(48vw, 26svh), 264px);
   }
   /* Um pouco mais largo que a tela e puxado para a esquerda: o corvo sangra pela borda. */
   .entrada-corvo svg {
@@ -750,9 +750,9 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
     /* Dos lados, a área segura: com o celular deitado, o entalhe não cobre o formulário. */
     padding: 24px max(20px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
   }
-  .entrada-marca { font-size: 42px; }
+  .entrada-marca { font-size: 48px; }
   .entrada-saudacao { gap: 8px; margin-top: 4px; }
-  .entrada-acesso h1 { font-size: clamp(31px, 9.6vw, 38px); }
+  .entrada-acesso h1 { font-size: clamp(30px, 8.8vw, 36px); }
   .entrada-lede { font-size: 15px; line-height: 1.5; }
   .entrada .login { gap: 16px; }
 }
@@ -764,6 +764,15 @@ button.ghost:hover { color: var(--text); background: var(--surface-2); border-co
   .entrada .memory-toggle input { width: 20px; height: 20px; }
   .login-links { align-items: center; margin: -10px 0; }
   .login-link { display: inline-flex; align-items: center; min-height: 44px; }
+}
+@media (max-width: 899px) and (max-height: 720px) {
+  .entrada-corvo { height: clamp(104px, 20vh, 144px); height: clamp(104px, 20svh, 144px); }
+  .entrada-acesso { gap: 14px; padding-top: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .entrada-saudacao { gap: 6px; }
+  .entrada-acesso h1 { font-size: clamp(28px, 8vw, 32px); }
+  .entrada .login { gap: 12px; }
+  .entrada .rs-campo input { height: 48px; min-height: 48px; }
+  .login-entrar { height: 50px; }
 }
 
 /* ---------- Primeira vez (4 passos) ---------- */
@@ -941,6 +950,32 @@ button.project-tile:hover { border-color: var(--border-strong); }
   .mobile-tabs { padding-bottom: 0; background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .mobile-tabs button { height: 46px; padding-top: 5px; }
   [data-ate-o-fim] .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
+}
+
+/* Abas principais: seleção clara, toque confortável e hierarquia tipográfica da marca. */
+@media (max-width: 899px) {
+  .mobile-bar-title { font: 400 18px/1.15 var(--font-display); letter-spacing: -.01em; }
+  .mobile-bar-button { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 14px; }
+  .mobile-tabs {
+    align-items: stretch; gap: 2px; padding: 4px 8px max(6px, calc(var(--safe-bottom) - 10px));
+    border-top: 0.5px solid var(--border); background: color-mix(in srgb, var(--surface) 90%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(18px); backdrop-filter: saturate(180%) blur(18px);
+  }
+  .mobile-tabs button, .mobile-tabs button[aria-current] {
+    height: 52px; min-width: 44px; justify-content: center; gap: 2px; padding: 0 3px;
+    border-radius: 12px; background: transparent; box-shadow: none; color: var(--text-muted);
+    font: 400 10px/12px var(--font-sans); letter-spacing: .01em; transition: color .16s var(--ease-out);
+  }
+  .mobile-tabs button[aria-current] { color: var(--text); font-weight: 600; }
+  .mobile-tab-icon {
+    width: 48px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px; color: inherit; transition: background-color .18s var(--ease-out), transform .16s var(--ease-out);
+  }
+  .mobile-tabs button[aria-current] .mobile-tab-icon { background: var(--surface-2); }
+  .mobile-tabs button:active .mobile-tab-icon { transform: scale(.92); transition-duration: .08s; }
+}
+@media (display-mode: standalone) and (max-width: 899px) {
+  .mobile-tabs { padding-bottom: max(4px, calc(var(--safe-bottom) - 14px)); }
 }
 
 /* ---------- Movimento do app (DESIGN.md §6) ----------

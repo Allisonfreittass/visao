@@ -72,7 +72,7 @@ describe("the empty field", () => {
 describe("the entrance", () => {
   it("shows, in order, the name, the greeting, the line, the fields, Entrar and the two links", () => {
     const html = entrada();
-    const order = ["VISAO</p>", "Bem-vindo de volta.", "Só você entra aqui. Ele lembra apenas do que você deixar.", ">E-mail</label>", ">Senha</label>", ">Entrar</button>", ">Esqueci a senha</button>", ">Primeira vez? Configurar</button>"];
+    const order = ["VISAO</p>", "Que bom ter você de volta.", "Só você entra aqui. Ele lembra apenas do que você deixar.", ">E-mail</label>", ">Senha</label>", ">Entrar</button>", ">Esqueci a senha</button>", ">Primeira vez? Configurar</button>"];
     const positions = order.map((text) => html.indexOf(text));
     expect(positions.every((at) => at >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);

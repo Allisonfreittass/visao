@@ -29,7 +29,7 @@ export function Entrance({ children, firstAccount = false }: { children: ReactNo
       <section className="entrada-acesso" aria-labelledby="entrada-titulo" onFocus={focou} onBlur={saiu}>
         <p className="entrada-marca" translate="no">VISAO</p>
         <div className="entrada-saudacao">
-          <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Bem-vindo de volta."}</h1>
+          <h1 id="entrada-titulo">{firstAccount ? "Bem-vindo." : "Que bom ter você de volta."}</h1>
           <p className="entrada-lede">Só você entra aqui. Ele lembra apenas do que você deixar.</p>
         </div>
         {children}
